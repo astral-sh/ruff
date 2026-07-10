@@ -10,7 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, NameHashMap};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
@@ -110,7 +110,7 @@ struct ScopeInfo<'ast> {
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NameHashMap<NarrowingAlias<'ast>>,
     /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
     ///
     /// 1. Visibility of nested writes. A nested function that binds a variable might affect the
@@ -133,12 +133,12 @@ struct ScopeInfo<'ast> {
     nested_global_or_nonlocal_declarations: NestedGlobalOrNonlocalDeclarations,
     /// Text ranges for `global` and `nonlocal` declarations in this scope, which we use to
     /// populate `nested_global_or_nonlocal_declarations` when we reach end of scope.
-    this_scope_global_or_nonlocal_declarations: FxHashMap<Name, TextRange>,
+    this_scope_global_or_nonlocal_declarations: NameHashMap<TextRange>,
     /// Free symbol uses from nested scopes that may resolve to this scope.
     pending_captures: PendingCaptures,
 }
 
-type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
+type NestedGlobalOrNonlocalDeclarations = NameHashMap<SmallVec<[NestedDeclaration; 1]>>;
 
 /// Captures cannot be resolved until the enclosing scope is complete because a later binding can
 /// make the name local. For example, `inner` captures `outer`'s local `value`, even though the
@@ -154,7 +154,7 @@ type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclar
 ///
 /// Each pending capture remembers the bindings visible when the nested scope was created and, for
 /// lazy scopes, any bindings added afterward.
-type PendingCaptures = FxHashMap<Name, SmallVec<[PendingCapture; 1]>>;
+type PendingCaptures = NameHashMap<SmallVec<[PendingCapture; 1]>>;
 
 #[derive(Debug)]
 struct PendingCapture {
@@ -294,7 +294,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Maps alias variable names to their narrowing expressions (same-scope only).
     /// TODO: cross-scope alias narrowing support
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NameHashMap<NarrowingAlias<'ast>>,
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
@@ -346,7 +346,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
             semantic_syntax_errors: RefCell::default(),
-            narrowing_aliases: FxHashMap::default(),
+            narrowing_aliases: NameHashMap::default(),
             alias_predicates: FxHashMap::default(),
         };
 
@@ -527,9 +527,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             file_scope_id,
             current_loop: None,
             narrowing_aliases: saved_aliases,
-            nested_global_or_nonlocal_declarations: FxHashMap::default(),
-            this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
-            pending_captures: FxHashMap::default(),
+            nested_global_or_nonlocal_declarations: NestedGlobalOrNonlocalDeclarations::default(),
+            this_scope_global_or_nonlocal_declarations: NameHashMap::default(),
+            pending_captures: PendingCaptures::default(),
         });
     }
 
@@ -934,7 +934,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // bindings. Short-circuit here and return an empty map.
         if popped_scope_kind.is_module() {
             debug_assert!(self.scope_stack.is_empty());
-            return FxHashMap::default();
+            return NestedGlobalOrNonlocalDeclarations::default();
         }
 
         // In the common case where we don't have any nested `global` or `nonlocal` declarations at
@@ -942,7 +942,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if nested_global_or_nonlocal_declarations.is_empty()
             && this_scope_global_or_nonlocal_declarations.is_empty()
         {
-            return FxHashMap::default();
+            return NestedGlobalOrNonlocalDeclarations::default();
         }
 
         // For each symbol in the (non-module) scope we just popped:

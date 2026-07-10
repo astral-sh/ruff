@@ -4,11 +4,10 @@ use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
-use ruff_python_ast::{Expr, ExprRef, name::Name};
+use ruff_python_ast::{Expr, ExprRef, name::NameHashMap};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
 };
@@ -79,8 +78,8 @@ impl<'db> SemanticModel<'db> {
     pub fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
-    ) -> FxHashMap<Name, MemberDefinition<'db>> {
-        let mut members = FxHashMap::default();
+    ) -> NameHashMap<MemberDefinition<'db>> {
+        let mut members = NameHashMap::default();
         let index = semantic_index(self.db, self.file);
         let Some(file_scope) = self.scope(node) else {
             return members;

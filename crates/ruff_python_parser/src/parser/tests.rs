@@ -102,6 +102,21 @@ fn only_heap_allocated_names_are_interned() {
 }
 
 #[test]
+fn prehashed_interner_survives_growth() {
+    let mut interner = NameInterner::default();
+    let texts: Vec<_> = (0..256)
+        .map(|index| format!("identifier_longer_than_inline_capacity_{index}"))
+        .collect();
+    let names: Vec<_> = texts.iter().map(|text| interner.intern(text)).collect();
+
+    assert_eq!(interner.names.len(), texts.len());
+    for (text, name) in texts.iter().zip(names) {
+        let interned = interner.intern(text);
+        assert!(std::ptr::eq(name.as_str(), interned.as_str()));
+    }
+}
+
+#[test]
 fn normalized_long_names_share_storage() {
     let normalized = "C".repeat(Name::INLINE_CAPACITY + 1);
     let source = format!("{} = {normalized}", "𝒞".repeat(Name::INLINE_CAPACITY + 1));

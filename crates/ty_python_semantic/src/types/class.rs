@@ -44,7 +44,7 @@ use crate::types::{
     UnionBuilder, VarianceInferable,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet,
+    Db, FxIndexMap, FxOrderSet, NameIndexMap,
     place::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, PublicTypePolicy,
         place_from_bindings, place_from_declarations,
@@ -1248,7 +1248,7 @@ impl<'db> ClassType<'db> {
     ///
     /// The value of the map is a struct containing information about the abstract method.
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
+    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> NameIndexMap<AbstractMethod<'db>> {
         fn type_as_abstract_method<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
@@ -1279,7 +1279,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
+        let mut abstract_methods = NameIndexMap::default();
 
         // Iterate through the MRO in reverse order,
         // skipping `object` (we know it doesn't define any abstract methods)

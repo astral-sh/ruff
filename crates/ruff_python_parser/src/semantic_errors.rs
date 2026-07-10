@@ -9,6 +9,7 @@ use ruff_python_ast::{
     StmtFunctionDef, StmtImportFrom,
     comparable::HashableExpr,
     helpers,
+    name::NameRefHashSet,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -198,7 +199,7 @@ impl SemanticSyntaxChecker {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 for case in &match_stmt.cases {
                     let mut visitor = MatchPatternVisitor {
-                        names: FxHashSet::default(),
+                        names: NameRefHashSet::default(),
                         ctx,
                     };
                     visitor.visit_pattern(&case.pattern);
@@ -1107,7 +1108,7 @@ impl SemanticSyntaxChecker {
         Self::check_rebound_variables(
             expr,
             comprehension_target_names(comprehensions),
-            FxHashSet::default(),
+            NameRefHashSet::default(),
             ctx,
         );
         Self::check_class_body_expr(expr, ctx);
@@ -1149,8 +1150,8 @@ impl SemanticSyntaxChecker {
 
     fn check_rebound_variables<'a, Ctx: SemanticSyntaxContext>(
         expr: &Expr,
-        targets: FxHashSet<&'a ast::name::Name>,
-        direct_targets: FxHashSet<&'a ast::name::Name>,
+        targets: NameRefHashSet<'a>,
+        direct_targets: NameRefHashSet<'a>,
         ctx: &Ctx,
     ) {
         let mut visitor = ReboundComprehensionVisitor {
@@ -1985,9 +1986,7 @@ pub enum WriteToDebugKind {
     Delete(PythonVersion),
 }
 
-fn comprehension_target_names(
-    comprehensions: &[ast::Comprehension],
-) -> FxHashSet<&ast::name::Name> {
+fn comprehension_target_names(comprehensions: &[ast::Comprehension]) -> NameRefHashSet<'_> {
     let mut visitor = helpers::StoredNameFinder::default();
     for comprehension in comprehensions {
         visitor.visit_expr(&comprehension.target);
@@ -2043,9 +2042,9 @@ impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
 /// iteration variables.
 struct ReboundComprehensionVisitor<'a> {
     /// Targets that apply inside nested comprehensions.
-    targets: FxHashSet<&'a ast::name::Name>,
+    targets: NameRefHashSet<'a>,
     /// Targets from later filter clauses, which do not apply inside nested comprehensions.
-    direct_targets: FxHashSet<&'a ast::name::Name>,
+    direct_targets: NameRefHashSet<'a>,
     ranges: Vec<TextRange>,
 }
 
@@ -2114,7 +2113,7 @@ impl Visitor<'_> for ReturnVisitor {
 }
 
 struct MatchPatternVisitor<'a, Ctx> {
-    names: FxHashSet<&'a ast::name::Name>,
+    names: NameRefHashSet<'a>,
     ctx: &'a Ctx,
 }
 
@@ -2272,10 +2271,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // match 2:
                 //     case Class(x) | [x] | x: ...
 
-                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
+                let mut previous_names: Option<NameRefHashSet<'_>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
-                        names: FxHashSet::default(),
+                        names: NameRefHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);

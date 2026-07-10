@@ -1,6 +1,7 @@
 use std::borrow::{Borrow, Cow};
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Write};
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::Deref;
 
 use arrayvec::ArrayVec;
@@ -9,14 +10,125 @@ use char_str::CharStr;
 use crate::Expr;
 use crate::generated::ExprName;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone)]
 #[cfg_attr(
     feature = "schemars",
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(CharStr);
+pub struct Name {
+    text: CharStr,
+    hash: u64,
+}
+
+/// A hash map keyed directly by [`Name`] that reuses each name's precomputed hash.
+pub type NameHashMap<V> = HashMap<Name, V, NameBuildHasher>;
+
+/// A hash set keyed directly by [`Name`] that reuses each name's precomputed hash.
+pub type NameHashSet = HashSet<Name, NameBuildHasher>;
+
+/// A hash map keyed by borrowed [`Name`] values that reuses each name's precomputed hash.
+pub type NameRefHashMap<'a, V> = HashMap<&'a Name, V, NameBuildHasher>;
+
+/// A hash set keyed by borrowed [`Name`] values that reuses each name's precomputed hash.
+pub type NameRefHashSet<'a> = HashSet<&'a Name, NameBuildHasher>;
+
+/// Build hasher for collections keyed directly by [`Name`].
+///
+/// This hasher also hashes borrowed `str` keys compatibly with `Name`, preserving zero-allocation
+/// lookups through [`Borrow<str>`]. It must not be used for composite keys.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NameBuildHasher;
+
+impl BuildHasher for NameBuildHasher {
+    type Hasher = NameHasher;
+
+    #[inline]
+    fn build_hasher(&self) -> Self::Hasher {
+        NameHasher::default()
+    }
+}
+
+/// Hasher used by [`NameBuildHasher`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NameHasher {
+    state: u64,
+}
+
+impl Hasher for NameHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        self.state = name_hash(bytes);
+    }
+
+    #[inline]
+    fn write_u8(&mut self, _: u8) {}
+
+    #[inline]
+    fn write_u64(&mut self, hash: u64) {
+        self.state = hash;
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.state
+    }
+}
+
+#[inline]
+const fn read_u32(bytes: &[u8], index: usize) -> u32 {
+    (bytes[index] as u32)
+        | ((bytes[index + 1] as u32) << 8)
+        | ((bytes[index + 2] as u32) << 16)
+        | ((bytes[index + 3] as u32) << 24)
+}
+
+#[inline]
+const fn mix(a: u32, b: u32) -> u32 {
+    let mixed = (a as u64).wrapping_mul(b as u64);
+    let bytes = mixed.to_le_bytes();
+    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+        ^ u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]])
+}
+
+/// Computes the hash stored in a [`Name`].
+///
+/// This follows Oxc's identifier hash: short names read all bytes, while longer names sample four
+/// positions. Full string equality still resolves hash collisions.
+#[inline]
+const fn name_hash(bytes: &[u8]) -> u64 {
+    const SEED1: u32 = 0x9E37_79B9;
+    const SEED2: u32 = 0x85EB_CA6B;
+
+    let len = bytes.len();
+    assert!(len <= u32::MAX as usize, "name is too long");
+
+    let hash = if len == 0 {
+        0
+    } else if len < 4 {
+        let packed =
+            ((bytes[0] as u32) << 16) | ((bytes[len >> 1] as u32) << 8) | bytes[len - 1] as u32;
+        mix(packed ^ SEED1, packed ^ SEED2)
+    } else if len <= 8 {
+        mix(read_u32(bytes, 0) ^ SEED1, read_u32(bytes, len - 4) ^ SEED2)
+    } else if len <= 16 {
+        let head = read_u32(bytes, 0);
+        let middle = read_u32(bytes, (len >> 1) - 2);
+        let tail = read_u32(bytes, len - 4);
+        mix(head ^ middle ^ SEED1, tail ^ SEED2)
+    } else {
+        let head = read_u32(bytes, 0);
+        let middle1 = read_u32(bytes, len / 3);
+        let middle2 = read_u32(bytes, 2 * len / 3);
+        let tail = read_u32(bytes, len - 4);
+        mix(head ^ middle1 ^ SEED1, middle2 ^ tail ^ SEED2)
+    };
+
+    let len_bytes = len.to_le_bytes();
+    let len = u32::from_le_bytes([len_bytes[0], len_bytes[1], len_bytes[2], len_bytes[3]]);
+    let low = hash ^ len.rotate_left(16);
+    (low as u64) | ((hash as u64) << 32)
+}
 
 impl Name {
     /// The maximum number of UTF-8 bytes stored inline in a name.
@@ -24,21 +136,71 @@ impl Name {
 
     #[inline]
     pub fn empty() -> Self {
-        Self(CharStr::new())
+        Self {
+            text: CharStr::new(),
+            hash: name_hash(b""),
+        }
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(CharStr::from(name.as_ref()))
+        Self::from_text(CharStr::from(name.as_ref()))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(CharStr::from_static_str(name))
+        Self {
+            text: CharStr::from_static_str(name),
+            hash: name_hash(name.as_bytes()),
+        }
     }
 
+    #[inline]
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        self.text.as_str()
+    }
+
+    #[inline]
+    fn from_text(text: CharStr) -> Self {
+        let hash = name_hash(text.as_bytes());
+        Self { text, hash }
+    }
+}
+
+impl Default for Name {
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+impl PartialEq for Name {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash && self.text == other.text
+    }
+}
+
+impl Eq for Name {}
+
+impl PartialOrd for Name {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Name {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_str().cmp(other.as_str())
+    }
+}
+
+impl Hash for Name {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
     }
 }
 
@@ -81,7 +243,7 @@ impl<'a> From<&'a str> for Name {
 impl From<String> for Name {
     #[inline]
     fn from(s: String) -> Self {
-        Name(s.into())
+        Self::from_text(s.into())
     }
 }
 
@@ -95,27 +257,41 @@ impl<'a> From<&'a String> for Name {
 impl<'a> From<Cow<'a, str>> for Name {
     #[inline]
     fn from(cow: Cow<'a, str>) -> Self {
-        Name(cow.into())
+        Self::from_text(cow.into())
     }
 }
 
 impl From<Box<str>> for Name {
     #[inline]
     fn from(b: Box<str>) -> Self {
-        Name(b.into())
+        Self::from_text(b.into())
     }
 }
 
 impl From<Name> for String {
     #[inline]
     fn from(name: Name) -> Self {
-        name.0.into()
+        name.text.into()
     }
 }
 
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+        Self::from_text(iter.into_iter().collect())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Name {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(self.as_str(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Name {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        <String as serde::Deserialize>::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -132,8 +308,8 @@ impl get_size2::GetSize for Name {
         &self,
         mut tracker: T,
     ) -> (usize, T) {
-        let size = if self.0.is_heap_allocated() && tracker.track(self.as_ptr()) {
-            self.0.len()
+        let size = if self.text.is_heap_allocated() && tracker.track(self.as_ptr()) {
+            self.text.len()
         } else {
             0
         };
@@ -772,11 +948,13 @@ type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {
+    use std::hash::BuildHasher;
+
     #[cfg(feature = "get-size")]
     use get_size2::{GetSize, StandardTracker};
 
     use crate::Identifier;
-    use crate::name::{Name, SegmentsVec};
+    use crate::name::{Name, NameBuildHasher, NameHashSet, SegmentsVec};
 
     const STATIC_NAME: Name = Name::new_static("a_static_name_that_is_not_inline");
 
@@ -784,24 +962,56 @@ mod tests {
     fn inline_and_static_storage() {
         assert!(
             !Name::new("x".repeat(Name::INLINE_CAPACITY))
-                .0
+                .text
                 .is_heap_allocated()
         );
         assert!(
             Name::new("x".repeat(Name::INLINE_CAPACITY + 1))
-                .0
+                .text
                 .is_heap_allocated()
         );
         assert_eq!(STATIC_NAME, "a_static_name_that_is_not_inline");
-        assert!(!STATIC_NAME.0.is_heap_allocated());
+        assert!(!STATIC_NAME.text.is_heap_allocated());
     }
 
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Name>(), 16);
-        assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
-        assert_eq!(std::mem::size_of::<Identifier>(), 32);
+        assert_eq!(std::mem::size_of::<Name>(), 24);
+        assert_eq!(std::mem::size_of::<Option<Name>>(), 24);
+        assert_eq!(std::mem::size_of::<Identifier>(), 40);
+    }
+
+    #[test]
+    fn precomputed_hash_matches_borrowed_string() {
+        for text in [
+            "",
+            "x",
+            "name",
+            "eight888",
+            "sixteen-bytes!!!",
+            "identifier_longer_than_inline_capacity",
+        ] {
+            let name = Name::new(text);
+            assert_eq!(
+                NameBuildHasher.hash_one(&name),
+                NameBuildHasher.hash_one(text)
+            );
+        }
+
+        assert_eq!(
+            NameBuildHasher.hash_one(&STATIC_NAME),
+            NameBuildHasher.hash_one(STATIC_NAME.as_str())
+        );
+    }
+
+    #[test]
+    fn name_hash_set_supports_borrowed_lookup() {
+        let mut names = NameHashSet::default();
+        names.insert(Name::new("identifier"));
+
+        assert!(names.contains("identifier"));
+        assert!(!names.contains("different"));
     }
 
     #[test]

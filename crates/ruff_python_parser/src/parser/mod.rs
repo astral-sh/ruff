@@ -4,14 +4,13 @@ use std::str::FromStr;
 
 use bitflags::bitflags;
 use hashbrown::HashSet;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, NameBuildHasher};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -38,7 +37,7 @@ mod tests;
 
 #[derive(Debug, Default)]
 struct NameInterner {
-    names: HashSet<Name, FxBuildHasher>,
+    names: HashSet<Name, NameBuildHasher>,
 }
 
 impl NameInterner {

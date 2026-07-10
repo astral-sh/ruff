@@ -1127,7 +1127,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 
         // A declaration on the metaclass constrains class-object access, but does not itself
         // populate a replacement value into the constructed class's namespace.
-        if !metaclass_assigned_members.contains(name.as_str()) {
+        if !metaclass_assigned_members.contains(&name) {
             continue;
         }
 

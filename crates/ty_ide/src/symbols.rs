@@ -10,7 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
-use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::name::{Name, NameHashSet, UnqualifiedName};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -119,7 +119,7 @@ pub struct FlatSymbols {
     ///
     /// This is `None` if the module has no `__all__` at module
     /// scope.
-    all_names: Option<FxHashSet<Name>>,
+    all_names: Option<NameHashSet>,
 }
 
 impl FlatSymbols {
@@ -706,7 +706,7 @@ struct SymbolVisitor<'db> {
     /// The origin of an `__all__` variable, if found.
     all_origin: Option<DunderAllOrigin>,
     /// A set of names extracted from `__all__`.
-    all_names: FxHashSet<Name>,
+    all_names: NameHashSet,
     /// A flag indicating whether the module uses unrecognized
     /// `__all__` idioms or there are any invalid elements in
     /// `__all__`.
@@ -729,7 +729,7 @@ impl<'db> SymbolVisitor<'db> {
             in_class: false,
             exports_only: false,
             all_origin: None,
-            all_names: FxHashSet::default(),
+            all_names: NameHashSet::default(),
             all_invalid: false,
             imports: Imports::default(),
         }

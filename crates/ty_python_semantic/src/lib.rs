@@ -67,6 +67,8 @@ type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHashe
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
+type NameIndexMap<V> =
+    indexmap::IndexMap<ruff_python_ast::name::Name, V, ruff_python_ast::name::NameBuildHasher>;
 
 /// Returns the default registry with all known semantic lints.
 pub fn default_lint_registry() -> &'static LintRegistry {

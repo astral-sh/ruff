@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::NameHashMap;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
@@ -104,7 +102,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
+    let mut explicit_decorator_calls: NameHashMap<&Stmt> = NameHashMap::default();
 
     let method_name = match method_type {
         MethodType::Classmethod => "classmethod",

@@ -26,7 +26,7 @@ use crate::types::{
     MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
     TypedDictType, UnionType, determine_upper_bound,
 };
-use crate::{Db, FxIndexMap};
+use crate::{Db, NameIndexMap};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -85,7 +85,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
 #[derive(Debug, Copy, Clone)]
 pub(super) enum TypedDictFields<'db> {
     Dynamic(&'db TypedDictSchema<'db>),
-    Static(&'db FxIndexMap<Name, super::Field<'db>>),
+    Static(&'db NameIndexMap<super::Field<'db>>),
 }
 
 impl<'db> TypedDictFields<'db> {

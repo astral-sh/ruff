@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use std::cell::RefCell;
 
 use crate::{
-    Db, FxIndexMap, FxIndexSet, Program, TypeQualifiers,
+    Db, FxIndexSet, NameIndexMap, Program, TypeQualifiers,
     place::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin, place_from_bindings, place_from_declarations,
@@ -1841,7 +1841,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Option<&'db FxIndexMap<Name, Field<'db>>> {
+    ) -> Option<&'db NameIndexMap<Field<'db>>> {
         for base in self.iter_mro(db, specialization).skip(1) {
             let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
 
@@ -1918,7 +1918,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> &'db FxIndexMap<Name, Field<'db>> {
+    ) -> &'db NameIndexMap<Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -1930,7 +1930,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
+        cycle_initial=|_, _, _, _, _| NameIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
     fn fields_inner(
@@ -1938,7 +1938,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> NameIndexMap<Field<'db>> {
         enum FieldSource<'db> {
             Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
@@ -1950,7 +1950,7 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
-        let mut map: FxIndexMap<_, _> = self
+        let mut map: NameIndexMap<_> = self
             .iter_mro(db, specialization)
             .rev()
             .filter_map(|superclass| {
@@ -2087,7 +2087,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// only what is explicitly specified in each field definition.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
+        cycle_initial=|_, _, _, _, _| NameIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
     pub(crate) fn own_fields(
@@ -2095,7 +2095,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> NameIndexMap<Field<'db>> {
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -2160,7 +2160,7 @@ impl<'db> StaticClassLiteral<'db> {
         field_declarations
             .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
 
-        let mut attributes = FxIndexMap::default();
+        let mut attributes = NameIndexMap::default();
         for (_, symbol_id, result) in field_declarations {
             let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;

@@ -1,12 +1,11 @@
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
-use rustc_hash::{FxHashMap, FxHashSet};
+use ruff_python_ast::name::{Name, NameHashMap, NameHashSet};
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
-use crate::FxOrderSet;
 use crate::{
-    Db, FxIndexMap,
+    Db,
     place::{
         DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
     },
@@ -22,6 +21,7 @@ use crate::{
         },
     },
 };
+use crate::{FxOrderSet, NameIndexMap};
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
 
 /// A resolved enum method, retaining both whether it is analyzable and who defines it.
@@ -223,14 +223,14 @@ impl<'db> EnumValueAnnotation<'db> {
 
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
-    pub(crate) members: FxIndexMap<Name, Type<'db>>,
-    pub(crate) aliases: FxHashMap<Name, Name>,
+    pub(crate) members: NameIndexMap<Type<'db>>,
+    pub(crate) aliases: NameHashMap<Name>,
 
     /// Whether alias detection was precise for every member declaration.
     pub(super) aliases_are_known: bool,
 
     /// Members whose values were defined using `auto()`.
-    pub(crate) auto_members: FxHashSet<Name>,
+    pub(crate) auto_members: NameHashSet,
 
     /// The effective `_value_` annotation, including where it was defined.
     value_annotation: Option<EnumValueAnnotation<'db>>,
@@ -497,10 +497,10 @@ fn value_has_exact_known_class<'db>(
 impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
-            members: FxIndexMap::default(),
-            aliases: FxHashMap::default(),
+            members: NameIndexMap::default(),
+            aliases: NameHashMap::default(),
             aliases_are_known: false,
-            auto_members: FxHashSet::default(),
+            auto_members: NameHashSet::default(),
             value_annotation: None,
             value_construction: EnumValueConstruction::default(),
         }
@@ -684,7 +684,7 @@ impl<'db> EnumComplementType<'db> {
         if !enum_class_literal.members_are_exhaustive(db) {
             return None;
         }
-        let mut excluded_names = FxHashSet::default();
+        let mut excluded_names = NameHashSet::default();
         for negative in negative {
             let enum_literal = negative.as_enum_literal()?;
             if enum_literal.enum_class_literal(db) != enum_class_literal {
@@ -859,12 +859,12 @@ impl<'db> EnumComplementType<'db> {
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> NameHashSet {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let Some(ignore) = table.symbol_id("_ignore_") else {
-        return FxHashSet::default();
+        return NameHashSet::default();
     };
 
     let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
@@ -883,7 +883,7 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
             .unwrap_or_default(),
 
         // TODO: support the list-variant of `_ignore_`.
-        Place::Undefined => FxHashSet::default(),
+        Place::Undefined => NameHashSet::default(),
     }
 }
 
@@ -895,7 +895,7 @@ fn try_register_alias<'db>(
     value_ty: Type<'db>,
     name: &Name,
     enum_values: &mut FxHashMap<LiteralValueTypeKind<'db>, Name>,
-    aliases: &mut FxHashMap<Name, Name>,
+    aliases: &mut NameHashMap<Name>,
 ) -> Option<bool> {
     let value = value_ty.as_literal_value_kind()?;
     if !matches!(
@@ -945,8 +945,8 @@ pub(crate) fn enum_metadata<'db>(
                 data_type: inherited_enum_data_type(db, ClassLiteral::DynamicEnum(enum_lit)),
                 ..EnumValueConstruction::default()
             };
-            let mut members = FxIndexMap::default();
-            let mut aliases = FxHashMap::default();
+            let mut members = NameIndexMap::default();
+            let mut aliases = NameHashMap::default();
             let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
                 if value_construction
@@ -970,7 +970,7 @@ pub(crate) fn enum_metadata<'db>(
                 members,
                 aliases,
                 aliases_are_known: true,
-                auto_members: FxHashSet::default(),
+                auto_members: NameHashSet::default(),
                 value_annotation: None,
                 value_construction,
             });
@@ -995,7 +995,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
-    let mut auto_members = FxHashSet::default();
+    let mut auto_members = NameHashSet::default();
     let mut aliases_are_known = true;
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
@@ -1032,7 +1032,7 @@ pub(crate) fn enum_metadata<'db>(
         metaclass_may_transform_values,
     };
 
-    let mut aliases = FxHashMap::default();
+    let mut aliases = NameHashMap::default();
 
     let mut members = use_def_map
         .all_end_of_scope_symbol_bindings()
@@ -1214,7 +1214,7 @@ pub(crate) fn enum_metadata<'db>(
 
             Some((name.clone(), value_ty))
         })
-        .collect::<FxIndexMap<_, _>>();
+        .collect::<NameIndexMap<_>>();
 
     if members.is_empty() {
         // Enum subclasses without members are not considered enums.

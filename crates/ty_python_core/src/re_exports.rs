@@ -23,10 +23,9 @@
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
-    name::Name,
+    name::{Name, NameRefHashMap},
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
-use rustc_hash::FxHashMap;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
@@ -53,7 +52,7 @@ struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-    exports: FxHashMap<&'db Name, PossibleExportKind>,
+    exports: NameRefHashMap<'db, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
@@ -63,7 +62,7 @@ impl<'db> ExportFinder<'db> {
             db,
             file,
             visiting_stub_file: file.is_stub(db),
-            exports: FxHashMap::default(),
+            exports: NameRefHashMap::default(),
             dunder_all: DunderAll::NotPresent,
         }
     }

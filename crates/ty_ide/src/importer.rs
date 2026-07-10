@@ -16,14 +16,12 @@ The main differences here are:
 3. It doesn't have as many facilities as `ruff_linter`'s importer.
 */
 
-use rustc_hash::FxHashMap;
-
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, NameHashMap};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_stmt};
 use ruff_python_codegen::Stylist;
@@ -324,7 +322,7 @@ impl<'a> Importer<'a> {
 #[derive(Debug)]
 pub struct MembersInScope<'ast> {
     at: TextSize,
-    map: FxHashMap<Name, MemberInScope<'ast>>,
+    map: NameHashMap<MemberInScope<'ast>>,
 }
 
 impl<'ast> MembersInScope<'ast> {

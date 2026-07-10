@@ -209,9 +209,9 @@ use crate::{
     },
 };
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, NameHashSet};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_python_core::{
@@ -287,11 +287,11 @@ fn type_narrowed_by_pattern<'db>(
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
     subject_ty: Type<'db>,
-) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
+) -> Option<(EnumClassLiteral<'db>, NameHashSet)> {
     fn add_enum_literal<'db>(
         db: &'db dyn Db,
         enum_class: &mut Option<EnumClassLiteral<'db>>,
-        names: &mut FxHashSet<Name>,
+        names: &mut NameHashSet,
         ty: Type<'db>,
     ) -> Option<()> {
         let enum_literal = ty.as_enum_literal()?;
@@ -312,7 +312,7 @@ fn enum_literal_subject_names<'db>(
     }
 
     let mut enum_class = None;
-    let mut names = FxHashSet::default();
+    let mut names = NameHashSet::default();
 
     match subject_ty {
         Type::LiteralValue(_) => {
@@ -353,7 +353,7 @@ fn enum_member_pattern_name<'db>(
 
 struct EnumMemberPatternCoverage {
     /// Enum members that this pattern definitely matches.
-    definitely_matched: FxHashSet<Name>,
+    definitely_matched: NameHashSet,
     /// Whether the collected coverage is known to represent every possible matching enum member.
     is_exact: bool,
 }
@@ -370,7 +370,7 @@ fn enum_member_pattern_coverage<'db>(
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
     let mut coverage = EnumMemberPatternCoverage {
-        definitely_matched: FxHashSet::default(),
+        definitely_matched: NameHashSet::default(),
         is_exact: true,
     };
     match kind {
