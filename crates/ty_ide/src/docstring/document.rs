@@ -9,13 +9,16 @@ pub(super) mod rst;
 pub(in crate::docstring) mod syntax;
 
 /// Returns docs for all parameters recognized in the given docstring.
+///
+/// `normalized_source` must have already undergone PEP-257 trimming and universal newline
+/// normalization.
 pub(super) fn parameter_documentation(
-    raw: &str,
+    normalized_source: &str,
     numpy_parameters: IndexMap<String, String>,
 ) -> IndexMap<String, String> {
-    let mut parameters = google::parameter_documentation(raw);
+    let mut parameters = google::parameter_documentation(normalized_source);
     parameters.extend(numpy_parameters);
-    parameters.extend(rst::parameter_documentation(raw));
+    parameters.extend(rst::parameter_documentation(normalized_source));
     parameters
 }
 
