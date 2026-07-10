@@ -2985,7 +2985,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import Any, Never, final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3057,6 +3057,9 @@ class LegacyFunctionScoped(Protocol):
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
+class UsesPep695Receiver(Protocol):
+    def compare[T](self: T, other: T) -> bool: ...
+
 class NominalNewStyle:
     def f[T](self, input: T) -> T:
         return input
@@ -3068,6 +3071,18 @@ class NominalLegacy:
 class NominalWithSelf:
     def g(self: Self) -> Self:
         return self
+
+class NominalPep695Receiver:
+    def compare(self, other: "NominalPep695Receiver") -> bool:
+        return True
+
+class NominalDynamic:
+    def f(self, input: Any) -> Any:
+        return input
+
+class NominalTopBottom:
+    def f(self, input: object) -> Never:
+        raise NotImplementedError
 
 class NominalNotGeneric:
     def f(self, input: int) -> int:
@@ -3101,9 +3116,17 @@ static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+static_assert(is_assignable_to(NominalPep695Receiver, UsesPep695Receiver))
+static_assert(is_subtype_of(NominalPep695Receiver, UsesPep695Receiver))
+static_assert(is_assignable_to(NominalDynamic, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalTopBottom, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
+# A concrete implementation cannot satisfy every specialization of a generic method.
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalNotGeneric, NewStyleFunctionScoped))
+
+# TODO: Universally quantify legacy method-local type variables.
 static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 

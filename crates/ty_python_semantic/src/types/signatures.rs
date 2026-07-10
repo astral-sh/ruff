@@ -34,11 +34,12 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -297,6 +298,7 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
+                        has_explicit_receiver: self_signature.has_explicit_receiver,
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
@@ -319,6 +321,8 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
+                            has_explicit_receiver: signature.has_explicit_receiver
+                                || self_signature.has_explicit_receiver,
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -454,7 +458,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair(db, self, other)
     }
 }
 
@@ -486,6 +490,12 @@ pub struct Signature<'db> {
     /// The original definition associated with this function, if available.
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
+
+    /// Whether this signature has an explicitly annotated receiver.
+    ///
+    /// Binding removes the receiver parameter, so retain this bit to conservatively exclude
+    /// receiver-bound variables from the initial higher-rank relation.
+    has_explicit_receiver: bool,
 
     /// Parameters, in source order.
     ///
@@ -621,6 +631,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
+            has_explicit_receiver: false,
             parameters,
             return_ty,
         }
@@ -634,6 +645,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
+            has_explicit_receiver: false,
             parameters,
             return_ty,
         }
@@ -644,6 +656,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
+            has_explicit_receiver: false,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
         }
@@ -656,6 +669,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
+        has_receiver_parameter: bool,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
@@ -676,6 +690,10 @@ impl<'db> Signature<'db> {
             pep695_generic_context,
             legacy_generic_context,
         );
+        let has_explicit_receiver = has_receiver_parameter
+            && parameters
+                .get(0)
+                .is_some_and(|receiver| !receiver.inferred_annotation);
 
         let (generic_context, return_ty) = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
@@ -696,6 +714,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
+            has_explicit_receiver,
             parameters,
             return_ty,
         }
@@ -768,6 +787,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_explicit_receiver: self.has_explicit_receiver,
             parameters,
             return_ty,
         }
@@ -797,6 +817,7 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_explicit_receiver: self.has_explicit_receiver,
             parameters,
             return_ty,
         })
@@ -814,6 +835,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
+            has_explicit_receiver: self.has_explicit_receiver,
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -974,6 +996,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
+            has_explicit_receiver: self.has_explicit_receiver,
             parameters,
             return_ty,
         }
@@ -1080,6 +1103,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_explicit_receiver: self.has_explicit_receiver,
             parameters,
             return_ty,
         }
@@ -1242,6 +1266,60 @@ impl<'db> Signature<'db> {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
         }
+    }
+
+    fn is_supported_higher_rank_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::Never => true,
+            Type::NominalInstance(instance) => {
+                !instance.inherits_from_explicit_any()
+                    && !ty.has_dynamic(db)
+                    && !ty.has_typevar_or_typevar_instance(db)
+                    && !any_over_type(db, ty, false, |nested| matches!(nested, Type::TypeAlias(_)))
+            }
+            _ => false,
+        }
+    }
+
+    fn has_only_supported_higher_rank_concrete_types(&self, db: &'db dyn Db) -> bool {
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| Self::is_supported_higher_rank_concrete_type(db, ty))
+    }
+
+    /// Return the single callable-local variable supported by the initial higher-rank relation.
+    fn bare_unbounded_pep695_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+        if self.has_explicit_receiver || !self.parameters.is_standard() {
+            return None;
+        }
+
+        let definition = self.definition?;
+        let mut typevars = self.generic_context?.variables(db);
+        let typevar = typevars.next()?;
+        if typevars.next().is_some()
+            || typevar.kind(db) != TypeVarKind::Pep695TypeVar
+            || typevar.binding_context(db).definition() != Some(definition)
+            || typevar.typevar(db).bound_or_constraints(db).is_some()
+        {
+            return None;
+        }
+
+        let identity = typevar.typevar(db).identity(db);
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| {
+                if ty.references_typevar(db, identity) {
+                    ty.as_typevar()
+                        .is_some_and(|inner| inner.is_same_typevar_as(db, typevar))
+                } else {
+                    Self::is_supported_higher_rank_concrete_type(db, ty)
+                }
+            })
+            .then_some(typevar)
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
@@ -1542,7 +1620,46 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let ([source], [target]) = (source.overloads.as_slice(), target.overloads.as_slice())
+            && let Some(relation) =
+                self.try_check_nongeneric_source_with_universal_target(db, source, target)
+        {
+            return relation;
+        }
+
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
+    }
+
+    /// Check the initial closed fragment of higher-rank generic callable relations.
+    ///
+    /// A non-generic source must satisfy every specialization of an unbounded target-local type
+    /// variable. Generic sources, overloads, declared domains, nested occurrences, receiver-bound
+    /// variables, and enclosing inference variables remain on the existing relation path.
+    fn try_check_nongeneric_source_with_universal_target(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.inferable != InferableTypeVars::None
+            || source.generic_context.is_some()
+            || !source.parameters.is_standard()
+            || !source.has_only_supported_higher_rank_concrete_types(db)
+        {
+            return None;
+        }
+
+        let target_typevar = target.bare_unbounded_pep695_typevar(db)?;
+        let target_local = InferableTypeVars::from_typevars(
+            db,
+            std::iter::once(target_typevar.identity(db)).collect(),
+        );
+        let mut checker = self.with_inferable_typevars(target_local);
+        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        let relation = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
+        Some(relation.for_all(db, self.constraints, target_local))
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable

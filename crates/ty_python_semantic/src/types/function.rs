@@ -593,6 +593,8 @@ impl<'db> OverloadLiteral<'db> {
             file_scope_id,
             index,
         );
+        let has_receiver_parameter = index.class_definition_of_method(file_scope_id).is_some()
+            && (!self.is_staticmethod(db) || self.name(db) == "__new__");
 
         let mut raw_signature = Signature::from_function(
             db,
@@ -600,6 +602,7 @@ impl<'db> OverloadLiteral<'db> {
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,
+            has_receiver_parameter,
             return_callable_typevar_scope,
         );
 

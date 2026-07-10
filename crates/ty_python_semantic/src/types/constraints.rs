@@ -590,13 +590,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// An atomic constraint must not relate a removed type variable to one that remains in the
     /// result. Callers that need type-level quantification must project those relationships before
     /// calling this method.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "used by generic signature quantification in the stacked follow-up"
-        )
-    )]
     pub(crate) fn for_all(
         self,
         db: &'db dyn Db,
