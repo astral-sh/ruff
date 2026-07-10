@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
+use std::mem::ManuallyDrop;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
@@ -303,17 +304,49 @@ enum RecursionGuardVisit<'guard, 'db> {
     Pending(ActiveIdentityGuard<'guard, 'db>),
 }
 
+type ActiveIdentityStorage<'db> = RefCell<Option<Box<SmallVec<[TypeIdentity<'db>; 4]>>>>;
+
+// The last active guard releases the allocation, so this field has no resources left to drop.
+#[derive(Default, Debug)]
+struct ActiveIdentities<'db>(ManuallyDrop<ActiveIdentityStorage<'db>>);
+
+impl<'db> ActiveIdentities<'db> {
+    #[inline]
+    fn contains(&self, identity: TypeIdentity<'db>) -> bool {
+        self.0
+            .borrow()
+            .as_deref()
+            .is_some_and(|active| active.contains(&identity))
+    }
+
+    #[inline]
+    fn push(&self, identity: TypeIdentity<'db>) {
+        self.0
+            .borrow_mut()
+            .get_or_insert_with(|| Box::new(SmallVec::new()))
+            .push(identity);
+    }
+
+    #[inline]
+    fn pop(&self) -> Option<TypeIdentity<'db>> {
+        let mut active = self.0.borrow_mut();
+        let identity = active.as_deref_mut().and_then(SmallVec::pop);
+        if active.as_deref().is_some_and(SmallVec::is_empty) {
+            *active = None;
+        }
+        identity
+    }
+}
+
 struct ActiveIdentityGuard<'guard, 'db> {
-    active_identities: &'guard RefCell<SmallVec<[TypeIdentity<'db>; 4]>>,
-    identity: Option<TypeIdentity<'db>>,
+    active_identities: &'guard ActiveIdentities<'db>,
+    identity: TypeIdentity<'db>,
 }
 
 impl Drop for ActiveIdentityGuard<'_, '_> {
     fn drop(&mut self) {
-        if let Some(identity) = self.identity {
-            let active_identity = self.active_identities.borrow_mut().pop();
-            debug_assert_eq!(active_identity, Some(identity));
-        }
+        let active_identity = self.active_identities.pop();
+        debug_assert_eq!(active_identity, Some(self.identity));
     }
 }
 
@@ -325,7 +358,7 @@ impl Drop for ActiveIdentityGuard<'_, '_> {
 #[derive(Default, Debug)]
 pub(crate) struct RecursionGuard<'db> {
     collected_types: TypeCollector<'db>,
-    active_identities: RefCell<SmallVec<[TypeIdentity<'db>; 4]>>,
+    active_identities: ActiveIdentities<'db>,
 }
 
 impl<'db> RecursionGuard<'db> {
@@ -349,44 +382,48 @@ impl<'db> RecursionGuard<'db> {
     ) -> Option<Type<'db>> {
         match TypeKind::from(ty) {
             TypeKind::Atomic => None,
-            TypeKind::NonAtomic(non_atomic_type) => match self.begin_visit(db, ty) {
-                RecursionGuardVisit::AlreadyCollected => None,
-                RecursionGuardVisit::Cycle => Some(ty),
-                RecursionGuardVisit::Pending(_active_identity) => {
-                    walk_non_atomic_type(db, non_atomic_type, visitor);
-                    None
+            TypeKind::NonAtomic(non_atomic_type) => {
+                let Some(identity) = ty.recursive_identity(db) else {
+                    if self.collected_types.collect_type(ty) {
+                        walk_non_atomic_type(db, non_atomic_type, visitor);
+                    }
+                    return None;
+                };
+
+                match self.begin_visit(ty, identity) {
+                    RecursionGuardVisit::AlreadyCollected => None,
+                    RecursionGuardVisit::Cycle => Some(ty),
+                    RecursionGuardVisit::Pending(_active_identity) => {
+                        walk_non_atomic_type(db, non_atomic_type, visitor);
+                        None
+                    }
                 }
-            },
+            }
         }
     }
 
     #[inline]
     fn begin_visit<'guard>(
         &'guard self,
-        db: &'db dyn Db,
         ty: Type<'db>,
+        identity: TypeIdentity<'db>,
     ) -> RecursionGuardVisit<'guard, 'db> {
         // Collect the exact type before checking for identity recursion. A recursive type keeps
         // the same identity across different expansions, but callers still need each distinct
         // expanded type to be collected.
         let was_collected = self.collected_types.collect_type(ty);
 
-        let active_identity = ty.recursive_identity(db);
-        if let Some(identity) = active_identity {
-            if self.active_identities.borrow().contains(&identity) {
-                return RecursionGuardVisit::Cycle;
-            }
+        if self.active_identities.contains(identity) {
+            return RecursionGuardVisit::Cycle;
         }
         if !was_collected {
             return RecursionGuardVisit::AlreadyCollected;
         }
 
-        if let Some(identity) = active_identity {
-            self.active_identities.borrow_mut().push(identity);
-        }
+        self.active_identities.push(identity);
         RecursionGuardVisit::Pending(ActiveIdentityGuard {
             active_identities: &self.active_identities,
-            identity: active_identity,
+            identity,
         })
     }
 }
