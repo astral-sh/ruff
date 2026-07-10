@@ -81,6 +81,102 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
+The unknown check follows lazy wrappers such as type aliases and protocol interfaces. If a recursive
+protocol is encountered under a different specialization, the check is indeterminate and
+conservatively suppresses the diagnostic.
+
+```py
+from typing import Any, Protocol, cast
+
+from ty_extensions import Unknown
+
+type Alias = Unknown
+
+def alias_unknown(value: Alias) -> None:
+    cast(Alias, value)
+
+class HasUnknown(Protocol):
+    value: Unknown
+
+def protocol_member_unknown(value: HasUnknown) -> None:
+    cast(HasUnknown, value)
+
+class HasInt(Protocol):
+    value: int
+
+def protocol_member_known(value: HasInt) -> None:
+    cast(HasInt, value)  # error: [redundant-cast]
+
+class HasAny(Protocol):
+    value: Any
+
+def distinct_protocols(value: HasAny) -> None:
+    reveal_type(value.value)  # revealed: Any
+    reveal_type(cast(HasUnknown, value).value)  # revealed: Unknown
+
+class GenericProtocol[T](Protocol):
+    value: T
+
+def protocol_specialization_unknown(value: GenericProtocol[Unknown]) -> None:
+    cast(GenericProtocol[Unknown], value)
+
+class RecursiveProtocol(Protocol):
+    next: "RecursiveProtocol"
+
+def exactly_recursive_protocol(value: RecursiveProtocol) -> None:
+    cast(RecursiveProtocol, value)  # error: [redundant-cast]
+
+class ExactGenericProtocol[T](Protocol):
+    next: "ExactGenericProtocol[T]"
+
+def exactly_recursive_generic_protocol(value: ExactGenericProtocol[int]) -> None:
+    cast(ExactGenericProtocol[int], value)  # error: [redundant-cast]
+
+class GrowingProtocol[T](Protocol):
+    value: T
+    next: "GrowingProtocol[list[T]]"
+
+def recursively_specialized_protocol(value: GrowingProtocol[int]) -> None:
+    cast(GrowingProtocol[int], value)
+```
+
+The interface of a specialized protocol is not necessarily a simple substitution of its type
+arguments. Descriptor overload resolution can expose `Unknown` only after recursive specialization,
+so an indeterminate result must suppress the diagnostic:
+
+```py
+from typing import Callable, Protocol, cast, overload
+
+from ty_extensions import Unknown
+
+class Descriptor:
+    @overload
+    def __get__(
+        self,
+        instance: "DescriptorProtocol[list[int]]",
+        owner: type["DescriptorProtocol[list[int]]"],
+    ) -> Unknown: ...
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> int: ...
+    def __get__(self, instance: object, owner: type[object]) -> object:
+        return object()
+
+def descriptor(function: Callable[..., object]) -> Descriptor:
+    return Descriptor()
+
+class DescriptorProtocol[T](Protocol):
+    marker: T
+    next: "DescriptorProtocol[list[T]]"
+
+    @descriptor
+    def value(self) -> object: ...
+
+def descriptor_specialization(value: DescriptorProtocol[int]) -> None:
+    reveal_type(value.value)  # revealed: int
+    reveal_type(value.next.value)  # revealed: Unknown
+    cast(DescriptorProtocol[int], value)
+```
+
 Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
 
 ```toml
