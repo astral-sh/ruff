@@ -365,7 +365,6 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
    |
 18 | class BadInvariantCo(Invariant[T_co]): ...
    |                      ^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_co` is declared as covariant, but base class `Invariant` requires it to be invariant
 
 
@@ -374,7 +373,6 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
    |
 21 | class BadInvariantContra(Invariant[T_contra]): ...
    |                          ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_contra` is declared as contravariant, but base class `Invariant` requires it to be invariant
 
 
@@ -383,7 +381,6 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
    |
 24 | class BadCovariant(Covariant[T_contra]): ...
    |                    ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_contra` is declared as contravariant, but base class `Covariant` requires it to be covariant
 
 
@@ -392,7 +389,6 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
    |
 27 | class BadContravariant(Contravariant[T_co]): ...
    |                        ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_co` is declared as covariant, but base class `Contravariant` requires it to be contravariant
 ```
 

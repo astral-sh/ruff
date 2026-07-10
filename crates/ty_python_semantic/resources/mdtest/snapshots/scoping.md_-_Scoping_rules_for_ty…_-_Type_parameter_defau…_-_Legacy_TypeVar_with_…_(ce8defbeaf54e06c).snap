@@ -39,7 +39,6 @@ error[invalid-type-variable-default]: Invalid use of type variable `U`
 6 | # error: [invalid-type-variable-default]
 7 | def bad(y: U, z: T) -> tuple[U, T]:
   |            ^ Default of `U` references later type parameter `T`
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
 
 ```

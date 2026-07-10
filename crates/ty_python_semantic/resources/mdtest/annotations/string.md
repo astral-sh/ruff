@@ -307,7 +307,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |
 4 | c: """'"int"'""" = 1
   |        ^^^^^ Too many levels of nested string annotations; remove the redundant nested quotes
-  |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
@@ -315,7 +314,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |
 9 | f: "'str | int | bool | Foo | Bar'" = 1
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Nested string annotation is too long; remove the redundant nested quotes
-  |
 ```
 
 ## Parameter
@@ -393,7 +391,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 43 | m: "yield 1"
    |     ^^^^^^^ Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["yield 1"]`?
 
 
@@ -402,7 +399,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 45 | n: "yield from 1"
    |     ^^^^^^^^^^^^ Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["yield from 1"]`?
 
 
@@ -413,7 +409,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |     -----^^^^^^^^^^^^-
    |          |
    |          Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["list[yield from 1]"]`?
 
 
@@ -424,7 +419,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |     ----^
    |         |
    |         Unexpected token at the end of an expression
-   |
 help: Did you mean `typing.Literal["type]"]`?
 ```
 
@@ -476,7 +470,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |____^-
    |      |
    |      Unexpected token at the end of an expression
-   |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
@@ -488,7 +481,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |      ^ Unexpected token at the end of an expression
 24 | | str
    | |____-
-   |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
@@ -500,5 +492,4 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |____________^-
    |              |
    |              Unexpected token at the end of an expression
-   |
 ```

@@ -56,7 +56,6 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
   | ------------------------------- `T1` defined here
 4 | T2 = TypeVar("T2")
   | ------------------ `T2` defined here
-  |
 
 ```
 
@@ -76,7 +75,6 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
  4 | T2 = TypeVar("T2")
  5 | T3 = TypeVar("T3")
    | ------------------ `T3` defined here
-   |
 
 ```
 
@@ -95,6 +93,5 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
    | ------------------------------- `T1` defined here
  4 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
-   |
 
 ```

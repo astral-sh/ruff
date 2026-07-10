@@ -291,7 +291,6 @@ C413 [*] Unnecessary `list()` call around `sorted()`
 28 | / list(sorted
 29 | | ("xy"))
    | |_______^
-   |
 help: Remove unnecessary `list()` call
    |
 27 |     (""))

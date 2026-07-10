@@ -713,7 +713,6 @@ UP032 [*] Use f-string instead of `format` call
 106 | |     "b"
 107 | | ).format(a=1)
     | |_____________^
-    |
 help: Convert to f-string
     |
 104 | (
@@ -731,7 +730,6 @@ UP032 [*] Use f-string instead of `format` call
 110 | def d(osname, version, release):
 111 |     return"{}-{}.{}".format(osname, version, release)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 110 | def d(osname, version, release):
@@ -746,7 +744,6 @@ UP032 [*] Use f-string instead of `format` call
 114 | def e():
 115 |     yield"{}".format(1)
     |          ^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 114 | def e():
@@ -760,7 +757,6 @@ UP032 [*] Use f-string instead of `format` call
     |
 118 | assert"{}".format(1)
     |       ^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 117 |
@@ -775,7 +771,6 @@ UP032 [*] Use f-string instead of `format` call
 121 | async def c():
 122 |     return "{}".format(await 3)
     |            ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 121 | async def c():
@@ -790,7 +785,6 @@ UP032 [*] Use f-string instead of `format` call
 125 | async def c():
 126 |     return "{}".format(1 + await 3)
     |            ^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 125 | async def c():
@@ -927,7 +921,6 @@ UP032 Use f-string instead of `format` call
 202 | |     1  # comment
 203 | | )
     | |_^
-    |
 help: Convert to f-string
 
 UP032 [*] Use f-string instead of `format` call
@@ -1056,7 +1049,6 @@ UP032 [*] Use f-string instead of `format` call
 234 |
 235 | ("{}" "{{}}").format(a)
     | ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 234 |
@@ -1267,7 +1259,6 @@ UP032 [*] Use f-string instead of `format` call
 282 | # Raw string with \N{...}
 283 | r"\N{angle}AOB = {angle}°".format(angle=180)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Convert to f-string
     |
 282 | # Raw string with \N{...}

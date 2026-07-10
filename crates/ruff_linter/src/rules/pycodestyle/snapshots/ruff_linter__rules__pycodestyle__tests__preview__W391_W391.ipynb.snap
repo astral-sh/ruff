@@ -51,7 +51,6 @@ W391 [*] Too many newlines at end of cell
 19 | /
 20 | |
    | |__^
-   |
 help: Remove trailing newlines
    |
 19 |

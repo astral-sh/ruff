@@ -95,7 +95,6 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
    |         ^^^^^^
 27 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-   |
 
 ```
 
@@ -114,7 +113,6 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 36 |     def method(self, x: str) -> str: ...
 37 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-   |
 
 ```
 
@@ -131,6 +129,5 @@ error[invalid-overload]: `@override` decorator should be applied only to the fir
 21 |       # error: [invalid-overload]
 22 |       def method(self, x: str) -> str: ...
    |           ^^^^^^
-   |
 
 ```

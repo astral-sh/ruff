@@ -185,7 +185,6 @@ RUF028 [*] This suppression comment is invalid because it cannot be at the end o
 62 |     val = 5 # fmt: on
 63 |     pass # fmt: on
    |          ^^^^^^^^^
-   |
 help: Remove this comment
    |
 62 |     val = 5 # fmt: on

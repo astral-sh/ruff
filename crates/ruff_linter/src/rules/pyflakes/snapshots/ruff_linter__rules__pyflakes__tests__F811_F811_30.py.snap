@@ -26,7 +26,6 @@ F811 Redefinition of unused `baz` from line 18
 20 |
 21 |     baz = 1
    |     ^^^ `baz` redefined here
-   |
 help: Remove definition: `baz`
 
 F811 Redefinition of unused `foo` from line 26
@@ -40,5 +39,4 @@ F811 Redefinition of unused `foo` from line 26
 28 |
 29 |     bar = (foo := 1)
    |            ^^^ `foo` redefined here
-   |
 help: Remove definition: `foo`

@@ -584,7 +584,6 @@ from module import =
       |
     2 | from module import =
       |                    ^
-      |
 
 
     ----- stderr -----
@@ -2052,7 +2051,6 @@ fn syntax_error_in_notebooks_check() -> Result<()> {
     2 |     # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint
     3 |     j = # ваш код здесь
       |                        ^
-      |
 
 
     ----- stderr -----

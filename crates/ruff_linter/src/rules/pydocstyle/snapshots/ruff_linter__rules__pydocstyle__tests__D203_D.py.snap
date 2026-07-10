@@ -7,7 +7,6 @@ D203 [*] 1 blank line required before class docstring
 160 | class LeadingSpaceMissing:
 161 |     """Leading space missing."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Insert 1 blank line before class docstring
     |
 160 | class LeadingSpaceMissing:
@@ -75,7 +74,6 @@ D203 [*] 1 blank line required before class docstring
 653 | class StatementOnSameLineAsDocstring:
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Insert 1 blank line before class docstring
     |
 653 | class StatementOnSameLineAsDocstring:

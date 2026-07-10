@@ -1392,7 +1392,6 @@ watermelon
           |
         5 | elephant
           | ^^^^^^^^
-          |
         ",
         );
 
@@ -1426,7 +1425,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1483,7 +1481,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
     }
@@ -1773,7 +1770,6 @@ watermelon
           |
         5 | canary
           | ^^^^^^
-          |
         ",
         );
     }
@@ -1957,7 +1953,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1986,7 +1981,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
@@ -2445,7 +2439,6 @@ watermelon
           |
         7 | gorilla
           | ------- secondary 7
-          |
         ",
         );
     }
@@ -2529,7 +2522,6 @@ watermelon
            |
          2 | banana
            | ------ secondary fruits 2
-           |
         ",
         );
     }

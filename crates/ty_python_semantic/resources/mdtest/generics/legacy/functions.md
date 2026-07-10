@@ -229,13 +229,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 11 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
 3 | T = TypeVar("T", bound=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 A bound can also be a union of protocols. If inference produces a union for the type variable, each
@@ -282,13 +280,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 12 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
 3 | T = TypeVar("T", int, None)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Typevar constraints

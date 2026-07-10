@@ -38,5 +38,4 @@ RUF054 Indented form feed
 16 |     print('F')
 17 |     ␌print('T')
    |     ^
-   |
 help: Remove form feed

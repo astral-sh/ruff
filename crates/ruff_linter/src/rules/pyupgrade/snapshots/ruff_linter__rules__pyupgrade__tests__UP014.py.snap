@@ -102,7 +102,6 @@ UP014 [*] Convert `X` from `NamedTuple` functional to class syntax
 37 | |     ("some_config", int),  # important
 38 | | ])
    | |__^
-   |
 help: Convert `X` to class syntax
    |
 35 | # Unsafe fix if comments are present

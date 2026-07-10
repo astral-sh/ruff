@@ -152,14 +152,12 @@ error[no-matching-overload]: No overload of function `foo` matches arguments
     |
 129 | foo(Foo(), Foo())  # error: [no-matching-overload]
     | ^^^^^^^^^^^^^^^^^
-    |
 info: First overload defined here
  --> src/mdtest_snippet.py:5:1
   |
 5 | / @overload
 6 | | def foo(a: int, b: int, c: int): ...
   | |____________________________________^ First overload defined here
-  |
 info: Possible overloads for function `foo`:
 info:   (a: int, b: int, c: int) -> Unknown
 info:   (a: str, b: int, c: int) -> Unknown
@@ -217,6 +215,5 @@ info: Overload implementation defined here
     |
 127 | def foo(a, b, c): ...
     |     ^^^^^^^^^^^^
-    |
 
 ```

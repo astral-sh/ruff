@@ -8,7 +8,6 @@ C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
 2 |
 3 | set([*x for x in xs])
   | ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Rewrite as a set comprehension
   |
 2 |

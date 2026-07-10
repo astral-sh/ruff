@@ -31,6 +31,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
   |                        ---          ^^^ Default of `T`
   |                        |
   |                        Upper bound of `T`
-  |
 
 ```

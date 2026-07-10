@@ -51,4 +51,3 @@ S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to
 28 |     return 'foobar'
 29 | Environment(loader=templateLoader, autoescape=fake_func())  # S701
    |                                    ^^^^^^^^^^^^^^^^^^^^^^
-   |

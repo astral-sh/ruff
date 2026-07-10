@@ -216,7 +216,6 @@ error[invalid-yield]: Yield expression type does not match annotation
 4 |     # snapshot: invalid-yield
 5 |     yield ""
   |           ^^ expression of type `Literal[""]`, expected `int`
-  |
 ```
 
 ### Invalid annotation
@@ -284,7 +283,6 @@ error[invalid-yield]: Send type does not match annotation
 7 |     # snapshot: invalid-yield
 8 |     yield from inner()
   |                ^^^^^^^ generator with send type `int`, expected `str`
-  |
 ```
 
 ### Non generator function with `Generator` annotation
@@ -308,7 +306,6 @@ error[invalid-return-type]: Return type does not match returned value
 4 |     # snapshot: invalid-return-type
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
-  |
 info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
 info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```

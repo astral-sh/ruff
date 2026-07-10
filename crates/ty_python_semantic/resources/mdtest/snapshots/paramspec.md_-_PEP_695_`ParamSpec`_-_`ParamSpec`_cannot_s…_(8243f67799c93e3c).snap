@@ -60,7 +60,6 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
    |
  3 | class OnlyTypeVar[T]:
    |                   - Type variable `T` defined here
-   |
 
 ```
 
@@ -79,7 +78,6 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
  8 |
  9 | def f[**P, T]():
    |         - ParamSpec `P` defined here
-   |
 
 ```
 
@@ -89,6 +87,5 @@ error[invalid-type-arguments]: Type argument for `ParamSpec` must be either a li
    |
 29 | def func3[T](c: ParamSpecAndTypeVar[T, int], other: T): ...
    |                                     ^
-   |
 
 ```

@@ -206,7 +206,6 @@ def outer():
         16 |     write_nonlocal()
         17 |     return last
            |            ----
-           |
         ");
     }
 
@@ -228,7 +227,6 @@ def f(items):
           |       ^^^^
         4 |     return last
           |            ----
-          |
         ");
     }
 
@@ -252,7 +250,6 @@ def f(items):
           |                 ----
         2 | print(last)
           |       ----
-          |
         ");
     }
 
@@ -296,7 +293,6 @@ func(value=42)
         5 |
         6 | func(value=42)
           |      -----
-          |
         ");
     }
 
@@ -324,7 +320,6 @@ x = func
           |           ----
         6 | x = func
           |     ----
-          |
         ");
     }
 
@@ -354,7 +349,6 @@ cls = MyClass
           |        -------
         7 | cls = MyClass
           |       -------
-          |
         ");
     }
 
@@ -374,7 +368,6 @@ def fu<CURSOR>nc():
           |
         2 | def func():
           |     ^^^^
-          |
         ");
     }
 
@@ -427,7 +420,6 @@ class DataProcessor:
         4 | def test(data):
         5 |     return func(data)
           |            ----
-          |
         ");
     }
 
@@ -465,7 +457,6 @@ instance = ExampleClass(old_name="test")
           |
         4 | instance = ExampleClass(old_name="test")
           |                         --------
-          |
         "#);
     }
 
@@ -489,7 +480,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -513,7 +503,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -551,7 +540,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -603,7 +591,6 @@ instance = ExampleClass(old_name="test")
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -640,7 +627,6 @@ instance = ExampleClass(old_name="test")
           |                      ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -663,7 +649,6 @@ instance = ExampleClass(old_name="test")
           |                      ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -686,7 +671,6 @@ instance = ExampleClass(old_name="test")
           |                       ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -709,7 +693,6 @@ instance = ExampleClass(old_name="test")
           |                       ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -732,7 +715,6 @@ instance = ExampleClass(old_name="test")
           |                                     ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -755,7 +737,6 @@ instance = ExampleClass(old_name="test")
           |                                     ^^
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -784,7 +765,6 @@ instance = ExampleClass(old_name="test")
            |                              ^^
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -813,7 +793,6 @@ instance = ExampleClass(old_name="test")
            |                              ^^
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -848,7 +827,6 @@ instance = ExampleClass(old_name="test")
          9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
-           |
         ");
     }
 
@@ -886,7 +864,6 @@ instance = ExampleClass(old_name="test")
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             ^^                      --       --
-          |
         ");
     }
 
@@ -904,7 +881,6 @@ instance = ExampleClass(old_name="test")
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             ^^                      --       --
-          |
         ");
     }
 
@@ -923,7 +899,6 @@ instance = ExampleClass(old_name="test")
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               ^^                          --        --
-          |
         ");
     }
 
@@ -942,7 +917,6 @@ instance = ExampleClass(old_name="test")
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               ^^                          --        --
-          |
         ");
     }
 
@@ -960,7 +934,6 @@ instance = ExampleClass(old_name="test")
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              ^^                      --          --
-          |
         ");
     }
 
@@ -978,7 +951,6 @@ instance = ExampleClass(old_name="test")
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              ^^                      --          --
-          |
         ");
     }
 
@@ -1048,7 +1020,6 @@ result = alias()
           |                           ^^^^^
         3 | result = alias()
           |          -----
-          |
         ");
     }
 
@@ -1079,7 +1050,6 @@ result = <CURSOR>alias()
           |                           ^^^^^
         3 | result = alias()
           |          -----
-          |
         ");
     }
 
@@ -1144,7 +1114,6 @@ value1 = func_alias()
         6 |
         7 | result = original_function()
           |          -----------------
-          |
         ");
     }
 
@@ -1196,7 +1165,6 @@ class App:
         3 |
         4 | func2()
           | -----
-          |
         ");
     }
 
@@ -1251,7 +1219,6 @@ result = func(10, <CURSOR>y=20)
         4 |
         5 | result = func(10, y=20)
           |                   -
-          |
         ");
     }
 
@@ -1278,7 +1245,6 @@ result = func(10, y=20)
         4 |
         5 | result = func(10, y=20)
           |                   -
-          |
         ");
     }
 
@@ -1306,7 +1272,6 @@ TD(f=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1334,7 +1299,6 @@ TD(f<CURSOR>=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1362,7 +1326,6 @@ NT(f=1)
         7 |
         8 | NT(f=1)
           |    -
-          |
         ");
     }
 
@@ -1391,7 +1354,6 @@ DC(f=1)
         8 |
         9 | DC(f=1)
           |    -
-          |
         ");
     }
 
@@ -1419,7 +1381,6 @@ DC(f=1)
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1446,7 +1407,6 @@ DC(f=1)
         3 |
         4 | x = lib2
           |     ----
-          |
         ");
     }
 
@@ -1478,7 +1438,6 @@ DC(f=1)
           |
         1 | def deprecated(): pass
           |     ----------
-          |
         ");
     }
 
@@ -1506,7 +1465,6 @@ DC(f=1)
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1537,7 +1495,6 @@ DC(f=1)
           |
         4 | x = subpkg
           |     ^^^^^^
-          |
         ");
     }
 
@@ -1670,7 +1627,6 @@ DC(f=1)
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1708,7 +1664,6 @@ DC(f=1)
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1764,7 +1719,6 @@ DC(f=1)
          3 |
          4 | test("test")
            | ----
-           |
         "#);
     }
 
@@ -1819,7 +1773,6 @@ DC(f=1)
            |
          4 | Test().test("test")
            |        ----
-           |
         "#);
     }
 
@@ -1876,7 +1829,6 @@ DC(f=1)
         10 |
         11 | def test(a: Any) -> Any:
            |     ----
-           |
         "#);
     }
 
@@ -1913,7 +1865,6 @@ DC(f=1)
           |
         4 | print(Foo().my_property)
           |             -----------
-          |
         ");
     }
 
@@ -1963,7 +1914,6 @@ DC(f=1)
           |             -----------
         5 | Foo().my_property = 56
           |       -----------
-          |
         ");
     }
 
@@ -2013,7 +1963,6 @@ DC(f=1)
           |             -----------
         5 | del Foo().my_property
           |           -----------
-          |
         ");
     }
 
@@ -2076,7 +2025,6 @@ DC(f=1)
            |       -----------
          6 | del Foo().my_property
            |           -----------
-           |
         ");
     }
 
@@ -2128,7 +2076,6 @@ DC(f=1)
           |             -----------
         5 | Foo().my_property = 56
           |       -----------
-          |
         ");
     }
 
@@ -2180,7 +2127,6 @@ DC(f=1)
           |             -----------
         5 | Foo().my_property = 56
           |       -----------
-          |
         ");
     }
 
@@ -2232,7 +2178,6 @@ DC(f=1)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-          |
         ");
     }
 
@@ -2276,7 +2221,6 @@ DC(f=1)
           |      -----
         8 |     def alpha(self, value: int) -> None:
           |         -----
-          |
         ");
     }
 
@@ -2316,7 +2260,6 @@ DC(f=1)
         10 |
         11 | @my_func.setter
            |  -------
-           |
         ");
     }
 
@@ -2359,7 +2302,6 @@ DC(f=1)
            |  -------
         12 | def my_func():
            |     ^^^^^^^
-           |
         ");
     }
 
@@ -2394,7 +2336,6 @@ DC(f=1)
         6 |
         7 |     @my_getter.setter
           |      ---------
-          |
         ");
     }
 
@@ -2436,7 +2377,6 @@ DC(f=1)
         11 |
         12 | @f.register
            |  -
-           |
         "#);
     }
 
@@ -2481,7 +2421,6 @@ DC(f=1)
         12 |
         13 | @f.register(str)
            |  -
-           |
         "#);
     }
 
@@ -2524,7 +2463,6 @@ DC(f=1)
         12 |
         13 |     @f.register
            |      -
-           |
         "#);
     }
 
@@ -2571,7 +2509,6 @@ DC(f=1)
         14 |
         15 |     @f.register
            |      -
-           |
         "#);
     }
 
@@ -2621,7 +2558,6 @@ DC(f=1)
            |      -
         16 |     @f.register(float)
            |      -
-           |
         "#);
     }
 
@@ -2672,7 +2608,6 @@ DC(f=1)
            |         ---------
         16 | c.attribute = "new_value"
            |   ---------
-           |
         "#);
     }
 
@@ -2722,7 +2657,6 @@ DC(f=1)
           |      -----------
         8 |     def my_property(self, value: int) -> None:
           |         -----------
-          |
         ");
     }
 
@@ -2761,7 +2695,6 @@ DC(f=1)
           |
         4 |         self.attribute = value
           |              ^^^^^^^^^
-          |
         ");
     }
 
@@ -2793,7 +2726,6 @@ DC(f=1)
         5 |
         6 | print(a)
           |       -
-          |
         "#);
     }
 
@@ -2819,7 +2751,6 @@ class C:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2845,7 +2776,6 @@ class C:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2871,7 +2801,6 @@ class C:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2897,7 +2826,6 @@ class C:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2943,7 +2871,6 @@ class D:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2969,7 +2896,6 @@ class C:
         5 |     def __init__(self):
         6 |         self.value = 1
           |              -----
-          |
         "#);
     }
 
@@ -2991,7 +2917,6 @@ class C:
           |                   ^^^^^
         4 |     value: int
           |     -----
-          |
         "#);
     }
 
@@ -3013,7 +2938,6 @@ class C:
           |
         6 |         self.value = 1
           |              ^^^^^
-          |
         ");
     }
 
@@ -3038,7 +2962,6 @@ class C:
           |                   ^^^^^
         4 |     value: int = ...
           |     -----
-          |
         "#);
     }
 
@@ -3064,7 +2987,6 @@ class C:
           |                        ^^^^^
         6 |         self.value = value
           |                      -----
-          |
         "#);
     }
 
@@ -3089,7 +3011,6 @@ class Outer:
           |
         7 |             self.value = 1
           |                  ^^^^^
-          |
         "#);
     }
 }

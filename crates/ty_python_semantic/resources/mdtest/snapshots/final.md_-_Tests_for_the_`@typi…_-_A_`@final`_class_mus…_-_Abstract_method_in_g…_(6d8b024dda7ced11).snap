@@ -45,6 +45,5 @@ error[abstract-method-in-final-class]: Final class `Child` has unimplemented abs
    |   ------
 12 |   class Child(Parent):  # error: [abstract-method-in-final-class]
    |         ^^^^^ `method` is unimplemented
-   |
 
 ```

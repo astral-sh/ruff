@@ -201,7 +201,6 @@ F841 [*] Local variable `coords3` is assigned to but never used
 33 |     (x2, y2) = coords2 = (1, 2)
 34 |     coords3 = (x3, y3) = (1, 2)
    |     ^^^^^^^
-   |
 help: Remove assignment to unused variable `coords3`
    |
 33 |     (x2, y2) = coords2 = (1, 2)
@@ -396,7 +395,6 @@ F841 [*] Local variable `toplevel` is assigned to but never used
 97 | def f():
 98 |     toplevel = tt = lexer.get_token()
    |     ^^^^^^^^
-   |
 help: Remove assignment to unused variable `toplevel`
    |
 97 | def f():
@@ -412,7 +410,6 @@ F841 [*] Local variable `tt` is assigned to but never used
 97 | def f():
 98 |     toplevel = tt = lexer.get_token()
    |                ^^
-   |
 help: Remove assignment to unused variable `tt`
    |
 97 | def f():
@@ -428,7 +425,6 @@ F841 [*] Local variable `toplevel` is assigned to but never used
 101 | def f():
 102 |     toplevel = (a, b) = lexer.get_token()
     |     ^^^^^^^^
-    |
 help: Remove assignment to unused variable `toplevel`
     |
 101 | def f():
@@ -444,7 +440,6 @@ F841 [*] Local variable `toplevel` is assigned to but never used
 105 | def f():
 106 |     (a, b) = toplevel = lexer.get_token()
     |              ^^^^^^^^
-    |
 help: Remove assignment to unused variable `toplevel`
     |
 105 | def f():
@@ -460,7 +455,6 @@ F841 [*] Local variable `toplevel` is assigned to but never used
 109 | def f():
 110 |     toplevel = tt = 1
     |     ^^^^^^^^
-    |
 help: Remove assignment to unused variable `toplevel`
     |
 109 | def f():
@@ -476,7 +470,6 @@ F841 [*] Local variable `tt` is assigned to but never used
 109 | def f():
 110 |     toplevel = tt = 1
     |                ^^
-    |
 help: Remove assignment to unused variable `tt`
     |
 109 | def f():
@@ -592,7 +585,6 @@ F841 [*] Local variable `y` is assigned to but never used
 160 |     x = 1
 161 |     y = 2
     |     ^
-    |
 help: Remove assignment to unused variable `y`
     |
 160 |     x = 1
@@ -625,7 +617,6 @@ F841 [*] Local variable `y` is assigned to but never used
 166 |
 167 |     y = 2
     |     ^
-    |
 help: Remove assignment to unused variable `y`
     |
 166 |
@@ -641,7 +632,6 @@ F841 [*] Local variable `x` is assigned to but never used
 172 |     ((x)) = foo()
 173 |     (x) = (y.z) = foo()
     |      ^
-    |
 help: Remove assignment to unused variable `x`
     |
 172 |     ((x)) = foo()

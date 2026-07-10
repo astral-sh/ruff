@@ -146,4 +146,3 @@ Module(
 4 |     match y:
 5 |         case _: ...
   |                    ^ Syntax Error: Expected a statement
-  |

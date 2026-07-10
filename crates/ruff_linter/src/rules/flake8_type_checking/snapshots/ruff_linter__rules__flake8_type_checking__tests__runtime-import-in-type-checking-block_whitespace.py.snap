@@ -10,7 +10,6 @@ TC004 [*] Move import `builtins` out of type-checking block. Import is used for 
   |                          ^^^^^^^^
 6 | builtins.print("!")
   | -------- Used at runtime here
-  |
 help: Move out of type-checking block
   |
 2 | # there is a (potentially invisible) unicode formfeed character (000C) between `TYPE_CHECKING` and the backslash

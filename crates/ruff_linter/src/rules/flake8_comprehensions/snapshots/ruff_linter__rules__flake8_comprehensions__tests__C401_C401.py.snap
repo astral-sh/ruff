@@ -86,7 +86,6 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Rewrite as a set comprehension
    |
 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
@@ -454,7 +453,6 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |           ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Rewrite using `set()`
    |
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
@@ -471,7 +469,6 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |                                   ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Rewrite using `set()`
    |
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")

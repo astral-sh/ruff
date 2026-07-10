@@ -83,4 +83,3 @@ S609 Possible wildcard injection in call due to `*` usage
 17 | x = 1
 18 | subprocess.Popen("chmod +w foo*", shell=f"{x=}")
    |                  ^^^^^^^^^^^^^^^
-   |
