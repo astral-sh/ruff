@@ -2118,8 +2118,8 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, *previous, cycle)
 }
 
-/// Bind `self` when the callable kind and receiver justify it, and *also* discard the
-/// functionlike-ness of the callable.
+/// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
+/// of the callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype

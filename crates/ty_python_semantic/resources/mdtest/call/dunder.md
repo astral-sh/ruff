@@ -138,17 +138,16 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-An annotation-only `__call__` can be generic over a `ParamSpec`. If the first parameter of the
-specialized callable cannot accept the instance, it is not a method receiver and must not be bound
-away.
+The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
+after the `ParamSpec` is specialized:
 
 ```py
 from collections.abc import Callable
-from typing import Generic, ParamSpec
+from typing import ParamSpec, Protocol
 
 P = ParamSpec("P")
 
-class C(Generic[P]):
+class C(Protocol[P]):
     __call__: Callable[P, int]
 
 def check(value: C[[str]]) -> None:

@@ -282,10 +282,8 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-The dunder-name heuristic is only evidence that a `Callable` might be a function descriptor. We bind
-the callable only if its first positional parameter can accept the instance. A callable with no
-receiver parameter remains a regular callable attribute, even if its name starts and ends with
-double underscores:
+The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
+accept a receiver:
 
 ```py
 class Thunk:
@@ -295,6 +293,19 @@ class Thunk:
         self.__value_thunk__ = other.__value_thunk__
 
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+For other concrete signatures, the heuristic does not check whether the first parameter can accept
+the instance:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
 ```
 
 A gradual callable signature might accept the receiver, so we preserve the function-descriptor

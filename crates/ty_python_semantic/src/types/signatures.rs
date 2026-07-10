@@ -398,24 +398,10 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn try_bind_dunder_self(
-        &self,
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-    ) -> Option<Self> {
-        let overloads = self
-            .overloads
+    pub(crate) fn has_parameters(&self) -> bool {
+        self.overloads
             .iter()
-            .filter(|signature| {
-                signature.has_potential_receiver() && signature.can_bind_self_to(db, self_type)
-            })
-            .map(|signature| signature.bind_self(db, Some(self_type)));
-        let bound = Self::from_overloads(overloads);
-        (!bound.overloads.is_empty()).then_some(bound)
-    }
-
-    pub(crate) fn has_potential_receiver(&self) -> bool {
-        self.overloads.iter().any(Signature::has_potential_receiver)
+            .any(|signature| !signature.parameters().as_slice().is_empty())
     }
 
     /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
@@ -631,15 +617,6 @@ impl<'db> PartialApplication<'db> {
 }
 
 impl<'db> Signature<'db> {
-    fn has_potential_receiver(&self) -> bool {
-        self.parameters().is_top()
-            || self.parameters().is_gradual()
-            || self
-                .parameters()
-                .get(0)
-                .is_some_and(Parameter::is_positional)
-    }
-
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
             generic_context: None,

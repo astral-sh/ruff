@@ -1119,9 +1119,9 @@ impl<'db> StaticClassLiteral<'db> {
             match ty {
                 Type::Callable(callable_ty)
                     if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_potential_receiver() =>
+                        && callable_ty.signatures(db).has_parameters() =>
                 {
-                    Type::Callable(callable_ty.into_dunder_function_like(db))
+                    Type::Callable(callable_ty.into_function_like(db))
                 }
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1168,6 +1168,23 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
+        fn into_dunder_paramspec_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty)
+                    if callable_ty.is_regular(db)
+                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
+                {
+                    Type::Callable(callable_ty.into_dunder_paramspec(db))
+                }
+                Type::Union(union) => {
+                    union.map(db, |element| into_dunder_paramspec_callable(db, *element))
+                }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_dunder_paramspec_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
         if CodeGeneratorKind::from_class(db, self.into())
             .is_some_and(CodeGeneratorKind::is_dataclass_like)
@@ -1211,6 +1228,12 @@ impl<'db> StaticClassLiteral<'db> {
 
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
+            let ty = if name.starts_with("__") && name.ends_with("__") {
+                into_dunder_paramspec_callable(db, ty)
+            } else {
+                ty
+            };
+
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
