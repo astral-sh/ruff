@@ -260,6 +260,13 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
+    #[salsa::tracked]
+    fn is_file_included_cached(self, db: &dyn Db, file: File) -> bool {
+        file.path(db)
+            .as_system_path()
+            .is_none_or(|path| self.is_file_included(db, path).is_included())
+    }
+
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
@@ -526,6 +533,7 @@ impl Project {
     ///   [`open_file`] or a system virtual path
     /// * For [`AllFiles`], it checks if the file is either a system virtual path or a part of the
     ///   indexed files in the project
+    /// * System files that aren't included in the project are never checked
     ///
     /// [`open_file`]: Self::open_file
     /// [`OpenFiles`]: CheckMode::OpenFiles
@@ -543,10 +551,15 @@ impl Project {
         // The problem is that it's incredibly noisy. Which is why
         // we set them to the TRACE level.
 
-        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
+        // Try to return early to avoid adding a dependency on `open_files` or `file_set`, which
         // both have a durability of `LOW`.
         if path.is_vendored_path() {
             tracing::trace!("Not checking {path} because it is a vendored path");
+            return false;
+        }
+
+        if path.is_system_path() && !self.is_file_included_cached(db, file) {
+            tracing::trace!("Not checking {path} because it is not included in the project");
             return false;
         }
 
@@ -952,5 +965,27 @@ mod tests {
                 literal_match: Some(true)
             }
         );
+    }
+
+    #[test]
+    fn excluded_files_do_not_index_project_files() -> ruff_db::system::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()));
+        let project = db.project();
+
+        assert!(project.file_set(&db).is_lazy());
+
+        for path in [
+            root.join(".venv/lib/python3.13/site-packages/package.py"),
+            SystemPathBuf::from("/external/package.py"),
+        ] {
+            db.write_file(&path, "")?;
+            let file = system_path_to_file(&db, &path).expect("written file to exist");
+
+            assert!(!project.should_check_file(&db, file));
+            assert!(project.file_set(&db).is_lazy());
+        }
+
+        Ok(())
     }
 }
