@@ -5527,18 +5527,18 @@ fn invalid_arguments_unterminated() {
         ))];
     let expected_ascii = str![[r#"
 error: invalid `--check-cfg` argument: `cfg(`
-  |
-  = note: expected `cfg(name, values("value1", "value2", ... "valueN"))`
-  = note: visit <https://doc.rust-lang.org/nightly/rustc/check-cfg.html> for more details
+ |
+ = note: expected `cfg(name, values("value1", "value2", ... "valueN"))`
+ = note: visit <https://doc.rust-lang.org/nightly/rustc/check-cfg.html> for more details
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
 
     let expected_unicode = str![[r#"
 error: invalid `--check-cfg` argument: `cfg(`
-  │
-  ├ note: expected `cfg(name, values("value1", "value2", ... "valueN"))`
-  ╰ note: visit <https://doc.rust-lang.org/nightly/rustc/check-cfg.html> for more details
+ │
+ ├ note: expected `cfg(name, values("value1", "value2", ... "valueN"))`
+ ╰ note: visit <https://doc.rust-lang.org/nightly/rustc/check-cfg.html> for more details
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);

@@ -2354,7 +2354,7 @@ fn extra_width_from_tabs(s: &str, n: usize) -> usize {
 // we're higher. If the loop isn't exited by the `return`, the last multiplication will wrap, which
 // is OK, because while we cannot fit a higher power of 10 in a usize, the loop will end anyway.
 // This is also why we need the max number of decimal digits within a `usize`.
-fn num_decimal_digits(num: usize) -> usize {
+fn num_decimal_digits(num: Option<usize>) -> usize {
     #[cfg(target_pointer_width = "64")]
     const MAX_DIGITS: usize = 20;
 
@@ -2363,6 +2363,10 @@ fn num_decimal_digits(num: usize) -> usize {
 
     #[cfg(target_pointer_width = "16")]
     const MAX_DIGITS: usize = 5;
+
+    let Some(num) = num else {
+        return 0;
+    };
 
     let mut lim = 10;
     for num_digits in 1..MAX_DIGITS {
@@ -2706,8 +2710,12 @@ enum PreProcessedElement<'a> {
 
 fn pre_process<'a>(
     groups: &'a [Group<'a>],
-) -> (usize, Option<&'a Cow<'a, str>>, Vec<PreProcessedGroup<'a>>) {
-    let mut max_line_num = 0;
+) -> (
+    Option<usize>,
+    Option<&'a Cow<'a, str>>,
+    Vec<PreProcessedGroup<'a>>,
+) {
+    let mut max_line_num = None;
     let mut og_primary_path = None;
     let mut out = Vec::with_capacity(groups.len());
     for group in groups {
@@ -2735,15 +2743,15 @@ fn pre_process<'a>(
                                 .unwrap_or(cause.source.len())
                                 .min(cause.source.len());
 
-                            max_line_num = max(
+                            max_line_num = Some(max(
                                 cause.line_start + newline_count(&cause.source[..end]),
-                                max_line_num,
-                            );
+                                max_line_num.unwrap_or(0),
+                            ));
                         } else {
-                            max_line_num = max(
+                            max_line_num = Some(max(
                                 cause.line_start + newline_count(&cause.source),
-                                max_line_num,
-                            );
+                                max_line_num.unwrap_or(0),
+                            ));
                         }
                         max_depth = max(depth, max_depth);
                     }
@@ -2776,13 +2784,14 @@ fn pre_process<'a>(
                                     DisplaySuggestion::None => l_start.line + nc,
                                     DisplaySuggestion::Add => l_start.line + nc,
                                 };
-                                max_line_num = max(sugg_max_line_num, max_line_num);
+                                max_line_num =
+                                    Some(max(sugg_max_line_num, max_line_num.unwrap_or(0)));
                             }
                         } else {
-                            max_line_num = max(
+                            max_line_num = Some(max(
                                 suggestion.line_start + newline_count(&complete),
-                                max_line_num,
-                            );
+                                max_line_num.unwrap_or(0),
+                            ));
                         }
 
                         elements.push(PreProcessedElement::Suggestion((
