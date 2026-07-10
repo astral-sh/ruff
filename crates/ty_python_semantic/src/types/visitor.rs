@@ -394,6 +394,17 @@ impl DynamicContent {
 /// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
 /// no new information, but revisiting the same protocol definition under a different
 /// specialization may expose different members and is therefore indeterminate.
+///
+/// ```python
+/// class Exact[T](Protocol):
+///     next: Exact[T]
+///
+/// class Growing[T](Protocol):
+///     next: Growing[list[T]]
+/// ```
+///
+/// Walking `Exact[int]` can skip its exact back-edge. Walking `Growing[int]` is indeterminate
+/// because each recursive edge creates a new specialization.
 pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
     struct DynamicContentVisitor<'db> {
         recursion_guard: TypeCollector<'db>,
@@ -432,13 +443,9 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
         ) {
+            let protocol_ty = Type::ProtocolInstance(protocol);
             let Some(class) = protocol.as_class_based() else {
-                walk_protocol_instance_interface(
-                    db,
-                    protocol.interface(db),
-                    Type::ProtocolInstance(protocol),
-                    self,
-                );
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
@@ -460,14 +467,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             self.active_class_protocols.visit(
                 &origin,
                 || self.record(DynamicContent::Indeterminate),
-                || {
-                    walk_protocol_instance_interface(
-                        db,
-                        protocol.interface(db),
-                        Type::ProtocolInstance(protocol),
-                        self,
-                    );
-                },
+                || walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self),
             );
         }
     }

@@ -210,6 +210,12 @@ pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> +
 ///
 /// This binds inferred method receivers and property accessors to `receiver_ty`, while leaving
 /// explicit receiver annotations in place because they can affect which overload is exposed.
+/// For example, walking `P[int]` visits the return type `int`, but not the inferred receiver type:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def method(self) -> T: ...
+/// ```
 pub(super) fn walk_protocol_instance_interface<
     'db,
     V: super::visitor::TypeVisitor<'db> + ?Sized,
