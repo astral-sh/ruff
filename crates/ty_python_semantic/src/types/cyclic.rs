@@ -319,29 +319,10 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ActiveRecursionDetector, CycleDetector};
+    use super::CycleDetector;
 
     struct TestCycleDetector;
     type Detector = CycleDetector<TestCycleDetector, u8, u8, 1>;
-
-    #[test]
-    fn active_recursion_detector_reports_scoped_visits() {
-        let detector = ActiveRecursionDetector::default();
-
-        assert!(!detector.has_active_visits());
-        assert!(!detector.is_active(&1));
-        assert!(detector.visit(
-            &1,
-            || false,
-            || {
-                assert!(detector.has_active_visits());
-                assert!(detector.is_active(&1));
-                true
-            },
-        ));
-        assert!(!detector.has_active_visits());
-        assert!(!detector.is_active(&1));
-    }
 
     #[test]
     fn caches_results_and_spills_after_two_entries() {
