@@ -483,10 +483,6 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
-
-        /// Return `Callable`-typed dunder attributes without applying the function-descriptor
-        /// heuristic. The instance descriptor path uses the receiver type to apply it later.
-        const NO_DUNDER_CALLABLE_DESCRIPTOR = 1 << 6;
     }
 }
 
@@ -523,10 +519,6 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     pub(crate) const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
-    }
-
-    pub(crate) const fn no_dunder_callable_descriptor(self) -> bool {
-        self.contains(Self::NO_DUNDER_CALLABLE_DESCRIPTOR)
     }
 }
 
@@ -2834,7 +2826,6 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let policy = policy | MemberLookupPolicy::NO_DUNDER_CALLABLE_DESCRIPTOR;
         if let Type::TypeVar(_) = self
             && let Some(class) = self.nominal_class(db)
         {
@@ -3626,33 +3617,6 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable_for_receiver<'d>(
-            db: &'d dyn Db,
-            ty: Type<'d>,
-            receiver: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable) => callable
-                    .try_into_function_like_for_receiver(db, receiver)
-                    .map(Type::Callable)
-                    .unwrap_or(ty),
-                Type::Union(union) => union.map(db, |element| {
-                    into_function_like_callable_for_receiver(db, *element, receiver)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-                    into_function_like_callable_for_receiver(db, *element, receiver)
-                }),
-                _ => ty,
-            }
-        }
-
-        let class_member =
-            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy);
-        let class_member = if name.starts_with("__") && name.ends_with("__") {
-            class_member.map_type(|ty| into_function_like_callable_for_receiver(db, ty, receiver))
-        } else {
-            class_member
-        };
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3661,7 +3625,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            class_member,
+            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
             Some(receiver),
             self.to_meta_type(db),
         );

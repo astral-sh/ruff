@@ -196,6 +196,25 @@ class ClassVarTask:
 reveal_type(ClassVarTask()("x"))  # revealed: int
 ```
 
+The same receiver check applies when comparing a concrete class against a protocol. Neither
+annotation below describes a method, so the implementation satisfies the protocol without binding
+away the `str` parameter:
+
+```py
+class CallableProtocol(Protocol):
+    __call__: Callable[[str], int]
+
+class CallableImplementation:
+    __call__: Callable[[str], int]
+
+    def __init__(self, implementation: Callable[[str], int]) -> None:
+        self.__call__ = implementation
+
+def accepts_callable_protocol(value: CallableProtocol) -> None: ...
+
+accepts_callable_protocol(CallableImplementation(len))
+```
+
 And of course the same is true if we have only an implicit assignment inside a method:
 
 ```py

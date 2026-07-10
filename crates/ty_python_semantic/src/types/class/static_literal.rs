@@ -1121,7 +1121,7 @@ impl<'db> StaticClassLiteral<'db> {
                     if callable_ty.is_regular(db)
                         && callable_ty.signatures(db).has_potential_receiver() =>
                 {
-                    Type::Callable(callable_ty.into_function_like(db))
+                    Type::Callable(callable_ty.into_dunder_function_like(db))
                 }
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -1148,8 +1148,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") && !policy.no_dunder_callable_descriptor()
-        {
+        if name.starts_with("__") && name.ends_with("__") {
             member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
 

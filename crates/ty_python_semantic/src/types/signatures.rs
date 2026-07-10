@@ -398,7 +398,7 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn retain_compatible_receiver(
+    pub(crate) fn try_bind_dunder_self(
         &self,
         db: &'db dyn Db,
         self_type: Type<'db>,
@@ -409,9 +409,9 @@ impl<'db> CallableSignature<'db> {
             .filter(|signature| {
                 signature.has_potential_receiver() && signature.can_bind_self_to(db, self_type)
             })
-            .cloned();
-        let compatible = Self::from_overloads(overloads);
-        (!compatible.overloads.is_empty()).then_some(compatible)
+            .map(|signature| signature.bind_self(db, Some(self_type)));
+        let bound = Self::from_overloads(overloads);
+        (!bound.overloads.is_empty()).then_some(bound)
     }
 
     pub(crate) fn has_potential_receiver(&self) -> bool {

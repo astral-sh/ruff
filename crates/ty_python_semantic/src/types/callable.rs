@@ -318,6 +318,12 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
+    /// Represents a `Callable`-typed dunder attribute that might be a function descriptor.
+    ///
+    /// Unlike a known function-like object, this callable only binds `self` when its signature
+    /// has a compatible receiver parameter.
+    DunderFunctionLike,
+
     /// A callable type that represents a staticmethod. These callables do not bind `self`
     /// when accessed as attributes on instances - they return the underlying function as-is.
     StaticMethodLike,
@@ -477,7 +483,14 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::FunctionLike)
+        matches!(
+            self.kind(db),
+            CallableTypeKind::FunctionLike | CallableTypeKind::DunderFunctionLike
+        )
+    }
+
+    pub(crate) fn is_dunder_function_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::DunderFunctionLike)
     }
 
     pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
@@ -497,6 +510,7 @@ impl<'db> CallableType<'db> {
         matches!(
             self.kind(db),
             CallableTypeKind::FunctionLike
+                | CallableTypeKind::DunderFunctionLike
                 | CallableTypeKind::StaticMethodLike
                 | CallableTypeKind::ClassMethodLike
         )
@@ -546,6 +560,14 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        // A dunder name is only evidence that the attribute is a function descriptor. Without a
+        // compatible receiver, preserve its declared `Callable` type instead of binding it.
+        if self.is_dunder_function_like(db) {
+            return self_type
+                .and_then(|self_type| self.try_bind_dunder_self(db, self_type))
+                .unwrap_or_else(|| self.into_regular(db));
+        }
+
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
@@ -554,31 +576,24 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
+    pub(crate) fn into_dunder_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db),
-            CallableTypeKind::FunctionLike,
+            CallableTypeKind::DunderFunctionLike,
             self.provenance(db),
         )
     }
 
-    pub(crate) fn try_into_function_like_for_receiver(
+    pub(crate) fn try_bind_dunder_self(
         self,
         db: &'db dyn Db,
         self_type: Type<'db>,
     ) -> Option<CallableType<'db>> {
-        if self.is_method_like(db) {
-            return Some(self);
-        }
-        if !self.is_regular(db) {
-            return None;
-        }
         Some(CallableType::new(
             db,
-            self.signatures(db)
-                .retain_compatible_receiver(db, self_type)?,
-            CallableTypeKind::FunctionLike,
+            self.signatures(db).try_bind_dunder_self(db, self_type)?,
+            self.kind(db),
             self.provenance(db),
         ))
     }
@@ -756,7 +771,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.is_function_like(db) && !source.is_function_like(db) {
+        // `DunderFunctionLike` still represents a declared `Callable`, so unlike a known function
+        // object it accepts regular callables as sources.
+        if target.kind(db) == CallableTypeKind::FunctionLike
+            && source.kind(db) != CallableTypeKind::FunctionLike
+        {
             return self.never();
         }
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
