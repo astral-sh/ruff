@@ -3523,20 +3523,37 @@ impl<'db> Type<'db> {
     /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
     /// type arguments do not affect the runtime descriptor class.
     pub(crate) fn is_definitely_non_data_descriptor(self, db: &'db dyn Db) -> bool {
+        self.is_definitely_non_data_descriptor_impl(db, ())
+    }
+
+    // Recursive aliases use `true`, the identity for the all-of classifications above.
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, ()| true,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, _: ()) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
+                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, ())),
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
-            Type::TypeAlias(alias) => alias.value_type(db).is_definitely_non_data_descriptor(db),
+                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, ())),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .is_definitely_non_data_descriptor_impl(db, ()),
             _ => !self.may_be_data_descriptor(db),
         }
     }
 
+    // Definite data descriptors use an all-of union fold; possible data descriptors use any-of.
+    // Seed recursive aliases with the corresponding identity value.
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, any_of_union: bool| !any_of_union,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,
@@ -3553,6 +3570,9 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .is_data_descriptor_impl(db, any_of_union),
             _ => {
                 !self
                     .class_member_with_policy(
