@@ -431,18 +431,46 @@ impl AttributeKind {
     }
 }
 
-/// This enum is used to control the behavior of the descriptor protocol implementation.
-/// When invoked on a class object, the fallback type (a class attribute) can shadow a
-/// non-data descriptor of the meta-type (the class's metaclass). However, this is not
-/// true for instances. When invoked on an instance, the fallback type (an attribute on
-/// the instance) cannot completely shadow a non-data descriptor of the meta-type (the
-/// class), because we do not currently attempt to statically infer if an instance
-/// attribute is definitely defined (i.e. to check whether a particular method has been
-/// called).
+/// Whether a member on the receiver can shadow a non-data member on the receiver's type.
+///
+/// This policy is shared by attribute reads and writes. For a class-object receiver `C`, the
+/// receiver member is a class attribute such as `C.x`, while the type member is an attribute on the
+/// metaclass, `type(C).x`. An always-defined class attribute can therefore shadow a non-data
+/// descriptor on the metaclass.
+///
+/// For an ordinary instance `obj`, the receiver member is an instance attribute such as `obj.x`,
+/// while the type member is a class attribute, `type(obj).x`. Shadowing is disabled in this case
+/// because we do not currently infer whether the instance attribute is definitely initialized at
+/// the point of access. Doing so would require tracking whether the relevant initializer path, or
+/// another method that assigns the attribute, has executed.
 #[derive(Clone, Debug, Copy, PartialEq)]
-enum InstanceFallbackShadowsNonDataDescriptor {
+enum ReceiverMemberShadowsNonDataDescriptor {
     Yes,
     No,
+}
+
+/// Return whether `receiver_member` takes precedence over `type_member`.
+///
+/// Descriptor uncertainty is conservative: the receiver member only takes precedence when it is
+/// always defined and the type member is known not to be a data descriptor.
+fn receiver_member_shadows_type_member<'db>(
+    db: &'db dyn Db,
+    type_member: PlaceAndQualifiers<'db>,
+    receiver_member: PlaceAndQualifiers<'db>,
+    policy: ReceiverMemberShadowsNonDataDescriptor,
+) -> bool {
+    policy == ReceiverMemberShadowsNonDataDescriptor::Yes
+        && matches!(
+            receiver_member.place,
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
+        )
+        && type_member
+            .place
+            .ignore_possibly_undefined()
+            .is_some_and(|ty| ty.is_definitely_non_data_descriptor(db))
 }
 
 bitflags! {
@@ -3617,9 +3645,14 @@ impl<'db> Type<'db> {
         receiver: Type<'db>,
         name: &str,
         fallback: PlaceAndQualifiers<'db>,
-        policy: InstanceFallbackShadowsNonDataDescriptor,
+        policy: ReceiverMemberShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let type_member =
+            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy);
+        if receiver_member_shadows_type_member(db, type_member, fallback, policy) {
+            return fallback;
+        }
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3628,7 +3661,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
+            type_member,
             Some(receiver),
             self.to_meta_type(db),
         );
@@ -3684,28 +3717,9 @@ impl<'db> Type<'db> {
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
-            // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
-            // now the highest priority. However, we only return the pure `fallback` type if the
-            // policy allows it. When invoked on class objects, the policy is set to `Yes`, which
-            // means that class-level attributes (the fallback) can shadow non-data descriptors
-            // on metaclasses. However, for instances, the policy is set to `No`, because we do
-            // allow instance-level attributes to shadow class-level non-data descriptors. This
-            // would require us to statically infer if an instance attribute is always set, which
-            // is something we currently don't attempt to do.
-            (
-                Place::Defined(_),
-                AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-            ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
-                fallback.with_qualifiers(fallback_qualifiers)
-            }
-
-            // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
-            // unbound or the policy argument is `No`. In both cases, the `fallback` type does
-            // not completely shadow the non-data descriptor, so we build a union of the two.
+            // The fallback cannot completely shadow the type member when it is possibly unbound,
+            // the policy disables shadowing, or the raw type member's descriptor status is
+            // uncertain. Preserve both possibilities.
             (
                 Place::Defined(DefinedPlace {
                     ty: meta_attr_ty,
@@ -3840,7 +3854,7 @@ impl<'db> Type<'db> {
                     receiver,
                     name_str,
                     fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    ReceiverMemberShadowsNonDataDescriptor::No,
                     policy,
                 );
 
@@ -4139,7 +4153,7 @@ impl<'db> Type<'db> {
                     receiver.unwrap_or(this),
                     name_str,
                     Place::Undefined.into(),
-                    InstanceFallbackShadowsNonDataDescriptor::No,
+                    ReceiverMemberShadowsNonDataDescriptor::No,
                     policy,
                 ),
 
@@ -4337,7 +4351,7 @@ impl<'db> Type<'db> {
                         receiver,
                         name_str,
                         class_attr_fallback,
-                        InstanceFallbackShadowsNonDataDescriptor::Yes,
+                        ReceiverMemberShadowsNonDataDescriptor::Yes,
                         policy,
                     );
 
