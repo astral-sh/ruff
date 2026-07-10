@@ -138,6 +138,51 @@ C()()
 _: Callable[..., None] = C()
 ```
 
+An annotation-only `__call__` can also be generic over a `ParamSpec`. It describes an instance
+member and must not additionally participate in class-namespace descriptor lookup, which would
+incorrectly bind away its first parameter. This is a regression test for
+<https://github.com/astral-sh/ty/issues/3957>.
+
+```py
+from collections.abc import Callable
+from typing import ClassVar, Generic, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", covariant=True)
+
+class Task(Protocol, Generic[P, R]):
+    __call__: Callable[P, int]
+
+def decorate(fn: Callable[P, R]) -> Task[P, R]:
+    raise NotImplementedError
+
+@decorate
+def my_task(ctx: str) -> str:
+    return ctx
+
+reveal_type(my_task)  # revealed: Task[(ctx: str), str]
+reveal_type(my_task.__call__)  # revealed: (ctx: str) -> int
+reveal_type(my_task(ctx="x"))  # revealed: int
+reveal_type(my_task("x"))  # revealed: int
+
+class InheritedTask(Task[P, R], Protocol): ...
+
+def decorate_inherited(fn: Callable[P, R]) -> InheritedTask[P, R]:
+    raise NotImplementedError
+
+@decorate_inherited
+def inherited_task(ctx: str) -> str:
+    return ctx
+
+reveal_type(inherited_task.__call__)  # revealed: (ctx: str) -> int
+reveal_type(inherited_task(ctx="x"))  # revealed: int
+
+class ClassVarTask:
+    __call__: ClassVar[Callable[["ClassVarTask", str], int]]
+
+reveal_type(ClassVarTask()("x"))  # revealed: int
+```
+
 And of course the same is true if we have only an implicit assignment inside a method:
 
 ```py
