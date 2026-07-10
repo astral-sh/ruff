@@ -5,7 +5,7 @@ mod python_version;
 mod rule;
 mod version;
 
-use std::fmt::Write;
+use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -506,11 +506,12 @@ impl MainLoop {
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
 
-                let mut stdout = self.printer.stream_for_details().lock();
+                let stdout = self.printer.stream_for_details().lock();
 
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
+                    let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
@@ -523,6 +524,7 @@ impl MainLoop {
                         "{}",
                         DisplayDiagnostics::new(db, &display_config, diagnostics)
                     )?;
+                    stdout.flush()?;
                 }
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {

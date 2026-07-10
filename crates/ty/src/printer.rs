@@ -175,15 +175,3 @@ impl std::io::Write for Stdout {
         }
     }
 }
-
-impl std::fmt::Write for Stdout {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        match self.status {
-            StreamStatus::Enabled => {
-                let _ = self.with_handle(|handle| write!(handle, "{s}"));
-                Ok(())
-            }
-            StreamStatus::Disabled => Ok(()),
-        }
-    }
-}
