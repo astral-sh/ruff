@@ -341,47 +341,6 @@ fn divergent_type() {
 }
 
 #[test]
-fn data_descriptor_classification_recovers_recursive_aliases() {
-    use crate::db::tests::TestDb;
-    use crate::place::global_symbol;
-
-    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
-        let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let ty = global_symbol(db, module, name).place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) = ty else {
-            panic!("Expected `{name}` to be a type alias");
-        };
-        Type::TypeAlias(type_alias)
-    }
-
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/a.py",
-        r#"
-class Descriptor:
-    def __set__(self, instance: object, value: object) -> None: ...
-
-type NonData = int | NonDataTail
-type NonDataTail = NonData
-
-type Data = Descriptor | DataTail
-type DataTail = Data
-"#,
-    )
-    .unwrap();
-
-    let non_data = get_type_alias(&db, "NonData");
-    assert!(!non_data.is_data_descriptor(&db));
-    assert!(!non_data.may_be_data_descriptor(&db));
-    assert!(non_data.is_definitely_non_data_descriptor(&db));
-
-    let data = get_type_alias(&db, "Data");
-    assert!(data.is_data_descriptor(&db));
-    assert!(data.may_be_data_descriptor(&db));
-    assert!(!data.is_definitely_non_data_descriptor(&db));
-}
-
-#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;

@@ -3531,7 +3531,7 @@ impl<'db> Type<'db> {
         cycle_initial=|_, _, _, ()| true,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, _: ()) -> bool {
+    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, (): ()) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
             Type::Union(union) => union
