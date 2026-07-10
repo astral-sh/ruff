@@ -50,6 +50,7 @@ pub struct Group<'a> {
     pub(crate) primary_level: Level<'a>,
     pub(crate) title: Option<Title<'a>>,
     pub(crate) elements: Vec<Element<'a>>,
+    pub(crate) lineno_offset: usize,
 }
 
 impl<'a> Group<'a> {
@@ -75,6 +76,7 @@ impl<'a> Group<'a> {
             primary_level: level,
             title: None,
             elements: vec![],
+            lineno_offset: 0,
         }
     }
 
@@ -99,7 +101,8 @@ impl<'a> Group<'a> {
     /// For normal diagnostics this is computed automatically based on the lines to be rendered.
     /// This is intended only for use in the formatter, where we don't render a snippet directly but
     /// still want the header to align with the diff.
-    pub fn lineno_offset(self, _offset: usize) -> Self {
+    pub fn lineno_offset(mut self, offset: usize) -> Self {
+        self.lineno_offset = offset;
         self
     }
 }
