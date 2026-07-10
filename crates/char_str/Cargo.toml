@@ -30,9 +30,6 @@ serde_json = { workspace = true }
 [target.'cfg(loom)'.dependencies]
 loom = { workspace = true, optional = true }
 
-[target.'cfg(loom)'.dev-dependencies]
-dhat = { workspace = true }
-
 [lints]
 workspace = true
 

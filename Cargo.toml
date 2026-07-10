@@ -91,7 +91,6 @@ crossbeam = { version = "0.8.4" }
 csv = { version = "1.3.1" }
 dashmap = { version = "6.0.1" }
 datatest-stable = { version = "0.3.3" }
-dhat = "0.3.3"
 divan = { package = "codspeed-divan-compat", version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }
 dunce = { version = "1.0.5" }

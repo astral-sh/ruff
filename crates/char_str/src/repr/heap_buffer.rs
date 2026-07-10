@@ -235,6 +235,13 @@ impl TextLen {
         usize::from_ne_bytes(bytes)
     };
 
+    #[cfg_attr(
+        target_pointer_width = "32",
+        expect(
+            clippy::unnecessary_wraps,
+            reason = "keeps length construction target-independent"
+        )
+    )]
     const fn new(size: usize) -> Result<Self, ReserveError> {
         if size > Self::MAX_LEN {
             #[cfg(target_pointer_width = "64")]
