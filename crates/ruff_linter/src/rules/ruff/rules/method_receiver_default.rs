@@ -50,8 +50,12 @@ impl Violation for MethodReceiverDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.receiver_kind {
-            ReceiverKind::Instance => "Instance receiver parameter should not have a default value".to_string(),
-            ReceiverKind::Class => "Class receiver parameter should not have a default value".to_string(),
+            ReceiverKind::Instance => {
+                "Instance receiver parameter should not have a default value".to_string()
+            }
+            ReceiverKind::Class => {
+                "Class receiver parameter should not have a default value".to_string()
+            }
         }
     }
 
@@ -110,35 +114,36 @@ fn is_name_or_attr(expr: &Expr, name: &str, _checker: &Checker) -> bool {
 }
 
 /// RUF077 — Method receiver parameter should not have a default value
-pub(crate) fn method_receiver_default(  
-    checker: &Checker,  
-    function: &ast::StmtFunctionDef,  
-) {  
-    // Only check functions directly in a class body  
-    let Some(Stmt::ClassDef(_)) = checker.semantic().current_statement_parent() else {  
-        return;  
-    };  
-  
-    // Determine receiver kind  
-    let Some(receiver_kind) = classify_receiver_kind(function, checker) else {  
-        return;  
-    };  
-  
-    // Get the first parameter (the receiver)  
-    let Some(first_param) = function.parameters.posonlyargs.first()  
-        .or_else(|| function.parameters.args.first()) else {  
-        return;  
-    };  
-  
-    // Check if the receiver parameter has a default value  
-    if first_param.default.is_some() {  
-        let diagnostic = MethodReceiverDefault { receiver_kind };  
-          
-        // Report at the default value location if available, otherwise at the parameter  
-        if let Some(default_expr) = &first_param.default {  
-            checker.report_diagnostic(diagnostic, default_expr.range());  
-        } else {  
-            checker.report_diagnostic(diagnostic, first_param.range());  
-        }  
-    }  
+pub(crate) fn method_receiver_default(checker: &Checker, function: &ast::StmtFunctionDef) {
+    // Only check functions directly in a class body
+    let Some(Stmt::ClassDef(_)) = checker.semantic().current_statement_parent() else {
+        return;
+    };
+
+    // Determine receiver kind
+    let Some(receiver_kind) = classify_receiver_kind(function, checker) else {
+        return;
+    };
+
+    // Get the first parameter (the receiver)
+    let Some(first_param) = function
+        .parameters
+        .posonlyargs
+        .first()
+        .or_else(|| function.parameters.args.first())
+    else {
+        return;
+    };
+
+    // Check if the receiver parameter has a default value
+    if first_param.default.is_some() {
+        let diagnostic = MethodReceiverDefault { receiver_kind };
+
+        // Report at the default value location if available, otherwise at the parameter
+        if let Some(default_expr) = &first_param.default {
+            checker.report_diagnostic(diagnostic, default_expr.range());
+        } else {
+            checker.report_diagnostic(diagnostic, first_param.range());
+        }
+    }
 }
