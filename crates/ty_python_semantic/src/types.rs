@@ -433,9 +433,16 @@ impl AttributeKind {
 
 /// Whether a member on the receiver can shadow a non-data member on the receiver's type.
 ///
-/// This is enabled for class objects, where an always-defined class member shadows a non-data
-/// descriptor on the metaclass. It is disabled for ordinary instances because we do not currently
-/// infer whether an instance attribute is definitely initialized.
+/// This policy is shared by attribute reads and writes. For a class-object receiver `C`, the
+/// receiver member is a class attribute such as `C.x`, while the type member is an attribute on the
+/// metaclass, `type(C).x`. An always-defined class attribute can therefore shadow a non-data
+/// descriptor on the metaclass.
+///
+/// For an ordinary instance `obj`, the receiver member is an instance attribute such as `obj.x`,
+/// while the type member is a class attribute, `type(obj).x`. Shadowing is disabled in this case
+/// because we do not currently infer whether the instance attribute is definitely initialized at
+/// the point of access. Doing so would require tracking whether the relevant initializer path, or
+/// another method that assigns the attribute, has executed.
 #[derive(Clone, Debug, Copy, PartialEq)]
 enum ReceiverMemberShadowsNonDataDescriptor {
     Yes,
