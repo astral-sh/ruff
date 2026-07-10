@@ -1465,10 +1465,10 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+    /// Whether equality-based checks should only narrow to literal types when it is safe to do so.
     ///
-    /// For example, when this option is enabled, ty narrows `value` from `str` to
-    /// `Literal["a"]` in the positive branch of `value == "a"`.
+    /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+    /// `value == "a"`. When this option is enabled, `value` remains `str`.
     /// This also applies to membership tests and literal patterns, which use equality.
     ///
     /// ```python
@@ -1476,24 +1476,24 @@ pub struct AnalysisOptions {
     ///
     /// def parse(value: str) -> Literal["a"] | None:
     ///     if value == "a":
-    ///         return value  # Accepted by default; `value` remains `str` when disabled.
+    ///         return value  # Accepted by default; `value` remains `str` in strict mode.
     ///     return None
     /// ```
     ///
     /// This narrowing is unsafe because subclasses of these builtin types may override
     /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
-    /// Disable this option to preserve the broader builtin type instead.
+    /// Enable this option to preserve the broader builtin type instead.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     #[option(
-        default = r#"true"#,
+        default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Preserve broad builtin types after equality-based checks
-        unsafe-literal-narrowing = false
+        # Only narrow to literals when it is safe to do so
+        strict-literal-narrowing = true
         "#
     )]
-    pub unsafe_literal_narrowing: Option<bool>,
+    pub strict_literal_narrowing: Option<bool>,
 
     /// Whether ty should respect `type: ignore` comments.
     ///
@@ -1571,14 +1571,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
-            unsafe_literal_narrowing,
+            strict_literal_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
-            unsafe_literal_narrowing: unsafe_literal_narrowing_default,
+            strict_literal_narrowing: strict_literal_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1607,8 +1607,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
-            unsafe_literal_narrowing: unsafe_literal_narrowing
-                .unwrap_or(unsafe_literal_narrowing_default),
+            strict_literal_narrowing: strict_literal_narrowing
+                .unwrap_or(strict_literal_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

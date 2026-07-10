@@ -716,9 +716,9 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             subject_ty,
             value_ty,
             false,
-            ComparisonSoundnessPolicy::from_unsafe_literal_narrowing(
+            ComparisonSoundnessPolicy::from_strict_literal_narrowing(
                 db.analysis_settings(value.file(db))
-                    .unsafe_literal_narrowing,
+                    .strict_literal_narrowing,
             ),
         ) {
             return IntersectionBuilder::new(db)

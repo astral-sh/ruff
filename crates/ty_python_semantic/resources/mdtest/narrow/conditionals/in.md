@@ -123,9 +123,9 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Literal["a", "c"]
 ```
 
-## Disabling unsafe literal narrowing for membership
+## Enabling strict literal narrowing for membership
 
-With unsafe literal narrowing disabled, a broad union arm is preserved when a membership test
+With strict literal narrowing enabled, a broad union arm is preserved when a membership test
 succeeds, while literal arms are still narrowed safely:
 
 ```toml
@@ -133,7 +133,7 @@ succeeds, while literal arms are still narrowed safely:
 python-version = "3.12"
 
 [analysis]
-unsafe-literal-narrowing = false
+strict-literal-narrowing = true
 ```
 
 ```py

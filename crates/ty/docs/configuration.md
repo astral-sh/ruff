@@ -160,12 +160,12 @@ Defaults to `true`.
 
 ---
 
-### `unsafe-literal-narrowing`
+### `strict-literal-narrowing`
 
-Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+Whether equality-based checks should only narrow to literal types when it is safe to do so.
 
-For example, when this option is enabled, ty narrows `value` from `str` to
-`Literal["a"]` in the positive branch of `value == "a"`.
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`.
 This also applies to membership tests and literal patterns, which use equality.
 
 ```python
@@ -173,17 +173,17 @@ from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` when disabled.
+        return value  # Accepted by default; `value` remains `str` in strict mode.
     return None
 ```
 
 This narrowing is unsafe because subclasses of these builtin types may override
 `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
-Disable this option to preserve the broader builtin type instead.
+Enable this option to preserve the broader builtin type instead.
 
-Defaults to `true`.
+Defaults to `false`.
 
-**Default value**: `true`
+**Default value**: `false`
 
 **Type**: `bool`
 
@@ -193,16 +193,16 @@ Defaults to `true`.
 
     ```toml
     [tool.ty.analysis]
-    # Preserve broad builtin types after equality-based checks
-    unsafe-literal-narrowing = false
+    # Only narrow to literals when it is safe to do so
+    strict-literal-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
     [analysis]
-    # Preserve broad builtin types after equality-based checks
-    unsafe-literal-narrowing = false
+    # Only narrow to literals when it is safe to do so
+    strict-literal-narrowing = true
     ```
 
 ---
@@ -701,12 +701,12 @@ Defaults to `true`.
 
 ---
 
-#### `unsafe-literal-narrowing`
+#### `strict-literal-narrowing`
 
-Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+Whether equality-based checks should only narrow to literal types when it is safe to do so.
 
-For example, when this option is enabled, ty narrows `value` from `str` to
-`Literal["a"]` in the positive branch of `value == "a"`.
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`.
 This also applies to membership tests and literal patterns, which use equality.
 
 ```python
@@ -714,17 +714,17 @@ from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` when disabled.
+        return value  # Accepted by default; `value` remains `str` in strict mode.
     return None
 ```
 
 This narrowing is unsafe because subclasses of these builtin types may override
 `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
-Disable this option to preserve the broader builtin type instead.
+Enable this option to preserve the broader builtin type instead.
 
-Defaults to `true`.
+Defaults to `false`.
 
-**Default value**: `true`
+**Default value**: `false`
 
 **Type**: `bool`
 
@@ -734,16 +734,16 @@ Defaults to `true`.
 
     ```toml
     [tool.ty.overrides.analysis]
-    # Preserve broad builtin types after equality-based checks
-    unsafe-literal-narrowing = false
+    # Only narrow to literals when it is safe to do so
+    strict-literal-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
     [overrides.analysis]
-    # Preserve broad builtin types after equality-based checks
-    unsafe-literal-narrowing = false
+    # Only narrow to literals when it is safe to do so
+    strict-literal-narrowing = true
     ```
 
 ---

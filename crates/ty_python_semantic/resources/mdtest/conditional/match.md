@@ -575,14 +575,14 @@ def _(target: int | str):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
-### Disabling unsafe literal narrowing
+### Enabling strict literal narrowing
 
-With unsafe literal narrowing disabled, broad builtin types are preserved both in the capture and
+With strict literal narrowing enabled, broad builtin types are preserved both in the capture and
 when narrowing the subject for later cases:
 
 ```toml
 [analysis]
-unsafe-literal-narrowing = false
+strict-literal-narrowing = true
 ```
 
 ```py

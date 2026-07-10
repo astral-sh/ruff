@@ -316,11 +316,11 @@ pub(super) enum ComparisonSoundnessPolicy {
 }
 
 impl ComparisonSoundnessPolicy {
-    pub(super) fn from_unsafe_literal_narrowing(enabled: bool) -> Self {
+    pub(super) fn from_strict_literal_narrowing(enabled: bool) -> Self {
         if enabled {
-            Self::UnsafeLiteralNarrowing
-        } else {
             Self::Conservative
+        } else {
+            Self::UnsafeLiteralNarrowing
         }
     }
 }

@@ -1617,14 +1617,14 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-## Disabling unsafe literal narrowing
+## Enabling strict literal narrowing
 
-The `unsafe-literal-narrowing` option can be disabled to preserve broad builtin types after equality
+The `strict-literal-narrowing` option can be enabled to preserve broad builtin types after equality
 comparisons. Narrowing types that are already literal unions remains safe and is unaffected.
 
 ```toml
 [analysis]
-unsafe-literal-narrowing = false
+strict-literal-narrowing = true
 ```
 
 ```py
