@@ -3853,10 +3853,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotation = assignment.annotation(self.module());
+        // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
+        self.setup_dataclass_field_specifiers();
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+        self.dataclass_field_specifiers.clear();
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
