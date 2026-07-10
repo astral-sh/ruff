@@ -2444,32 +2444,53 @@ static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter
 
 ## Protocol members defined using descriptor decorators
 
+### Descriptor reads and writes
+
+On an instance, a protocol member defined using a descriptor decorator has the type returned by
+`__get__`, not the type of the descriptor stored on the protocol class. If the descriptor defines
+`__set__`, its value parameter determines which assignments are valid:
+
+```py
+from typing import Protocol
+
+class StringDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "example"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class HasName(Protocol):
+    @StringDescriptor
+    def name(self) -> object: ...
+
+class WithName:
+    name: str = "example"
+
+has_name: HasName = WithName()
+reveal_type(has_name.name)  # revealed: str
+has_name.name = "updated"
+has_name.name = 1  # error: [invalid-assignment]
+```
+
 ### `cached_property`
 
-On an instance, a protocol member decorated with `cached_property` has the type returned by
-`cached_property.__get__`, not the type of the descriptor stored on the protocol class. The typeshed
-definition also includes a `__set__` method, whose value parameter determines which assignments are
-valid:
+The standard-library `cached_property` descriptor uses the same behavior:
 
 ```py
 from functools import cached_property
 from typing import Protocol
 
-class HasName(Protocol):
+class HasCachedName(Protocol):
     @cached_property
     def name(self) -> str: ...
 
-class WithName:
+class WithCachedName:
     @cached_property
     def name(self) -> str:
         return "example"
 
-has_name: HasName = WithName()
-
-def update_name(value: HasName) -> None:
-    reveal_type(value.name)  # revealed: str
-    value.name = "updated"
-    value.name = 1  # error: [invalid-assignment]
+has_name: HasCachedName = WithCachedName()
 ```
 
 ### Generic descriptor result types
