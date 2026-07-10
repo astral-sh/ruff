@@ -1,4 +1,4 @@
-use ruff_python_trivia::leading_indentation;
+use ruff_python_trivia::{leading_indentation, tab_offset_u32};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -205,7 +205,7 @@ pub(super) fn indentation(line: &str) -> TextSize {
         leading_indentation(line)
             .bytes()
             .fold(0u32, |column, byte| match byte {
-                b'\t' => (column / 8 + 1) * 8,
+                b'\t' => column + tab_offset_u32(column, 8),
                 _ => column + 1,
             }),
     )
