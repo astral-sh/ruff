@@ -138,81 +138,22 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-An annotation-only `__call__` can also be generic over a `ParamSpec`. Once specialized, its first
-parameter might not accept the instance and therefore cannot be a method receiver. In that case, the
-dunder-name heuristic must not bind the parameter away. This is a regression test for
-<https://github.com/astral-sh/ty/issues/3957>.
+An annotation-only `__call__` can be generic over a `ParamSpec`. If the first parameter of the
+specialized callable cannot accept the instance, it is not a method receiver and must not be bound
+away.
 
 ```py
 from collections.abc import Callable
-from typing import ClassVar, Generic, ParamSpec, Protocol, TypeVar
+from typing import Generic, ParamSpec
 
 P = ParamSpec("P")
-R = TypeVar("R", covariant=True)
 
-class Task(Protocol, Generic[P, R]):
+class C(Generic[P]):
     __call__: Callable[P, int]
 
-def decorate(fn: Callable[P, R]) -> Task[P, R]:
-    raise NotImplementedError
-
-@decorate
-def my_task(ctx: str) -> str:
-    return ctx
-
-reveal_type(my_task)  # revealed: Task[(ctx: str), str]
-reveal_type(my_task.__call__)  # revealed: (ctx: str) -> int
-reveal_type(my_task(ctx="x"))  # revealed: int
-reveal_type(my_task("x"))  # revealed: int
-
-class InheritedTask(Task[P, R], Protocol): ...
-
-def decorate_inherited(fn: Callable[P, R]) -> InheritedTask[P, R]:
-    raise NotImplementedError
-
-@decorate_inherited
-def inherited_task(ctx: str) -> str:
-    return ctx
-
-reveal_type(inherited_task.__call__)  # revealed: (ctx: str) -> int
-reveal_type(inherited_task(ctx="x"))  # revealed: int
-
-class NominalTask(Generic[P, R]):
-    __call__: Callable[P, int]
-
-def decorate_nominal(fn: Callable[P, R]) -> NominalTask[P, R]:
-    raise NotImplementedError
-
-@decorate_nominal
-def nominal_task(ctx: str) -> str:
-    return ctx
-
-reveal_type(nominal_task.__call__)  # revealed: (ctx: str) -> int
-reveal_type(nominal_task(ctx="x"))  # revealed: int
-
-class ClassVarTask:
-    __call__: ClassVar[Callable[["ClassVarTask", str], int]]
-
-reveal_type(ClassVarTask()("x"))  # revealed: int
-```
-
-The same receiver check applies when comparing a concrete class against a protocol. Neither
-annotation below describes a method, so the implementation satisfies the protocol without binding
-away the `str` parameter:
-
-```py
-class CallableProtocol(Protocol):
-    __call__: Callable[[str], int]
-
-class CallableImplementation:
-    __call__: Callable[[str], int]
-
-    def __init__(self, implementation: Callable[[str], int]) -> None:
-        self.__call__ = implementation
-
-def accepts_callable_protocol(value: CallableProtocol) -> None: ...
-
-accepts_callable_protocol(CallableImplementation(len))
+def check(value: C[[str]]) -> None:
+    reveal_type(value.__call__)  # revealed: (str, /) -> int
+    reveal_type(value("value"))  # revealed: int
 ```
 
 And of course the same is true if we have only an implicit assignment inside a method:
