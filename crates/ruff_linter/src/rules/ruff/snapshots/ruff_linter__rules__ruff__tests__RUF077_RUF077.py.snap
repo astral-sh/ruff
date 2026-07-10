@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF077 Instance receiver parameter should not have a default value
+ --> RUF077.py:4:21
+  |
+3 | class InstanceReceiverDefault:
+4 |     def method(self=None): ...  # RUF077
+  |                     ^^^^
+  |
+help: Remove default value from receiver parameter
+
+RUF077 Class receiver parameter should not have a default value
+ --> RUF077.py:9:19
+  |
+7 | class ClassReceiverDefault:
+8 |     @classmethod
+9 |     def build(cls=None): ...  # RUF077
+  |                   ^^^^
+  |
+help: Remove default value from receiver parameter
+
+RUF077 Class receiver parameter should not have a default value
+  --> RUF077.py:13:21
+   |
+12 | class NewMethodClassReceiver:
+13 |     def __new__(cls=None): ...  # RUF077
+   |                     ^^^^
+   |
+help: Remove default value from receiver parameter
