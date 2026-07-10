@@ -1908,17 +1908,36 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             else {
                 return self.never();
             };
-            let Some(method_return_type) = non_never_callable_return_type(db, method) else {
+            if !callable_has_only_non_never_returns(db, method) {
                 return self.never();
-            };
+            }
 
             ty.try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
                 .when_some_and(db, self.constraints, |callables| {
                     callables.iter().when_all(db, self.constraints, |callable| {
-                        non_never_callable_return_type(db, *callable).when_some_and(
+                        if !callable_has_only_non_never_returns(db, *callable) {
+                            return self.never();
+                        }
+
+                        // Disjointness distributes over unions. Compare the overload return arms
+                        // directly so that recursive return types do not require canonicalizing an
+                        // intermediate union merely to distribute it again.
+                        method.signatures(db).iter().when_all(
                             db,
                             self.constraints,
-                            |return_type| self.check_type_pair(db, method_return_type, return_type),
+                            |method_signature| {
+                                callable.signatures(db).iter().when_all(
+                                    db,
+                                    self.constraints,
+                                    |callable_signature| {
+                                        self.check_type_pair(
+                                            db,
+                                            method_signature.return_ty,
+                                            callable_signature.return_ty,
+                                        )
+                                    },
+                                )
+                            },
                         )
                     })
                 })
@@ -2132,19 +2151,19 @@ fn protocol_bind_self<'db>(
     callable.bind_self(db, self_type).into_regular(db)
 }
 
-/// Return the possible output type of a callable unless any overload returns `Never`.
+/// Return `true` if a callable has at least one overload and none return `Never`.
 ///
 /// Return-type disjointness is a pragmatic approximation for method members: a callable returning
 /// `Never` could satisfy otherwise-incompatible signatures, so it must not establish disjointness.
-fn non_never_callable_return_type<'db>(
-    db: &'db dyn Db,
-    callable: CallableType<'db>,
-) -> Option<Type<'db>> {
-    callable
-        .signatures(db)
-        .iter()
-        .all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
-        .then(|| callable.signatures(db).overload_return_type_or_unknown(db))
+fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
+    let mut signatures = callable.signatures(db).iter();
+    let Some(first) = signatures.next() else {
+        // An empty signature previously produced `Unknown`, which cannot establish disjointness.
+        return false;
+    };
+
+    !first.return_ty.resolve_type_alias(db).is_never()
+        && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
 }
 
 /// Protocol compatibility can only succeed if every required member is present.

@@ -1683,6 +1683,86 @@ static_assert(is_assignable_to(AliasedNeverLength, HasLengthTwo))
 static_assert(not is_disjoint_from(AliasedNeverLength, HasLengthTwo))
 ```
 
+For overloaded methods, every possible return type on one side must be disjoint from every possible
+return type on the other. A `Never` return in either overload set prevents the method from
+establishing disjointness.
+
+```py
+from typing import Literal, Protocol, overload
+from typing_extensions import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class ReturnsOneOrTwo(Protocol):
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[1]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> Literal[2]: ...
+
+class ReturnsThreeOrFour:
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[3]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> Literal[4]: ...
+    def value(self, flag: bool, /) -> Literal[3, 4]:
+        return 3 if flag else 4
+
+class ReturnsTwoOrThree:
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[2]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> Literal[3]: ...
+    def value(self, flag: bool, /) -> Literal[2, 3]:
+        return 2 if flag else 3
+
+static_assert(is_disjoint_from(ReturnsOneOrTwo, ReturnsThreeOrFour))
+static_assert(not is_disjoint_from(ReturnsOneOrTwo, ReturnsTwoOrThree))
+
+class ReturnsOneOrNever(Protocol):
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[1]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> Never: ...
+
+class ReturnsThreeOrNever:
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[3]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> Never: ...
+    def value(self, flag: bool, /) -> Literal[3]:
+        return 3
+
+static_assert(not is_disjoint_from(ReturnsOneOrNever, ReturnsThreeOrFour))
+static_assert(not is_disjoint_from(ReturnsOneOrTwo, ReturnsThreeOrNever))
+
+type BottomReturn = Never
+
+class ReturnsThreeOrBottom:
+    @overload
+    def value(self, flag: Literal[True], /) -> Literal[3]: ...
+    @overload
+    def value(self, flag: Literal[False], /) -> BottomReturn: ...
+    def value(self, flag: bool, /) -> Literal[3]:
+        return 3
+
+static_assert(not is_disjoint_from(ReturnsOneOrTwo, ReturnsThreeOrBottom))
+
+class ReceiverFiltered[T]:
+    payload: T
+
+    @overload
+    def value(self: "ReceiverFiltered[bytes]", flag: bool, /) -> bytes: ...
+    @overload
+    def value(self: "ReceiverFiltered[str]", flag: bool, /) -> str: ...
+    def value(self, flag: bool, /) -> str | bytes:
+        return ""
+
+def empty_overloads(receiver: ReceiverFiltered[int]) -> None:
+    reveal_type(receiver.value)  # revealed: Overload[]
+
+static_assert(not is_disjoint_from(ReturnsOneOrTwo, ReceiverFiltered[int]))
+```
+
 ## Intersections of protocols with types that have possibly unbound attributes
 
 Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
