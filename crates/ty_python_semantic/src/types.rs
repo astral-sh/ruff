@@ -1132,14 +1132,9 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-        fn contains_self_impl<'db>(db: &'db dyn Db, ty: Type<'db>, _: ()) -> bool {
-            any_over_type(db, ty, false, |ty| {
-                ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
-            })
-        }
-
-        contains_self_impl(db, self, ())
+        any_over_type(db, self, false, |ty| {
+            ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
+        })
     }
 
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
