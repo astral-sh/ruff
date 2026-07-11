@@ -1785,8 +1785,38 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
                 parenthesized: _,
             }) => {
-                self.visit_generators(GeneratorKind::Generator, generators);
-                self.visit_expr(elt);
+                // Defer the entire generator in class scope so that
+                // references to the class name resolve (the generator body
+                // and non-first iterables run lazily, after the class is
+                // defined).  This introduces a false negative for the first
+                // iterable, which runs eagerly in the class scope and should
+                // be flagged, but the trade-off is acceptable (Ruff prefers
+                // false negatives over false positives).  Module- and
+                // function-scope generators stay eager to avoid ecosystem
+                // regressions with except-handler variables and del names.
+                if self
+                    .semantic
+                    .current_scopes()
+                    .any(|scope| scope.kind.is_class())
+                {
+                    // Visit the first iterable's iterator expression in the
+                    // enclosing scope (as Python does), then defer the rest.
+                    let Some(first_generator) = generators.first() else {
+                        unreachable!("Generator must have at least one comprehension");
+                    };
+                    self.visit_expr(&first_generator.iter);
+
+                    self.semantic.push_scope(ScopeKind::Generator {
+                        kind: GeneratorKind::Generator,
+                        is_async: generators
+                            .iter()
+                            .any(|comprehension| comprehension.is_async),
+                    });
+                    self.visit.generators.push(self.semantic.snapshot());
+                } else {
+                    self.visit_generators(GeneratorKind::Generator, generators);
+                    self.visit_expr(elt);
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3212,6 +3242,61 @@ impl<'a> Checker<'a> {
     }
 
     /// After initial traversal of the source tree has been completed,
+    /// visit all class-scope generator expressions.  Generator bodies and
+    /// non-first iterables run lazily, after the enclosing class is defined,
+    /// so they are deferred so that forward references to the class name
+    /// resolve.
+    ///
+    /// The first iterable is visited eagerly in the enclosing scope (before
+    /// the snapshot was saved), matching CPython's evaluation order.  This
+    /// introduces a false negative: references to the class name in the first
+    /// iterable should be flagged (the class doesn't exist yet), but deferring
+    /// causes them to resolve.  Ruff errs toward false negatives in this case.
+    fn visit_deferred_generators(&mut self) {
+        let snapshot = self.semantic.snapshot();
+        while !self.visit.generators.is_empty() {
+            let generators = std::mem::take(&mut self.visit.generators);
+            for snapshot in generators {
+                self.semantic.restore(snapshot);
+
+                let Some(Expr::Generator(ast::ExprGenerator {
+                    elt,
+                    generators,
+                    range: _,
+                    node_index: _,
+                    parenthesized: _,
+                })) = self.semantic.current_expression()
+                else {
+                    unreachable!("Expected Expr::Generator");
+                };
+
+                // Replay the remaining visit_generators logic: first
+                // iterable's target and ifs, plus all subsequent generators.
+                let mut iterator = generators.iter();
+                let first_generator = iterator.next().unwrap();
+
+                self.visit_expr(&first_generator.target);
+                let flags_snapshot = self.semantic.flags;
+                for expr in &first_generator.ifs {
+                    self.visit_boolean_test(expr);
+                }
+
+                for generator in iterator {
+                    self.visit_expr(&generator.iter);
+                    self.visit_expr(&generator.target);
+                    self.semantic.flags = flags_snapshot;
+                    for expr in &generator.ifs {
+                        self.visit_boolean_test(expr);
+                    }
+                }
+
+                self.visit_expr(elt);
+            }
+        }
+        self.semantic.restore(snapshot);
+    }
+
+    /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
     /// This includes lambdas, functions, type parameters, and type annotations.
     fn visit_deferred(&mut self) {
@@ -3220,6 +3305,7 @@ impl<'a> Checker<'a> {
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
+            self.visit_deferred_generators();
             self.visit_deferred_future_type_definitions();
             self.visit_deferred_string_type_definitions();
         }

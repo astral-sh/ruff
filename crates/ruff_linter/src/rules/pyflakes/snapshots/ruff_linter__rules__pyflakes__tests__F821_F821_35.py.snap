@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `Foo`
+  --> F821_35.py:35:23
+   |
+33 |     # class scope at runtime, would fail with NameError, but Ruff's
+34 |     # deferral causes it to resolve).
+35 |     gen = (x for x in Foo.BAR)
+   |                       ^^^
+   |
+
+F821 Undefined name `FailingListComp`
+  --> F821_35.py:42:12
+   |
+40 | class FailingListComp:
+41 |     BAR = [1, 2, 3]
+42 |     BAZ = [FailingListComp.BAR for _ in range(1)]  # F821
+   |            ^^^^^^^^^^^^^^^
+43 |
+44 | class FailingSetComp:
+   |
+
+F821 Undefined name `FailingSetComp`
+  --> F821_35.py:46:15
+   |
+44 | class FailingSetComp:
+45 |     items = [1, 2]
+46 |     result = {FailingSetComp.items for _ in range(1)}  # F821
+   |               ^^^^^^^^^^^^^^
+47 |
+48 | class FailingDictComp:
+   |
+
+F821 Undefined name `FailingDictComp`
+  --> F821_35.py:50:18
+   |
+48 | class FailingDictComp:
+49 |     keys = [1, 2]
+50 |     result = {k: FailingDictComp.keys for k in range(1)}  # F821
+   |                  ^^^^^^^^^^^^^^^
+   |
