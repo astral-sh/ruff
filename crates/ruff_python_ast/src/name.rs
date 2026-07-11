@@ -135,6 +135,13 @@ impl From<Name> for String {
     }
 }
 
+impl From<Name> for CharStr {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.0
+    }
+}
+
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
