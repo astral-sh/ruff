@@ -34,7 +34,7 @@ bitflags! {
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a symbol to be *bound* as opposed to *declared*.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    struct SymbolFlags: u8 {
+    pub(super) struct SymbolFlags: u8 {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
         const IS_DECLARED           = 1 << 2;
@@ -47,6 +47,36 @@ bitflags! {
 }
 
 impl get_size2::GetSize for SymbolFlags {}
+
+impl SymbolFlags {
+    pub(super) fn mark_global(&mut self) {
+        self.insert(Self::MARKED_GLOBAL);
+    }
+
+    pub(super) fn mark_nonlocal(&mut self) {
+        self.insert(Self::MARKED_NONLOCAL);
+    }
+
+    pub(super) fn mark_bound(&mut self) {
+        if self.intersects(Self::IS_BOUND | Self::IS_USED) {
+            self.insert(Self::IS_REASSIGNED);
+        }
+
+        self.insert(Self::IS_BOUND);
+    }
+
+    pub(super) fn mark_used(&mut self) {
+        self.insert(Self::IS_USED);
+    }
+
+    pub(super) fn mark_declared(&mut self) {
+        self.insert(Self::IS_DECLARED);
+    }
+
+    pub(super) fn mark_parameter(&mut self) {
+        self.insert(Self::IS_PARAMETER);
+    }
+}
 
 impl Symbol {
     pub const fn new(name: Name) -> Self {
@@ -125,36 +155,12 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_PARAMETER)
     }
 
-    pub(super) fn mark_global(&mut self) {
-        self.insert_flags(SymbolFlags::MARKED_GLOBAL);
-    }
-
-    pub(super) fn mark_nonlocal(&mut self) {
-        self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
-    }
-
     pub(super) fn mark_bound(&mut self) {
-        if self.is_bound() || self.is_used() {
-            self.insert_flags(SymbolFlags::IS_REASSIGNED);
-        }
-
-        self.insert_flags(SymbolFlags::IS_BOUND);
+        self.flags.mark_bound();
     }
 
     pub(super) fn mark_used(&mut self) {
-        self.insert_flags(SymbolFlags::IS_USED);
-    }
-
-    pub(super) fn mark_declared(&mut self) {
-        self.insert_flags(SymbolFlags::IS_DECLARED);
-    }
-
-    pub(super) fn mark_parameter(&mut self) {
-        self.insert_flags(SymbolFlags::IS_PARAMETER);
-    }
-
-    fn insert_flags(&mut self, flags: SymbolFlags) {
-        self.flags.insert(flags);
+        self.flags.mark_used();
     }
 }
 
@@ -227,22 +233,6 @@ impl<'a> From<&'a Symbol> for SymbolRef<'a> {
     }
 }
 
-trait SymbolName {
-    fn symbol_name(&self) -> &str;
-}
-
-impl SymbolName for Name {
-    fn symbol_name(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl SymbolName for Symbol {
-    fn symbol_name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
 /// Map from symbol name to its ID.
 ///
 /// Uses a hash table to avoid storing the name twice.
@@ -250,33 +240,31 @@ impl SymbolName for Symbol {
 struct SymbolReverseTable(hashbrown::HashTable<ScopedSymbolId>);
 
 impl SymbolReverseTable {
-    fn symbol_id<T: SymbolName>(
+    fn symbol_id(
         &self,
-        symbols: &IndexSlice<ScopedSymbolId, T>,
+        names: &IndexSlice<ScopedSymbolId, Name>,
         name: &str,
     ) -> Option<ScopedSymbolId> {
         self.0
-            .find(Self::hash_name(name), |id| {
-                symbols[*id].symbol_name() == name
-            })
+            .find(Self::hash_name(name), |id| names[*id] == name)
             .copied()
     }
 
     fn entry<'a>(
         &'a mut self,
-        symbols: &IndexVec<ScopedSymbolId, Symbol>,
-        symbol: &Symbol,
+        names: &IndexVec<ScopedSymbolId, Name>,
+        name: &Name,
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
-            Self::hash_name(symbol.name()),
-            |id| symbols[*id].name == symbol.name,
-            |id| Self::hash_name(symbols[*id].name.as_str()),
+            Self::hash_name(name),
+            |id| names[*id] == *name,
+            |id| Self::hash_name(names[*id].as_str()),
         )
     }
 
-    fn shrink_to_fit<T: SymbolName>(&mut self, symbols: &IndexSlice<ScopedSymbolId, T>) {
+    fn shrink_to_fit(&mut self, names: &IndexSlice<ScopedSymbolId, Name>) {
         self.0
-            .shrink_to_fit(|id| Self::hash_name(symbols[*id].symbol_name()));
+            .shrink_to_fit(|id| Self::hash_name(names[*id].as_str()));
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -367,46 +355,55 @@ impl std::fmt::Debug for SymbolTable {
 
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
-    symbols: IndexVec<ScopedSymbolId, Symbol>,
+    names: IndexVec<ScopedSymbolId, Name>,
+    flags: IndexVec<ScopedSymbolId, SymbolFlags>,
     reverse: SymbolReverseTable,
 }
 
 impl SymbolTableBuilder {
     pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.reverse.symbol_id(&self.symbols, name)
+        self.reverse.symbol_id(&self.names, name)
     }
 
     #[track_caller]
-    pub(super) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
-        &self.symbols[id]
+    pub(super) fn symbol(&self, id: ScopedSymbolId) -> SymbolRef<'_> {
+        SymbolRef {
+            name: &self.names[id],
+            flags: self.flags[id],
+        }
     }
 
     #[track_caller]
-    pub(super) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
-        &mut self.symbols[id]
+    pub(super) fn symbol_flags_mut(&mut self, id: ScopedSymbolId) -> &mut SymbolFlags {
+        &mut self.flags[id]
     }
 
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
-        self.symbols.iter()
+    pub(super) fn iter(&self) -> impl Iterator<Item = SymbolRef<'_>> {
+        self.names
+            .iter()
+            .zip(self.flags.iter().copied())
+            .map(|(name, flags)| SymbolRef { name, flags })
     }
 
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let entry = self.reverse.entry(&self.symbols, &symbol);
+        let entry = self.reverse.entry(&self.names, &symbol.name);
 
         match entry {
             Entry::Occupied(entry) => {
                 let id = *entry.get();
 
                 if !symbol.flags.is_empty() {
-                    self.symbols[id].insert_flags(symbol.flags);
+                    self.flags[id].insert(symbol.flags);
                 }
 
                 (id, false)
             }
             Entry::Vacant(entry) => {
                 symbol.name.shrink_to_fit();
-                let id = self.symbols.push(symbol);
+                let id = self.names.push(symbol.name);
+                let flags_id = self.flags.push(symbol.flags);
+                debug_assert_eq!(id, flags_id);
                 entry.insert(id);
                 (id, true)
             }
@@ -415,18 +412,10 @@ impl SymbolTableBuilder {
 
     pub(super) fn build(self) -> SymbolTable {
         let Self {
-            symbols,
+            names,
+            flags,
             mut reverse,
         } = self;
-        let symbol_count = symbols.len();
-        let mut names = IndexVec::with_capacity(symbol_count);
-        let mut flags = IndexVec::with_capacity(symbol_count);
-
-        for symbol in symbols {
-            names.push(symbol.name);
-            flags.push(symbol.flags);
-        }
-
         let reverse = if names.len() > LINEAR_SEARCH_THRESHOLD {
             reverse.shrink_to_fit(&names);
             Some(Box::new(reverse))
@@ -462,10 +451,10 @@ mod tests {
 
             symbol.mark_used();
             symbol.mark_bound();
-            symbol.mark_declared();
-            symbol.mark_global();
-            symbol.mark_nonlocal();
-            symbol.mark_parameter();
+            symbol.flags.mark_declared();
+            symbol.flags.mark_global();
+            symbol.flags.mark_nonlocal();
+            symbol.flags.mark_parameter();
 
             assert_eq!(symbol.flags, SymbolFlags::all());
             assert!(symbol.is_used());
@@ -487,7 +476,14 @@ mod tests {
             );
 
             let mut builder = SymbolTableBuilder::default();
-            let (id, _) = builder.add(symbol);
+            let (id, _) = builder.add(Symbol::new(Name::new(name)));
+            let flags = builder.symbol_flags_mut(id);
+            flags.mark_used();
+            flags.mark_bound();
+            flags.mark_declared();
+            flags.mark_global();
+            flags.mark_nonlocal();
+            flags.mark_parameter();
             let table = builder.build();
             let symbol = table.symbol(id);
 

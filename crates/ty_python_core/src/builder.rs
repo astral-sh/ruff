@@ -58,7 +58,7 @@ use crate::scope::{
     ScopeLaziness,
 };
 use crate::statement::StatementInner;
-use crate::symbol::{ScopedSymbolId, Symbol};
+use crate::symbol::{ScopedSymbolId, Symbol, SymbolRef};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, PreviousDefinitions,
@@ -593,7 +593,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn bound_scope(&self, enclosing_scope: FileScopeId, symbol: &Symbol) -> Option<FileScopeId> {
+    fn bound_scope(
+        &self,
+        enclosing_scope: FileScopeId,
+        symbol: SymbolRef<'_>,
+    ) -> Option<FileScopeId> {
         self.scope_stack
             .iter()
             .rev()
@@ -762,7 +766,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_enclosing_state(
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
-                    enclosing_place.into(),
+                    PlaceExprRef::Symbol(enclosing_place),
                     false,
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
@@ -1372,7 +1376,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     #[track_caller]
     fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
-        self.current_place_table_mut().symbol_mut(id).mark_used();
+        self.current_place_table_mut()
+            .symbol_flags_mut(id)
+            .mark_used();
     }
 
     fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -2469,7 +2475,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
             self.current_place_table_mut()
-                .symbol_mut(symbol)
+                .symbol_flags_mut(symbol)
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
@@ -2479,7 +2485,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
             self.current_place_table_mut()
-                .symbol_mut(symbol)
+                .symbol_flags_mut(symbol)
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
@@ -2497,7 +2503,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         self.current_place_table_mut()
-            .symbol_mut(symbol)
+            .symbol_flags_mut(symbol)
             .mark_parameter();
     }
 
@@ -2518,7 +2524,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
             self.current_place_table_mut()
-                .symbol_mut(symbol)
+                .symbol_flags_mut(symbol)
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
@@ -2537,7 +2543,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
             self.current_place_table_mut()
-                .symbol_mut(symbol)
+                .symbol_flags_mut(symbol)
                 .mark_parameter();
             self.add_definition(
                 symbol.into(),
@@ -2568,7 +2574,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         self.current_place_table_mut()
-            .symbol_mut(symbol)
+            .symbol_flags_mut(symbol)
             .mark_parameter();
     }
 
@@ -4019,7 +4025,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         continue;
                     }
                     self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
+                        .symbol_flags_mut(symbol_id)
                         .mark_global();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
@@ -4070,7 +4076,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         continue;
                     }
                     self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
+                        .symbol_flags_mut(symbol_id)
                         .mark_nonlocal();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations

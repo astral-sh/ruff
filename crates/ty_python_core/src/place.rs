@@ -5,7 +5,9 @@ use crate::member::{
 };
 use crate::predicate::PatternPredicate;
 use crate::scope::FileScopeId;
-use crate::symbol::{ScopedSymbolId, Symbol, SymbolRef, SymbolTable, SymbolTableBuilder};
+use crate::symbol::{
+    ScopedSymbolId, Symbol, SymbolFlags, SymbolRef, SymbolTable, SymbolTableBuilder,
+};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
@@ -295,7 +297,7 @@ impl PlaceTableBuilder {
     }
 
     #[track_caller]
-    pub(super) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+    pub(super) fn symbol(&self, id: ScopedSymbolId) -> SymbolRef<'_> {
         self.symbols.symbol(id)
     }
 
@@ -308,8 +310,8 @@ impl PlaceTableBuilder {
     }
 
     #[track_caller]
-    pub(super) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
-        self.symbols.symbol_mut(id)
+    pub(super) fn symbol_flags_mut(&mut self, id: ScopedSymbolId) -> &mut SymbolFlags {
+        self.symbols.symbol_flags_mut(id)
     }
 
     #[track_caller]
@@ -320,7 +322,7 @@ impl PlaceTableBuilder {
     #[track_caller]
     pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
-            ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id).into()),
+            ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
             ScopedPlaceId::Member(id) => PlaceExprRef::Member(self.member.member(id)),
         }
     }
@@ -335,11 +337,11 @@ impl PlaceTableBuilder {
     pub fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
         self.symbols
             .iter()
-            .map(Into::into)
+            .map(PlaceExprRef::Symbol)
             .chain(self.member.iter().map(PlaceExprRef::Member))
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+    pub fn symbols(&self) -> impl Iterator<Item = SymbolRef<'_>> {
         self.symbols.iter()
     }
 
@@ -400,7 +402,7 @@ impl PlaceTableBuilder {
     pub(super) fn mark_bound(&mut self, id: ScopedPlaceId) {
         match id {
             ScopedPlaceId::Symbol(symbol_id) => {
-                self.symbol_mut(symbol_id).mark_bound();
+                self.symbol_flags_mut(symbol_id).mark_bound();
             }
             ScopedPlaceId::Member(member_id) => {
                 self.member_mut(member_id).mark_bound();
@@ -412,7 +414,7 @@ impl PlaceTableBuilder {
     pub(super) fn mark_declared(&mut self, id: ScopedPlaceId) {
         match id {
             ScopedPlaceId::Symbol(symbol_id) => {
-                self.symbol_mut(symbol_id).mark_declared();
+                self.symbol_flags_mut(symbol_id).mark_declared();
             }
             ScopedPlaceId::Member(member_id) => {
                 self.member_mut(member_id).mark_declared();
