@@ -50,6 +50,14 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
         && matches!(bytes.get(digits + 1), Some(b' ' | b'\t'))
 }
 
+/// Returns whether `text` consists of a complete Markdown code span.
+///
+/// For example, this returns `true` for ``"`value`"`` and `false` for
+/// ``"`value` trailing"``.
+pub(in crate::docstring) fn is_markdown_code_span(text: &str) -> bool {
+    markdown_code_span_len(text) == Some(TextSize::of(text))
+}
+
 /// Returns the length of a complete Markdown code span at the start of `text`.
 ///
 /// For example, given `text` equal to ``"`value` trailing"``, the returned length covers only
