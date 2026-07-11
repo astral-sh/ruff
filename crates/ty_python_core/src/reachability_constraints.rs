@@ -107,6 +107,27 @@ impl ScopedReachabilityConstraintId {
     pub fn as_u32(self) -> u32 {
         self.0
     }
+
+    pub(crate) fn compact(self) -> u32 {
+        match self {
+            ALWAYS_TRUE => COMPACT_ALWAYS_TRUE,
+            AMBIGUOUS => COMPACT_AMBIGUOUS,
+            ALWAYS_FALSE => COMPACT_ALWAYS_FALSE,
+            constraint => {
+                debug_assert!((constraint.0 as usize) < MAX_INTERIOR_NODES);
+                constraint.0
+            }
+        }
+    }
+
+    pub(crate) const fn from_compact(value: u32) -> Self {
+        match value {
+            COMPACT_ALWAYS_TRUE => ALWAYS_TRUE,
+            COMPACT_AMBIGUOUS => AMBIGUOUS,
+            COMPACT_ALWAYS_FALSE => ALWAYS_FALSE,
+            constraint => Self(constraint),
+        }
+    }
 }
 
 impl Idx for ScopedReachabilityConstraintId {
@@ -135,6 +156,11 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// (e.g., a 5000-line while loop with hundreds of if-branches). This can lead to less precise
 /// reachability analysis and type narrowing.
 const MAX_INTERIOR_NODES: usize = 512 * 1024;
+const COMPACT_ALWAYS_TRUE: u32 = (1 << 20) - 1;
+const COMPACT_AMBIGUOUS: u32 = COMPACT_ALWAYS_TRUE - 1;
+const COMPACT_ALWAYS_FALSE: u32 = COMPACT_ALWAYS_TRUE - 2;
+
+static_assertions::const_assert!(MAX_INTERIOR_NODES <= COMPACT_ALWAYS_FALSE as usize);
 
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -274,6 +300,10 @@ impl ReachabilityConstraintsBuilder {
         // branch to go there too. And this node is then redundant and can be reduced.
         if node.if_true == node.if_false {
             return node.if_true;
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return self.interior_cache.get(&node).copied().unwrap_or(AMBIGUOUS);
         }
 
         *self.interior_cache.entry(node).or_insert_with(|| {
@@ -484,5 +514,34 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_index::Idx;
+
+    use super::*;
+
+    #[test]
+    fn adding_atoms_respects_interior_limit() {
+        let existing = InteriorNode {
+            atom: ScopedPredicateId::new(0),
+            if_true: ALWAYS_TRUE,
+            if_ambiguous: AMBIGUOUS,
+            if_false: ALWAYS_FALSE,
+        };
+        let existing_id = ScopedReachabilityConstraintId(0);
+        let mut constraints = ReachabilityConstraintsBuilder {
+            interiors: IndexVec::from_raw(vec![existing; MAX_INTERIOR_NODES]),
+            interior_used: RankBitBox::bits_with_capacity(MAX_INTERIOR_NODES),
+            interior_cache: FxHashMap::from_iter([(existing, existing_id)]),
+            ..ReachabilityConstraintsBuilder::default()
+        };
+
+        assert_eq!(constraints.add_atom(ScopedPredicateId::new(0)), existing_id);
+        assert_eq!(constraints.add_atom(ScopedPredicateId::new(1)), AMBIGUOUS);
+        assert_eq!(constraints.interiors.len(), MAX_INTERIOR_NODES);
+        assert_eq!(constraints.interior_used.len(), MAX_INTERIOR_NODES);
     }
 }

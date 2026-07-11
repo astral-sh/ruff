@@ -797,16 +797,60 @@ pub struct UseDefMap<'db> {
 
 /// Information about a given range of source code.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct RangeInfo {
-    reachability: ScopedReachabilityConstraintId,
-    in_type_checking_block: bool,
-}
+struct RangeInfo(u32);
+
+static_assertions::assert_eq_size!(RangeInfo, u32);
+static_assertions::assert_eq_size!((TextRange, RangeInfo), [u32; 3]);
 
 impl Default for RangeInfo {
     fn default() -> Self {
-        Self {
-            reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            in_type_checking_block: false,
+        Self::new(ScopedReachabilityConstraintId::ALWAYS_TRUE, false)
+    }
+}
+
+impl RangeInfo {
+    const IN_TYPE_CHECKING_BLOCK: u32 = 1 << 31;
+
+    fn new(reachability: ScopedReachabilityConstraintId, in_type_checking_block: bool) -> Self {
+        let flag = u32::from(in_type_checking_block) << 31;
+        Self(reachability.compact() | flag)
+    }
+
+    fn reachability(self) -> ScopedReachabilityConstraintId {
+        ScopedReachabilityConstraintId::from_compact(self.0 & !Self::IN_TYPE_CHECKING_BLOCK)
+    }
+
+    fn in_type_checking_block(self) -> bool {
+        self.0 & Self::IN_TYPE_CHECKING_BLOCK != 0
+    }
+}
+
+#[cfg(test)]
+mod range_info_tests {
+    use ruff_index::Idx;
+
+    use super::*;
+
+    #[test]
+    fn compact_reachability_and_type_checking_round_trip() {
+        let default = RangeInfo::default();
+        assert_eq!(
+            default.reachability(),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        );
+        assert!(!default.in_type_checking_block());
+
+        for reachability in [
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::AMBIGUOUS,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            ScopedReachabilityConstraintId::new(512 * 1024 - 1),
+        ] {
+            for in_type_checking_block in [false, true] {
+                let info = RangeInfo::new(reachability, in_type_checking_block);
+                assert_eq!(info.reachability(), reachability);
+                assert_eq!(info.in_type_checking_block(), in_type_checking_block);
+            }
         }
     }
 }
@@ -871,7 +915,7 @@ impl<'db> UseDefMap<'db> {
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {
         self.range_reachability
             .iter()
-            .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
+            .map(|&(range, info)| (range, info.reachability()))
     }
 
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
@@ -962,7 +1006,7 @@ impl<'db> UseDefMap<'db> {
             .iter()
             .take_while(|(entry_range, _)| entry_range.start() <= range.start())
             .any(|&(entry_range, block)| {
-                block.in_type_checking_block && entry_range.contains_range(range)
+                block.in_type_checking_block() && entry_range.contains_range(range)
             })
     }
     pub fn end_of_scope_bindings(
@@ -2296,10 +2340,7 @@ impl<'db> UseDefMapBuilder<'db> {
         range: TextRange,
         is_type_checking_block: bool,
     ) {
-        let this_range_info = RangeInfo {
-            reachability: self.reachability,
-            in_type_checking_block: is_type_checking_block,
-        };
+        let this_range_info = RangeInfo::new(self.reachability, is_type_checking_block);
 
         // If the last entry has the same reachability constraint and the same
         // "in-TYPE_CHECKING" status, extend it to cover this range too, collapsing
@@ -2609,8 +2650,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // default of reachable code outside a `TYPE_CHECKING` block.
         self.range_reachability
             .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
-            self.reachability_constraints.mark_used(reachability);
+        for &(_, info) in &self.range_reachability {
+            self.reachability_constraints.mark_used(info.reachability());
         }
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
