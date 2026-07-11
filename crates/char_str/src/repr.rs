@@ -54,18 +54,35 @@ impl Repr {
 
     #[inline]
     pub(crate) fn from_slices(slices: &[&str]) -> Result<Self, ReserveError> {
-        let text_len = slices.iter().try_fold(0usize, |len, text| {
+        Self::from_iter(slices.iter().copied())
+    }
+
+    #[inline]
+    pub(crate) fn from_joined_slices<T: AsRef<str>>(
+        slices: &[T],
+        separator: &str,
+    ) -> Result<Self, ReserveError> {
+        let slices = slices.iter().enumerate().flat_map(move |(index, text)| {
+            [(index > 0).then_some(separator), Some(text.as_ref())]
+                .into_iter()
+                .flatten()
+        });
+        Self::from_iter(slices)
+    }
+
+    fn from_iter<'a>(slices: impl Iterator<Item = &'a str> + Clone) -> Result<Self, ReserveError> {
+        let text_len = slices.clone().try_fold(0usize, |len, text| {
             len.checked_add(text.len()).ok_or(ReserveError)
         })?;
 
         if text_len <= MAX_INLINE_SIZE {
             // SAFETY: `text_len` is the checked sum of every slice length and fits inline.
             Ok(Self::from_inline(unsafe {
-                InlineBuffer::from_slices(slices, text_len)
+                InlineBuffer::from_iter(slices, text_len)
             }))
         } else {
             // SAFETY: `text_len` is the checked sum of every slice length.
-            unsafe { HeapBuffer::from_slices(slices, text_len) }.map(Self::from_heap)
+            unsafe { HeapBuffer::from_iter(slices, text_len) }.map(Self::from_heap)
         }
     }
 

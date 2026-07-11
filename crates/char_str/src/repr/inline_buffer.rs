@@ -33,8 +33,12 @@ impl InlineBuffer {
 
     /// # Safety
     ///
-    /// `text_len` must be the sum of all slice lengths and no greater than [`MAX_INLINE_SIZE`].
-    pub(super) unsafe fn from_slices(slices: &[&str], text_len: usize) -> Self {
+    /// `text_len` must be the sum of all yielded slice lengths and no greater than
+    /// [`MAX_INLINE_SIZE`].
+    pub(super) unsafe fn from_iter<'a>(
+        slices: impl Iterator<Item = &'a str>,
+        text_len: usize,
+    ) -> Self {
         debug_assert!(text_len <= MAX_INLINE_SIZE);
 
         let mut buffer = [0; MAX_INLINE_SIZE];

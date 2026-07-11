@@ -65,9 +65,9 @@ impl HeapBuffer {
 
     /// # Safety
     ///
-    /// `text_len` must equal the sum of the lengths of all `slices`.
-    pub(super) unsafe fn from_slices(
-        slices: &[&str],
+    /// `text_len` must equal the sum of all yielded slice lengths.
+    pub(super) unsafe fn from_iter<'a>(
+        slices: impl Iterator<Item = &'a str>,
         text_len: usize,
     ) -> Result<Self, ReserveError> {
         let len = TextLen::new(text_len)?;

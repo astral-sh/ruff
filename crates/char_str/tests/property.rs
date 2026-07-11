@@ -27,6 +27,13 @@ fn concatenate(input: Vec<String>) -> bool {
 
 #[quickcheck_macros::quickcheck]
 #[cfg_attr(miri, ignore)]
+fn join(input: Vec<String>, separator: String) -> bool {
+    let value = CharStr::join(&input, &separator);
+    value.as_str() == input.join(&separator)
+}
+
+#[quickcheck_macros::quickcheck]
+#[cfg_attr(miri, ignore)]
 fn collect_chars(input: String) -> bool {
     let value = input.chars().collect::<CharStr>();
     value.as_str() == input
