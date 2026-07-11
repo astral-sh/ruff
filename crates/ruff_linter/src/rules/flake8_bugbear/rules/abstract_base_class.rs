@@ -204,7 +204,7 @@ pub(crate) fn abstract_base_class(
         {
             checker.report_diagnostic(
                 EmptyMethodWithoutAbstractDecorator {
-                    name: format!("{name}.{method_name}"),
+                    name: format!("{name}.{}", method_name.as_str()),
                 },
                 stmt.range(),
             );

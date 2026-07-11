@@ -63,13 +63,15 @@ Module(
                             ),
                         },
                     ],
-                    name: Identifier {
-                        id: Name("spam"),
-                        range: 85..89,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("spam"),
+                            range: 85..89,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 89..91,
                         node_index: NodeIndex(None),

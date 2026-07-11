@@ -129,13 +129,14 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     }
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 complexity += get_complexity_number(body);
                 if !orelse.is_empty() {
                     complexity += 1;

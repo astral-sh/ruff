@@ -64,9 +64,9 @@ fn traverse_body(checker: &Checker, body: &[Stmt]) {
                     traverse_body(checker, &clause.body);
                 }
             }
-            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
-                traverse_body(checker, body);
-                traverse_body(checker, orelse);
+            Stmt::Try(try_stmt) => {
+                traverse_body(checker, &try_stmt.body);
+                traverse_body(checker, &try_stmt.orelse);
             }
             Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 traverse_body(checker, orelse);

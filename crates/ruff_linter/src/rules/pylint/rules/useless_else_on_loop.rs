@@ -101,13 +101,14 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
         Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .any(|MatchCase { body, .. }| loop_exits_early(body)),
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
+        Stmt::Try(try_stmt) => {
+            let ast::StmtTryInner {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: _,
+            } = try_stmt.inner.as_ref();
             loop_exits_early(body)
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)

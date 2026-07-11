@@ -263,7 +263,6 @@ impl<'a> Generator<'a> {
                 body,
                 returns,
                 decorator_list,
-                type_params,
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -278,8 +277,8 @@ impl<'a> Generator<'a> {
                         self.p("async ");
                     }
                     self.p("def ");
-                    self.p_id(name);
-                    if let Some(type_params) = type_params {
+                    self.p_id(&name.name);
+                    if let Some(type_params) = &name.type_params {
                         self.unparse_type_params(type_params);
                     }
                     self.p("(");
@@ -584,15 +583,14 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star,
+                } = try_stmt.inner.as_ref();
                 statement!({
                     self.p("try:");
                 });

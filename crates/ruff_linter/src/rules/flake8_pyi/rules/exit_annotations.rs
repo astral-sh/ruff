@@ -320,7 +320,9 @@ fn check_positional_args_for_overloaded_method(
         .iter()
         .filter_map(|stmt| {
             let func_def = stmt.as_function_def_stmt()?;
-            if &func_def.name == kind.as_str() && is_overload(&func_def.decorator_list, semantic) {
+            if func_def.name.as_str() == kind.as_str()
+                && is_overload(&func_def.decorator_list, semantic)
+            {
                 Some(func_def)
             } else {
                 None

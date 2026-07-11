@@ -62,7 +62,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
-        if name != "Meta" {
+        if name.as_str() != "Meta" {
             continue;
         }
         for element in body {

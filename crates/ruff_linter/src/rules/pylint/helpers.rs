@@ -33,7 +33,7 @@ pub(super) fn in_dunder_method(
     else {
         return false;
     };
-    if name != dunder_name {
+    if name.as_str() != dunder_name {
         return false;
     }
     let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
@@ -349,13 +349,14 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
                     count += num_statements(&case.body);
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 count += 1;
                 count += num_statements(body);
                 if !orelse.is_empty() {

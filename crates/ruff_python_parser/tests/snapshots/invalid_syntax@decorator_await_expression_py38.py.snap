@@ -16,13 +16,15 @@ Module(
                     range: 45..95,
                     is_async: true,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 55..58,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 55..58,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 58..60,
                         node_index: NodeIndex(None),
@@ -59,13 +61,15 @@ Module(
                                         ),
                                     },
                                 ],
-                                name: Identifier {
-                                    id: Name("baz"),
-                                    range: 85..88,
-                                    node_index: NodeIndex(None),
-                                    parameter_node_index: NodeIndex(None),
+                                name: FunctionDefName {
+                                    name: Identifier {
+                                        id: Name("baz"),
+                                        range: 85..88,
+                                        node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
+                                    },
+                                    type_params: None,
                                 },
-                                type_params: None,
                                 parameters: Parameters {
                                     range: 88..90,
                                     node_index: NodeIndex(None),

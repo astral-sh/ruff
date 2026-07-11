@@ -114,7 +114,6 @@ fn function_def_visit_preorder_except_body<'a, V>(
         parameters,
         decorator_list,
         returns,
-        type_params,
         ..
     } = function_def;
 
@@ -122,7 +121,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
         visitor.visit_decorator(decorator);
     }
 
-    if let Some(type_params) = type_params {
+    if let Some(type_params) = &function_def.name.type_params {
         visitor.visit_type_params(type_params);
     }
 

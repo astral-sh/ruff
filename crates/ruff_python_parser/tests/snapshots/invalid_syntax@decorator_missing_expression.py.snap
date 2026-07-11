@@ -29,13 +29,15 @@ Module(
                             ),
                         },
                     ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 5..8,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 5..8,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 8..10,
                         node_index: NodeIndex(None),
@@ -81,13 +83,15 @@ Module(
                             ),
                         },
                     ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 22..25,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 22..25,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 25..27,
                         node_index: NodeIndex(None),
@@ -148,13 +152,15 @@ Module(
                             ),
                         },
                     ],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 40..43,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 40..43,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 43..45,
                         node_index: NodeIndex(None),

@@ -1946,7 +1946,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 body,
             } = clause;
 
-            if let Some(test) = &test {
+            if let Some(test) = test.as_deref() {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
                 if let Err(err) = test_ty.try_bool(self.db()) {
@@ -1959,15 +1959,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_try_statement(&mut self, try_statement: &ast::StmtTry) {
-        let ast::StmtTry {
-            range: _,
-            node_index: _,
+        let ast::StmtTryInner {
             body,
             handlers,
             orelse,
             finalbody,
             is_star: _,
-        } = try_statement;
+        } = try_statement.inner.as_ref();
 
         self.infer_body(body);
 

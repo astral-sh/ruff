@@ -16,13 +16,15 @@ Module(
                     range: 0..44,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 4..5,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("_"),
+                            range: 4..5,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 5..7,
                         node_index: NodeIndex(None),

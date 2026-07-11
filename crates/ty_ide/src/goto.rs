@@ -1003,7 +1003,7 @@ impl GotoTarget<'_> {
                             // Regular import statement like "import x.y as z"
 
                             // Is the offset within the alias name (asname) part?
-                            if let Some(asname) = &alias.asname {
+                            if let Some(asname) = alias.asname.as_deref() {
                                 if asname.range.contains_inclusive(offset) {
                                     return Some(GotoTarget::ImportModuleAlias { alias, asname });
                                 }
@@ -1035,7 +1035,7 @@ impl GotoTarget<'_> {
                             // From import statement like "from x import y as z"
 
                             // Is the offset within the alias name (asname) part?
-                            if let Some(asname) = &alias.asname {
+                            if let Some(asname) = alias.asname.as_deref() {
                                 if asname.range.contains_inclusive(offset) {
                                     return Some(GotoTarget::ImportSymbolAlias { alias, asname });
                                 }

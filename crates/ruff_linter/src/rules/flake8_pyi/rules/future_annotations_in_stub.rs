@@ -46,7 +46,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     };
 
-    if module_name != "__future__" {
+    if module_name.as_str() != "__future__" {
         return;
     }
 

@@ -16,13 +16,15 @@ Module(
                     range: 0..28,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 4..7,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 4..7,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 7..23,
                         node_index: NodeIndex(None),
@@ -82,13 +84,15 @@ Module(
                     range: 29..60,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 33..36,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 33..36,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 36..55,
                         node_index: NodeIndex(None),

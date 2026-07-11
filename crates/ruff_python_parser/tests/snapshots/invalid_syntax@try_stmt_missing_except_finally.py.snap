@@ -14,43 +14,47 @@ Module(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 0..13,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 9..13,
-                            },
-                        ),
-                    ],
-                    handlers: [],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
+                    inner: StmtTryInner {
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 9..13,
+                                },
+                            ),
+                        ],
+                        handlers: [],
+                        orelse: [],
+                        finalbody: [],
+                        is_star: false,
+                    },
                 },
             ),
             Try(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 14..42,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 23..27,
-                            },
-                        ),
-                    ],
-                    handlers: [],
-                    orelse: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 38..42,
-                            },
-                        ),
-                    ],
-                    finalbody: [],
-                    is_star: false,
+                    inner: StmtTryInner {
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 23..27,
+                                },
+                            ),
+                        ],
+                        handlers: [],
+                        orelse: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 38..42,
+                                },
+                            ),
+                        ],
+                        finalbody: [],
+                        is_star: false,
+                    },
                 },
             ),
         ],

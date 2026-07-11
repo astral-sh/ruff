@@ -507,20 +507,15 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
         {
             return true;
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) if (is_only(body, child)
-            || is_only(orelse, child)
-            || is_only(finalbody, child)
-            || handlers.iter().any(|handler| match handler {
-                ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
-                    is_only(body, child)
-                }
-            })) =>
+        Stmt::Try(try_stmt)
+            if (is_only(&try_stmt.body, child)
+                || is_only(&try_stmt.orelse, child)
+                || is_only(&try_stmt.finalbody, child)
+                || try_stmt.handlers.iter().any(|handler| match handler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                        body, ..
+                    }) => is_only(body, child),
+                })) =>
         {
             return true;
         }

@@ -463,7 +463,7 @@ impl<'a> Importer<'a> {
             }) = stmt
             {
                 if *level == 0
-                    && name.as_ref().is_some_and(|name| name == module)
+                    && name.as_deref().is_some_and(|name| name == module)
                     && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
@@ -541,7 +541,9 @@ impl<'a> Importer<'a> {
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt().is_some_and(|import_from| {
-                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                !import_from.is_lazy
+                    && import_from.module.as_deref().map(ast::Identifier::as_str)
+                        == Some("__future__")
             })
         })
         .last()

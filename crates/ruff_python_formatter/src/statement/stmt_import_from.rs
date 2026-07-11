@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                     }
                     Ok(())
                 }),
-                module.as_ref().map(DotDelimitedIdentifier::new),
+                module.as_deref().map(DotDelimitedIdentifier::new),
                 space(),
                 token("import"),
                 space(),

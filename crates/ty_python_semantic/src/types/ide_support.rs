@@ -1545,7 +1545,7 @@ mod resolve_definition {
     ) -> Vec<ResolvedDefinition<'db>> {
         if alias_resolution == ImportAliasResolution::PreserveAliases {
             for alias in &import_node.names {
-                if let Some(asname) = &alias.asname {
+                if let Some(asname) = alias.asname.as_deref() {
                     if asname.as_str() == symbol_name {
                         return vec![ResolvedDefinition::FileWithRange(FileRange::new(
                             file,

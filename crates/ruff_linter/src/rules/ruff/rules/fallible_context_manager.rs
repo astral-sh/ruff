@@ -124,13 +124,14 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
 
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 // Only the `try` body itself catches exceptions. Yields in
                 // `except` / `else` / `finally` are unprotected, but they
                 // inherit the surrounding terminal position because the

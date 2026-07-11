@@ -258,10 +258,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.
         let module_ref = module
-            .as_ref()
+            .as_deref()
             .map(ast::AnyNodeRef::from)
             .unwrap_or_else(|| ast::AnyNodeRef::from(import_from));
-        let module = module.as_deref();
+        let module = module.as_ref().map(|module| module.id.as_str());
 
         tracing::trace!(
             "Resolving import statement from module `{}` into file `{}`",
@@ -554,7 +554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(final_part) = ModuleName::from_identifier_parts(
             db,
             self.file(),
-            import_from.module.as_deref(),
+            import_from.module.as_ref().map(|module| module.id.as_str()),
             import_from.level,
         )
         .ok()

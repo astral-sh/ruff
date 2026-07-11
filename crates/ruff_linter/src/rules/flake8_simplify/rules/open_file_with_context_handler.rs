@@ -266,7 +266,7 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
         &checker.semantic().current_scope().kind
     {
-        if name == "__enter__" {
+        if name.as_str() == "__enter__" {
             return;
         }
     }

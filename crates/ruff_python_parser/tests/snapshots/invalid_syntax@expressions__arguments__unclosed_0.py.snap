@@ -42,13 +42,15 @@ Module(
                     range: 7..26,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 11..14,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 11..14,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 14..16,
                         node_index: NodeIndex(None),

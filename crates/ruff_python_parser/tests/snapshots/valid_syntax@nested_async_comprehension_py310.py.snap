@@ -16,13 +16,15 @@ Module(
                     range: 44..116,
                     is_async: true,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("f"),
-                        range: 54..55,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("f"),
+                            range: 54..55,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 55..57,
                         node_index: NodeIndex(None),
@@ -175,13 +177,15 @@ Module(
                     range: 117..180,
                     is_async: true,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("f"),
-                        range: 127..128,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("f"),
+                            range: 127..128,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 128..130,
                         node_index: NodeIndex(None),
@@ -199,13 +203,15 @@ Module(
                                 range: 136..148,
                                 is_async: false,
                                 decorator_list: [],
-                                name: Identifier {
-                                    id: Name("g"),
-                                    range: 140..141,
-                                    node_index: NodeIndex(None),
-                                    parameter_node_index: NodeIndex(None),
+                                name: FunctionDefName {
+                                    name: Identifier {
+                                        id: Name("g"),
+                                        range: 140..141,
+                                        node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
+                                    },
+                                    type_params: None,
                                 },
-                                type_params: None,
                                 parameters: Parameters {
                                     range: 141..143,
                                     node_index: NodeIndex(None),

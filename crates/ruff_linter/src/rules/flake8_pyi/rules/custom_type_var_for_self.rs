@@ -132,11 +132,10 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         parameters,
         returns,
         decorator_list,
-        type_params,
         ..
     } = function_def;
 
-    let type_params = type_params.as_deref();
+    let type_params = function_name.type_params.as_deref();
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
     let Some(self_or_cls_parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next()
@@ -357,7 +356,7 @@ fn replace_custom_typevar_with_self(
 
     // (3) If it was a PEP-695 type variable, remove that `TypeVar` from the PEP-695 type-parameter list
     if custom_typevar.is_pep695_typevar() {
-        let type_params = function_def.type_params.as_deref().context(
+        let type_params = function_def.name.type_params.as_deref().context(
             "Should not be possible to have a type parameter without a type parameter list",
         )?;
         let deletion_edit = remove_pep695_typevar_declaration(type_params, custom_typevar)

@@ -121,25 +121,18 @@ pub fn walk_elif_else_clause<V: Transformer + ?Sized>(
 
 pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
+        Stmt::FunctionDef(stmt) => {
+            for decorator in &mut stmt.decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            if let Some(type_params) = type_params {
+            if let Some(type_params) = &mut stmt.name.type_params {
                 visitor.visit_type_params(type_params);
             }
-            visitor.visit_parameters(parameters);
-            if let Some(expr) = returns {
+            visitor.visit_parameters(&mut stmt.parameters);
+            if let Some(expr) = &mut stmt.returns {
                 visitor.visit_annotation(expr);
             }
-            visitor.visit_body(body);
+            visitor.visit_body(&mut stmt.body);
         }
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
@@ -285,21 +278,13 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
+        Stmt::Try(stmt) => {
+            visitor.visit_body(&mut stmt.body);
+            for except_handler in &mut stmt.handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            visitor.visit_body(&mut stmt.orelse);
+            visitor.visit_body(&mut stmt.finalbody);
         }
         Stmt::Assert(ast::StmtAssert {
             test,

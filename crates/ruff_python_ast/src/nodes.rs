@@ -3,7 +3,7 @@
 use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
+    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef, StmtFunctionDef, StmtTry,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -22,11 +22,92 @@ use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use crate::{
-    Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
-    Stmt, TypeParam, int,
+    ExceptHandler, Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef,
+    OperatorPrecedence, Pattern, Stmt, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };
+
+/// A function name and its optional type parameters, co-located in the name allocation.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct FunctionDefName {
+    pub name: Identifier,
+    pub type_params: Option<Box<TypeParams>>,
+}
+
+impl Deref for FunctionDefName {
+    type Target = Identifier;
+
+    fn deref(&self) -> &Self::Target {
+        &self.name
+    }
+}
+
+impl DerefMut for FunctionDefName {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.name
+    }
+}
+
+impl StmtFunctionDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        for decorator in &self.decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+        visitor.visit_identifier(&self.name.name);
+        if let Some(type_params) = &self.name.type_params {
+            visitor.visit_type_params(type_params);
+        }
+        visitor.visit_parameters(&self.parameters);
+        if let Some(returns) = &self.returns {
+            visitor.visit_annotation(returns);
+        }
+        visitor.visit_body(&self.body);
+    }
+}
+
+/// The payload for a `try` statement, stored out of line because `try` statements are rare.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct StmtTryInner {
+    pub body: Suite,
+    pub handlers: Vec<ExceptHandler>,
+    pub orelse: Suite,
+    pub finalbody: Suite,
+    pub is_star: bool,
+}
+
+impl Deref for StmtTry {
+    type Target = StmtTryInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for StmtTry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl StmtTry {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
+    {
+        visitor.visit_body(&self.body);
+        for handler in &self.handlers {
+            visitor.visit_except_handler(handler);
+        }
+        visitor.visit_body(&self.orelse);
+        visitor.visit_body(&self.finalbody);
+    }
+}
 
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
@@ -51,7 +132,7 @@ impl StmtClassDef {
 pub struct ElifElseClause {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub test: Option<Expr>,
+    pub test: Option<Box<Expr>>,
     pub body: Suite,
 }
 
@@ -3943,10 +4024,11 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 96);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
-        assert_eq!(std::mem::size_of::<StmtTry>(), 64);
+        assert_eq!(std::mem::size_of::<Stmt>(), 64);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 56);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 56);
+        assert_eq!(std::mem::size_of::<StmtTry>(), 24);
+        assert_eq!(std::mem::size_of::<crate::ElifElseClause>(), 32);
         assert_eq!(std::mem::size_of::<crate::Alias>(), 56);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 80);

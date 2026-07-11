@@ -86,7 +86,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
             else {
                 return false;
             };
-            module.as_deref() == target.module.as_deref()
+            module.as_deref().map(ast::Identifier::as_str) == target.module.as_deref()
                 && *level == target.level
                 && names.iter().any(|alias| {
                     alias.name == target.name.name

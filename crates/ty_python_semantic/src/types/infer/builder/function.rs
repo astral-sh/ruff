@@ -84,7 +84,7 @@ impl<'db> ExpectedReturnType<'db> {
             same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
-        let lexical = function_node.type_params.is_some().then(|| {
+        let lexical = function_node.name.type_params.is_some().then(|| {
             normalize(
                 db,
                 same_module_uncached_raw_signature(
@@ -301,12 +301,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             is_async: _,
             name,
-            type_params,
             parameters,
             returns: _,
             body: _,
             decorator_list,
         } = function;
+        let type_params = &name.type_params;
+        let name = &name.name;
 
         let db = self.db();
 
@@ -428,7 +429,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Check that the function's own type parameters don't shadow
         // type variables from enclosing scopes (by name).
-        if let Some(type_params) = &function.type_params {
+        if let Some(type_params) = &function.name.type_params {
             let current_scope = self.scope().file_scope_id(db);
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
@@ -490,7 +491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Useless body for `@overload`-decorated function `{}`",
-                    &function.name
+                    function.name.as_str()
                 ));
                 diagnostic.set_primary_message("This statement will never be executed");
                 diagnostic.info(
@@ -528,7 +529,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inference_flags
             .set(InferenceFlags::IN_NO_TYPE_CHECK, prev_in_no_type_check);
 
-        let has_type_params = function.type_params.is_some();
+        let has_type_params = function.name.type_params.is_some();
         let has_defaults = function
             .parameters
             .iter_non_variadic_params()
@@ -609,6 +610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
         let type_params = function
+            .name
             .type_params
             .as_deref()
             .expect("function type params scope without type params");
@@ -985,7 +987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let function_node = function_definition.node(self.module());
-        let function_name = &function_node.name;
+        let function_name = &function_node.name.name;
 
         let mut is_classmethod = is_implicit_classmethod(function_name);
         let inference = infer_definition_types(db, method_definition);

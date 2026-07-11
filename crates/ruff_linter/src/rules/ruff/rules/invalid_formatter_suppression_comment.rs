@@ -143,20 +143,21 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         }
 
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
-            if let Some(
-                AnyNodeRef::StmtClassDef(StmtClassDef {
+            let enclosing = match comment.enclosing {
+                Some(AnyNodeRef::StmtClassDef(StmtClassDef {
                     name,
                     decorator_list,
                     ..
-                })
-                | AnyNodeRef::StmtFunctionDef(StmtFunctionDef {
+                })) => Some((name.start(), decorator_list)),
+                Some(AnyNodeRef::StmtFunctionDef(StmtFunctionDef {
                     name,
                     decorator_list,
                     ..
-                }),
-            ) = comment.enclosing
-            {
-                if comment.line_position.is_own_line() && comment.range.start() < name.start() {
+                })) => Some((name.start(), decorator_list)),
+                _ => None,
+            };
+            if let Some((name_start, decorator_list)) = enclosing {
+                if comment.line_position.is_own_line() && comment.range.start() < name_start {
                     if let Some(decorator) = decorator_list.first() {
                         if decorator.end() < comment.range.start() {
                             return Err(IgnoredReason::AfterDecorator);

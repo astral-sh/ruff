@@ -74,11 +74,10 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
                 walk_stmt(checker, body, Stmt::is_return_stmt);
             }
-            Stmt::If(ast::StmtIf { body, .. })
-            | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
+            Stmt::If(ast::StmtIf { body, .. }) | Stmt::With(ast::StmtWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }
+            Stmt::Try(try_stmt) => walk_stmt(checker, &try_stmt.body, f),
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
                     walk_stmt(checker, &case.body, f);

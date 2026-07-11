@@ -2712,7 +2712,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let ast::StmtFunctionDef {
                     decorator_list,
                     parameters,
-                    type_params,
                     name,
                     returns,
                     body,
@@ -2743,7 +2742,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    type_params.as_deref(),
+                    name.type_params.as_deref(),
                     |builder| {
                         builder.visit_parameters(parameters);
                         if let Some(returns) = returns {
@@ -2817,7 +2816,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids_mut().record_use(name);
+                let use_id = self.current_ast_ids_mut().record_use(&name.name);
                 self.current_use_def_map_mut()
                     .record_use(symbol.into(), use_id);
 
@@ -2926,7 +2925,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
                         self.file,
-                        node.module.as_deref(),
+                        node.module.as_ref().map(|module| module.id.as_str()),
                         node.level,
                     )
                     && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
@@ -3101,7 +3100,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
                         && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                        && node
+                            .module
+                            .as_ref()
+                            .is_some_and(|module| module.id == "__future__");
 
                     let symbol = self.add_symbol(symbol_name.clone());
 
@@ -3316,7 +3318,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
-                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
+                    .map(|clause| (clause.test.as_deref(), clause.body.as_slice()));
                 let has_else = node
                     .elif_else_clauses
                     .last()
@@ -3798,15 +3800,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_clause_state);
                 }
             }
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star,
+                } = try_stmt.inner.as_ref();
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 

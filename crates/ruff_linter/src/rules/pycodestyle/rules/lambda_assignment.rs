@@ -225,7 +225,10 @@ fn function(
                 .collect::<ast::ParameterWithDefaults>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
-                name: Identifier::new(name.to_string(), TextRange::default()),
+                name: Box::new(ast::FunctionDefName {
+                    name: Identifier::new(name.to_string(), TextRange::default()),
+                    type_params: None,
+                }),
                 parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -234,7 +237,6 @@ fn function(
                 body: ast::Suite::from([body]),
                 decorator_list: ast::DecoratorList::new(),
                 returns: Some(Box::new(return_type)),
-                type_params: None,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
@@ -245,12 +247,14 @@ fn function(
     }
     let function = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
-        name: Identifier::new(name.to_string(), TextRange::default()),
+        name: Box::new(ast::FunctionDefName {
+            name: Identifier::new(name.to_string(), TextRange::default()),
+            type_params: None,
+        }),
         parameters: Box::new(parameters),
         body: ast::Suite::from([body]),
         decorator_list: DecoratorList::new(),
         returns: None,
-        type_params: None,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });

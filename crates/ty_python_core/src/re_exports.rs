@@ -197,8 +197,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 decorator_list,
                 parameters,
                 returns,
-                type_params: _, // We don't want to visit the type params of the function
-                body: _,        // We don't want to visit the body of the function
+                body: _, // We don't want to visit the body of the function
                 range: _,
                 node_index: _,
                 is_async: _,

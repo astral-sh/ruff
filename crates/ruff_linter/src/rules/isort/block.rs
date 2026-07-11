@@ -242,13 +242,14 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                     self.visit_match_case(match_case);
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);
                 }

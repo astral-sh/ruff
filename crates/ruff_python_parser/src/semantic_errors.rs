@@ -130,7 +130,10 @@ impl SemanticSyntaxChecker {
                         //     lazy from sys import *
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyImportStar, *range);
                         handled_lazy_error = true;
-                    } else if matches!(module.as_deref(), Some("__future__")) {
+                    } else if matches!(
+                        module.as_deref().map(ast::Identifier::as_str),
+                        Some("__future__")
+                    ) {
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyFutureImport, *range);
                         handled_lazy_error = true;
                     }
@@ -139,7 +142,10 @@ impl SemanticSyntaxChecker {
                 if handled_lazy_error {
                     // Skip the regular `from`-import validations after reporting the lazy-specific
                     // syntax error with the highest precedence.
-                } else if matches!(module.as_deref(), Some("__future__")) {
+                } else if matches!(
+                    module.as_deref().map(ast::Identifier::as_str),
+                    Some("__future__")
+                ) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
@@ -179,7 +185,11 @@ impl SemanticSyntaxChecker {
                         Self::add_error(
                             ctx,
                             SemanticSyntaxErrorKind::NonModuleImportStar(
-                                helpers::format_import_from(*level, module.as_deref()).to_string(),
+                                helpers::format_import_from(
+                                    *level,
+                                    module.as_deref().map(ast::Identifier::as_str),
+                                )
+                                .to_string(),
                             ),
                             *range,
                         );
@@ -205,11 +215,9 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
-                parameters,
-                ..
+                name, parameters, ..
             }) => {
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &name.type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                     Self::type_parameter_default_order(type_params, ctx);
                 }
@@ -390,7 +398,7 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
+                name,
                 parameters,
                 returns,
                 ..
@@ -446,13 +454,13 @@ impl SemanticSyntaxChecker {
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &name.type_params {
                     visitor.visit_type_params(type_params);
                 }
                 // the __future__ annotation error takes precedence over the generic error
                 if ctx.future_annotations_or_stub() || ctx.python_version() > PythonVersion::PY313 {
                     visitor.position = InvalidExpressionPosition::TypeAnnotation;
-                } else if type_params.is_some() {
+                } else if name.type_params.is_some() {
                     visitor.position = InvalidExpressionPosition::GenericDefinition;
                 } else {
                     return;
@@ -577,10 +585,7 @@ impl SemanticSyntaxChecker {
     fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                type_params,
-                parameters,
-                ..
+                name, parameters, ..
             }) => {
                 // test_err debug_shadow_function
                 // def __debug__(): ...  # function name
@@ -588,7 +593,7 @@ impl SemanticSyntaxChecker {
                 // def f(__debug__): ...  # parameter name
                 // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &name.type_params {
                     for type_param in type_params.iter() {
                         Self::check_identifier(type_param.name(), ctx);
                     }
@@ -640,11 +645,12 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Try(ast::StmtTry { handlers, .. }) => {
+            Stmt::Try(stmt) => {
                 // test_err debug_shadow_try
                 // try: ...
                 // except Exception as __debug__: ...
-                for handler in handlers
+                for handler in stmt
+                    .handlers
                     .iter()
                     .filter_map(ast::ExceptHandler::as_except_handler)
                 {
@@ -832,7 +838,12 @@ impl SemanticSyntaxChecker {
             }) => {
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, always close the boundary.
-                if *is_lazy || !matches!(module.as_deref(), Some("__future__")) {
+                if *is_lazy
+                    || !matches!(
+                        module.as_deref().map(ast::Identifier::as_str),
+                        Some("__future__")
+                    )
+                {
                     self.seen_futures_boundary = true;
                 }
             }

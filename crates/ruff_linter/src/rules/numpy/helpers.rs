@@ -29,7 +29,9 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
             return;
         }
         if let Stmt::ImportFrom(StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
+            if module
+                .as_deref()
+                .is_some_and(|module| module == self.module)
                 && names.iter().any(|Alias { name, .. }| name == self.name)
             {
                 self.found_import = true;

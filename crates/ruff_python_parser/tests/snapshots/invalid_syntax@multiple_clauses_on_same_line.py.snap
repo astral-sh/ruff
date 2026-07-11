@@ -206,116 +206,120 @@ Module(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 151..202,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 156..160,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 161..177,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 168..171,
-                                            id: Name("exc"),
-                                            ctx: Load,
-                                        },
+                    inner: StmtTryInner {
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 156..160,
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 161..177,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 168..171,
+                                                id: Name("exc"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 173..177,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 184..188,
-                            },
-                        ),
-                    ],
-                    finalbody: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 198..202,
-                            },
-                        ),
-                    ],
-                    is_star: false,
+                                    name: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 173..177,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 184..188,
+                                },
+                            ),
+                        ],
+                        finalbody: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 198..202,
+                                },
+                            ),
+                        ],
+                        is_star: false,
+                    },
                 },
             ),
             Try(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 203..257,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 208..212,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 214..230,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 221..224,
-                                            id: Name("exc"),
-                                            ctx: Load,
-                                        },
+                    inner: StmtTryInner {
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 208..212,
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 214..230,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 221..224,
+                                                id: Name("exc"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 226..230,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 238..242,
-                            },
-                        ),
-                    ],
-                    finalbody: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 253..257,
-                            },
-                        ),
-                    ],
-                    is_star: false,
+                                    name: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 226..230,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 238..242,
+                                },
+                            ),
+                        ],
+                        finalbody: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 253..257,
+                                },
+                            ),
+                        ],
+                        is_star: false,
+                    },
                 },
             ),
         ],

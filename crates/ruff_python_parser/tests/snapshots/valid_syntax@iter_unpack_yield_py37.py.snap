@@ -69,13 +69,15 @@ Module(
                     range: 60..91,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("g"),
-                        range: 64..65,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("g"),
+                            range: 64..65,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 65..67,
                         node_index: NodeIndex(None),

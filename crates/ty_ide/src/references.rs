@@ -493,7 +493,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             }
             AnyNodeRef::Alias(alias) => {
                 // Handle import alias declarations
-                if let Some(asname) = &alias.asname {
+                if let Some(asname) = alias.asname.as_deref() {
                     self.check_declaration_identifier(asname);
                 }
                 // Only check the original name if it matches our target text

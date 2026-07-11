@@ -43,7 +43,7 @@ pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch<'
     .chain(stmt_if.elif_else_clauses.iter().filter_map(|clause| {
         Some(IfElifBranch {
             kind: BranchKind::Elif,
-            test: clause.test.as_ref()?,
+            test: clause.test.as_deref()?,
             body: clause.body.as_slice(),
             range: clause.range,
         })

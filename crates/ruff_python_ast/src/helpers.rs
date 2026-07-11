@@ -549,7 +549,7 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters,
-                type_params,
+                name,
                 body,
                 decorator_list,
                 returns,
@@ -562,7 +562,7 @@ where
                         || param
                             .annotation()
                             .is_some_and(|annotation| any_over_expr(annotation, &mut *func))
-                }) || type_params.as_ref().is_some_and(|type_params| {
+                }) || name.type_params.as_ref().is_some_and(|type_params| {
                     type_params
                         .iter()
                         .any(|type_param| any_over_type_param(type_param, &mut *func))
@@ -681,7 +681,7 @@ where
                     || elif_else_clauses.iter().any(|clause| {
                         clause
                             .test
-                            .as_ref()
+                            .as_deref()
                             .is_some_and(|test| any_over_expr(test, &mut *func))
                             || any_over_body(&clause.body, &mut *func)
                     })
@@ -707,17 +707,9 @@ where
                         .as_ref()
                         .is_some_and(|value| any_over_expr(value, &mut *func))
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star: _,
-                range: _,
-                node_index: _,
-            }) => {
-                any_over_body(body, &mut *func)
-                    || handlers.iter().any(|handler| {
+            Stmt::Try(stmt) => {
+                any_over_body(&stmt.body, &mut *func)
+                    || stmt.handlers.iter().any(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             type_,
                             body,
@@ -728,8 +720,8 @@ where
                             .is_some_and(|expr| any_over_expr(expr, &mut *func))
                             || any_over_body(body, &mut *func)
                     })
-                    || any_over_body(orelse, &mut *func)
-                    || any_over_body(finalbody, &mut *func)
+                    || any_over_body(&stmt.orelse, &mut *func)
+                    || any_over_body(&stmt.finalbody, &mut *func)
             }
             Stmt::Assert(ast::StmtAssert {
                 test,

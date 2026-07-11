@@ -56,7 +56,7 @@ fn check_pep695_function_legacy_typevars<'db>(
 ) {
     let db = context.db();
     let node = last_definition.node(db, context.file(), context.module());
-    let Some(type_params) = node.type_params.as_deref() else {
+    let Some(type_params) = node.name.type_params.as_deref() else {
         return;
     };
 

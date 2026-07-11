@@ -738,7 +738,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 );
 
                 // Type parameters (Python 3.12+ syntax)
-                if let Some(type_params) = &func.type_params {
+                if let Some(type_params) = &func.name.type_params {
                     for type_param in &type_params.type_params {
                         self.visit_type_param(type_param);
                     }

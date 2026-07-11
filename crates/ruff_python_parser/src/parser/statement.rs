@@ -761,7 +761,7 @@ impl<'src> Parser<'src> {
         names.shrink_to_fit();
 
         ast::StmtImportFrom {
-            module,
+            module: module.map(Box::new),
             names,
             level: leading_dots,
             is_lazy,
@@ -1493,10 +1493,10 @@ impl<'src> Parser<'src> {
             //     pass
             // elif yield x:
             //     pass
-            Some(
+            Some(Box::new(
                 self.parse_named_expression_or_higher(ExpressionContext::default())
                     .expr,
-            )
+            ))
         } else {
             None
         };
@@ -1662,11 +1662,13 @@ impl<'src> Parser<'src> {
         // except    *     Error: ...
 
         ast::StmtTry {
-            body: try_body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star,
+            inner: Box::new(ast::StmtTryInner {
+                body: try_body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star,
+            }),
             range: self.node_range(try_start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2100,8 +2102,10 @@ impl<'src> Parser<'src> {
         let body = self.parse_body(Clause::FunctionDef);
 
         ast::StmtFunctionDef {
-            name,
-            type_params: type_params.map(Box::new),
+            name: Box::new(ast::FunctionDefName {
+                name,
+                type_params: type_params.map(Box::new),
+            }),
             parameters: Box::new(parameters),
             body,
             decorator_list,
@@ -2179,7 +2183,7 @@ impl<'src> Parser<'src> {
         ast::StmtClassDef {
             range: self.node_range(start),
             decorator_list,
-            name,
+            name: Box::new(name),
             type_params: type_params.map(Box::new),
             arguments,
             body,
@@ -3055,13 +3059,15 @@ impl<'src> Parser<'src> {
                     range,
                     is_async: false,
                     decorator_list: decorators,
-                    name: ast::Identifier {
-                        id: Name::empty(),
-                        range: self.missing_node_range(),
-                        node_index: AtomicNodeIndex::NONE,
-                        parameter_node_index: AtomicNodeIndex::NONE,
-                    },
-                    type_params: None,
+                    name: Box::new(ast::FunctionDefName {
+                        name: ast::Identifier {
+                            id: Name::empty(),
+                            range: self.missing_node_range(),
+                            node_index: AtomicNodeIndex::NONE,
+                            parameter_node_index: AtomicNodeIndex::NONE,
+                        },
+                        type_params: None,
+                    }),
                     parameters: Box::new(ast::Parameters {
                         range: self.missing_node_range(),
                         ..ast::Parameters::default()

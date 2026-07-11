@@ -95,7 +95,7 @@ impl<'a> BannedModuleImportPolicies<'a> {
             Stmt::ImportFrom(import @ StmtImportFrom { module, level, .. }) => {
                 let module = resolve_imported_module_path(
                     *level,
-                    module.as_deref(),
+                    module.as_deref().map(ruff_python_ast::Identifier::as_str),
                     checker.module.qualified_name(),
                 );
 

@@ -156,7 +156,7 @@ pub(crate) fn annotate_imports<'a>(
                     }
 
                     AnnotatedImport::ImportFrom {
-                        module: module.as_ref().map(|module| locator.slice(module)),
+                        module: module.as_deref().map(|module| locator.slice(module)),
                         names: aliases,
                         level: *level,
                         is_lazy: *is_lazy,

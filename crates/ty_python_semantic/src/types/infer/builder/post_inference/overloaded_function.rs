@@ -108,10 +108,10 @@ pub(crate) fn check_overloaded_function<'db>(
     // Check that the overloaded function has at least two overloads
     if let [single_overload] = overloads {
         let function_node = single_overload.node(db, context.file(), context.module());
-        if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
+        if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` requires at least two overloads",
-                &function_node.name
+                function_node.name.as_str()
             ));
             diagnostic.set_primary_message("Only one overload defined here");
             if let Some(decorator) =
@@ -154,15 +154,16 @@ pub(crate) fn check_overloaded_function<'db>(
 
         if implementation_required {
             let function_node = overloads[0].node(db, context.file(), context.module());
-            if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
+            if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name.name)
+            {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Overloads for function `{}` must be followed by a \
                     non-`@overload`-decorated implementation function",
-                    &function_node.name
+                    function_node.name.as_str()
                 ));
                 diagnostic.info(format_args!(
                     "Attempting to call `{}` will raise `TypeError` at runtime",
-                    &function_node.name
+                    function_node.name.as_str()
                 ));
                 diagnostic.info("Overloaded functions without implementations are only permitted:");
                 diagnostic.info(" - in stub files");
@@ -179,11 +180,12 @@ pub(crate) fn check_overloaded_function<'db>(
 
     for inconsistency in binding_decorator_inconsistencies {
         let function_node = function.node(db, context.file(), context.module());
-        if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
+        if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` does not use the `@{}` decorator \
                     consistently",
-                &function_node.name, inconsistency.decorator_name
+                function_node.name.as_str(),
+                inconsistency.decorator_name
             ));
             for function in inconsistency.missing {
                 diagnostic.annotate(
@@ -210,7 +212,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     continue;
                 }
                 let function_node = overload.node(db, context.file(), context.module());
-                let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name)
+                let Some(builder) =
+                    context.report_lint(&INVALID_OVERLOAD, &function_node.name.name)
                 else {
                     continue;
                 };
@@ -241,7 +244,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     continue;
                 }
                 let function_node = overload.node(db, context.file(), context.module());
-                let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name)
+                let Some(builder) =
+                    context.report_lint(&INVALID_OVERLOAD, &function_node.name.name)
                 else {
                     continue;
                 };
@@ -340,7 +344,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
                 ),
             };
 
-        let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) else {
+        let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name.name) else {
             continue;
         };
         let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));

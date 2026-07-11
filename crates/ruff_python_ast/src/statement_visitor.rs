@@ -61,19 +61,13 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
                 visitor.visit_match_case(match_case);
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
+        Stmt::Try(stmt) => {
+            visitor.visit_body(&stmt.body);
+            for except_handler in &stmt.handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            visitor.visit_body(&stmt.orelse);
+            visitor.visit_body(&stmt.finalbody);
         }
         _ => {}
     }

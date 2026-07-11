@@ -14,115 +14,119 @@ Module(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 44..84,
-                    body: [
-                        Import(
-                            StmtImport {
-                                node_index: NodeIndex(None),
-                                range: 53..67,
-                                names: [
-                                    Alias {
-                                        end: 67,
-                                        node_index: NodeIndex(None),
-                                        name: Identifier {
-                                            id: Name("os"),
-                                            range: 65..67,
+                    inner: StmtTryInner {
+                        body: [
+                            Import(
+                                StmtImport {
+                                    node_index: NodeIndex(None),
+                                    range: 53..67,
+                                    names: [
+                                        Alias {
+                                            end: 67,
                                             node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
+                                            name: Identifier {
+                                                id: Name("os"),
+                                                range: 65..67,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            asname: None,
                                         },
-                                        asname: None,
-                                    },
-                                ],
-                                is_lazy: true,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 68..84,
-                                node_index: NodeIndex(None),
-                                type_: None,
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 80..84,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
+                                    ],
+                                    is_lazy: true,
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 68..84,
+                                    node_index: NodeIndex(None),
+                                    type_: None,
+                                    name: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 80..84,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                        finalbody: [],
+                        is_star: false,
+                    },
                 },
             ),
             Try(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 86..135,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 95..96,
-                                value: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 95..96,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 97..135,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
+                    inner: StmtTryInner {
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    node_index: NodeIndex(None),
+                                    range: 95..96,
+                                    value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 105..114,
-                                            id: Name("Exception"),
+                                            range: 95..96,
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
-                                ),
-                                name: None,
-                                body: [
-                                    Import(
-                                        StmtImport {
-                                            node_index: NodeIndex(None),
-                                            range: 120..135,
-                                            names: [
-                                                Alias {
-                                                    end: 135,
-                                                    node_index: NodeIndex(None),
-                                                    name: Identifier {
-                                                        id: Name("sys"),
-                                                        range: 132..135,
-                                                        node_index: NodeIndex(None),
-                                                        parameter_node_index: NodeIndex(None),
-                                                    },
-                                                    asname: None,
-                                                },
-                                            ],
-                                            is_lazy: true,
-                                        },
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 97..135,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 105..114,
+                                                id: Name("Exception"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: true,
+                                    name: None,
+                                    body: [
+                                        Import(
+                                            StmtImport {
+                                                node_index: NodeIndex(None),
+                                                range: 120..135,
+                                                names: [
+                                                    Alias {
+                                                        end: 135,
+                                                        node_index: NodeIndex(None),
+                                                        name: Identifier {
+                                                            id: Name("sys"),
+                                                            range: 132..135,
+                                                            node_index: NodeIndex(None),
+                                                            parameter_node_index: NodeIndex(None),
+                                                        },
+                                                        asname: None,
+                                                    },
+                                                ],
+                                                is_lazy: true,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                        finalbody: [],
+                        is_star: true,
+                    },
                 },
             ),
             FunctionDef(
@@ -131,13 +135,15 @@ Module(
                     range: 137..169,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 141..145,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 141..145,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 145..147,
                         node_index: NodeIndex(None),
@@ -178,13 +184,15 @@ Module(
                     range: 171..226,
                     is_async: true,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("async_func"),
-                        range: 181..191,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("async_func"),
+                            range: 181..191,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 191..193,
                         node_index: NodeIndex(None),
@@ -271,13 +279,15 @@ Module(
                     range: 267..321,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 271..276,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("outer"),
+                            range: 271..276,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 276..278,
                         node_index: NodeIndex(None),

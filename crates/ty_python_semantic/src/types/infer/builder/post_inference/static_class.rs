@@ -933,7 +933,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         if kw_only_sentinel_fields.len() > 1 {
             // TODO: The fields should be displayed in a subdiagnostic.
-            if let Some(builder) = context.report_lint(&DUPLICATE_KW_ONLY, &class_node.name) {
+            if let Some(builder) = context.report_lint(&DUPLICATE_KW_ONLY, class_node.name.as_ref())
+            {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Dataclass has more than one field annotated with `KW_ONLY`"
                 ));
@@ -1215,7 +1216,8 @@ fn check_final_class_abstract_methods<'db>(
         return;
     };
 
-    let Some(builder) = context.report_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS, &class_node.name)
+    let Some(builder) =
+        context.report_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS, class_node.name.as_ref())
     else {
         return;
     };

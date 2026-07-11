@@ -59,7 +59,7 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
     }
 
     for elif in &stmt.elif_else_clauses {
-        if let Some(bool_op) = elif.test.as_ref().and_then(Expr::as_bool_op_expr) {
+        if let Some(bool_op) = elif.test.as_deref().and_then(Expr::as_bool_op_expr) {
             let expressions = count_bools(bool_op);
             if expressions > checker.settings().pylint.max_bool_expr {
                 checker.report_diagnostic(

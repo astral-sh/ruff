@@ -111,13 +111,14 @@ fn has_nested_block(stmt: &Stmt) -> bool {
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
             body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
+        Stmt::Try(try_stmt) => {
+            let ast::StmtTryInner {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: _,
+            } = try_stmt.inner.as_ref();
             body.iter().any(is_nested_block)
                 || handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {

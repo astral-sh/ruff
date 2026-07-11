@@ -33,16 +33,11 @@ pub fn suite<'a>(
             .iter()
             .map(|case| &case.body)
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        AnyNodeRef::StmtTry(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => [body, orelse, finalbody]
+        AnyNodeRef::StmtTry(try_stmt) => [&try_stmt.body, &try_stmt.orelse, &try_stmt.finalbody]
             .into_iter()
             .chain(
-                handlers
+                try_stmt
+                    .handlers
                     .iter()
                     .filter_map(ExceptHandler::as_except_handler)
                     .map(|handler| &handler.body),

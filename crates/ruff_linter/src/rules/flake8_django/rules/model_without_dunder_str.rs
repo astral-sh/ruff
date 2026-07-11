@@ -72,7 +72,7 @@ pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtC
 fn has_dunder_method(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     analyze::class::any_super_class(class_def, semantic, |class_def| {
         class_def.body.iter().any(|val| match val {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name == "__str__",
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name.as_str() == "__str__",
             _ => false,
         })
     })
@@ -93,7 +93,7 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
-        if name != "Meta" {
+        if name.as_str() != "Meta" {
             continue;
         }
         for element in body {

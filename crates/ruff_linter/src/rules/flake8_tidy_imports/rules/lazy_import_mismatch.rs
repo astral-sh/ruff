@@ -117,8 +117,10 @@ fn lazy_import_policy(checker: &Checker, stmt: &Stmt) -> Option<LazyImportPolicy
             is_lazy,
             ..
         }) => {
-            if matches!(module.as_deref(), Some("__future__"))
-                || names.iter().any(|alias| alias.name.as_str() == "*")
+            if matches!(
+                module.as_deref().map(ruff_python_ast::Identifier::as_str),
+                Some("__future__")
+            ) || names.iter().any(|alias| alias.name.as_str() == "*")
             {
                 None
             } else {

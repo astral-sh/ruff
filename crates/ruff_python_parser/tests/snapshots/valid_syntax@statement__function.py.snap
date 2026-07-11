@@ -16,13 +16,15 @@ Module(
                     range: 0..29,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("no_parameters"),
-                        range: 4..17,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("no_parameters"),
+                            range: 4..17,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 17..19,
                         node_index: NodeIndex(None),
@@ -49,13 +51,15 @@ Module(
                     range: 32..76,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_parameters"),
-                        range: 36..57,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_parameters"),
+                            range: 36..57,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 57..66,
                         node_index: NodeIndex(None),
@@ -128,13 +132,15 @@ Module(
                     range: 79..149,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_parameters_with_default_values"),
-                        range: 83..124,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_parameters_with_default_values"),
+                            range: 83..124,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 124..139,
                         node_index: NodeIndex(None),
@@ -227,13 +233,15 @@ Module(
                     range: 152..226,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_parameters_with_default_values2"),
-                        range: 156..198,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_parameters_with_default_values2"),
+                            range: 156..198,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 198..216,
                         node_index: NodeIndex(None),
@@ -327,13 +335,15 @@ Module(
                     range: 229..296,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_only_and_positional_parameters"),
-                        range: 233..274,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_only_and_positional_parameters"),
+                            range: 233..274,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 274..286,
                         node_index: NodeIndex(None),
@@ -407,13 +417,15 @@ Module(
                     range: 299..393,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_args_with_defaults_and_varargs_and_kwargs"),
-                        range: 303..348,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_args_with_defaults_and_varargs_and_kwargs"),
+                            range: 303..348,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 348..383,
                         node_index: NodeIndex(None),
@@ -529,13 +541,15 @@ Module(
                     range: 396..445,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("keyword_only_parameters"),
-                        range: 400..423,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("keyword_only_parameters"),
+                            range: 400..423,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 423..435,
                         node_index: NodeIndex(None),
@@ -608,13 +622,15 @@ Module(
                     range: 448..517,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("keyword_only_parameters_with_defaults"),
-                        range: 452..489,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("keyword_only_parameters_with_defaults"),
+                            range: 452..489,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 489..507,
                         node_index: NodeIndex(None),
@@ -707,13 +723,15 @@ Module(
                     range: 520..594,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("kw_only_args_with_defaults_and_varargs"),
-                        range: 524..562,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("kw_only_args_with_defaults_and_varargs"),
+                            range: 524..562,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 562..584,
                         node_index: NodeIndex(None),
@@ -817,13 +835,15 @@ Module(
                     range: 597..676,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("kw_only_args_with_defaults_and_kwargs"),
-                        range: 601..638,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("kw_only_args_with_defaults_and_kwargs"),
+                            range: 601..638,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 638..666,
                         node_index: NodeIndex(None),
@@ -927,13 +947,15 @@ Module(
                     range: 679..774,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("kw_only_args_with_defaults_and_varargs_and_kwargs"),
-                        range: 683..732,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("kw_only_args_with_defaults_and_varargs_and_kwargs"),
+                            range: 683..732,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 732..764,
                         node_index: NodeIndex(None),
@@ -1048,13 +1070,15 @@ Module(
                     range: 777..835,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_and_kw_only_args"),
-                        range: 781..801,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_and_kw_only_args"),
+                            range: 781..801,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 801..825,
                         node_index: NodeIndex(None),
@@ -1174,13 +1198,15 @@ Module(
                     range: 838..916,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_and_kw_only_args_with_defaults"),
-                        range: 842..876,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_and_kw_only_args_with_defaults"),
+                            range: 842..876,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 876..906,
                         node_index: NodeIndex(None),
@@ -1320,13 +1346,15 @@ Module(
                     range: 919..1013,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_and_kw_only_args_with_defaults_and_varargs"),
-                        range: 923..969,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_and_kw_only_args_with_defaults_and_varargs"),
+                            range: 923..969,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 969..1003,
                         node_index: NodeIndex(None),
@@ -1477,13 +1505,15 @@ Module(
                     range: 1016..1121,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_and_kw_only_args_with_defaults_and_kwargs"),
-                        range: 1020..1065,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_and_kw_only_args_with_defaults_and_kwargs"),
+                            range: 1020..1065,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1065..1111,
                         node_index: NodeIndex(None),
@@ -1634,13 +1664,15 @@ Module(
                     range: 1124..1245,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs"),
-                        range: 1128..1185,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs"),
+                            range: 1128..1185,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1185..1235,
                         node_index: NodeIndex(None),
@@ -1802,13 +1834,15 @@ Module(
                     range: 1248..1316,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_and_keyword_parameters"),
-                        range: 1252..1285,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_and_keyword_parameters"),
+                            range: 1252..1285,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1285..1306,
                         node_index: NodeIndex(None),
@@ -1927,13 +1961,15 @@ Module(
                     range: 1319..1407,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_and_keyword_parameters_with_defaults"),
-                        range: 1323..1370,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_and_keyword_parameters_with_defaults"),
+                            range: 1323..1370,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1370..1397,
                         node_index: NodeIndex(None),
@@ -2072,13 +2108,15 @@ Module(
                     range: 1410..1520,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_and_keyword_parameters_with_defaults_and_varargs"),
-                        range: 1414..1473,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_and_keyword_parameters_with_defaults_and_varargs"),
+                            range: 1414..1473,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1473..1510,
                         node_index: NodeIndex(None),
@@ -2228,13 +2266,15 @@ Module(
                     range: 1523..1654,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs"),
-                        range: 1527..1597,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs"),
+                            range: 1527..1597,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1597..1644,
                         node_index: NodeIndex(None),
@@ -2395,34 +2435,36 @@ Module(
                     range: 1703..1735,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1707..1711,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1711..1714,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1707..1711,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 1712..1713,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 1712..1713,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        bound: None,
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1711..1714,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 1712..1713,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 1712..1713,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            bound: None,
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1714..1720,
                         node_index: NodeIndex(None),
@@ -2483,43 +2525,45 @@ Module(
                     range: 1738..1775,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1742..1746,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1746..1754,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1742..1746,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 1747..1753,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 1747..1748,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 1750..1753,
-                                                    id: Name("str"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1746..1754,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 1747..1753,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 1747..1748,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 1750..1753,
+                                                        id: Name("str"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1754..1760,
                         node_index: NodeIndex(None),
@@ -2580,61 +2624,63 @@ Module(
                     range: 1778..1824,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1782..1786,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1786..1803,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1782..1786,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 1787..1802,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 1787..1788,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    node_index: NodeIndex(None),
-                                                    range: 1790..1802,
-                                                    elts: [
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 1791..1794,
-                                                                id: Name("str"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 1796..1801,
-                                                                id: Name("bytes"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                    ctx: Load,
-                                                    parenthesized: true,
-                                                },
-                                            ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1786..1803,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 1787..1802,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 1787..1788,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Tuple(
+                                                    ExprTuple {
+                                                        node_index: NodeIndex(None),
+                                                        range: 1790..1802,
+                                                        elts: [
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 1791..1794,
+                                                                    id: Name("str"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 1796..1801,
+                                                                    id: Name("bytes"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        ctx: Load,
+                                                        parenthesized: true,
+                                                    },
+                                                ),
+                                            ),
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1803..1809,
                         node_index: NodeIndex(None),
@@ -2695,33 +2741,35 @@ Module(
                     range: 1827..1873,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1831..1835,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1835..1840,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1831..1835,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVarTuple(
-                                    TypeParamTypeVarTuple {
-                                        node_index: NodeIndex(None),
-                                        range: 1836..1839,
-                                        name: Identifier {
-                                            id: Name("Ts"),
-                                            range: 1837..1839,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1835..1840,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVarTuple(
+                                        TypeParamTypeVarTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 1836..1839,
+                                            name: Identifier {
+                                                id: Name("Ts"),
+                                                range: 1837..1839,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1840..1849,
                         node_index: NodeIndex(None),
@@ -2816,33 +2864,35 @@ Module(
                     range: 1876..1934,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1880..1884,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1884..1889,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1880..1884,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                ParamSpec(
-                                    TypeParamParamSpec {
-                                        node_index: NodeIndex(None),
-                                        range: 1885..1888,
-                                        name: Identifier {
-                                            id: Name("P"),
-                                            range: 1887..1888,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1884..1889,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    ParamSpec(
+                                        TypeParamParamSpec {
+                                            node_index: NodeIndex(None),
+                                            range: 1885..1888,
+                                            name: Identifier {
+                                                id: Name("P"),
+                                                range: 1887..1888,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1889..1924,
                         node_index: NodeIndex(None),
@@ -2935,83 +2985,85 @@ Module(
                     range: 1937..1978,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("func"),
-                        range: 1941..1945,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
-                    },
-                    type_params: Some(
-                        TypeParams {
-                            range: 1945..1966,
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("func"),
+                            range: 1941..1945,
                             node_index: NodeIndex(None),
-                            type_params: [
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 1946..1947,
-                                        name: Identifier {
-                                            id: Name("T"),
-                                            range: 1946..1947,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        bound: None,
-                                        default: None,
-                                    },
-                                ),
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        node_index: NodeIndex(None),
-                                        range: 1949..1955,
-                                        name: Identifier {
-                                            id: Name("U"),
-                                            range: 1949..1950,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        bound: Some(
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 1952..1955,
-                                                    id: Name("str"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ),
-                                        default: None,
-                                    },
-                                ),
-                                TypeVarTuple(
-                                    TypeParamTypeVarTuple {
-                                        node_index: NodeIndex(None),
-                                        range: 1957..1960,
-                                        name: Identifier {
-                                            id: Name("Ts"),
-                                            range: 1958..1960,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        default: None,
-                                    },
-                                ),
-                                ParamSpec(
-                                    TypeParamParamSpec {
-                                        node_index: NodeIndex(None),
-                                        range: 1962..1965,
-                                        name: Identifier {
-                                            id: Name("P"),
-                                            range: 1964..1965,
-                                            node_index: NodeIndex(None),
-                                            parameter_node_index: NodeIndex(None),
-                                        },
-                                        default: None,
-                                    },
-                                ),
-                            ],
+                            parameter_node_index: NodeIndex(None),
                         },
-                    ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 1945..1966,
+                                node_index: NodeIndex(None),
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 1946..1947,
+                                            name: Identifier {
+                                                id: Name("T"),
+                                                range: 1946..1947,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            bound: None,
+                                            default: None,
+                                        },
+                                    ),
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            node_index: NodeIndex(None),
+                                            range: 1949..1955,
+                                            name: Identifier {
+                                                id: Name("U"),
+                                                range: 1949..1950,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            bound: Some(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 1952..1955,
+                                                        id: Name("str"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                            default: None,
+                                        },
+                                    ),
+                                    TypeVarTuple(
+                                        TypeParamTypeVarTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 1957..1960,
+                                            name: Identifier {
+                                                id: Name("Ts"),
+                                                range: 1958..1960,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            default: None,
+                                        },
+                                    ),
+                                    ParamSpec(
+                                        TypeParamParamSpec {
+                                            node_index: NodeIndex(None),
+                                            range: 1962..1965,
+                                            name: Identifier {
+                                                id: Name("P"),
+                                                range: 1964..1965,
+                                                node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
+                                            },
+                                            default: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
                     parameters: Parameters {
                         range: 1966..1968,
                         node_index: NodeIndex(None),
@@ -3038,13 +3090,15 @@ Module(
                     range: 1981..2000,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("ellipsis"),
-                        range: 1985..1993,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("ellipsis"),
+                            range: 1985..1993,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 1993..1995,
                         node_index: NodeIndex(None),
@@ -3077,13 +3131,15 @@ Module(
                     range: 2003..2064,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("multiple_statements"),
-                        range: 2007..2026,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("multiple_statements"),
+                            range: 2007..2026,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2026..2028,
                         node_index: NodeIndex(None),
@@ -3157,13 +3213,15 @@ Module(
                     range: 2067..2091,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2071..2074,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2071..2074,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2074..2081,
                         node_index: NodeIndex(None),
@@ -3201,13 +3259,15 @@ Module(
                     range: 2094..2121,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2098..2101,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2098..2101,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2101..2111,
                         node_index: NodeIndex(None),
@@ -3245,13 +3305,15 @@ Module(
                     range: 2124..2158,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2128..2131,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2128..2131,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2131..2148,
                         node_index: NodeIndex(None),
@@ -3300,13 +3362,15 @@ Module(
                     range: 2161..2184,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2165..2168,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2165..2168,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2168..2174,
                         node_index: NodeIndex(None),
@@ -3349,13 +3413,15 @@ Module(
                     range: 2187..2213,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2191..2194,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2191..2194,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2194..2203,
                         node_index: NodeIndex(None),
@@ -3414,13 +3480,15 @@ Module(
                     range: 2216..2242,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2220..2223,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2220..2223,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2223..2232,
                         node_index: NodeIndex(None),
@@ -3473,13 +3541,15 @@ Module(
                     range: 2245..2277,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2249..2252,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2249..2252,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2252..2267,
                         node_index: NodeIndex(None),
@@ -3553,13 +3623,15 @@ Module(
                     range: 2280..2309,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2284..2287,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2284..2287,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2287..2299,
                         node_index: NodeIndex(None),
@@ -3628,13 +3700,15 @@ Module(
                     range: 2312..2357,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2316..2319,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2316..2319,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2319..2347,
                         node_index: NodeIndex(None),
@@ -3764,13 +3838,15 @@ Module(
                     range: 2360..2398,
                     is_async: false,
                     decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 2364..2367,
-                        node_index: NodeIndex(None),
-                        parameter_node_index: NodeIndex(None),
+                    name: FunctionDefName {
+                        name: Identifier {
+                            id: Name("foo"),
+                            range: 2364..2367,
+                            node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
+                        },
+                        type_params: None,
                     },
-                    type_params: None,
                     parameters: Parameters {
                         range: 2367..2388,
                         node_index: NodeIndex(None),

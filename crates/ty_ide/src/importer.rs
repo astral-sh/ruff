@@ -302,7 +302,11 @@ impl<'a> Importer<'a> {
                     .stmt
                     .as_import_from_stmt()
                     .is_some_and(|import_from| {
-                        !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                        !import_from.is_lazy
+                            && import_from
+                                .module
+                                .as_ref()
+                                .is_some_and(|module| module.id == "__future__")
                     })
             })
             .last()

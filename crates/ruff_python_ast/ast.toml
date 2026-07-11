@@ -93,11 +93,11 @@ doc = """See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.F
 and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
+custom_source_order = true
 fields = [
   { name = "is_async", type = "bool" },
   { name = "decorator_list", type = "ThinVec<Decorator>" },
-  { name = "name", type = "Identifier" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
+  { name = "name", type = "Box<crate::FunctionDefName>", skip_visit = true },
   { name = "parameters", type = "Box<crate::Parameters>" },
   { name = "returns", type = "Expr?", is_annotation = true },
   { name = "body", type = "ThinVec<Stmt>" },
@@ -107,7 +107,7 @@ fields = [
 doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
 fields = [
   { name = "decorator_list", type = "ThinVec<Decorator>" },
-  { name = "name", type = "Identifier" },
+  { name = "name", type = "Box<crate::Identifier>" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "arguments", type = "Box<crate::Arguments>?" },
   { name = "body", type = "ThinVec<Stmt>" },
@@ -209,13 +209,8 @@ fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
 [Stmt.nodes.StmtTry]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
 and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
-fields = [
-  { name = "body", type = "ThinVec<Stmt>" },
-  { name = "handlers", type = "ExceptHandler*" },
-  { name = "orelse", type = "ThinVec<Stmt>" },
-  { name = "finalbody", type = "ThinVec<Stmt>" },
-  { name = "is_star", type = "bool" },
-]
+custom_source_order = true
+fields = [{ name = "inner", type = "Box<crate::StmtTryInner>", skip_visit = true }]
 
 [Stmt.nodes.StmtAssert]
 doc = "See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)"
@@ -231,7 +226,7 @@ fields = [
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
 fields = [
-  { name = "module", type = "Identifier?" },
+  { name = "module", type = "Box<crate::Identifier>?" },
   { name = "names", type = "Alias*" },
   { name = "level", type = "u32" },
   { name = "is_lazy", type = "bool" },

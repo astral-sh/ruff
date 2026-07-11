@@ -611,7 +611,7 @@ impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
             body,
         } = elif_else_clause;
         Self {
-            test: test.as_ref().map(Into::into),
+            test: test.as_deref().map(Into::into),
             body: body.iter().map(Into::into).collect(),
         }
     }
@@ -1632,7 +1632,6 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body,
                 decorator_list,
                 returns,
-                type_params,
                 range: _,
                 node_index: _,
             }) => Self::FunctionDef(StmtFunctionDef {
@@ -1642,7 +1641,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_params: type_params.as_ref().map(Into::into),
+                type_params: name.type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -1783,20 +1782,12 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 exc: exc.as_ref().map(Into::into),
                 cause: cause.as_ref().map(Into::into),
             }),
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => Self::Try(StmtTry {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
-                is_star: *is_star,
+            ast::Stmt::Try(stmt) => Self::Try(StmtTry {
+                body: stmt.body.iter().map(Into::into).collect(),
+                handlers: stmt.handlers.iter().map(Into::into).collect(),
+                orelse: stmt.orelse.iter().map(Into::into).collect(),
+                finalbody: stmt.finalbody.iter().map(Into::into).collect(),
+                is_star: stmt.is_star,
             }),
             ast::Stmt::Assert(ast::StmtAssert {
                 test,
@@ -1824,7 +1815,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _,
                 node_index: _,
             }) => Self::ImportFrom(StmtImportFrom {
-                module: module.as_deref(),
+                module: module.as_deref().map(ast::Identifier::as_str),
                 names: names.iter().map(Into::into).collect(),
                 level: *level,
                 is_lazy: *is_lazy,

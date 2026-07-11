@@ -623,25 +623,19 @@ impl<'a> AnyNodeRef<'a> {
                     return cases.last().map(AnyNodeRef::from);
                 }
 
-                AnyNodeRef::StmtTry(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    if finalbody.is_empty() {
-                        if orelse.is_empty() {
-                            if handlers.is_empty() {
-                                body
+                AnyNodeRef::StmtTry(stmt) => {
+                    if stmt.finalbody.is_empty() {
+                        if stmt.orelse.is_empty() {
+                            if stmt.handlers.is_empty() {
+                                &stmt.body
                             } else {
-                                return handlers.last().map(AnyNodeRef::from);
+                                return stmt.handlers.last().map(AnyNodeRef::from);
                             }
                         } else {
-                            orelse
+                            &stmt.orelse
                         }
                     } else {
-                        finalbody
+                        &stmt.finalbody
                     }
                 }
 
@@ -700,15 +694,10 @@ impl<'a> AnyNodeRef<'a> {
                 are_same_optional(*self, body.first()) || are_same_optional(*self, orelse.first())
             }
 
-            AnyNodeRef::StmtTry(ast::StmtTry {
-                body,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                are_same_optional(*self, body.first())
-                    || are_same_optional(*self, orelse.first())
-                    || are_same_optional(*self, finalbody.first())
+            AnyNodeRef::StmtTry(stmt) => {
+                are_same_optional(*self, stmt.body.first())
+                    || are_same_optional(*self, stmt.orelse.first())
+                    || are_same_optional(*self, stmt.finalbody.first())
             }
 
             AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
@@ -740,15 +729,10 @@ impl<'a> AnyNodeRef<'a> {
                 are_same_optional(*self, orelse.first())
             }
 
-            AnyNodeRef::StmtTry(ast::StmtTry {
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                are_same_optional(*self, handlers.first())
-                    || are_same_optional(*self, orelse.first())
-                    || are_same_optional(*self, finalbody.first())
+            AnyNodeRef::StmtTry(stmt) => {
+                are_same_optional(*self, stmt.handlers.first())
+                    || are_same_optional(*self, stmt.orelse.first())
+                    || are_same_optional(*self, stmt.finalbody.first())
             }
 
             AnyNodeRef::StmtIf(ast::StmtIf {

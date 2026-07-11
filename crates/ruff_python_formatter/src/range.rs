@@ -5,7 +5,7 @@ use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
+use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
     BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
@@ -410,15 +410,14 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 // Already traversed as part of `enter_node`.
                 TraversalSignal::Skip
             }
-            AnyNodeRef::StmtTry(StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star: _,
-                range: _,
-                node_index: _,
-            }) => {
+            AnyNodeRef::StmtTry(try_stmt) => {
+                let ruff_python_ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 self.visit_body(body);
                 if let Some(except_handler_saved) =
                     self.enter_level(handlers.first().map(AnyNodeRef::from))

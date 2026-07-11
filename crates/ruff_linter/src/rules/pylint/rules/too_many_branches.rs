@@ -196,13 +196,14 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         1 + num_branches(orelse)
                     })
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let ast::StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 // Count each `except` clause as a branch; the `else` and `finally` clauses also
                 // count, but the `try` clause itself does not.
                 num_branches(body)

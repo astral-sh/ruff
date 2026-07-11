@@ -59,15 +59,13 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
 
 impl FormatNodeRule<StmtTry> for FormatStmtTry {
     fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtTry {
+        let ruff_python_ast::StmtTryInner {
             body,
             handlers,
             orelse,
             finalbody,
             is_star,
-            range: _,
-            node_index: _,
-        } = item;
+        } = item.inner.as_ref();
 
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling(item);

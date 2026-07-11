@@ -7,7 +7,8 @@ use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::{
     ExceptHandler, ExceptHandlerExceptHandler, Expr, ExprAttribute, ExprCall, ExprSubscript,
-    ExprTuple, Stmt, StmtAssign, StmtAugAssign, StmtDelete, StmtFor, StmtIf, StmtTry, StmtWhile,
+    ExprTuple, Stmt, StmtAssign, StmtAugAssign, StmtDelete, StmtFor, StmtIf, StmtTryInner,
+    StmtWhile,
     visitor::{self, Visitor},
 };
 use ruff_text_size::TextRange;
@@ -445,13 +446,14 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Ex) `try: ... except: ... else: ... finally: ...`
-            Stmt::Try(StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(try_stmt) => {
+                let StmtTryInner {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star: _,
+                } = try_stmt.inner.as_ref();
                 let saved_branch = self.branch;
 
                 self.enter_new_branch();

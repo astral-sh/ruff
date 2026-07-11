@@ -65,7 +65,7 @@ enum Kind {
 
 /// PLC2403
 pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
-    if let Some(asname) = &alias.asname {
+    if let Some(asname) = alias.asname.as_deref() {
         if asname.as_str().is_ascii() {
             return;
         }

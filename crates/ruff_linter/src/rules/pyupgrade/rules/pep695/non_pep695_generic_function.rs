@@ -116,10 +116,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     let StmtFunctionDef {
-        name,
-        type_params,
-        parameters,
-        ..
+        name, parameters, ..
     } = function_def;
 
     // TODO(brent) handle methods, for now return early in a class body. For example, an additional
@@ -141,7 +138,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     // invalid to mix old-style and new-style generics
-    if type_params.is_some() {
+    if name.type_params.is_some() {
         return;
     }
 

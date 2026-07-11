@@ -71,7 +71,7 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
                 let func = fn_ref.node(&parsed);
                 finder.walk_callable_signature(
                     &func.decorator_list,
-                    func.type_params.as_deref(),
+                    func.name.type_params.as_deref(),
                     Some(&func.parameters),
                     func.returns.as_deref(),
                 );
@@ -246,7 +246,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
             AnyNodeRef::StmtFunctionDef(func) => {
                 self.walk_callable_signature(
                     &func.decorator_list,
-                    func.type_params.as_deref(),
+                    func.name.type_params.as_deref(),
                     Some(&func.parameters),
                     func.returns.as_deref(),
                 );

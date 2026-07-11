@@ -574,9 +574,13 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
-        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(db, index, definition, type_params)
-        });
+        let pep695_ctx = function_stmt_node
+            .name
+            .type_params
+            .as_ref()
+            .map(|type_params| {
+                GenericContext::from_type_params(db, index, definition, type_params)
+            });
         let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(

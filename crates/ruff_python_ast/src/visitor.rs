@@ -134,25 +134,18 @@ pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
 
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
+        Stmt::FunctionDef(stmt) => {
+            for decorator in &stmt.decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            if let Some(type_params) = type_params {
+            if let Some(type_params) = &stmt.name.type_params {
                 visitor.visit_type_params(type_params);
             }
-            visitor.visit_parameters(parameters);
-            if let Some(expr) = returns {
+            visitor.visit_parameters(&stmt.parameters);
+            if let Some(expr) = &stmt.returns {
                 visitor.visit_annotation(expr);
             }
-            visitor.visit_body(body);
+            visitor.visit_body(&stmt.body);
         }
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
@@ -301,21 +294,13 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
+        Stmt::Try(stmt) => {
+            visitor.visit_body(&stmt.body);
+            for except_handler in &stmt.handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            visitor.visit_body(&stmt.orelse);
+            visitor.visit_body(&stmt.finalbody);
         }
         Stmt::Assert(ast::StmtAssert {
             test,

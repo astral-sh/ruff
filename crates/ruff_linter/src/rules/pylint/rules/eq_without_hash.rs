@@ -1,7 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
-};
+use ruff_python_ast::{Expr, ExprName, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef};
 use ruff_python_semantic::analyze::class::{
     ClassMemberBoundness, ClassMemberKind, any_member_declaration,
 };
@@ -117,10 +115,7 @@ impl EqHash {
 
                     id
                 }
-                ClassMemberKind::FunctionDef(StmtFunctionDef {
-                    name: Identifier { id, .. },
-                    ..
-                }) => id.as_str(),
+                ClassMemberKind::FunctionDef(StmtFunctionDef { name, .. }) => name.as_str(),
             };
 
             match id {

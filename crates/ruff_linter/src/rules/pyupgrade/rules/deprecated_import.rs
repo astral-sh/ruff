@@ -729,7 +729,7 @@ impl<'a> ImportReplacer<'a> {
         // Generate the formatted names.
         let qualified_names: String = names
             .iter()
-            .map(|name| match &name.asname {
+            .map(|name| match name.asname.as_deref() {
                 Some(asname) => format!("{} as {}", name.name, asname),
                 None => format!("{}", name.name),
             })

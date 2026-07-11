@@ -1007,7 +1007,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
+                if !*is_lazy
+                    && matches!(
+                        module.as_deref().map(ast::Identifier::as_str),
+                        Some("__future__")
+                    )
+                {
                     if names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
@@ -1127,7 +1132,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.importer.visit_import(stmt);
                 }
 
-                let module = module.as_deref();
+                let module = module.as_deref().map(ast::Identifier::as_str);
                 let level = *level;
                 let is_lazy = *is_lazy;
 
@@ -1253,7 +1258,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     parameters,
                     decorator_list,
                     returns,
-                    type_params,
                     ..
                 },
             ) => {
@@ -1315,7 +1319,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &name.type_params {
                     self.visit_type_params(type_params);
                 }
 
@@ -1457,15 +1461,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
-            Stmt::Try(
-                try_node @ ast::StmtTry {
+            Stmt::Try(try_node) => {
+                let ast::StmtTryInner {
                     body,
                     handlers,
                     orelse,
                     finalbody,
-                    ..
-                },
-            ) => {
+                    is_star: _,
+                } = try_node.inner.as_ref();
                 // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
                 // `finalbody`, but treat the body and the `orelse` as a single branch for
                 // flow analysis purposes.

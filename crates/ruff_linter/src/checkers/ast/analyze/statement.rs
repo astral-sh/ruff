@@ -56,7 +56,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 returns,
                 parameters,
                 body,
-                type_params: _,
                 range: _,
                 node_index: _,
             },
@@ -718,7 +717,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             let level = *level;
-            let module = module.as_deref();
+            let module = module.as_deref().map(ast::Identifier::as_str);
             if checker.is_rule_enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
@@ -1128,7 +1127,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
                 bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
                 for clause in elif_else_clauses {
-                    if let Some(test) = clause.test.as_ref() {
+                    if let Some(test) = clause.test.as_deref() {
                         bad_version_info_comparison(checker, test, has_else_clause);
                     }
                 }
@@ -1331,16 +1330,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::needless_else(checker, for_stmt.into());
             }
         }
-        Stmt::Try(
-            try_stmt @ ast::StmtTry {
+        Stmt::Try(try_stmt) => {
+            let ast::StmtTryInner {
                 body,
                 handlers,
                 orelse,
                 finalbody,
                 is_star,
-                ..
-            },
-        ) => {
+            } = try_stmt.inner.as_ref();
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }

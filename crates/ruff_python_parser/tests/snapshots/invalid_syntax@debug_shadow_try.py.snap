@@ -14,63 +14,65 @@ Module(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 0..43,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                node_index: NodeIndex(None),
-                                range: 5..8,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 5..8,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 9..43,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
+                    inner: StmtTryInner {
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    node_index: NodeIndex(None),
+                                    range: 5..8,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
                                             node_index: NodeIndex(None),
-                                            range: 16..25,
-                                            id: Name("Exception"),
-                                            ctx: Load,
+                                            range: 5..8,
                                         },
                                     ),
-                                ),
-                                name: Some(
-                                    Identifier {
-                                        id: Name("__debug__"),
-                                        range: 29..38,
-                                        node_index: NodeIndex(None),
-                                        parameter_node_index: NodeIndex(None),
-                                    },
-                                ),
-                                body: [
-                                    Expr(
-                                        StmtExpr {
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 9..43,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 16..25,
+                                                id: Name("Exception"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("__debug__"),
+                                            range: 29..38,
                                             node_index: NodeIndex(None),
-                                            range: 40..43,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 40..43,
-                                                },
-                                            ),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                     ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
+                                    body: [
+                                        Expr(
+                                            StmtExpr {
+                                                node_index: NodeIndex(None),
+                                                range: 40..43,
+                                                value: EllipsisLiteral(
+                                                    ExprEllipsisLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 40..43,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                        finalbody: [],
+                        is_star: false,
+                    },
                 },
             ),
         ],

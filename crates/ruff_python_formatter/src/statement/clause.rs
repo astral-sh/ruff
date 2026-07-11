@@ -52,20 +52,20 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::Function(StmtFunctionDef { body, .. })
             | ClauseHeader::If(StmtIf { body, .. })
             | ClauseHeader::ElifElse(ElifElseClause { body, .. })
-            | ClauseHeader::Try(StmtTry { body, .. })
             | ClauseHeader::MatchCase(MatchCase { body, .. })
             | ClauseHeader::For(StmtFor { body, .. })
             | ClauseHeader::While(StmtWhile { body, .. })
             | ClauseHeader::With(StmtWith { body, .. })
             | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
             | ClauseHeader::OrElse(
-                ElseClause::Try(StmtTry { orelse: body, .. })
-                | ElseClause::For(StmtFor { orelse: body, .. })
+                ElseClause::For(StmtFor { orelse: body, .. })
                 | ElseClause::While(StmtWhile { orelse: body, .. }),
-            )
-            | ClauseHeader::TryFinally(StmtTry {
-                finalbody: body, ..
-            }) => body.last().map(AnyNodeRef::from),
+            ) => body.last().map(AnyNodeRef::from),
+            ClauseHeader::Try(try_stmt) => try_stmt.body.last().map(AnyNodeRef::from),
+            ClauseHeader::OrElse(ElseClause::Try(try_stmt)) => {
+                try_stmt.orelse.last().map(AnyNodeRef::from)
+            }
+            ClauseHeader::TryFinally(try_stmt) => try_stmt.finalbody.last().map(AnyNodeRef::from),
             ClauseHeader::Match(StmtMatch { cases, .. }) => cases
                 .last()
                 .and_then(|case| case.body.last().map(AnyNodeRef::from)),
@@ -136,17 +136,16 @@ impl<'a> ClauseHeader<'a> {
                 }
             }
             ClauseHeader::Function(StmtFunctionDef {
-                type_params,
                 parameters,
                 range: _,
                 node_index: _,
                 is_async: _,
                 decorator_list: _,
-                name: _,
+                name,
                 returns,
                 body: _,
             }) => {
-                if let Some(type_params) = type_params.as_deref() {
+                if let Some(type_params) = name.type_params.as_deref() {
                     visit(type_params, visitor);
                 }
                 visit(parameters.as_ref(), visitor);
@@ -170,7 +169,7 @@ impl<'a> ClauseHeader<'a> {
                 node_index: _,
                 body: _,
             }) => {
-                if let Some(test) = test.as_ref() {
+                if let Some(test) = test.as_deref() {
                     visit(test, visitor);
                 }
             }

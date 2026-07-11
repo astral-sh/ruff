@@ -644,7 +644,6 @@ pub(crate) fn definition(
         is_async: _,
         decorator_list,
         name,
-        type_params: _,
         parameters,
         returns,
         body,

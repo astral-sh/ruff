@@ -342,7 +342,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                 return;
             }
 
-            if module == "mock" {
+            if module.as_str() == "mock" {
                 if names.iter().any(|alias| {
                     alias.name.as_str() == "mock"
                         && is_import_required_by_isort(

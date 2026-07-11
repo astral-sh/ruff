@@ -197,7 +197,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
             continue;
         };
 
-        if name == "__init__" {
+        if name.as_str() == "__init__" {
             for statement in body {
                 match statement {
                     // Ex) `self.name = name`

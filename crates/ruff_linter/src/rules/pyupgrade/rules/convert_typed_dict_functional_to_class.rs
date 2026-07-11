@@ -174,7 +174,10 @@ fn create_class_def_stmt(
     base_class: &Expr,
 ) -> Stmt {
     ast::StmtClassDef {
-        name: Identifier::new(class_name.to_string(), TextRange::default()),
+        name: Box::new(Identifier::new(
+            class_name.to_string(),
+            TextRange::default(),
+        )),
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: match total_keyword {

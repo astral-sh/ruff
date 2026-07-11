@@ -14,69 +14,71 @@ Module(
                 StmtTry {
                     node_index: NodeIndex(None),
                     range: 0..72,
-                    body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 9..13,
-                            },
-                        ),
-                    ],
-                    handlers: [
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 14..43,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 21..30,
-                                            id: Name("Exception"),
-                                            ctx: Load,
-                                        },
+                    inner: StmtTryInner {
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    node_index: NodeIndex(None),
+                                    range: 9..13,
+                                },
+                            ),
+                        ],
+                        handlers: [
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 14..43,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 21..30,
+                                                id: Name("Exception"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 39..43,
-                                        },
+                                    name: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 39..43,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ExceptHandler(
+                                ExceptHandlerExceptHandler {
+                                    range: 44..72,
+                                    node_index: NodeIndex(None),
+                                    type_: Some(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 51..60,
+                                                id: Name("Exception"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ],
-                            },
-                        ),
-                        ExceptHandler(
-                            ExceptHandlerExceptHandler {
-                                range: 44..72,
-                                node_index: NodeIndex(None),
-                                type_: Some(
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 51..60,
-                                            id: Name("Exception"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                name: None,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            node_index: NodeIndex(None),
-                                            range: 68..72,
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                    ],
-                    orelse: [],
-                    finalbody: [],
-                    is_star: false,
+                                    name: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                node_index: NodeIndex(None),
+                                                range: 68..72,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                        finalbody: [],
+                        is_star: false,
+                    },
                 },
             ),
         ],

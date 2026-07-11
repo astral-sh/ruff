@@ -1380,7 +1380,7 @@ impl<'m> ContextCursor<'m> {
                     || stmt
                         .elif_else_clauses
                         .iter()
-                        .any(|clause| clause.test.as_ref().is_some_and(contains))
+                        .any(|clause| clause.test.as_deref().is_some_and(contains))
             }
             // while_stmt := 'while' named_expression ':' block [else_block]
             ast::AnyNodeRef::StmtWhile(stmt) => contains(&stmt.test),
@@ -2924,7 +2924,10 @@ impl<'a> ImportStatement<'a> {
                 }
                 FromImportKind::Attribute => {
                     let module_dependency_kind = model
-                        .resolve_module(ast.module.as_ref().map(ast::Identifier::as_str), ast.level)
+                        .resolve_module(
+                            ast.module.as_deref().map(ast::Identifier::as_str),
+                            ast.level,
+                        )
                         .map(|module| ModuleDependencyKind::from_module(db, module));
                     add_import_completions_with_module_dependency_kind(
                         db,

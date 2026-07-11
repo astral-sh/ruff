@@ -322,7 +322,12 @@ impl ModuleName {
             range: _,
             node_index: _,
         } = node;
-        Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
+        Self::from_identifier_parts(
+            db,
+            importing_file,
+            module.as_ref().map(|module| module.id.as_str()),
+            *level,
+        )
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`

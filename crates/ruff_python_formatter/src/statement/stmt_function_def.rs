@@ -98,7 +98,6 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
         is_async,
         decorator_list: _,
         name,
-        type_params,
         parameters,
         returns,
         body: _,
@@ -110,9 +109,9 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
         write!(f, [token("async"), space()])?;
     }
 
-    write!(f, [token("def"), space(), name.format()])?;
+    write!(f, [token("def"), space(), name.name.format()])?;
 
-    if let Some(type_params) = type_params.as_ref() {
+    if let Some(type_params) = name.type_params.as_ref() {
         type_params.format().fmt(f)?;
     }
 

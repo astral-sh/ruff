@@ -98,10 +98,8 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
             Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
                 self.raises.push(raise);
             }
-            Stmt::Try(ast::StmtTry {
-                body, finalbody, ..
-            }) => {
-                for stmt in body.iter().chain(finalbody) {
+            Stmt::Try(try_stmt) => {
+                for stmt in try_stmt.body.iter().chain(&try_stmt.finalbody) {
                     walk_stmt(self, stmt);
                 }
             }

@@ -79,10 +79,10 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             if *level > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`
             } else if let Some(module) = module {
-                if module == "xml.etree.cElementTree" {
+                if module.as_str() == "xml.etree.cElementTree" {
                     // Ex) `from xml.etree.cElementTree import XML`
                     add_check_for_node(checker, stmt);
-                } else if module == "xml.etree" {
+                } else if module.as_str() == "xml.etree" {
                     // Ex) `from xml.etree import cElementTree as ET`
                     for name in names {
                         if &name.name == "cElementTree" && name.asname.is_some() {

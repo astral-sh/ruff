@@ -170,7 +170,7 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
             }
         }
         Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-            if name == "Meta" {
+            if name.as_str() == "Meta" {
                 Some(ContentType::MetaClass)
             } else {
                 None

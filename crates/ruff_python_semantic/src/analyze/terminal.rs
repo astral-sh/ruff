@@ -107,13 +107,14 @@ impl Terminal {
                         }
                     }
                 }
-                Stmt::Try(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
+                Stmt::Try(try_stmt) => {
+                    let ast::StmtTryInner {
+                        body,
+                        handlers,
+                        orelse,
+                        finalbody,
+                        is_star: _,
+                    } = try_stmt.inner.as_ref();
                     // If the body returns, then this can't be a non-returning function. We assume
                     // that _any_ statement in the body could raise an exception, so we don't
                     // consider the body to be exhaustive. In other words, we assume the exception
@@ -323,21 +324,17 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
             {
                 return true;
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) if (sometimes_breaks(body, semantic)
-                || handlers.iter().any(|handler| {
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) = handler;
-                    sometimes_breaks(body, semantic)
-                })
-                || sometimes_breaks(orelse, semantic)
-                || sometimes_breaks(finalbody, semantic)) =>
+            Stmt::Try(try_stmt)
+                if (sometimes_breaks(&try_stmt.body, semantic)
+                    || try_stmt.handlers.iter().any(|handler| {
+                        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                            body,
+                            ..
+                        }) = handler;
+                        sometimes_breaks(body, semantic)
+                    })
+                    || sometimes_breaks(&try_stmt.orelse, semantic)
+                    || sometimes_breaks(&try_stmt.finalbody, semantic)) =>
             {
                 return true;
             }

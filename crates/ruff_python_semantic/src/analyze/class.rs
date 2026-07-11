@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt, StmtFor, StmtIf,
-    StmtMatch, StmtTry, StmtWhile, StmtWith,
+    StmtMatch, StmtWhile, StmtWith,
 };
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
@@ -232,13 +232,14 @@ where
                     None
                 }
 
-                Stmt::Try(StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
+                Stmt::Try(try_stmt) => {
+                    let ast::StmtTryInner {
+                        body,
+                        handlers,
+                        orelse,
+                        finalbody,
+                        is_star: _,
+                    } = try_stmt.inner.as_ref();
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
                         || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
                         || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
@@ -348,7 +349,7 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
             continue;
         };
 
-        if name != "__new__" {
+        if name.as_str() != "__new__" {
             continue;
         }
 

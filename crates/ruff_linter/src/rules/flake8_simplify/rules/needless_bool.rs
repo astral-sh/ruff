@@ -142,7 +142,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 node_index: _,
             },
         ] => (
-            elif_test,
+            elif_test.as_ref(),
             elif_body,
             else_body.as_slice(),
             TextRange::new(elif_range.start(), else_range.end()),

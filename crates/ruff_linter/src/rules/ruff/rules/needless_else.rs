@@ -240,11 +240,12 @@ impl<'a> AnyNodeWithOrElse<'a> {
     /// Returns the suite before the else block.
     fn body_before_else(self) -> &'a [Stmt] {
         match self {
-            Self::Try(StmtTry { body, handlers, .. }) => handlers
+            Self::Try(try_stmt) => try_stmt
+                .handlers
                 .last()
                 .and_then(|handler| handler.as_except_handler())
                 .map(|handler| &handler.body)
-                .unwrap_or(body),
+                .unwrap_or(&try_stmt.body),
 
             Self::While(StmtWhile { body, .. }) | Self::For(StmtFor { body, .. }) => body,
 
@@ -265,9 +266,8 @@ impl<'a> AnyNodeWithOrElse<'a> {
     /// Defaults to an empty suite if the statement has no `else` block.
     fn else_body(self) -> &'a [Stmt] {
         match self {
-            Self::While(StmtWhile { orelse, .. })
-            | Self::For(StmtFor { orelse, .. })
-            | Self::Try(StmtTry { orelse, .. }) => orelse,
+            Self::While(StmtWhile { orelse, .. }) | Self::For(StmtFor { orelse, .. }) => orelse,
+            Self::Try(try_stmt) => &try_stmt.orelse,
 
             Self::If(StmtIf {
                 elif_else_clauses, ..

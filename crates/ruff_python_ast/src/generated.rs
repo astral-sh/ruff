@@ -9291,8 +9291,7 @@ pub struct StmtFunctionDef {
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
-    pub name: crate::Identifier,
-    pub type_params: Option<Box<crate::TypeParams>>,
+    pub name: Box<crate::FunctionDefName>,
     pub parameters: Box<crate::Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: thin_vec::ThinVec<Stmt>,
@@ -9305,7 +9304,7 @@ pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
-    pub name: crate::Identifier,
+    pub name: Box<crate::Identifier>,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub arguments: Option<Box<crate::Arguments>>,
     pub body: thin_vec::ThinVec<Stmt>,
@@ -9453,11 +9452,7 @@ pub struct StmtRaise {
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: thin_vec::ThinVec<Stmt>,
-    pub handlers: Vec<ExceptHandler>,
-    pub orelse: thin_vec::ThinVec<Stmt>,
-    pub finalbody: thin_vec::ThinVec<Stmt>,
-    pub is_star: bool,
+    pub inner: Box<crate::StmtTryInner>,
 }
 
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
@@ -9486,7 +9481,7 @@ pub struct StmtImport {
 pub struct StmtImportFrom {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub module: Option<crate::Identifier>,
+    pub module: Option<Box<crate::Identifier>>,
     pub names: Vec<crate::Alias>,
     pub level: u32,
     pub is_lazy: bool,
@@ -10087,42 +10082,6 @@ impl ModExpression {
     }
 }
 
-impl StmtFunctionDef {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let StmtFunctionDef {
-            is_async: _,
-            decorator_list,
-            name,
-            type_params,
-            parameters,
-            returns,
-            body,
-            range: _,
-            node_index: _,
-        } = self;
-
-        for elm in decorator_list {
-            visitor.visit_decorator(elm);
-        }
-        visitor.visit_identifier(name);
-
-        if let Some(type_params) = type_params {
-            visitor.visit_type_params(type_params);
-        }
-
-        visitor.visit_parameters(parameters);
-
-        if let Some(returns) = returns {
-            visitor.visit_annotation(returns);
-        }
-
-        visitor.visit_body(body);
-    }
-}
-
 impl StmtClassDef {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -10388,30 +10347,6 @@ impl StmtRaise {
         if let Some(cause) = cause {
             visitor.visit_expr(cause);
         }
-    }
-}
-
-impl StmtTry {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        } = self;
-        visitor.visit_body(body);
-
-        for elm in handlers {
-            visitor.visit_except_handler(elm);
-        }
-        visitor.visit_body(orelse);
-        visitor.visit_body(finalbody);
     }
 }
 

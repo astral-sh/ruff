@@ -121,7 +121,9 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
             Stmt::Import(_) | Stmt::ImportFrom(_) => return,
 
             // Allow PEP-562 module `__getattr__` and `__dir__`
-            Stmt::FunctionDef(func) if matches!(&*func.name, "__getattr__" | "__dir__") => return,
+            Stmt::FunctionDef(func) if matches!(func.name.as_str(), "__getattr__" | "__dir__") => {
+                return;
+            }
 
             // Allow `TYPE_CHECKING` blocks
             Stmt::If(stmt_if) if is_type_checking_block(stmt_if, semantic) => return,

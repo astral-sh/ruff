@@ -234,7 +234,7 @@ fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
-        name: Identifier::new(typename.to_string(), TextRange::default()),
+        name: Box::new(Identifier::new(typename.to_string(), TextRange::default())),
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: std::iter::empty().collect(),

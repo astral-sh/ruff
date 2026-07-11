@@ -214,7 +214,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
     let (test, nested_if) = if let Some(clause) = elif_else_clauses.last() {
-        if let Some(test) = &clause.test {
+        if let Some(test) = clause.test.as_deref() {
             (test, NestedIf::Elif(clause))
         } else {
             // The last condition is an `else` (different rule)

@@ -69,7 +69,7 @@ impl Violation for UselessImportAlias {
 
 /// PLC0414
 pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
-    let Some(asname) = &alias.asname else {
+    let Some(asname) = alias.asname.as_deref() else {
         return;
     };
     if alias.name.as_str() != asname.as_str() {
@@ -108,7 +108,7 @@ pub(crate) fn useless_import_from_alias(
     module: Option<&str>,
     level: u32,
 ) {
-    let Some(asname) = &alias.asname else {
+    let Some(asname) = alias.asname.as_deref() else {
         return;
     };
     if alias.name.as_str() != asname.as_str() {

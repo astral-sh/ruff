@@ -700,12 +700,9 @@ bitflags! {
 }
 
 impl Exceptions {
-    pub fn from_try_stmt(
-        ast::StmtTry { handlers, .. }: &ast::StmtTry,
-        semantic: &SemanticModel,
-    ) -> Self {
+    pub fn from_try_stmt(try_stmt: &ast::StmtTry, semantic: &SemanticModel) -> Self {
         let mut handled_exceptions = Self::empty();
-        for type_ in extract_handled_exceptions(handlers) {
+        for type_ in extract_handled_exceptions(&try_stmt.handlers) {
             handled_exceptions |= match semantic.resolve_builtin_symbol(type_) {
                 Some("NameError") => Self::NAME_ERROR,
                 Some("ModuleNotFoundError") => Self::MODULE_NOT_FOUND_ERROR,
