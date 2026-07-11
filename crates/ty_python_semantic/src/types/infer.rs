@@ -209,10 +209,15 @@ pub(crate) fn function_known_decorator_flags<'db>(
 #[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
-    bindings: Box<[(Definition<'db>, Type<'db>)]>,
-    called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
     diagnostics: TypeCheckDiagnostics,
+    extra: Option<Box<FunctionDecoratorInferenceExtra<'db>>>,
+}
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct FunctionDecoratorInferenceExtra<'db> {
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    called_functions: Box<[FunctionType<'db>]>,
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
@@ -232,11 +237,17 @@ impl<'db> FunctionDecoratorInference<'db> {
     pub(crate) fn bindings(
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
-        self.bindings.iter().copied()
+        self.extra
+            .as_deref()
+            .map_or(&[][..], |extra| extra.bindings.as_ref())
+            .iter()
+            .copied()
     }
 
     pub(crate) fn called_functions(&self) -> &[FunctionType<'db>] {
-        &self.called_functions
+        self.extra
+            .as_deref()
+            .map_or(&[], |extra| extra.called_functions.as_ref())
     }
 
     pub(crate) fn known_decorators(&self) -> FunctionDecorators {

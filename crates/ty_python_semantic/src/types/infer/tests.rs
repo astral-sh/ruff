@@ -116,6 +116,45 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
+fn empty_function_decorator_inference_is_compact() {
+    assert_eq!(std::mem::size_of::<FunctionDecoratorInference>(), 88);
+
+    let inference = FunctionDecoratorInference::default();
+    assert_eq!(inference.expression_types().len(), 0);
+    assert_eq!(inference.bindings().len(), 0);
+    assert!(inference.called_functions().is_empty());
+    assert!(inference.known_decorators().is_empty());
+    assert!(inference.diagnostics().is_empty());
+}
+
+#[test]
+fn function_decorator_inference_retains_non_empty_extra() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/decorators.py", "def decorator(): ...")?;
+
+    let file = system_path_to_file(&db, "/src/decorators.py").unwrap();
+    let definition = first_public_binding(&db, file, "decorator");
+    let function = global_symbol(&db, file, "decorator")
+        .place
+        .expect_type()
+        .expect_function_literal();
+    let ty = Type::unknown();
+    let inference = FunctionDecoratorInference {
+        extra: Some(Box::new(FunctionDecoratorInferenceExtra {
+            bindings: vec![(definition, ty)].into_boxed_slice(),
+            called_functions: vec![function].into_boxed_slice(),
+        })),
+        ..FunctionDecoratorInference::default()
+    };
+
+    assert_eq!(inference.bindings().collect::<Vec<_>>(), [(definition, ty)]);
+    assert_eq!(inference.called_functions(), [function]);
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

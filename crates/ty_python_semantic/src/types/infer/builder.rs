@@ -25,9 +25,10 @@ use ty_python_core::statement::StatementInner;
 use super::{
     DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
     ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    FunctionDecoratorInference, FunctionDecoratorInferenceExtra, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -10352,15 +10353,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self;
         let diagnostics = context.finish();
 
+        let extra = (!bindings.is_empty() || !called_functions.is_empty()).then(|| {
+            Box::new(FunctionDecoratorInferenceExtra {
+                bindings: bindings.into_boxed_slice(),
+                called_functions: called_functions
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            })
+        });
+
         FunctionDecoratorInference {
             expression_types: FrozenMap::from(expressions),
-            bindings: bindings.into_boxed_slice(),
-            called_functions: called_functions
-                .into_iter()
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
             known_decorators,
             diagnostics,
+            extra,
         }
     }
 
