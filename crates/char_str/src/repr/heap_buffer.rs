@@ -123,6 +123,15 @@ impl HeapBuffer {
         &header.count
     }
 
+    pub(super) const fn allocation_size(&self) -> usize {
+        let prefix = if self.len.is_heap() {
+            size_of::<usize>()
+        } else {
+            0
+        };
+        prefix + Self::header_offset() + self.len()
+    }
+
     /// Releases one live reference, deallocating the buffer when it was the last reference.
     ///
     /// # Safety
@@ -178,12 +187,8 @@ impl HeapBuffer {
     /// The allocation must have been created by [`HeapBuffer::allocate`] with the same immutable
     /// length, and no references to it may remain.
     unsafe fn dealloc(&self) {
-        let text_len = self.len();
         let len_on_heap = self.len.is_heap();
-        let prefix = if len_on_heap { size_of::<usize>() } else { 0 };
-        let allocation_size = prefix
-            .wrapping_add(Self::header_offset())
-            .wrapping_add(text_len);
+        let allocation_size = self.allocation_size();
 
         // SAFETY: The allocation's original checked layout had these exact immutable dimensions.
         let layout =

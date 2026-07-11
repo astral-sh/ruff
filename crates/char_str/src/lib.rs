@@ -164,6 +164,16 @@ impl CharStr {
     pub const fn is_heap_allocated(&self) -> bool {
         self.0.is_heap_buffer()
     }
+
+    /// Returns the number of bytes allocated for this string's heap buffer.
+    ///
+    /// This includes the reference-count header but excludes allocator bookkeeping. Inline and
+    /// static strings return zero. Clones of a heap-backed string share the same allocation and
+    /// therefore return the same value.
+    #[inline]
+    pub const fn heap_allocation_size(&self) -> usize {
+        self.0.heap_allocation_size()
+    }
 }
 
 impl Clone for CharStr {

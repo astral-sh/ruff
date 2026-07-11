@@ -24,6 +24,23 @@ const STATIC: CharStr = CharStr::from_static_str("a long string stored in static
 assert!(!STATIC.is_heap_allocated());
 ```
 
+## When to use `CharStr`
+
+`CharStr` is intended for immutable strings where retained size or cheap clones matter. It is a
+good fit for values that are stored in many objects, cloned after construction, or deduplicated by
+sharing their backing allocation.
+
+`CompactString` remains a better fit for strings that are built incrementally or are generally
+unique and short-to-medium in length. On 64-bit platforms, `CompactString` occupies three words and
+stores up to 24 bytes inline, while `CharStr` occupies two words and stores up to 16 bytes inline.
+Consequently, a dynamically constructed 17–24 byte string is inline in `CompactString` but
+heap-allocated in `CharStr`.
+
+When all parts of an immutable result are available up front, prefer `CharStr::concat` or
+`CharStr::join` over constructing a mutable string and then copying it into a `CharStr`. Borrowing
+either representation as `&str` is allocation-free; conversions that transfer ownership between
+different string representations may require an allocation and copy.
+
 ## Acknowledgements
 
 This crate is a fork of [`lean_string`](https://github.com/ryota2357/lean_string) by ryota2357,

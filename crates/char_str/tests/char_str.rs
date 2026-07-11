@@ -29,6 +29,22 @@ fn storage_kinds() {
 }
 
 #[test]
+fn heap_allocation_size() {
+    const STATIC: CharStr =
+        CharStr::from_static_str("a static string longer than the inline limit");
+
+    let inline = CharStr::from("inline");
+    let text = "a heap string longer than the inline limit";
+    let heap = CharStr::from(text);
+    let shared = heap.clone();
+
+    assert_eq!(inline.heap_allocation_size(), 0);
+    assert_eq!(STATIC.heap_allocation_size(), 0);
+    assert_eq!(heap.heap_allocation_size(), text.len() + size_of::<usize>());
+    assert_eq!(shared.heap_allocation_size(), heap.heap_allocation_size());
+}
+
+#[test]
 fn full_inline_storage_accepts_every_valid_last_byte_kind() {
     let nul = CharStr::from("\0".repeat(INLINE_LIMIT));
     let continuation = CharStr::from(format!("{}é", "x".repeat(INLINE_LIMIT - 2)));
