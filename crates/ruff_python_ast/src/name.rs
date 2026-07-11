@@ -169,7 +169,7 @@ impl get_size2::GetSize for Name {
         mut tracker: T,
     ) -> (usize, T) {
         let size = if self.0.is_heap_allocated() && tracker.track(self.as_ptr()) {
-            self.0.len()
+            self.0.heap_allocation_size()
         } else {
             0
         };
@@ -841,6 +841,17 @@ mod tests {
     #[test]
     fn join() {
         assert_eq!(Name::join(&["foo", "bar"], "."), "foo.bar");
+    }
+
+    #[test]
+    #[cfg(feature = "get-size")]
+    fn heap_size_includes_allocation_header() {
+        use get_size2::GetSize as _;
+
+        let text = "a name longer than the inline capacity";
+        let name = Name::new(text);
+
+        assert_eq!(name.get_heap_size(), text.len() + size_of::<usize>());
     }
 
     #[test]
