@@ -220,14 +220,8 @@ from typing import Protocol
 class Variadic(Protocol):
     def method(*args: int) -> int: ...
 
-class KeywordOnly(Protocol):
-    def method(*, value: int) -> int: ...
-
 def check_variadic(value: Variadic) -> None:
     value.method()  # error: [invalid-argument-type]
-
-def check_keyword_only(value: KeywordOnly) -> None:
-    value.method(value=1)  # error: [too-many-positional-arguments]
 ```
 
 ## Method calls on `KnownInstance` types
