@@ -2046,7 +2046,7 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             };
 
-            match name.as_str() {
+            match name {
                 "__setattr__" | "__delattr__" => {
                     if field_policy.is_dataclass_like()
                         && self.is_frozen_dataclass(db) == Some(true)
@@ -2294,7 +2294,7 @@ impl<'db> StaticClassLiteral<'db> {
                     *kw = dataclass_kw_only_default;
                 }
 
-                attributes.insert(symbol.name().clone(), field);
+                attributes.insert(Name::new(symbol.name()), field);
             }
         }
 
@@ -3185,9 +3185,6 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
             }
         };
 
-        let init_name: &Name = &"__init__".into();
-        let new_name: &Name = &"__new__".into();
-
         let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
         let table = place_table(db, class_body_scope);
         let attribute_places_and_qualifiers =
@@ -3205,7 +3202,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
                     if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
-                        (![init_name, new_name].contains(&name))
+                        (!matches!(name, "__init__" | "__new__"))
                             .then_some((name.to_string(), place_and_qual))
                     } else {
                         None
@@ -3222,7 +3219,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
                     .place_table(function_scope_id)
                     .members()
                     .filter_map(|member| member.as_instance_attribute())
-                    .filter(|name| *name != init_name && *name != new_name)
+                    .filter(|name| !matches!(*name, "__init__" | "__new__"))
                     .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
             })

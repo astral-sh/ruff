@@ -9200,7 +9200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_fall_back_to(db, || {
                     self.infer_explicit_global_symbol_load(
                         place_expr,
-                        place_expr.as_symbol().map(|symbol| symbol.name().as_str()),
+                        place_expr.as_symbol().map(Symbol::name),
                         file_scope_id,
                         &mut constraint_keys,
                         false,

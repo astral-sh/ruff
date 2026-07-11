@@ -647,10 +647,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definition_id: ScopedDefinitionId,
     ) {
         let current_scope = self.current_scope();
-        let name = self.place_tables[current_scope]
-            .symbol(symbol)
-            .name()
-            .clone();
+        let name = Name::new(self.place_tables[current_scope].symbol(symbol).name());
 
         let Some(captures) = self
             .current_scope_info_mut()
@@ -703,7 +700,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if symbol.is_used() && !symbol.is_local() && !symbol.is_global() {
                 unresolved.push(UnresolvedCapture {
                     nested_scope: popped_scope_id,
-                    name: symbol.name().clone(),
+                    name: Name::new(symbol.name()),
                     laziness: popped_scope_laziness,
                 });
             }
@@ -1003,7 +1000,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     GlobalOrNonlocal::Nonlocal
                 };
                 nested_global_or_nonlocal_declarations
-                    .entry(symbol.name().clone())
+                    .entry(Name::new(symbol.name()))
                     .or_default()
                     .push(NestedDeclaration {
                         kind,

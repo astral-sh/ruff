@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use compact_str::CompactString;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
@@ -17,15 +18,24 @@ const LINEAR_SEARCH_THRESHOLD: usize = 16;
 pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub struct Symbol {
-    name: Name,
-    flags: SymbolFlags,
+    /// The symbol name followed by a single ASCII byte containing its flags.
+    name_and_flags: CompactString,
 }
 
 impl std::fmt::Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.name.fmt(f)
+        self.name().fmt(f)
+    }
+}
+
+impl std::fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Symbol")
+            .field("name", &format_args!("Name({:?})", self.name()))
+            .field("flags", &self.flags())
+            .finish()
     }
 }
 
@@ -47,43 +57,45 @@ bitflags! {
     }
 }
 
-impl get_size2::GetSize for SymbolFlags {}
+#[cfg(target_pointer_width = "64")]
+static_assertions::assert_eq_size!(Symbol, [u64; 3]);
+static_assertions::const_assert!(SymbolFlags::all().bits() <= 0x7f);
 
 impl Symbol {
-    pub const fn new(name: Name) -> Self {
-        Self {
-            name,
-            flags: SymbolFlags::empty(),
-        }
+    pub fn new(name: Name) -> Self {
+        let mut name_and_flags = CompactString::from(name);
+        name_and_flags.push('\0');
+        Self { name_and_flags }
     }
 
-    pub fn name(&self) -> &Name {
-        &self.name
+    pub fn name(&self) -> &str {
+        let name_and_flags = self.name_and_flags.as_str();
+        &name_and_flags[..name_and_flags.len().saturating_sub(1)]
     }
 
     /// Is the symbol used in its containing scope?
     pub fn is_used(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_USED)
+        self.flags().contains(SymbolFlags::IS_USED)
     }
 
     /// Is the symbol given a value in its containing scope?
-    pub const fn is_bound(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_BOUND)
+    pub fn is_bound(&self) -> bool {
+        self.flags().contains(SymbolFlags::IS_BOUND)
     }
 
     /// Is the symbol declared in its containing scope?
     pub fn is_declared(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_DECLARED)
+        self.flags().contains(SymbolFlags::IS_DECLARED)
     }
 
     /// Is the symbol `global` its containing scope?
     pub fn is_global(&self) -> bool {
-        self.flags.contains(SymbolFlags::MARKED_GLOBAL)
+        self.flags().contains(SymbolFlags::MARKED_GLOBAL)
     }
 
     /// Is the symbol `nonlocal` its containing scope?
     pub fn is_nonlocal(&self) -> bool {
-        self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
+        self.flags().contains(SymbolFlags::MARKED_NONLOCAL)
     }
 
     /// Is the symbol defined in this scope, vs referring to some enclosing scope?
@@ -118,12 +130,12 @@ impl Symbol {
         !self.is_global() && !self.is_nonlocal() && (self.is_bound() || self.is_declared())
     }
 
-    pub const fn is_reassigned(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_REASSIGNED)
+    pub fn is_reassigned(&self) -> bool {
+        self.flags().contains(SymbolFlags::IS_REASSIGNED)
     }
 
     pub fn is_parameter(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_PARAMETER)
+        self.flags().contains(SymbolFlags::IS_PARAMETER)
     }
 
     pub(super) fn mark_global(&mut self) {
@@ -155,7 +167,17 @@ impl Symbol {
     }
 
     fn insert_flags(&mut self, flags: SymbolFlags) {
-        self.flags.insert(flags);
+        let flags = self.flags() | flags;
+        let _ = self.name_and_flags.pop();
+        self.name_and_flags.push(char::from(flags.bits()));
+    }
+
+    fn flags(&self) -> SymbolFlags {
+        self.name_and_flags
+            .as_bytes()
+            .last()
+            .copied()
+            .map_or_else(SymbolFlags::empty, SymbolFlags::from_bits_truncate)
     }
 }
 
@@ -172,7 +194,7 @@ impl SymbolReverseTable {
         name: &str,
     ) -> Option<ScopedSymbolId> {
         self.0
-            .find(Self::hash_name(name), |id| symbols[*id].name == name)
+            .find(Self::hash_name(name), |id| symbols[*id].name() == name)
             .copied()
     }
 
@@ -183,14 +205,14 @@ impl SymbolReverseTable {
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
             Self::hash_name(symbol.name()),
-            |id| &symbols[*id].name == symbol.name(),
-            |id| Self::hash_name(&symbols[*id].name),
+            |id| symbols[*id].name() == symbol.name(),
+            |id| Self::hash_name(symbols[*id].name()),
         )
     }
 
     fn shrink_to_fit(&mut self, symbols: &IndexVec<ScopedSymbolId, Symbol>) {
         self.0
-            .shrink_to_fit(|id| Self::hash_name(&symbols[*id].name));
+            .shrink_to_fit(|id| Self::hash_name(symbols[*id].name()));
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -237,7 +259,7 @@ impl SymbolTable {
 
         self.symbols
             .iter_enumerated()
-            .find_map(|(id, symbol)| (symbol.name == name).then_some(id))
+            .find_map(|(id, symbol)| (symbol.name() == name).then_some(id))
     }
 
     /// Iterate over the symbols in this symbol table.
@@ -280,14 +302,15 @@ impl SymbolTableBuilder {
             Entry::Occupied(entry) => {
                 let id = *entry.get();
 
-                if !symbol.flags.is_empty() {
-                    self.symbols[id].flags.insert(symbol.flags);
+                let flags = symbol.flags();
+                if !flags.is_empty() {
+                    self.symbols[id].insert_flags(flags);
                 }
 
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                symbol.name.shrink_to_fit();
+                symbol.name_and_flags.shrink_to_fit();
                 let id = self.table.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)
@@ -322,5 +345,73 @@ impl Deref for SymbolTableBuilder {
 impl DerefMut for SymbolTableBuilder {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.table
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn symbol_flags_round_trip() {
+        for name in [
+            "",
+            "short",
+            "éclair",
+            "abcdefghijklmnopqrstuvwx",
+            "abcdefghijklmnopqrstuvwxy",
+        ] {
+            let mut symbol = Symbol::new(Name::new(name));
+
+            assert_eq!(symbol.name(), name);
+            assert!(symbol.flags().is_empty());
+
+            symbol.mark_used();
+            symbol.mark_bound();
+            symbol.mark_declared();
+            symbol.mark_global();
+            symbol.mark_nonlocal();
+            symbol.mark_parameter();
+
+            assert_eq!(symbol.flags(), SymbolFlags::all());
+            assert!(symbol.is_used());
+            assert!(symbol.is_bound());
+            assert!(symbol.is_declared());
+            assert!(symbol.is_global());
+            assert!(symbol.is_nonlocal());
+            assert!(symbol.is_reassigned());
+            assert!(symbol.is_parameter());
+            assert_eq!(symbol.name(), name);
+            assert_eq!(symbol.to_string(), name);
+            assert_eq!(
+                format!("{symbol:?}"),
+                format!(
+                    "Symbol {{ name: {:?}, flags: {:?} }}",
+                    Name::new(name),
+                    SymbolFlags::all()
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn symbol_lookup_ignores_flags() {
+        let mut builder = SymbolTableBuilder::default();
+
+        for index in 0..=LINEAR_SEARCH_THRESHOLD {
+            let name = format!("symbol_{index}");
+            let mut symbol = Symbol::new(Name::new(&name));
+            symbol.mark_bound();
+            builder.add(symbol);
+
+            assert!(builder.symbol_id(&name).is_some());
+        }
+
+        let table = builder.build();
+        for index in 0..=LINEAR_SEARCH_THRESHOLD {
+            let name = format!("symbol_{index}");
+            let id = table.symbol_id(&name).unwrap();
+            assert!(table.symbol(id).is_bound());
+        }
     }
 }

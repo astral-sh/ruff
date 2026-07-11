@@ -130,7 +130,7 @@ impl<'a> PlaceExprRef<'a> {
         }
     }
 
-    pub const fn is_bound(self) -> bool {
+    pub fn is_bound(self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
             PlaceExprRef::Member(member) => member.is_bound(),

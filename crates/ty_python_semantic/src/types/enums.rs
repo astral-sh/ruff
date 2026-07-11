@@ -1046,7 +1046,7 @@ pub(crate) fn enum_metadata<'db>(
             }
 
             if matches!(
-                name.as_str(),
+                name,
                 "_generate_next_value_" | "_ignore_" | "_value_" | "_name_"
             ) || ignored_names.contains(name)
             {
@@ -1085,7 +1085,7 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                auto_members.insert(name.clone());
+                                auto_members.insert(Name::new(name));
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
                                 let auto_value_ty =
@@ -1199,10 +1199,11 @@ pub(crate) fn enum_metadata<'db>(
                         _ => None,
                     });
 
+            let name = Name::new(name);
             match value_construction
-                .alias_detection_value(db, value_ty, auto_members.contains(name))
+                .alias_detection_value(db, value_ty, auto_members.contains(&name))
                 .and_then(|alias_value_ty| {
-                    try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                    try_register_alias(alias_value_ty, &name, &mut enum_values, &mut aliases)
                 }) {
                 Some(true) => return None,
                 Some(false) => {}
@@ -1212,7 +1213,7 @@ pub(crate) fn enum_metadata<'db>(
                 None => {}
             }
 
-            Some((name.clone(), value_ty))
+            Some((name, value_ty))
         })
         .collect::<FxIndexMap<_, _>>();
 

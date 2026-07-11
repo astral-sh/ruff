@@ -2100,7 +2100,7 @@ fn cached_protocol_interface<'db>(
                 _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
             };
 
-            members.insert(name.clone(), member);
+            members.insert(Name::new(name), member);
         }
     }
 

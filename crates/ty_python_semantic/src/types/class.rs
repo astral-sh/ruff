@@ -1335,7 +1335,7 @@ impl<'db> ClassType<'db> {
                         definition,
                         kind,
                     };
-                    abstract_methods.insert(name.clone(), abstract_method);
+                    abstract_methods.insert(Name::new(name), abstract_method);
                 } else {
                     // If this method is concrete, remove it from the map of abstract methods.
                     abstract_methods.shift_remove(name);
