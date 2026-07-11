@@ -4685,8 +4685,8 @@ def f(x: PGconn):
 
 ### Recursive protocols used as the first argument to `cast()`
 
-Before reporting a redundant cast, ty checks whether either type contains `Unknown` or `Todo`. That
-check must inspect protocol members without recursing forever when a protocol refers back to itself.
+A redundant cast is reported only if neither type contains `Unknown` nor `Todo`. Inspecting protocol
+members for these types must terminate when a protocol refers back to itself.
 
 ```toml
 [environment]
@@ -4769,9 +4769,9 @@ def bounded(value: BoundedProtocol[int]) -> None:
 ### Recursive protocol specializations in `cast()`
 
 A protocol can refer to itself with a different type argument on every step. Since the sequence
-`Linked[int]`, `Linked[list[int]]`, and so on never repeats exactly, ty stops when it sees the same
-protocol definition again. It does not report a redundant cast because a later specialization could
-expose `Unknown`.
+`Linked[int]`, `Linked[list[int]]`, and so on never repeats exactly, the inspection stops when it
+sees the same protocol definition again. The diagnostic is not reported because a later
+specialization could expose `Unknown`.
 
 ```toml
 [environment]
@@ -4802,7 +4802,7 @@ def explicit_receiver(value: ExplicitReceiver[int]) -> None:
     cast(ExplicitReceiver[int], value)
 ```
 
-Ty must withhold the diagnostic because member lookup can depend on the type argument. In this
+The diagnostic must be withheld because member lookup can depend on the type argument. In this
 example, descriptor overload resolution exposes `Unknown` only through the nested protocol.
 
 ```py
