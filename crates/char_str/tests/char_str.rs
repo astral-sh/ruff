@@ -79,6 +79,20 @@ fn concat_uses_smallest_storage_kind() {
 }
 
 #[test]
+fn join_uses_smallest_storage_kind() {
+    let empty = CharStr::join::<&str>(&[], ".");
+    let inline = CharStr::join(&["foo", "bar"], ".");
+    let heap = CharStr::try_join(&["a long first component", "bar"], ".").unwrap();
+
+    assert!(empty.is_empty());
+    assert!(!empty.is_heap_allocated());
+    assert_eq!(inline, "foo.bar");
+    assert!(!inline.is_heap_allocated());
+    assert_eq!(heap, "a long first component.bar");
+    assert!(heap.is_heap_allocated());
+}
+
+#[test]
 fn common_string_traits() {
     let text = "a string longer than the inline limit";
     let value = CharStr::from(text);

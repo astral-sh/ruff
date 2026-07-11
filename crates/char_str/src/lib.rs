@@ -110,6 +110,31 @@ impl CharStr {
         Repr::from_slices(slices).map(Self)
     }
 
+    /// Creates an exactly-sized `CharStr` by joining string slices with a separator.
+    ///
+    /// Heap storage is allocated at most once. To handle allocation failure, use
+    /// [`CharStr::try_join`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the joined length overflows or the exact buffer cannot be allocated.
+    #[inline]
+    pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
+        Self::try_join(slices, separator)
+            .unwrap_or_else(|_| panic!("cannot allocate memory to hold CharStr"))
+    }
+
+    /// Fallible version of [`CharStr::join`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReserveError`] if the joined length overflows, is too long to represent, or
+    /// its heap buffer cannot be allocated.
+    #[inline]
+    pub fn try_join<T: AsRef<str>>(slices: &[T], separator: &str) -> Result<Self, ReserveError> {
+        Repr::from_joined_slices(slices, separator).map(Self)
+    }
+
     /// Returns the string as a string slice.
     #[inline]
     pub const fn as_str(&self) -> &str {
