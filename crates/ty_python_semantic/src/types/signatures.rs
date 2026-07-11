@@ -1052,6 +1052,12 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
+    pub(crate) fn has_implicit_positional_receiver_annotation(&self) -> bool {
+        self.parameters
+            .get(0)
+            .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         if !self.needs_self_mapping(db, false) {
             return self.clone();

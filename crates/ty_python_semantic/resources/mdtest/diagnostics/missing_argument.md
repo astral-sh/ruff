@@ -32,6 +32,14 @@ h = f if coinflip() else g
 h(b=56)
 
 Foo().method()  # snapshot: missing-argument
+
+from typing import Protocol
+
+class P(Protocol):
+    def method(self, value: int) -> None: ...
+
+def check_protocol(p: P) -> None:
+    p.method()  # snapshot: missing-argument
 ```
 
 ```snapshot
@@ -81,4 +89,18 @@ info: Parameter declared here
 5 |     def method(self, a): ...
   |                      ^
   |
+
+
+error[missing-argument]: No argument provided for required parameter `value` of bound method `P.method`
+  --> src/main.py:22:5
+   |
+22 |     p.method()  # snapshot: missing-argument
+   |     ^^^^^^^^^^
+   |
+info: Parameter declared here
+  --> src/main.py:19:22
+   |
+19 |     def method(self, value: int) -> None: ...
+   |                      ^^^^^^^^^^
+   |
 ```
