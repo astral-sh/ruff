@@ -41,6 +41,14 @@
 # A boolean that specifies if this node has a custom source order visitor implementation.
 # generation of visit_source_order will be skipped for this node.
 #
+# custom_range:
+# A boolean that specifies if this node has a custom Ranged implementation.
+# generation of Ranged will be skipped for this node.
+#
+# custom_node_index:
+# A boolean that specifies if this node has a custom HasNodeIndex implementation.
+# generation of HasNodeIndex will be skipped for this node.
+#
 # fields:
 # List of fields in the syntax node struct. Each field is a table with the
 # following keys:
@@ -640,10 +648,10 @@ PatternKeyword = {}
 Comprehension = {}
 Arguments = {}
 Parameters = {}
-Parameter = {}
-ParameterWithDefault = {}
+Parameter = { custom_node_index = true }
+ParameterWithDefault = { custom_range = true }
 Keyword = {}
-Alias = {}
+Alias = { custom_range = true }
 WithItem = {}
 MatchCase = {}
 Decorator = {}

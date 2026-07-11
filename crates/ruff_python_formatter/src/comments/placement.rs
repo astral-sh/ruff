@@ -2135,7 +2135,7 @@ fn handle_alias_comment<'a>(
     alias: &'a ruff_python_ast::Alias,
     source: &str,
 ) -> CommentPlacement<'a> {
-    if let Some(asname) = &alias.asname {
+    if let Some(asname) = alias.asname.as_deref() {
         if let Some(SimpleToken {
             kind: SimpleTokenKind::As,
             range: as_range,

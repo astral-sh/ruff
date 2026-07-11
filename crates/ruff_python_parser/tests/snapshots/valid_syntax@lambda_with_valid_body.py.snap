@@ -25,15 +25,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 7..8,
+                                            end: 8,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 7..8,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 7..8,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -72,15 +72,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 19..20,
+                                            end: 20,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 19..20,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 19..20,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -140,15 +140,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 46..47,
+                                            end: 47,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 46..47,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 46..47,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -193,15 +193,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 64..65,
+                                            end: 65,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 64..65,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 64..65,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -224,15 +224,15 @@ Module(
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
-                                                    range: 74..75,
+                                                    end: 75,
                                                     node_index: NodeIndex(None),
                                                     parameter: Parameter {
                                                         range: 74..75,
-                                                        node_index: NodeIndex(None),
                                                         name: Identifier {
                                                             id: Name("y"),
                                                             range: 74..75,
                                                             node_index: NodeIndex(None),
+                                                            parameter_node_index: NodeIndex(None),
                                                         },
                                                         annotation: None,
                                                     },
@@ -288,15 +288,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 90..91,
+                                            end: 91,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 90..91,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("x"),
                                                     range: 90..91,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -348,15 +348,15 @@ Module(
                                                 posonlyargs: [],
                                                 args: [
                                                     ParameterWithDefault {
-                                                        range: 143..144,
+                                                        end: 144,
                                                         node_index: NodeIndex(None),
                                                         parameter: Parameter {
                                                             range: 143..144,
-                                                            node_index: NodeIndex(None),
                                                             name: Identifier {
                                                                 id: Name("x"),
                                                                 range: 143..144,
                                                                 node_index: NodeIndex(None),
+                                                                parameter_node_index: NodeIndex(None),
                                                             },
                                                             annotation: None,
                                                         },

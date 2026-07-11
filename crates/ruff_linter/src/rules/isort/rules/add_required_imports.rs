@@ -70,7 +70,8 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
             };
             names.iter().any(|alias| {
                 alias.name == target.name.name
-                    && alias.asname.as_deref() == target.name.as_name.as_deref()
+                    && alias.asname.as_deref().map(ast::Identifier::as_str)
+                        == target.name.as_name.as_deref()
             })
         }
         NameImport::ImportFrom(target) => {
@@ -89,7 +90,8 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
                 && *level == target.level
                 && names.iter().any(|alias| {
                     alias.name == target.name.name
-                        && alias.asname.as_deref() == target.name.as_name.as_deref()
+                        && alias.asname.as_deref().map(ast::Identifier::as_str)
+                            == target.name.as_name.as_deref()
                 })
         }
     }

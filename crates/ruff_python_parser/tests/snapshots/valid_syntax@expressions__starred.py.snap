@@ -92,6 +92,7 @@ Module(
                                         id: Name("attr"),
                                         range: 15..19,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },

@@ -285,6 +285,7 @@ Module(
                                             id: Name("value"),
                                             range: 125..130,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         ctx: Load,
                                     },
@@ -338,15 +339,15 @@ Module(
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
-                                                range: 162..163,
+                                                end: 163,
                                                 node_index: NodeIndex(None),
                                                 parameter: Parameter {
                                                     range: 162..163,
-                                                    node_index: NodeIndex(None),
                                                     name: Identifier {
                                                         id: Name("x"),
                                                         range: 162..163,
                                                         node_index: NodeIndex(None),
+                                                        parameter_node_index: NodeIndex(None),
                                                     },
                                                     annotation: None,
                                                 },

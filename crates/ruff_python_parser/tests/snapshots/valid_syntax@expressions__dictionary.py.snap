@@ -341,15 +341,15 @@ Module(
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
-                                                                range: 163..164,
+                                                                end: 164,
                                                                 node_index: NodeIndex(None),
                                                                 parameter: Parameter {
                                                                     range: 163..164,
-                                                                    node_index: NodeIndex(None),
                                                                     name: Identifier {
                                                                         id: Name("x"),
                                                                         range: 163..164,
                                                                         node_index: NodeIndex(None),
+                                                                        parameter_node_index: NodeIndex(None),
                                                                     },
                                                                     annotation: None,
                                                                 },
@@ -431,15 +431,15 @@ Module(
                                                     posonlyargs: [],
                                                     args: [
                                                         ParameterWithDefault {
-                                                            range: 185..186,
+                                                            end: 186,
                                                             node_index: NodeIndex(None),
                                                             parameter: Parameter {
                                                                 range: 185..186,
-                                                                node_index: NodeIndex(None),
                                                                 name: Identifier {
                                                                     id: Name("p"),
                                                                     range: 185..186,
                                                                     node_index: NodeIndex(None),
+                                                                    parameter_node_index: NodeIndex(None),
                                                                 },
                                                                 annotation: None,
                                                             },

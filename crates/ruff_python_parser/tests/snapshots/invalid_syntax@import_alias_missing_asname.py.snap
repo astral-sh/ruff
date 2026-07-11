@@ -16,12 +16,13 @@ Module(
                     range: 0..11,
                     names: [
                         Alias {
-                            range: 7..11,
+                            end: 11,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 7..8,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

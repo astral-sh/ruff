@@ -8,7 +8,6 @@ impl FormatNodeRule<Parameter> for FormatParameter {
     fn fmt_fields(&self, item: &Parameter, f: &mut PyFormatter) -> FormatResult<()> {
         let Parameter {
             range: _,
-            node_index: _,
             name,
             annotation,
         } = item;

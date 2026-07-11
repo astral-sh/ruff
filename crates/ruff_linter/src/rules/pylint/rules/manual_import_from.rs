@@ -56,7 +56,7 @@ impl Violation for ManualFromImport {
 
 /// PLR0402
 pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
-    let Some(asname) = &alias.asname else {
+    let Some(asname) = alias.asname.as_deref() else {
         return;
     };
     let Some((module, name)) = alias.name.rsplit_once('.') else {
@@ -91,7 +91,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
             names: vec![Alias {
                 name: asname.clone(),
                 asname: None,
-                range: TextRange::default(),
+                end: asname.end(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }],
             level: 0,

@@ -815,7 +815,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     // Create separate tokens for each part of a dotted module name
                     self.add_dotted_name_tokens(&alias.name, SemanticTokenType::Namespace);
 
-                    if let Some(asname) = &alias.asname {
+                    if let Some(asname) = alias.asname.as_deref() {
                         self.add_token(
                             asname.range(),
                             SemanticTokenType::Namespace,
@@ -849,7 +849,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                         self.add_token(&alias.name, token_type, modifiers);
 
                         // For aliased imports (from X import Y as Z), also add a token for the alias Z
-                        if let Some(asname) = &alias.asname {
+                        if let Some(asname) = alias.asname.as_deref() {
                             self.add_token(asname, token_type, modifiers);
                         }
                     }

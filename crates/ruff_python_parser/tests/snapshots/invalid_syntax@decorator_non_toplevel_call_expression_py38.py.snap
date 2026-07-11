@@ -51,6 +51,7 @@ Module(
                                                 id: Name("bar"),
                                                 range: 52..55,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
                                         },
@@ -69,6 +70,7 @@ Module(
                         id: Name("baz"),
                         range: 62..65,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

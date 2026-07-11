@@ -19,6 +19,7 @@ Module(
                         id: Name("F"),
                         range: 6..7,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: Some(
@@ -78,6 +79,7 @@ Module(
                         id: Name("f"),
                         range: 28..29,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -100,6 +102,7 @@ Module(
                                     id: Name("G"),
                                     range: 43..44,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 type_params: None,
                                 arguments: Some(
@@ -153,6 +156,7 @@ Module(
                                     id: Name("H"),
                                     range: 71..72,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 type_params: None,
                                 arguments: Some(
@@ -208,6 +212,7 @@ Module(
                         id: Name("f"),
                         range: 104..105,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -230,6 +235,7 @@ Module(
                                     id: Name("G"),
                                     range: 119..120,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 type_params: None,
                                 arguments: Some(

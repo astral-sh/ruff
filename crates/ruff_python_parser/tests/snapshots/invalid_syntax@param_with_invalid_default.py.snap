@@ -20,6 +20,7 @@ Module(
                         id: Name("foo"),
                         range: 4..7,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -28,15 +29,15 @@ Module(
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 8..14,
+                                end: 14,
                                 node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 8..9,
-                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 8..9,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -90,6 +91,7 @@ Module(
                         id: Name("foo"),
                         range: 25..28,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -98,15 +100,15 @@ Module(
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 29..37,
+                                end: 37,
                                 node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 29..30,
-                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 29..30,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -160,6 +162,7 @@ Module(
                         id: Name("foo"),
                         range: 48..51,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -168,15 +171,15 @@ Module(
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 52..61,
+                                end: 61,
                                 node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 52..53,
-                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 52..53,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },

@@ -19,6 +19,7 @@ Module(
                             id: Name("x"),
                             range: 7..8,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ],
                 },

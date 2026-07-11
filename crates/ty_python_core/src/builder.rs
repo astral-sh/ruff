@@ -2884,7 +2884,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.imported_modules.extend(module_name.ancestors());
                     }
 
-                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                    let (symbol_name, is_reexported) = if let Some(asname) = alias.asname.as_deref()
+                    {
                         self.scopes_by_expression
                             .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
@@ -2947,7 +2948,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 return false;
                             }
 
-                            let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
+                            let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
                             bound_name.id.as_str() == direct_submodule
                         });
 
@@ -3080,7 +3081,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                    let (symbol_name, is_reexported) = if let Some(asname) = alias.asname.as_deref()
+                    {
                         self.scopes_by_expression
                             .record_expression(asname, self.current_scope());
                         // It's re-exported if it's `from ... import x as x`

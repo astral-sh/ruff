@@ -145,6 +145,8 @@ class Node:
     fields: list[Field] | None
     derives: list[str]
     custom_source_order: bool
+    custom_range: bool
+    custom_node_index: bool
     source_order: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
@@ -156,6 +158,8 @@ class Node:
         if fields is not None:
             self.fields = [Field(f) for f in fields]
         self.custom_source_order = node.get("custom_source_order", False)
+        self.custom_range = node.get("custom_range", False)
+        self.custom_node_index = node.get("custom_node_index", False)
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
         self.source_order = node.get("source_order")
@@ -456,6 +460,9 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         out.append("}")
 
     for node in ast.all_nodes:
+        if node.custom_range:
+            continue
+
         out.append(f"""
             impl ruff_text_size::Ranged for {node.ty} {{
                 fn range(&self) -> ruff_text_size::TextRange {{
@@ -465,6 +472,9 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
 
     for node in ast.all_nodes:
+        if node.custom_node_index:
+            continue
+
         out.append(f"""
             impl crate::HasNodeIndex for {node.ty} {{
                 fn node_index(&self) -> &crate::AtomicNodeIndex {{

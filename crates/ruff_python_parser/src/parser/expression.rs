@@ -579,6 +579,7 @@ impl<'src> Parser<'src> {
                 id: name,
                 range,
                 node_index: AtomicNodeIndex::NONE,
+                parameter_node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -589,6 +590,7 @@ impl<'src> Parser<'src> {
                 id,
                 range,
                 node_index: AtomicNodeIndex::NONE,
+                parameter_node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -623,6 +625,7 @@ impl<'src> Parser<'src> {
                 id,
                 range,
                 node_index: AtomicNodeIndex::NONE,
+                parameter_node_index: AtomicNodeIndex::NONE,
             }
         } else {
             self.parse_missing_identifier()
@@ -639,6 +642,7 @@ impl<'src> Parser<'src> {
             id: Name::empty(),
             range: self.missing_node_range(),
             node_index: AtomicNodeIndex::NONE,
+            parameter_node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -898,6 +902,7 @@ impl<'src> Parser<'src> {
                                 id: ident_expr.id,
                                 range: ident_expr.range,
                                 node_index: AtomicNodeIndex::NONE,
+                                parameter_node_index: AtomicNodeIndex::NONE,
                             }
                         } else {
                             // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
@@ -911,6 +916,7 @@ impl<'src> Parser<'src> {
                                 id: Name::empty(),
                                 range: parsed_expr.range(),
                                 node_index: AtomicNodeIndex::NONE,
+                                parameter_node_index: AtomicNodeIndex::NONE,
                             }
                         };
 

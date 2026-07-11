@@ -232,6 +232,7 @@ Module(
                                 id: Name("foo"),
                                 range: 89..92,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },

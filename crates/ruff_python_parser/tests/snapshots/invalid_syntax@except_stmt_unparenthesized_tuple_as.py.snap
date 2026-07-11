@@ -60,6 +60,7 @@ Module(
                                         id: Name("exc"),
                                         range: 29..32,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -128,6 +129,7 @@ Module(
                                         id: Name("eg"),
                                         range: 73..75,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [

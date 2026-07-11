@@ -245,6 +245,7 @@ Module(
                                                     id: Name("x"),
                                                     range: 198..199,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -276,6 +277,7 @@ Module(
                                                     id: Name("y"),
                                                     range: 204..205,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {

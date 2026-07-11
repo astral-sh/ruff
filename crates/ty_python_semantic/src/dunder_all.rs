@@ -239,7 +239,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         // `from module import __all__`
                         // `from module import __all__ as __all__`
                         if name != "__all__"
-                            || asname.as_ref().is_some_and(|asname| asname != "__all__")
+                            || asname.as_deref().is_some_and(|asname| asname != "__all__")
                         {
                             continue;
                         }

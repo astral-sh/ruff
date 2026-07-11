@@ -16,18 +16,20 @@ Module(
                     range: 0..25,
                     names: [
                         Alias {
-                            range: 7..25,
+                            end: 25,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 7..16,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("debug"),
                                     range: 20..25,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                             ),
                         },
@@ -44,16 +46,18 @@ Module(
                             id: Name("__debug__"),
                             range: 31..40,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 48..52,
+                            end: 52,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("Some"),
                                 range: 48..52,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -71,22 +75,25 @@ Module(
                             id: Name("x"),
                             range: 58..59,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 67..85,
+                            end: 85,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("__debug__"),
                                 range: 67..76,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: Some(
                                 Identifier {
                                     id: Name("debug"),
                                     range: 80..85,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                             ),
                         },

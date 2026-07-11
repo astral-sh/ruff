@@ -19,16 +19,18 @@ Module(
                             id: Name("__future__"),
                             range: 5..15,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 23..38,
+                            end: 38,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("invalid_feature"),
                                 range: 23..38,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -46,26 +48,29 @@ Module(
                             id: Name("__future__"),
                             range: 44..54,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 62..73,
+                            end: 73,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("annotations"),
                                 range: 62..73,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
                         Alias {
-                            range: 75..90,
+                            end: 90,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("invalid_feature"),
                                 range: 75..90,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -83,26 +88,29 @@ Module(
                             id: Name("__future__"),
                             range: 96..106,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 114..131,
+                            end: 131,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("invalid_feature_1"),
                                 range: 114..131,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
                         Alias {
-                            range: 133..150,
+                            end: 150,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("invalid_feature_2"),
                                 range: 133..150,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

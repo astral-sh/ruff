@@ -97,6 +97,7 @@ Module(
                                                 id: Name("x"),
                                                 range: 23..24,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
@@ -153,6 +154,7 @@ Module(
                                                 id: Name("x"),
                                                 range: 36..37,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(

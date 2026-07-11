@@ -343,15 +343,15 @@ Module(
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
-                                                                range: 178..179,
+                                                                end: 179,
                                                                 node_index: NodeIndex(None),
                                                                 parameter: Parameter {
                                                                     range: 178..179,
-                                                                    node_index: NodeIndex(None),
                                                                     name: Identifier {
                                                                         id: Name("x"),
                                                                         range: 178..179,
                                                                         node_index: NodeIndex(None),
+                                                                        parameter_node_index: NodeIndex(None),
                                                                     },
                                                                     annotation: None,
                                                                 },

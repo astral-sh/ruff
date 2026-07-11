@@ -603,15 +603,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 332..335,
+                                            end: 335,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 332..335,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("foo"),
                                                     range: 332..335,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },

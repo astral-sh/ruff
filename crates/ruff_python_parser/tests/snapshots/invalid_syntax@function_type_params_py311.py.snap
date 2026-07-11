@@ -20,6 +20,7 @@ Module(
                         id: Name("foo"),
                         range: 48..51,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -34,6 +35,7 @@ Module(
                                             id: Name("T"),
                                             range: 52..53,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -78,6 +80,7 @@ Module(
                         id: Name("foo"),
                         range: 66..69,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {

@@ -50,6 +50,7 @@ Module(
                                                     id: Name(""),
                                                     range: 80..80,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -108,6 +109,7 @@ Module(
                                                     id: Name(""),
                                                     range: 118..118,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -166,6 +168,7 @@ Module(
                                                     id: Name(""),
                                                     range: 157..157,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -224,6 +227,7 @@ Module(
                                                     id: Name(""),
                                                     range: 200..200,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -282,6 +286,7 @@ Module(
                                                     id: Name(""),
                                                     range: 233..233,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -340,6 +345,7 @@ Module(
                                                     id: Name(""),
                                                     range: 269..269,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {

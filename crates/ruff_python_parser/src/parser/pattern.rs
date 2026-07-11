@@ -743,6 +743,7 @@ impl Parser<'_> {
                             id: Name::empty(),
                             range: parser.missing_node_range(),
                             node_index: AtomicNodeIndex::NONE,
+                            parameter_node_index: AtomicNodeIndex::NONE,
                         }
                     };
 

@@ -472,7 +472,7 @@ enum ImportKind {
 
 impl From<&ast::Alias> for ImportKind {
     fn from(alias: &ast::Alias) -> ImportKind {
-        if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+        if alias.asname.as_deref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
             ImportKind::RedundantAlias
         } else {
             ImportKind::Normal
@@ -549,7 +549,7 @@ impl<'db> Imports<'db> {
         for alias in &import.names {
             let asname = alias
                 .asname
-                .as_ref()
+                .as_deref()
                 .map(|ident| &ident.id)
                 .unwrap_or(&alias.name.id);
             let module_name = ImportModuleName::Import(&alias.name.id);
@@ -572,7 +572,7 @@ impl<'db> Imports<'db> {
 
             let asname = alias
                 .asname
-                .as_ref()
+                .as_deref()
                 .map(|ident| &ident.id)
                 .unwrap_or(&alias.name.id);
             let module_name = ImportModuleName::ImportFrom {
@@ -870,7 +870,7 @@ impl<'db> SymbolVisitor<'db> {
 
     /// Adds a symbol introduced via an import `stmt`.
     fn add_import_alias(&mut self, import: AstImport<'_>, alias: &ast::Alias) -> Option<SymbolId> {
-        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+        let name = alias.asname.as_deref().unwrap_or(&alias.name);
         let kind = if matches!(import, AstImport::Import(_)) {
             SymbolKind::Module
         } else if Self::is_constant_name(name.as_str()) {
@@ -1436,7 +1436,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                         if &alias.name == "__all__"
                             && alias
                                 .asname
-                                .as_ref()
+                                .as_deref()
                                 .is_none_or(|asname| asname == "__all__")
                         {
                             self.add_all_from_import(import_from);

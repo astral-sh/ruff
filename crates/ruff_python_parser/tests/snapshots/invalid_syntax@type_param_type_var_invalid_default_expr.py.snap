@@ -35,6 +35,7 @@ Module(
                                             id: Name("T"),
                                             range: 7..8,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
@@ -94,6 +95,7 @@ Module(
                                             id: Name("T"),
                                             range: 30..31,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
@@ -154,6 +156,7 @@ Module(
                                             id: Name("T"),
                                             range: 56..57,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
@@ -214,6 +217,7 @@ Module(
                                             id: Name("T"),
                                             range: 84..85,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
@@ -272,6 +276,7 @@ Module(
                                             id: Name("T"),
                                             range: 115..116,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: Some(
@@ -294,6 +299,7 @@ Module(
                                             id: Name("int"),
                                             range: 124..127,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -337,6 +343,7 @@ Module(
                                             id: Name("T"),
                                             range: 142..143,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: Some(
                                             Name(

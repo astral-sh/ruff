@@ -55,6 +55,7 @@ Module(
                                                 id: Name("clicked"),
                                                 range: 57..64,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
                                         },
@@ -63,6 +64,7 @@ Module(
                                         id: Name("connect"),
                                         range: 65..72,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },
@@ -73,6 +75,7 @@ Module(
                         id: Name("spam"),
                         range: 77..81,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -137,15 +140,15 @@ Module(
                                                             posonlyargs: [],
                                                             args: [
                                                                 ParameterWithDefault {
-                                                                    range: 103..104,
+                                                                    end: 104,
                                                                     node_index: NodeIndex(None),
                                                                     parameter: Parameter {
                                                                         range: 103..104,
-                                                                        node_index: NodeIndex(None),
                                                                         name: Identifier {
                                                                             id: Name("x"),
                                                                             range: 103..104,
                                                                             node_index: NodeIndex(None),
+                                                                            parameter_node_index: NodeIndex(None),
                                                                         },
                                                                         annotation: None,
                                                                     },
@@ -192,6 +195,7 @@ Module(
                         id: Name("bar"),
                         range: 118..121,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

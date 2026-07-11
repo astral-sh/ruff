@@ -380,47 +380,51 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
             for name in names {
                 match name.name.as_str() {
                     "telnetlib" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousTelnetlibImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousTelnetlibImport, name.range());
                     }
                     "ftplib" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousFtplibImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousFtplibImport, name.range());
                     }
                     "pickle" | "cPickle" | "dill" | "shelve" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPickleImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousPickleImport, name.range());
                     }
                     "subprocess" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousSubprocessImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousSubprocessImport, name.range());
                     }
                     "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, name.range());
                     }
                     "xml.sax" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlSaxImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlSaxImport, name.range());
                     }
                     "xml.dom.expatbuilder" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range());
                     }
                     "xml.dom.minidom" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range());
                     }
                     "xml.dom.pulldom" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range());
                     }
                     "lxml" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, name.range());
                     }
                     "xmlrpc" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range());
                     }
                     "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                     | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range());
                     }
                     "pyghmi" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range());
                     }
                     _ => {}
                 }

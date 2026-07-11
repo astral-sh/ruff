@@ -565,7 +565,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 for name in names {
-                    if let Some(asname) = name.asname.as_ref() {
+                    if let Some(asname) = name.asname.as_deref() {
                         pylint::rules::global_statement(checker, asname);
                     } else {
                         pylint::rules::global_statement(checker, &name.name);
@@ -635,7 +635,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.is_rule_enabled(Rule::ImportSelf) {
                     pylint::rules::import_self(checker, alias, checker.module.qualified_name());
                 }
-                if let Some(asname) = &alias.asname {
+                if let Some(asname) = alias.asname.as_deref() {
                     let name = alias.name.split('.').next_back().unwrap();
                     if checker.is_rule_enabled(Rule::ConstantImportedAsNonConstant) {
                         pep8_naming::rules::constant_imported_as_non_constant(
@@ -684,7 +684,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.is_rule_enabled(Rule::BannedImportAlias) {
-                    if let Some(asname) = &alias.asname {
+                    if let Some(asname) = alias.asname.as_deref() {
                         flake8_import_conventions::rules::banned_import_alias(
                             checker,
                             stmt,
@@ -699,7 +699,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         checker,
                         stmt,
                         &alias.name,
-                        alias.asname.as_deref(),
+                        alias.asname.as_deref().map(ast::Identifier::as_str),
                     );
                 }
                 if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
@@ -727,7 +727,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 for name in names {
-                    if let Some(asname) = name.asname.as_ref() {
+                    if let Some(asname) = name.asname.as_deref() {
                         pylint::rules::global_statement(checker, asname);
                     } else {
                         pylint::rules::global_statement(checker, &name.name);
@@ -843,7 +843,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_debugger::rules::debugger_import(checker, stmt, module, &alias.name);
                 }
                 if checker.is_rule_enabled(Rule::BannedImportAlias) {
-                    if let Some(asname) = &alias.asname {
+                    if let Some(asname) = alias.asname.as_deref() {
                         let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
                         flake8_import_conventions::rules::banned_import_alias(
@@ -855,7 +855,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         );
                     }
                 }
-                if let Some(asname) = &alias.asname {
+                if let Some(asname) = alias.asname.as_deref() {
                     if checker.is_rule_enabled(Rule::ConstantImportedAsNonConstant) {
                         pep8_naming::rules::constant_imported_as_non_constant(
                             checker,

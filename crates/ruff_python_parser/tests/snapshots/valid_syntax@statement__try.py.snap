@@ -95,6 +95,7 @@ Module(
                                         id: Name("e"),
                                         range: 64..65,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -132,6 +133,7 @@ Module(
                                         id: Name("e"),
                                         range: 96..97,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -194,6 +196,7 @@ Module(
                                         id: Name("e"),
                                         range: 141..142,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -511,6 +514,7 @@ Module(
                                         id: Name("eg"),
                                         range: 398..400,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -631,6 +635,7 @@ Module(
                                         id: Name("e"),
                                         range: 492..493,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -752,6 +757,7 @@ Module(
                                         id: Name("e"),
                                         range: 544..545,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -1066,6 +1072,7 @@ Module(
                                         id: Name("e"),
                                         range: 691..692,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -1172,6 +1179,7 @@ Module(
                                                                                                             id: Name("exceptions"),
                                                                                                             range: 738..748,
                                                                                                             node_index: NodeIndex(None),
+                                                                                                            parameter_node_index: NodeIndex(None),
                                                                                                         },
                                                                                                         ctx: Load,
                                                                                                     },
@@ -1223,6 +1231,7 @@ Module(
                                         id: Name("e"),
                                         range: 771..772,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -1329,6 +1338,7 @@ Module(
                                                                                                             id: Name("exceptions"),
                                                                                                             range: 818..828,
                                                                                                             node_index: NodeIndex(None),
+                                                                                                            parameter_node_index: NodeIndex(None),
                                                                                                         },
                                                                                                         ctx: Load,
                                                                                                     },
@@ -1639,15 +1649,15 @@ Module(
                                                     posonlyargs: [],
                                                     args: [
                                                         ParameterWithDefault {
-                                                            range: 1027..1028,
+                                                            end: 1028,
                                                             node_index: NodeIndex(None),
                                                             parameter: Parameter {
                                                                 range: 1027..1028,
-                                                                node_index: NodeIndex(None),
                                                                 name: Identifier {
                                                                     id: Name("x"),
                                                                     range: 1027..1028,
                                                                     node_index: NodeIndex(None),
+                                                                    parameter_node_index: NodeIndex(None),
                                                                 },
                                                                 annotation: None,
                                                             },

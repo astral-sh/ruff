@@ -117,7 +117,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
-                    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                    let name = alias.asname.as_deref().unwrap_or(&alias.name);
                     self.bound_places
                         .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                 }
@@ -125,7 +125,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
             ast::Stmt::ImportFrom(node) => {
                 for alias in &node.names {
                     if &*alias.name != "*" {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let name = alias.asname.as_deref().unwrap_or(&alias.name);
                         self.bound_places
                             .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                     }

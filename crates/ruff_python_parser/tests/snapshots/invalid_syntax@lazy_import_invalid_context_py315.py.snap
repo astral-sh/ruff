@@ -21,12 +21,13 @@ Module(
                                 range: 53..67,
                                 names: [
                                     Alias {
-                                        range: 65..67,
+                                        end: 67,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("os"),
                                             range: 65..67,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -101,12 +102,13 @@ Module(
                                             range: 120..135,
                                             names: [
                                                 Alias {
-                                                    range: 132..135,
+                                                    end: 135,
                                                     node_index: NodeIndex(None),
                                                     name: Identifier {
                                                         id: Name("sys"),
                                                         range: 132..135,
                                                         node_index: NodeIndex(None),
+                                                        parameter_node_index: NodeIndex(None),
                                                     },
                                                     asname: None,
                                                 },
@@ -133,6 +135,7 @@ Module(
                         id: Name("func"),
                         range: 141..145,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -152,12 +155,13 @@ Module(
                                 range: 153..169,
                                 names: [
                                     Alias {
-                                        range: 165..169,
+                                        end: 169,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("math"),
                                             range: 165..169,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -178,6 +182,7 @@ Module(
                         id: Name("async_func"),
                         range: 181..191,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -200,16 +205,18 @@ Module(
                                         id: Name("json"),
                                         range: 209..213,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 221..226,
+                                        end: 226,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("loads"),
                                             range: 221..226,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -230,6 +237,7 @@ Module(
                         id: Name("MyClass"),
                         range: 234..241,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
@@ -240,12 +248,13 @@ Module(
                                 range: 247..265,
                                 names: [
                                     Alias {
-                                        range: 259..265,
+                                        end: 265,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("typing"),
                                             range: 259..265,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -266,6 +275,7 @@ Module(
                         id: Name("outer"),
                         range: 271..276,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -288,6 +298,7 @@ Module(
                                     id: Name("Inner"),
                                     range: 290..295,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 type_params: None,
                                 arguments: None,
@@ -298,12 +309,13 @@ Module(
                                             range: 305..321,
                                             names: [
                                                 Alias {
-                                                    range: 317..321,
+                                                    end: 321,
                                                     node_index: NodeIndex(None),
                                                     name: Identifier {
                                                         id: Name("json"),
                                                         range: 317..321,
                                                         node_index: NodeIndex(None),
+                                                        parameter_node_index: NodeIndex(None),
                                                     },
                                                     asname: None,
                                                 },

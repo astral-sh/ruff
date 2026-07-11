@@ -63,6 +63,7 @@ Module(
                         id: Name("bar"),
                         range: 20..23,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

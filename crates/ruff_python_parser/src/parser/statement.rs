@@ -784,9 +784,10 @@ impl<'src> Parser<'src> {
                     id: Name::new_static("*"),
                     range,
                     node_index: AtomicNodeIndex::NONE,
+                    parameter_node_index: AtomicNodeIndex::NONE,
                 },
                 asname: None,
-                range,
+                end: range.end(),
                 node_index: AtomicNodeIndex::NONE,
             };
         }
@@ -818,9 +819,9 @@ impl<'src> Parser<'src> {
         };
 
         ast::Alias {
-            range: self.node_range(start),
+            end: self.node_range(start).end(),
             name,
-            asname,
+            asname: asname.map(Box::new),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -851,6 +852,7 @@ impl<'src> Parser<'src> {
             id: Name::from(dotted_name),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
+            parameter_node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3057,6 +3059,7 @@ impl<'src> Parser<'src> {
                         id: Name::empty(),
                         range: self.missing_node_range(),
                         node_index: AtomicNodeIndex::NONE,
+                        parameter_node_index: AtomicNodeIndex::NONE,
                     },
                     type_params: None,
                     parameters: Box::new(ast::Parameters {
@@ -3238,7 +3241,6 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             annotation,
-            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3285,7 +3287,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::ParameterWithDefault {
-            range: self.node_range(start),
+            end: self.node_range(start).end(),
             parameter,
             default,
             node_index: AtomicNodeIndex::NONE,

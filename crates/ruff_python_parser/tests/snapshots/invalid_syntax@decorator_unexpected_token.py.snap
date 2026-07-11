@@ -33,6 +33,7 @@ Module(
                         id: Name(""),
                         range: 4..4,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -107,6 +108,7 @@ Module(
                         id: Name(""),
                         range: 27..27,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

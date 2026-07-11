@@ -60,6 +60,7 @@ Module(
                                         id: Name("expr"),
                                         range: 126..130,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },

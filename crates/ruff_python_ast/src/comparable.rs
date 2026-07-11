@@ -132,7 +132,7 @@ impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
     fn from(alias: &'a ast::Alias) -> Self {
         Self {
             name: alias.name.as_str(),
-            asname: alias.asname.as_deref(),
+            asname: alias.asname.as_deref().map(ast::Identifier::as_str),
         }
     }
 }

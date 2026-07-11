@@ -39,6 +39,7 @@ Module(
                                                 id: Name("clicked"),
                                                 range: 54..61,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
                                         },
@@ -47,6 +48,7 @@ Module(
                                         id: Name("connect"),
                                         range: 62..69,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },
@@ -57,6 +59,7 @@ Module(
                         id: Name("spam"),
                         range: 74..78,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

@@ -33,6 +33,7 @@ Module(
                         id: Name("foo"),
                         range: 7..10,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -84,6 +85,7 @@ Module(
                         id: Name("foo"),
                         range: 31..34,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -134,6 +136,7 @@ Module(
                         id: Name("Foo"),
                         range: 51..54,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,

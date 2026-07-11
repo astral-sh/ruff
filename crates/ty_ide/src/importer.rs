@@ -181,7 +181,7 @@ impl<'a> Importer<'a> {
         };
         match response.kind {
             ImportResponseKind::Unqualified { ast, alias } => {
-                let member = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
+                let member = alias.asname.as_deref().unwrap_or(&alias.name).as_str();
                 // As long as it's not a wildcard import, we use whatever name
                 // the member is imported as when inserting the symbol.
                 if member != "*" {
@@ -193,7 +193,7 @@ impl<'a> Importer<'a> {
                 }
             }
             ImportResponseKind::Qualified { ast, alias } => {
-                let module = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
+                let module = alias.asname.as_deref().unwrap_or(&alias.name).as_str();
                 ImportAction {
                     import: None,
                     symbol_text: format!("{module}.{symbol_text}").into(),

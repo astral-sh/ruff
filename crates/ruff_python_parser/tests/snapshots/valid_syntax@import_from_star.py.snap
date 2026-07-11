@@ -19,16 +19,18 @@ Module(
                             id: Name("module"),
                             range: 5..11,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 19..20,
+                            end: 20,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 19..20,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

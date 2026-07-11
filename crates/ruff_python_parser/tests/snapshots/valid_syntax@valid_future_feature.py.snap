@@ -19,16 +19,18 @@ Module(
                             id: Name("__future__"),
                             range: 5..15,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 23..34,
+                            end: 34,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("annotations"),
                                 range: 23..34,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

@@ -98,7 +98,7 @@ impl Identifier for Alias {
     /// ```
     fn identifier(&self) -> TextRange {
         self.asname
-            .as_ref()
+            .as_deref()
             .map_or_else(|| self.name.range(), Ranged::range)
     }
 }

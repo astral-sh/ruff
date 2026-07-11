@@ -11,7 +11,7 @@ pub struct FormatParameterWithDefault;
 impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
     fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
         let ParameterWithDefault {
-            range: _,
+            end: _,
             node_index: _,
             parameter,
             default,

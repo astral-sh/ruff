@@ -48,6 +48,7 @@ Module(
                                         id: Name("match"),
                                         range: 29..34,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -85,6 +86,7 @@ Module(
                                         id: Name("case"),
                                         range: 60..64,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [
@@ -122,6 +124,7 @@ Module(
                                         id: Name("type"),
                                         range: 90..94,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 body: [

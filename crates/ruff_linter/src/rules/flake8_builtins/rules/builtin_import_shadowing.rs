@@ -56,7 +56,7 @@ impl Violation for BuiltinImportShadowing {
 
 /// A004
 pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
-    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+    let name = alias.asname.as_deref().unwrap_or(&alias.name);
     if shadows_builtin(
         name.as_str(),
         checker.source_type,

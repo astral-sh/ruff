@@ -36,6 +36,7 @@ Module(
                                             id: Name("__debug__"),
                                             range: 18..27,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                     ),
                                 },

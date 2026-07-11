@@ -16,12 +16,13 @@ Module(
                     range: 44..61,
                     names: [
                         Alias {
-                            range: 51..61,
+                            end: 61,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("contextlib"),
                                 range: 51..61,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -58,6 +59,7 @@ Module(
                                                 id: Name("nullcontext"),
                                                 range: 78..89,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
                                         },
@@ -80,12 +82,13 @@ Module(
                                 range: 97..111,
                                 names: [
                                     Alias {
-                                        range: 109..111,
+                                        end: 111,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("os"),
                                             range: 109..111,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -125,6 +128,7 @@ Module(
                                                 id: Name("nullcontext"),
                                                 range: 128..139,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                             ctx: Load,
                                         },
@@ -150,16 +154,18 @@ Module(
                                         id: Name("sys"),
                                         range: 157..160,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 168..172,
+                                        end: 172,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("path"),
                                             range: 168..172,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },

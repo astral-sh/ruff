@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/t_string.py
 ---
 ## AST
 
@@ -1749,6 +1750,7 @@ Module(
                                                                                             id: Name("pop"),
                                                                                             range: 562..565,
                                                                                             node_index: NodeIndex(None),
+                                                                                            parameter_node_index: NodeIndex(None),
                                                                                         },
                                                                                         ctx: Load,
                                                                                     },
@@ -1814,15 +1816,15 @@ Module(
                                                                     posonlyargs: [],
                                                                     args: [
                                                                         ParameterWithDefault {
-                                                                            range: 582..583,
+                                                                            end: 583,
                                                                             node_index: NodeIndex(None),
                                                                             parameter: Parameter {
                                                                                 range: 582..583,
-                                                                                node_index: NodeIndex(None),
                                                                                 name: Identifier {
                                                                                     id: Name("x"),
                                                                                     range: 582..583,
                                                                                     node_index: NodeIndex(None),
+                                                                                    parameter_node_index: NodeIndex(None),
                                                                                 },
                                                                                 annotation: None,
                                                                             },

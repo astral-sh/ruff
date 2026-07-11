@@ -19,6 +19,7 @@ Module(
                         id: Name(""),
                         range: 5..5,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
@@ -47,6 +48,7 @@ Module(
                         id: Name(""),
                         range: 17..17,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: Some(
@@ -82,6 +84,7 @@ Module(
                         id: Name(""),
                         range: 31..31,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: Some(
@@ -98,6 +101,7 @@ Module(
                                             id: Name("metaclass"),
                                             range: 33..42,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                     ),
                                     value: Name(

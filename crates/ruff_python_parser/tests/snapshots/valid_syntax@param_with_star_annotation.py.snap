@@ -20,6 +20,7 @@ Module(
                         id: Name("foo"),
                         range: 4..7,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -30,11 +31,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 8..25,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 9..13,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Starred(
@@ -100,6 +101,7 @@ Module(
                         id: Name("foo"),
                         range: 36..39,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -110,11 +112,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 40..60,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 41..45,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Starred(

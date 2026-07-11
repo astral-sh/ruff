@@ -1102,7 +1102,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
 
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let name = alias.asname.as_deref().unwrap_or(&alias.name);
                         let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             name,
@@ -1140,7 +1140,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 for alias in names {
                     if !is_lazy && matches!(module, Some("__future__")) {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let name = alias.asname.as_deref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
@@ -1167,7 +1167,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let name = alias.asname.as_deref().unwrap_or(&alias.name);
 
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,

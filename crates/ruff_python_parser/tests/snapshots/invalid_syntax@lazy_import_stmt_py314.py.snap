@@ -16,12 +16,13 @@ Module(
                     range: 44..59,
                     names: [
                         Alias {
-                            range: 56..59,
+                            end: 59,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("foo"),
                                 range: 56..59,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -38,16 +39,18 @@ Module(
                             id: Name("bar"),
                             range: 70..73,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 81..84,
+                            end: 84,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("baz"),
                                 range: 81..84,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

@@ -101,12 +101,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         let ast::Alias {
             name,
             asname,
-            range: _,
+            end: _,
             node_index: _,
         } = alias;
 
         let name = &name.id;
-        let asname = asname.as_ref().map(|asname| &asname.id);
+        let asname = asname.as_deref().map(|asname| &asname.id);
 
         // If the source is a stub, names defined by imports are only exported
         // if they use the explicit `foo as foo` syntax:

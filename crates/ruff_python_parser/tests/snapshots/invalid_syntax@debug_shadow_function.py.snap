@@ -20,6 +20,7 @@ Module(
                         id: Name("__debug__"),
                         range: 4..13,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -58,6 +59,7 @@ Module(
                         id: Name("f"),
                         range: 42..43,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -72,6 +74,7 @@ Module(
                                             id: Name("__debug__"),
                                             range: 44..53,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -116,6 +119,7 @@ Module(
                         id: Name("f"),
                         range: 89..90,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -124,15 +128,15 @@ Module(
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 91..100,
+                                end: 100,
                                 node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 91..100,
-                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("__debug__"),
                                         range: 91..100,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -175,15 +179,15 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 132..141,
+                                            end: 141,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 132..141,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("__debug__"),
                                                     range: 132..141,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },

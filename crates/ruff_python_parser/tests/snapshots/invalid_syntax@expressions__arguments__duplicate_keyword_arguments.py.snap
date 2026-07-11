@@ -39,6 +39,7 @@ Module(
                                                 id: Name("a"),
                                                 range: 4..5,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
@@ -59,6 +60,7 @@ Module(
                                                 id: Name("b"),
                                                 range: 9..10,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
@@ -79,6 +81,7 @@ Module(
                                                 id: Name("c"),
                                                 range: 14..15,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
@@ -99,6 +102,7 @@ Module(
                                                 id: Name("b"),
                                                 range: 19..20,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
@@ -119,6 +123,7 @@ Module(
                                                 id: Name("a"),
                                                 range: 24..25,
                                                 node_index: NodeIndex(None),
+                                                parameter_node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(

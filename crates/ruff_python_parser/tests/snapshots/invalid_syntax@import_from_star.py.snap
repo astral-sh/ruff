@@ -20,6 +20,7 @@ Module(
                         id: Name("f1"),
                         range: 4..6,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -42,16 +43,18 @@ Module(
                                         id: Name("module"),
                                         range: 19..25,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 33..34,
+                                        end: 34,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 33..34,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -72,6 +75,7 @@ Module(
                         id: Name("C"),
                         range: 41..42,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
@@ -85,16 +89,18 @@ Module(
                                         id: Name("module"),
                                         range: 53..59,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 67..68,
+                                        end: 68,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 67..68,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -116,6 +122,7 @@ Module(
                         id: Name("f2"),
                         range: 73..75,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -138,16 +145,18 @@ Module(
                                         id: Name("module"),
                                         range: 90..96,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 104..105,
+                                        end: 105,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 104..105,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
@@ -169,6 +178,7 @@ Module(
                         id: Name("f3"),
                         range: 110..112,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -191,26 +201,29 @@ Module(
                                         id: Name("module"),
                                         range: 125..131,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 139..140,
+                                        end: 140,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 139..140,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
                                     Alias {
-                                        range: 142..143,
+                                        end: 143,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 142..143,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },

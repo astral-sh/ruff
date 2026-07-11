@@ -19,16 +19,18 @@ Module(
                             id: Name("os"),
                             range: 54..56,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 64..65,
+                            end: 65,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("*"),
                                 range: 64..65,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -46,16 +48,18 @@ Module(
                             id: Name("__future__"),
                             range: 76..86,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 94..105,
+                            end: 105,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("annotations"),
                                 range: 94..105,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -74,6 +78,7 @@ Module(
                         id: Name("func"),
                         range: 111..115,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -96,16 +101,18 @@ Module(
                                         id: Name("sys"),
                                         range: 133..136,
                                         node_index: NodeIndex(None),
+                                        parameter_node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 144..145,
+                                        end: 145,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
                                             range: 144..145,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },

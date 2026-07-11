@@ -358,7 +358,6 @@ impl ast::Parameter {
     {
         let ast::Parameter {
             range: _,
-            node_index: _,
             name,
             annotation,
         } = self;
@@ -376,7 +375,7 @@ impl ast::ParameterWithDefault {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ParameterWithDefault {
-            range: _,
+            end: _,
             node_index: _,
             parameter,
             default,
@@ -413,7 +412,7 @@ impl Alias {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Alias {
-            range: _,
+            end: _,
             node_index: _,
             name,
             asname,
@@ -574,6 +573,7 @@ impl ast::Identifier {
         let ast::Identifier {
             range: _,
             node_index: _,
+            parameter_node_index: _,
             id: _,
         } = self;
     }

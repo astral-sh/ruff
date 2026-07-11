@@ -52,7 +52,7 @@ pub(crate) fn annotate_imports<'a>(
                             .iter()
                             .map(|alias| AliasData {
                                 name: locator.slice(&alias.name),
-                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
+                                asname: alias.asname.as_deref().map(|asname| locator.slice(asname)),
                                 is_lazy: *is_lazy,
                             })
                             .collect(),
@@ -118,7 +118,7 @@ pub(crate) fn annotate_imports<'a>(
 
                             AnnotatedAliasData {
                                 name: locator.slice(&alias.name),
-                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
+                                asname: alias.asname.as_deref().map(|asname| locator.slice(asname)),
                                 atop: alias_atop,
                                 inline: alias_inline,
                                 trailing: vec![],

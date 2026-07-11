@@ -20,6 +20,7 @@ Module(
                         id: Name("keyword"),
                         range: 800..807,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -34,6 +35,7 @@ Module(
                                             id: Name("A"),
                                             range: 808..809,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -47,6 +49,7 @@ Module(
                                             id: Name("await"),
                                             range: 811..816,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -91,6 +94,7 @@ Module(
                         id: Name("not_a_type_param"),
                         range: 830..846,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -105,6 +109,7 @@ Module(
                                             id: Name("A"),
                                             range: 847..848,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -118,6 +123,7 @@ Module(
                                             id: Name("B"),
                                             range: 853..854,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -162,6 +168,7 @@ Module(
                         id: Name("multiple_commas"),
                         range: 868..883,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -176,6 +183,7 @@ Module(
                                             id: Name("A"),
                                             range: 884..885,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -189,6 +197,7 @@ Module(
                                             id: Name("B"),
                                             range: 887..888,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -233,6 +242,7 @@ Module(
                         id: Name("multiple_trailing_commas"),
                         range: 902..926,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -247,6 +257,7 @@ Module(
                                             id: Name("A"),
                                             range: 927..928,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,
@@ -291,6 +302,7 @@ Module(
                         id: Name("multiple_commas_and_recovery"),
                         range: 944..972,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -305,6 +317,7 @@ Module(
                                             id: Name("A"),
                                             range: 973..974,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,

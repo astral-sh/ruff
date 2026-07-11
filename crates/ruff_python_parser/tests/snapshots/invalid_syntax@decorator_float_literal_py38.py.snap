@@ -34,6 +34,7 @@ Module(
                         id: Name("bar"),
                         range: 55..58,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

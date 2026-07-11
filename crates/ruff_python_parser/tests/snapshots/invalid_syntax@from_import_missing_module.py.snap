@@ -27,12 +27,13 @@ Module(
                     module: None,
                     names: [
                         Alias {
-                            range: 17..18,
+                            end: 18,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("x"),
                                 range: 17..18,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

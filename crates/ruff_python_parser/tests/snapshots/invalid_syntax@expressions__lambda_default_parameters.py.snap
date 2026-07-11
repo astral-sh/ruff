@@ -25,30 +25,30 @@ Module(
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 7..8,
+                                            end: 8,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 7..8,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 7..8,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
                                             default: None,
                                         },
                                         ParameterWithDefault {
-                                            range: 10..14,
+                                            end: 14,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 10..11,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("b"),
                                                     range: 10..11,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -65,15 +65,15 @@ Module(
                                             ),
                                         },
                                         ParameterWithDefault {
-                                            range: 16..17,
+                                            end: 17,
                                             node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 16..17,
-                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("c"),
                                                     range: 16..17,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },

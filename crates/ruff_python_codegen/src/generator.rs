@@ -1607,7 +1607,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_alias(&mut self, alias: &Alias) {
         self.p_id(&alias.name);
-        if let Some(asname) = &alias.asname {
+        if let Some(asname) = alias.asname.as_deref() {
             self.p(" as ");
             self.p_id(asname);
         }

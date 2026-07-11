@@ -4050,19 +4050,7 @@ impl ruff_text_size::Ranged for crate::Parameter {
     }
 }
 
-impl ruff_text_size::Ranged for crate::ParameterWithDefault {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
 impl ruff_text_size::Ranged for crate::Keyword {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::Alias {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -4603,12 +4591,6 @@ impl crate::HasNodeIndex for crate::Arguments {
 }
 
 impl crate::HasNodeIndex for crate::Parameters {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
-    }
-}
-
-impl crate::HasNodeIndex for crate::Parameter {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }

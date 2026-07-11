@@ -2810,9 +2810,18 @@ pub struct ExceptHandlerExceptHandler {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameter {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub annotation: Option<Box<Expr>>,
+}
+
+impl crate::HasNodeIndex for Parameter {
+    #[expect(
+        clippy::misnamed_getters,
+        reason = "the parameter node index is stored in the identifier's tail padding"
+    )]
+    fn node_index(&self) -> &AtomicNodeIndex {
+        &self.name.parameter_node_index
+    }
 }
 
 impl Parameter {
@@ -2839,10 +2848,16 @@ pub struct Keyword {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Alias {
-    pub range: TextRange,
+    pub end: TextSize,
     pub node_index: AtomicNodeIndex,
     pub name: Identifier,
-    pub asname: Option<Identifier>,
+    pub asname: Option<Box<Identifier>>,
+}
+
+impl Ranged for Alias {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.name.start(), self.end)
+    }
 }
 
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
@@ -3096,7 +3111,7 @@ impl<'a> AnyParameterRef<'a> {
 impl Ranged for AnyParameterRef<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::NonVariadic(param) => param.range,
+            Self::NonVariadic(param) => param.range(),
             Self::Variadic(param) => param.range,
         }
     }
@@ -3424,10 +3439,16 @@ impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
-    pub range: TextRange,
+    pub end: TextSize,
     pub node_index: AtomicNodeIndex,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
+}
+
+impl Ranged for ParameterWithDefault {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.parameter.start(), self.end)
+    }
 }
 
 impl ParameterWithDefault {
@@ -3820,6 +3841,8 @@ pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
+    /// The enclosing parameter's distinct node index, stored in the identifier's tail padding.
+    pub parameter_node_index: AtomicNodeIndex,
 }
 
 impl Identifier {
@@ -3828,6 +3851,7 @@ impl Identifier {
         Self {
             id: id.into(),
             node_index: AtomicNodeIndex::NONE,
+            parameter_node_index: AtomicNodeIndex::NONE,
             range,
         }
     }
@@ -3911,7 +3935,10 @@ impl From<bool> for Singleton {
 #[cfg(test)]
 mod tests {
     use crate::generated::*;
-    use crate::{Arguments, Mod, Parameters};
+    use crate::{
+        Arguments, HasNodeIndex, Mod, NodeIndex, Parameter, ParameterWithDefault, Parameters,
+    };
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3920,9 +3947,13 @@ mod tests {
         assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
         assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
+        assert_eq!(std::mem::size_of::<crate::Alias>(), 56);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 80);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
+        assert_eq!(std::mem::size_of::<crate::Identifier>(), 40);
+        assert_eq!(std::mem::size_of::<Parameter>(), 56);
+        assert_eq!(std::mem::size_of::<ParameterWithDefault>(), 72);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
         assert_eq!(std::mem::size_of::<Expr>(), 72);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
@@ -3957,5 +3988,57 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 24);
         assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 24);
+    }
+
+    #[test]
+    fn parameter_with_default_range() {
+        let parameter = Parameter {
+            range: TextRange::new(TextSize::new(2), TextSize::new(5)),
+            name: crate::Identifier::new("arg", TextRange::new(TextSize::new(2), TextSize::new(5))),
+            annotation: None,
+        };
+        let parameter_with_default = ParameterWithDefault {
+            end: TextSize::new(6),
+            node_index: crate::AtomicNodeIndex::NONE,
+            parameter,
+            default: None,
+        };
+
+        assert_eq!(
+            parameter_with_default.range(),
+            TextRange::new(TextSize::new(2), TextSize::new(6))
+        );
+    }
+
+    #[test]
+    fn parameter_and_identifier_node_indices_are_distinct() {
+        let parameter = Parameter {
+            range: TextRange::new(TextSize::new(2), TextSize::new(5)),
+            name: crate::Identifier::new("arg", TextRange::new(TextSize::new(2), TextSize::new(5))),
+            annotation: None,
+        };
+        parameter.node_index().set(NodeIndex::from(1));
+        parameter.name.node_index.set(NodeIndex::from(2));
+
+        assert_eq!(parameter.node_index().load(), NodeIndex::from(1));
+        assert_eq!(parameter.name.node_index.load(), NodeIndex::from(2));
+    }
+
+    #[test]
+    fn alias_range() {
+        let alias = crate::Alias {
+            end: TextSize::new(12),
+            node_index: crate::AtomicNodeIndex::NONE,
+            name: crate::Identifier::new(
+                "module",
+                TextRange::new(TextSize::new(2), TextSize::new(8)),
+            ),
+            asname: None,
+        };
+
+        assert_eq!(
+            alias.range(),
+            TextRange::new(TextSize::new(2), TextSize::new(12))
+        );
     }
 }

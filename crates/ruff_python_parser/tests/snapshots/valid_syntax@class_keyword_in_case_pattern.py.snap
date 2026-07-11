@@ -51,6 +51,7 @@ Module(
                                                     id: Name("x"),
                                                     range: 24..25,
                                                     node_index: NodeIndex(None),
+                                                    parameter_node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchAs(
                                                     PatternMatchAs {
@@ -62,6 +63,7 @@ Module(
                                                                 id: Name("x"),
                                                                 range: 26..27,
                                                                 node_index: NodeIndex(None),
+                                                                parameter_node_index: NodeIndex(None),
                                                             },
                                                         ),
                                                     },

@@ -20,6 +20,7 @@ Module(
                         id: Name("foo"),
                         range: 4..7,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -82,6 +83,7 @@ Module(
                         id: Name("foo"),
                         range: 32..35,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -105,15 +107,15 @@ Module(
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
-                                                range: 48..49,
+                                                end: 49,
                                                 node_index: NodeIndex(None),
                                                 parameter: Parameter {
                                                     range: 48..49,
-                                                    node_index: NodeIndex(None),
                                                     name: Identifier {
                                                         id: Name("x"),
                                                         range: 48..49,
                                                         node_index: NodeIndex(None),
+                                                        parameter_node_index: NodeIndex(None),
                                                     },
                                                     annotation: None,
                                                 },
@@ -162,6 +164,7 @@ Module(
                         id: Name("foo"),
                         range: 62..65,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {

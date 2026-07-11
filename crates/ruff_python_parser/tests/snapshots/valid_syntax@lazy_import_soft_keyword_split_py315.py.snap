@@ -30,12 +30,13 @@ Module(
                     range: 49..58,
                     names: [
                         Alias {
-                            range: 56..58,
+                            end: 58,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("os"),
                                 range: 56..58,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -66,16 +67,18 @@ Module(
                             id: Name("sys"),
                             range: 81..84,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 92..96,
+                            end: 96,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("path"),
                                 range: 92..96,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },

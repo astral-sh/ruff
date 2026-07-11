@@ -19,6 +19,7 @@ Module(
                         id: Name("__debug__"),
                         range: 6..15,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
@@ -47,6 +48,7 @@ Module(
                         id: Name("C"),
                         range: 41..42,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: Some(
                         TypeParams {
@@ -61,6 +63,7 @@ Module(
                                             id: Name("__debug__"),
                                             range: 43..52,
                                             node_index: NodeIndex(None),
+                                            parameter_node_index: NodeIndex(None),
                                         },
                                         bound: None,
                                         default: None,

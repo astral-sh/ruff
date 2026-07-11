@@ -738,7 +738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
         let ast::ParameterWithDefault {
-            range: _,
+            end: _,
             node_index: _,
             parameter,
             default: _,
@@ -755,7 +755,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
         let ast::Parameter {
             range: _,
-            node_index: _,
             name: _,
             annotation,
         } = parameter;
@@ -795,7 +794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ParameterWithDefault {
             parameter,
             default,
-            range: _,
+            end: _,
             node_index: _,
         } = parameter_with_default;
 
@@ -1105,7 +1104,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ParameterWithDefault {
             parameter,
             default,
-            range: _,
+            end: _,
             node_index: _,
         } = parameter_with_default;
 

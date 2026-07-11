@@ -144,6 +144,7 @@ Module(
                                                                             id: Name("join"),
                                                                             range: 103..107,
                                                                             node_index: NodeIndex(None),
+                                                                            parameter_node_index: NodeIndex(None),
                                                                         },
                                                                         ctx: Load,
                                                                     },

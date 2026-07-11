@@ -19,26 +19,29 @@ Module(
                             id: Name("typing"),
                             range: 174..180,
                             node_index: NodeIndex(None),
+                            parameter_node_index: NodeIndex(None),
                         },
                     ),
                     names: [
                         Alias {
-                            range: 188..197,
+                            end: 197,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("Annotated"),
                                 range: 188..197,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
                         Alias {
-                            range: 199..206,
+                            end: 206,
                             node_index: NodeIndex(None),
                             name: Identifier {
                                 id: Name("Literal"),
                                 range: 199..206,
                                 node_index: NodeIndex(None),
+                                parameter_node_index: NodeIndex(None),
                             },
                             asname: None,
                         },
@@ -57,6 +60,7 @@ Module(
                         id: Name("foo"),
                         range: 211..214,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -67,11 +71,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 215..224,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 216..220,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Name(
@@ -115,6 +119,7 @@ Module(
                         id: Name("foo"),
                         range: 235..238,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -125,11 +130,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 239..289,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("x"),
                                     range: 240..241,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Subscript(
@@ -201,6 +206,7 @@ Module(
                         id: Name("foo"),
                         range: 300..303,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -211,11 +217,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 304..361,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("x"),
                                     range: 305..306,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Subscript(
@@ -305,6 +311,7 @@ Module(
                         id: Name("foo"),
                         range: 372..375,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -315,11 +322,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 376..386,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 377..381,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Name(
@@ -337,11 +344,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 388..399,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("kwds"),
                                     range: 390..394,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     Name(
@@ -383,6 +390,7 @@ Module(
                         id: Name("union"),
                         range: 410..415,
                         node_index: NodeIndex(None),
+                        parameter_node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
@@ -393,11 +401,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 416..425,
-                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("x"),
                                     range: 417..418,
                                     node_index: NodeIndex(None),
+                                    parameter_node_index: NodeIndex(None),
                                 },
                                 annotation: Some(
                                     BinOp(
