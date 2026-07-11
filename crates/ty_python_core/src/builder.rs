@@ -66,8 +66,9 @@ use crate::use_def::{
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
-    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
+    DefinitionsByNode, EvaluationMode, ExpressionScopeRange, ExpressionsScopeMap, LoopHeader,
+    LoopHeaderId, NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    VisibleAncestorsIter,
 };
 
 use super::place::PlaceExprRef;
@@ -502,7 +503,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(parent, node_with_kind, children_start);
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
@@ -5111,23 +5112,33 @@ impl ExpressionsScopeMapBuilder {
         let mut interval_map = Vec::new();
 
         let mut current_scope = first.1;
-        let mut range = first.0..=first.0;
+        let mut range_start = first.0;
+        let mut range_end = first.0;
 
         for (index, scope) in iter {
             if scope == current_scope {
-                range = *range.start()..=index;
+                range_end = index;
                 continue;
             }
 
-            interval_map.push((range, current_scope));
+            interval_map.push(ExpressionScopeRange {
+                start: range_start,
+                end: range_end,
+                scope: current_scope,
+            });
 
             current_scope = scope;
-            range = index..=index;
+            range_start = index;
+            range_end = index;
         }
 
-        interval_map.push((range, current_scope));
+        interval_map.push(ExpressionScopeRange {
+            start: range_start,
+            end: range_end,
+            scope: current_scope,
+        });
 
-        ExpressionsScopeMap(interval_map.into_boxed_slice())
+        ExpressionsScopeMap::new(interval_map)
     }
 }
 

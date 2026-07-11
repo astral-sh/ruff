@@ -16,6 +16,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -182,7 +183,7 @@ pub fn attribute_scopes<'db>(
                     // This could be a generic method with a type-params scope.
                     // Go one level deeper to find the function scope. The first
                     // descendant is the (potential) function scope.
-                    let function_scope_id = scope.descendants().start;
+                    let function_scope_id = scope.descendants(child_scope_id).start;
                     (function_scope_id, index.scope(function_scope_id))
                 } else {
                     (child_scope_id, scope)
@@ -844,7 +845,7 @@ pub(crate) struct DescendantsIter<'a> {
 impl<'a> DescendantsIter<'a> {
     fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
         let scope = &scopes[scope_id];
-        let scopes = &scopes[scope.descendants()];
+        let scopes = &scopes[scope.descendants(scope_id)];
 
         Self {
             next_id: scope_id + 1,
@@ -905,30 +906,88 @@ impl FusedIterator for ChildrenIter<'_> {}
 /// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
 /// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
-struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
+struct ExpressionsScopeMap {
+    /// Ranges whose endpoints and scope fit in 16 bits.
+    ranges: Box<[CompactExpressionScopeRange]>,
+    /// The uncommon ranges that cannot use the compact representation.
+    wide_ranges: ThinVec<ExpressionScopeRange>,
+}
+
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+struct CompactExpressionScopeRange {
+    start: u16,
+    end: u16,
+    scope: u16,
+}
+
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+struct ExpressionScopeRange {
+    start: NodeIndex,
+    end: NodeIndex,
+    scope: FileScopeId,
+}
 
 impl ExpressionsScopeMap {
+    fn new(ranges: Vec<ExpressionScopeRange>) -> Self {
+        let mut compact_ranges = Vec::with_capacity(ranges.len());
+        let mut wide_ranges = Vec::new();
+
+        for range in ranges {
+            let start = range
+                .start
+                .as_u32()
+                .and_then(|start| u16::try_from(start).ok());
+            let end = range.end.as_u32().and_then(|end| u16::try_from(end).ok());
+            let scope = u16::try_from(range.scope.as_u32()).ok();
+
+            if let (Some(start), Some(end), Some(scope)) = (start, end, scope) {
+                compact_ranges.push(CompactExpressionScopeRange { start, end, scope });
+            } else {
+                wide_ranges.push(range);
+            }
+        }
+
+        Self {
+            ranges: compact_ranges.into_boxed_slice(),
+            wide_ranges: wide_ranges.into(),
+        }
+    }
+
     fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
     where
         E: HasTrackedScope,
     {
-        let node_index = node.node_index().load();
+        let node_index = node.node_index().load().as_u32()?;
+
+        if let Ok(node_index) = u16::try_from(node_index) {
+            let entry = self
+                .ranges
+                .binary_search_by_key(&node_index, |range| range.start);
+
+            let index = match entry {
+                Ok(index) => index,
+                Err(index) => index.saturating_sub(1),
+            };
+
+            if let Some(range) = self.ranges.get(index)
+                && node_index >= range.start
+                && node_index <= range.end
+            {
+                return Some(FileScopeId::from_u32(u32::from(range.scope)));
+            }
+        }
 
         let entry = self
-            .0
-            .binary_search_by_key(&node_index, |(range, _)| *range.start());
+            .wide_ranges
+            .binary_search_by(|range| range.start.as_u32().cmp(&Some(node_index)));
 
         let index = match entry {
             Ok(index) => index,
             Err(index) => index.checked_sub(1)?,
         };
 
-        let (range, scope) = &self.0[index];
-        if range.contains(&node_index) {
-            Some(*scope)
-        } else {
-            None
-        }
+        let range = &self.wide_ranges[index];
+        (node_index <= range.end.as_u32()?).then_some(range.scope)
     }
 }
 
@@ -1826,6 +1885,68 @@ class C[T]:
         let y = &y_stmt.targets[0];
 
         assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
+    }
+
+    #[test]
+    fn expression_scope_range_is_compact_and_inclusive() {
+        assert_eq!(std::mem::size_of::<CompactExpressionScopeRange>(), 6);
+
+        let compact_scope = FileScopeId::from_u32(u32::from(u16::MAX));
+        let wide_range_scope = FileScopeId::from_u32(1);
+        let wide_scope = FileScopeId::from_u32(u32::from(u16::MAX) + 1);
+        let map = ExpressionsScopeMap::new(vec![
+            ExpressionScopeRange {
+                start: NodeIndex::from(2),
+                end: NodeIndex::from(40),
+                scope: compact_scope,
+            },
+            ExpressionScopeRange {
+                start: NodeIndex::from(42),
+                end: NodeIndex::from(44),
+                scope: wide_scope,
+            },
+            ExpressionScopeRange {
+                start: NodeIndex::from(46),
+                end: NodeIndex::from(65_535),
+                scope: compact_scope,
+            },
+            ExpressionScopeRange {
+                start: NodeIndex::from(65_537),
+                end: NodeIndex::from(131_075),
+                scope: wide_range_scope,
+            },
+            ExpressionScopeRange {
+                start: NodeIndex::from(131_077),
+                end: NodeIndex::from(131_079),
+                scope: wide_range_scope,
+            },
+        ]);
+
+        assert_eq!(map.ranges.len(), 2);
+        assert_eq!(map.wide_ranges.len(), 3);
+
+        let identifier = |index| {
+            let identifier = ast::Identifier::new("x", TextRange::default());
+            identifier.node_index.set(NodeIndex::from(index));
+            identifier
+        };
+
+        assert_eq!(map.try_get(&identifier(1)), None);
+        assert_eq!(map.try_get(&identifier(2)), Some(compact_scope));
+        assert_eq!(map.try_get(&identifier(40)), Some(compact_scope));
+        assert_eq!(map.try_get(&identifier(41)), None);
+        assert_eq!(map.try_get(&identifier(42)), Some(wide_scope));
+        assert_eq!(map.try_get(&identifier(44)), Some(wide_scope));
+        assert_eq!(map.try_get(&identifier(45)), None);
+        assert_eq!(map.try_get(&identifier(46)), Some(compact_scope));
+        assert_eq!(map.try_get(&identifier(65_535)), Some(compact_scope));
+        assert_eq!(map.try_get(&identifier(65_536)), None);
+        assert_eq!(map.try_get(&identifier(65_537)), Some(wide_range_scope));
+        assert_eq!(map.try_get(&identifier(131_075)), Some(wide_range_scope));
+        assert_eq!(map.try_get(&identifier(131_076)), None);
+        assert_eq!(map.try_get(&identifier(131_077)), Some(wide_range_scope));
+        assert_eq!(map.try_get(&identifier(131_079)), Some(wide_range_scope));
+        assert_eq!(map.try_get(&identifier(131_080)), None);
     }
 
     #[test]

@@ -117,20 +117,20 @@ pub struct Scope {
     /// The node that introduces this scope.
     node: NodeWithScopeKind,
 
-    /// The range of [`FileScopeId`]s that are descendants of this scope.
-    descendants: Range<FileScopeId>,
+    /// The exclusive end of this scope's descendant range.
+    descendants_end: FileScopeId,
 }
 
 impl Scope {
     pub(super) fn new(
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
-        descendants: Range<FileScopeId>,
+        descendants_end: FileScopeId,
     ) -> Self {
         Scope {
             parent,
             node,
-            descendants,
+            descendants_end,
         }
     }
 
@@ -150,12 +150,12 @@ impl Scope {
         self.kind().visibility()
     }
 
-    pub fn descendants(&self) -> Range<FileScopeId> {
-        self.descendants.clone()
+    pub(crate) fn descendants(&self, scope_id: FileScopeId) -> Range<FileScopeId> {
+        scope_id + 1..self.descendants_end
     }
 
     pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
-        self.descendants = self.descendants.start..children_end;
+        self.descendants_end = children_end;
     }
 
     pub fn is_eager(&self) -> bool {
