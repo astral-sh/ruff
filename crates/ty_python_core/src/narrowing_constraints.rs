@@ -90,9 +90,70 @@ pub struct InteriorNode {
     pub if_false: ScopedNarrowingConstraint,
 }
 
+/// A compact retained interior node. Constraint IDs are limited to 19 bits by
+/// [`MAX_INTERIOR_NODES`], leaving room to encode the two terminal values in 20 bits.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct RetainedInteriorNode {
+    atom: ScopedPredicateId,
+    edges: [u32; 2],
+}
+
+impl RetainedInteriorNode {
+    const EDGE_BITS: u32 = 20;
+    const EDGE_MASK: u64 = (1 << Self::EDGE_BITS) - 1;
+    const PACKED_TRUE: u32 = (1 << Self::EDGE_BITS) - 1;
+    const PACKED_FALSE: u32 = Self::PACKED_TRUE - 1;
+
+    fn new(node: InteriorNode) -> Self {
+        let edges = u64::from(Self::pack_edge(node.if_true))
+            | (u64::from(Self::pack_edge(node.if_uncertain)) << Self::EDGE_BITS)
+            | (u64::from(Self::pack_edge(node.if_false)) << (2 * Self::EDGE_BITS));
+
+        #[expect(clippy::cast_possible_truncation)]
+        Self {
+            atom: node.atom,
+            edges: [edges as u32, (edges >> 32) as u32],
+        }
+    }
+
+    fn unpack(self) -> InteriorNode {
+        let edges = u64::from(self.edges[0]) | (u64::from(self.edges[1]) << 32);
+        InteriorNode {
+            atom: self.atom,
+            if_true: Self::unpack_edge((edges & Self::EDGE_MASK) as u32),
+            if_uncertain: Self::unpack_edge(((edges >> Self::EDGE_BITS) & Self::EDGE_MASK) as u32),
+            if_false: Self::unpack_edge(
+                ((edges >> (2 * Self::EDGE_BITS)) & Self::EDGE_MASK) as u32,
+            ),
+        }
+    }
+
+    fn pack_edge(edge: ScopedNarrowingConstraint) -> u32 {
+        match edge {
+            ALWAYS_TRUE => Self::PACKED_TRUE,
+            ALWAYS_FALSE => Self::PACKED_FALSE,
+            edge => {
+                debug_assert!((edge.0 as usize) < MAX_INTERIOR_NODES);
+                edge.0
+            }
+        }
+    }
+
+    const fn unpack_edge(edge: u32) -> ScopedNarrowingConstraint {
+        match edge {
+            Self::PACKED_TRUE => ALWAYS_TRUE,
+            Self::PACKED_FALSE => ALWAYS_FALSE,
+            edge => ScopedNarrowingConstraint(edge),
+        }
+    }
+}
+
+static_assertions::const_assert_eq!(std::mem::size_of::<RetainedInteriorNode>(), 12);
+static_assertions::const_assert!(MAX_INTERIOR_NODES <= RetainedInteriorNode::PACKED_FALSE as usize);
+
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct NarrowingConstraints {
-    used_interiors: Box<[InteriorNode]>,
+    used_interiors: Box<[RetainedInteriorNode]>,
     used_indices: Option<RankBitBox>,
 }
 
@@ -102,8 +163,14 @@ impl NarrowingConstraints {
     /// The nodes must satisfy the same ordering and allocation invariants as graphs produced by
     /// [`NarrowingConstraintsBuilder`].
     pub fn from_test_nodes(nodes: Vec<InteriorNode>) -> Self {
+        assert!(nodes.len() <= MAX_INTERIOR_NODES);
+        assert!(nodes.iter().all(|node| {
+            [node.if_true, node.if_uncertain, node.if_false]
+                .into_iter()
+                .all(|edge| edge.is_terminal() || (edge.0 as usize) < MAX_INTERIOR_NODES)
+        }));
         Self {
-            used_interiors: nodes.into_boxed_slice(),
+            used_interiors: nodes.into_iter().map(RetainedInteriorNode::new).collect(),
             used_indices: None,
         }
     }
@@ -120,9 +187,9 @@ impl NarrowingConstraints {
                 used_indices.get_bit(raw_index).unwrap_or(false),
                 "all used narrowing constraints should have been marked as used",
             );
-            self.used_interiors[used_indices.rank(raw_index) as usize]
+            self.used_interiors[used_indices.rank(raw_index) as usize].unpack()
         } else {
-            self.used_interiors[raw_index]
+            self.used_interiors[raw_index].unpack()
         }
     }
 }
@@ -146,7 +213,11 @@ impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
         if self.interior_used.first_zero().is_none() {
             NarrowingConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_interiors: self
+                    .interiors
+                    .into_iter()
+                    .map(RetainedInteriorNode::new)
+                    .collect(),
                 used_indices: None,
             }
         } else {
@@ -155,6 +226,7 @@ impl NarrowingConstraintsBuilder {
                 .into_iter()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
+                .map(RetainedInteriorNode::new)
                 .collect();
             let used_indices = RankBitBox::from_bits(self.interior_used);
             NarrowingConstraints {
@@ -225,6 +297,14 @@ impl NarrowingConstraintsBuilder {
                 if_uncertain: when_true,
                 if_false: ALWAYS_TRUE,
             });
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return self
+                .interior_cache
+                .get(&node)
+                .copied()
+                .unwrap_or(ALWAYS_TRUE);
         }
 
         *self.interior_cache.entry(node).or_insert_with(|| {
@@ -424,6 +504,46 @@ mod tests {
 
     fn predicate(index: usize) -> ScopedPredicateId {
         ScopedPredicateId::new(index)
+    }
+
+    #[test]
+    fn retained_interior_round_trip() {
+        let max = ScopedNarrowingConstraint::new(MAX_INTERIOR_NODES - 1);
+        for (if_true, if_uncertain, if_false) in [
+            (ALWAYS_TRUE, ALWAYS_FALSE, max),
+            (max, ALWAYS_TRUE, ALWAYS_FALSE),
+        ] {
+            let node = InteriorNode {
+                atom: predicate(0),
+                if_true,
+                if_uncertain,
+                if_false,
+            };
+            assert_eq!(RetainedInteriorNode::new(node).unpack(), node);
+        }
+    }
+
+    #[test]
+    fn adding_atoms_respects_interior_limit() {
+        let existing = InteriorNode {
+            atom: predicate(0),
+            if_true: ALWAYS_TRUE,
+            if_uncertain: ALWAYS_FALSE,
+            if_false: ALWAYS_FALSE,
+        };
+        let existing_id = ScopedNarrowingConstraint(0);
+        let mut constraints = NarrowingConstraintsBuilder {
+            interiors: IndexVec::from_raw(vec![existing; MAX_INTERIOR_NODES]),
+            interior_used: RankBitBox::bits_with_capacity(MAX_INTERIOR_NODES),
+            interior_cache: FxHashMap::from_iter([(existing, existing_id)]),
+            ..NarrowingConstraintsBuilder::default()
+        };
+
+        assert_eq!(constraints.add_atom(predicate(0)), existing_id);
+        assert_eq!(constraints.add_atom(predicate(1)), ALWAYS_TRUE);
+        assert_eq!(constraints.add_negated_atom(predicate(1)), ALWAYS_TRUE);
+        assert_eq!(constraints.interiors.len(), MAX_INTERIOR_NODES);
+        assert_eq!(constraints.interior_used.len(), MAX_INTERIOR_NODES);
     }
 
     fn evaluate(

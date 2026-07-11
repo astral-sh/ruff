@@ -2641,7 +2641,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let predicates = self.predicates.build();
         let reachability_constraints = self.reachability_constraints.build();
         let narrowing_constraints = self.narrowing_constraints.build();
-        let constraint_tables = (!reachability_constraints.used_interiors().is_empty()
+        let constraint_tables = (!reachability_constraints.is_empty()
             || !narrowing_constraints.is_empty())
         .then(|| {
             Box::new(ConstraintTables {

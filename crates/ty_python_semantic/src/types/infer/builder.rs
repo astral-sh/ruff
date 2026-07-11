@@ -2276,7 +2276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
         // exact union of every visible loop-back binding can recursively force inference of large
         // boolean expressions and explode on real-world loops.
-        if use_def.reachability_constraints().used_interiors().len()
+        if use_def.reachability_constraints().used_interior_count()
             > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
         {
             self.bindings.insert(definition, Type::unknown());
@@ -2368,8 +2368,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .index
                 .use_def_map(scope_id)
                 .reachability_constraints()
-                .used_interiors()
-                .len()
+                .used_interior_count()
                 > MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES
         {
             // As with loop header definitions above, use a reachability cutoff to avoid excessive

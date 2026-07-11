@@ -69,6 +69,70 @@ pub struct InteriorNode {
     if_false: ScopedReachabilityConstraintId,
 }
 
+/// A compact retained interior node. Constraint IDs are limited to 19 bits by
+/// [`MAX_INTERIOR_NODES`], leaving room to encode the three terminal values in 20 bits.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct RetainedInteriorNode {
+    atom: ScopedPredicateId,
+    edges: [u32; 2],
+}
+
+impl RetainedInteriorNode {
+    const EDGE_BITS: u32 = 20;
+    const EDGE_MASK: u64 = (1 << Self::EDGE_BITS) - 1;
+    const PACKED_TRUE: u32 = (1 << Self::EDGE_BITS) - 1;
+    const PACKED_AMBIGUOUS: u32 = Self::PACKED_TRUE - 1;
+    const PACKED_FALSE: u32 = Self::PACKED_TRUE - 2;
+
+    fn new(node: InteriorNode) -> Self {
+        let edges = u64::from(Self::pack_edge(node.if_true))
+            | (u64::from(Self::pack_edge(node.if_ambiguous)) << Self::EDGE_BITS)
+            | (u64::from(Self::pack_edge(node.if_false)) << (2 * Self::EDGE_BITS));
+
+        #[expect(clippy::cast_possible_truncation)]
+        Self {
+            atom: node.atom,
+            edges: [edges as u32, (edges >> 32) as u32],
+        }
+    }
+
+    fn unpack(self) -> InteriorNode {
+        let edges = u64::from(self.edges[0]) | (u64::from(self.edges[1]) << 32);
+        InteriorNode {
+            atom: self.atom,
+            if_true: Self::unpack_edge((edges & Self::EDGE_MASK) as u32),
+            if_ambiguous: Self::unpack_edge(((edges >> Self::EDGE_BITS) & Self::EDGE_MASK) as u32),
+            if_false: Self::unpack_edge(
+                ((edges >> (2 * Self::EDGE_BITS)) & Self::EDGE_MASK) as u32,
+            ),
+        }
+    }
+
+    fn pack_edge(edge: ScopedReachabilityConstraintId) -> u32 {
+        match edge {
+            ALWAYS_TRUE => Self::PACKED_TRUE,
+            AMBIGUOUS => Self::PACKED_AMBIGUOUS,
+            ALWAYS_FALSE => Self::PACKED_FALSE,
+            edge => {
+                debug_assert!((edge.0 as usize) < MAX_INTERIOR_NODES);
+                edge.0
+            }
+        }
+    }
+
+    const fn unpack_edge(edge: u32) -> ScopedReachabilityConstraintId {
+        match edge {
+            Self::PACKED_TRUE => ALWAYS_TRUE,
+            Self::PACKED_AMBIGUOUS => AMBIGUOUS,
+            Self::PACKED_FALSE => ALWAYS_FALSE,
+            edge => ScopedReachabilityConstraintId(edge),
+        }
+    }
+}
+
+static_assertions::const_assert_eq!(std::mem::size_of::<RetainedInteriorNode>(), 12);
+static_assertions::const_assert!(MAX_INTERIOR_NODES <= RetainedInteriorNode::PACKED_FALSE as usize);
+
 impl InteriorNode {
     pub const fn atom(self) -> ScopedPredicateId {
         self.atom
@@ -140,7 +204,7 @@ const MAX_INTERIOR_NODES: usize = 512 * 1024;
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
-    used_interiors: Box<[InteriorNode]>,
+    used_interiors: Box<[RetainedInteriorNode]>,
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
     /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
     /// index of that node in the `used_interiors` vector.
@@ -160,14 +224,18 @@ impl ReachabilityConstraints {
                 "all used reachability constraints should have been marked as used",
             );
             let index = used_indices.rank(raw_index) as usize;
-            self.used_interiors[index]
+            self.used_interiors[index].unpack()
         } else {
-            self.used_interiors[raw_index]
+            self.used_interiors[raw_index].unpack()
         }
     }
 
-    pub fn used_interiors(&self) -> &[InteriorNode] {
-        &self.used_interiors
+    pub fn is_empty(&self) -> bool {
+        self.used_interiors.is_empty()
+    }
+
+    pub fn used_interior_count(&self) -> usize {
+        self.used_interiors.len()
     }
 }
 
@@ -197,13 +265,18 @@ impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         if self.interior_used.first_zero().is_none() {
             ReachabilityConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_interiors: self
+                    .interiors
+                    .into_iter()
+                    .map(RetainedInteriorNode::new)
+                    .collect(),
                 used_indices: None,
             }
         } else {
             let used_interiors = (self.interiors.into_iter())
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
+                .map(RetainedInteriorNode::new)
                 .collect();
             let used_indices = RankBitBox::from_bits(self.interior_used);
             ReachabilityConstraints {
@@ -274,6 +347,10 @@ impl ReachabilityConstraintsBuilder {
         // branch to go there too. And this node is then redundant and can be reduced.
         if node.if_true == node.if_false {
             return node.if_true;
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return self.interior_cache.get(&node).copied().unwrap_or(AMBIGUOUS);
         }
 
         *self.interior_cache.entry(node).or_insert_with(|| {
@@ -484,5 +561,50 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ruff_index::Idx;
+
+    #[test]
+    fn retained_interior_round_trip() {
+        let max = ScopedReachabilityConstraintId::new(MAX_INTERIOR_NODES - 1);
+        for (if_true, if_ambiguous, if_false) in [
+            (ALWAYS_TRUE, AMBIGUOUS, max),
+            (max, ALWAYS_FALSE, ALWAYS_TRUE),
+        ] {
+            let node = InteriorNode {
+                atom: ScopedPredicateId::new(0),
+                if_true,
+                if_ambiguous,
+                if_false,
+            };
+            assert_eq!(RetainedInteriorNode::new(node).unpack(), node);
+        }
+    }
+
+    #[test]
+    fn adding_atoms_respects_interior_limit() {
+        let existing = InteriorNode {
+            atom: ScopedPredicateId::new(0),
+            if_true: ALWAYS_TRUE,
+            if_ambiguous: AMBIGUOUS,
+            if_false: ALWAYS_FALSE,
+        };
+        let existing_id = ScopedReachabilityConstraintId(0);
+        let mut constraints = ReachabilityConstraintsBuilder {
+            interiors: IndexVec::from_raw(vec![existing; MAX_INTERIOR_NODES]),
+            interior_used: RankBitBox::bits_with_capacity(MAX_INTERIOR_NODES),
+            interior_cache: FxHashMap::from_iter([(existing, existing_id)]),
+            ..ReachabilityConstraintsBuilder::default()
+        };
+
+        assert_eq!(constraints.add_atom(ScopedPredicateId::new(0)), existing_id);
+        assert_eq!(constraints.add_atom(ScopedPredicateId::new(1)), AMBIGUOUS);
+        assert_eq!(constraints.interiors.len(), MAX_INTERIOR_NODES);
+        assert_eq!(constraints.interior_used.len(), MAX_INTERIOR_NODES);
     }
 }

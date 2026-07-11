@@ -1374,7 +1374,7 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+    let use_exact_reachability = use_def.reachability_constraints().used_interior_count()
         <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
     for live_binding in live_bindings {
