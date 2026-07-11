@@ -1,5 +1,5 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
@@ -157,8 +157,8 @@ impl get_size2::GetSize for MemberFlags {}
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    /// The entire path as a single Name
-    path: Name,
+    /// The entire path as a single compact string.
+    path: CompactString,
     /// Metadata for each segment (in forward order)
     segments: Segments,
 }
@@ -174,7 +174,7 @@ impl MemberExpr {
             None
         } else {
             Some(Self {
-                path: Name::new(builder.path.as_str()),
+                path: builder.path,
                 segments: Segments::from_vec(builder.segments),
             })
         }
@@ -186,6 +186,10 @@ impl MemberExpr {
 
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> + '_ {
         SegmentsIterator::new(self.path.as_str(), self.segment_infos())
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.path.shrink_to_fit();
     }
 
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
@@ -549,7 +553,7 @@ impl MemberTableBuilder {
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
-    pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
+    pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
         let entry = self.reverse.entry(&self.table.members, &member);
 
         match entry {
@@ -563,6 +567,8 @@ impl MemberTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
+                member.expression.shrink_to_fit();
+
                 let id = self.table.members.push(member);
                 entry.insert(id);
                 (id, true)

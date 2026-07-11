@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::Span,
@@ -2367,16 +2366,20 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Member<'db> {
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
-        if implicit_attribute_names(db, class_body_scope)
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_err()
-        {
+        let names = implicit_attribute_names(db, class_body_scope);
+        let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
+        else {
             return Member::unbound();
-        }
+        };
 
         Self::implicit_attribute_inner(
             db,
-            ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
+            ImplicitAttributeName::new(
+                db,
+                class_body_scope,
+                &names[name_index],
+                target_method_decorator,
+            ),
         )
     }
 
@@ -2393,7 +2396,7 @@ impl<'db> StaticClassLiteral<'db> {
         attribute: ImplicitAttributeName<'db>,
     ) -> Member<'db> {
         let class_body_scope = attribute.class_body_scope(db);
-        let name = attribute.name(db);
+        let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
@@ -3359,8 +3362,8 @@ fn explicit_bases_cycle_fn<'db>(
 struct ImplicitAttributeName<'db> {
     #[returns(copy)]
     class_body_scope: ScopeId<'db>,
-    #[returns(deref)]
-    name: CompactString,
+    #[returns(ref)]
+    name: Name,
     #[returns(copy)]
     target_method_decorator: MethodDecorator,
 }

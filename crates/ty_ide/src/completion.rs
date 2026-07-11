@@ -760,7 +760,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(CompactString::new(class_def.name.as_str()));
+                        bases.insert(class_def.name.id.clone().into());
                     }
                     bases
                 });
@@ -1546,7 +1546,7 @@ struct CollectionContext<'db> {
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
     /// This is only `Some` when we're in a class definition context.
-    existing_class_bases: Option<FxHashSet<CompactString>>,
+    existing_class_bases: Option<FxHashSet<CharStr>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1597,7 +1597,7 @@ impl<'db> CollectionContext<'db> {
             // This handles cases like `class Foo(mod.Bar, ...)` where we want to
             // filter out auto-import suggestions for `Bar` from module `mod`.
             if let Some(ref qualified) = builder.qualified
-                && existing_class_bases.contains(qualified)
+                && existing_class_bases.contains(qualified.as_str())
             {
                 return true;
             }
@@ -1620,12 +1620,18 @@ impl<'db> CollectionContext<'db> {
 ///
 /// For simple name references (e.g., `Foo`), returns the name as-is.
 /// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
-fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CharStr> {
     class_def
         .bases()
         .iter()
-        .filter_map(UnqualifiedName::from_expr)
-        .map(|name| compact_str::format_compact!("{name}"))
+        .filter_map(|base| {
+            if let ast::Expr::Name(name) = base {
+                return Some(name.id.clone().into());
+            }
+
+            let name = UnqualifiedName::from_expr(base)?;
+            Some(CharStr::join(name.segments(), "."))
+        })
         .collect()
 }
 

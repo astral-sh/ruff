@@ -38,6 +38,13 @@ impl Name {
         Self(CharStr::from_static_str(name))
     }
 
+    /// Creates a name by joining string slices with at most one heap allocation.
+    #[inline]
+    pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
+        Self(CharStr::join(slices, separator))
+    }
+
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -829,6 +836,11 @@ mod tests {
         assert_eq!(name_hasher.finish(), lookup_hasher.finish());
         assert!(salsa::HashEqLike::<&str>::eq(&name, &lookup));
         assert_eq!(salsa::Lookup::<Name>::into_owned(lookup), name);
+    }
+
+    #[test]
+    fn join() {
+        assert_eq!(Name::join(&["foo", "bar"], "."), "foo.bar");
     }
 
     #[test]
