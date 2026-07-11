@@ -81,6 +81,35 @@ def convert(value: Any | Recursive[T_co]) -> list[T_co]:
         return [value]  # error: [invalid-return-type]
 ```
 
+The cycle can also alternate between different protocol declarations. The nominal shortcut must not
+bind an unconstrained type variable from one union arm before the sibling arm is related.
+
+`indirect.py`:
+
+```py
+from collections.abc import Iterable
+from typing import Protocol, TypeAlias, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Frame(Protocol[T_co]):
+    def method(self): ...
+
+class FirstMarker(Protocol):
+    def first(self): ...
+
+class SecondMarker(Protocol):
+    def second(self): ...
+
+Options: TypeAlias = Iterable[T_co] | Frame[T_co] | FirstMarker | SecondMarker
+
+def convert(value: Options[T_co]) -> list[T_co]:
+    try:
+        raise Exception
+    except:
+        return [value]  # error: [invalid-return-type]
+```
+
 Nested, non-recursive protocol members must still expose an incompatible leaf signature; an active
 signature relation is not sufficient reason to assume that an unrelated nested relation succeeds.
 

@@ -573,7 +573,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let ClassType::Generic(source_alias) = source_class else {
                         return true;
                     };
-                    let source_contains_same_protocol = source_alias
+                    let ClassType::Generic(target_alias) = nominal_instance.class(db) else {
+                        return true;
+                    };
+
+                    // Do not let the shortcut infer an unconstrained typevar. A sibling union arm
+                    // can otherwise feed a different protocol specialization into the typevar,
+                    // forming an indirect cycle before the source contains this declaration.
+                    if target_alias
+                        .specialization(db)
+                        .types(db)
+                        .iter()
+                        .any(|argument| {
+                            any_over_type(db, *argument, false, |nested| {
+                                let Type::TypeVar(typevar) = nested else {
+                                    return false;
+                                };
+                                typevar.typevar(db).bound_or_constraints(db).is_none()
+                            })
+                        })
+                    {
+                        return false;
+                    }
+
+                    // A constrained target can still recurse directly through this declaration.
+                    !source_alias
                         .specialization(db)
                         .types(db)
                         .iter()
@@ -590,9 +614,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         nested.class(db).class_literal(db) == target_class_literal
                                     })
                             })
-                        });
-
-                    !source_contains_same_protocol
+                        })
                 })
             {
                 return result;
