@@ -166,6 +166,28 @@ pub(super) enum TypeKind<'db> {
     NonAtomic(NonAtomicType<'db>),
 }
 
+impl<'db> Type<'db> {
+    fn may_contain_nested_types(self, db: &'db dyn Db) -> bool {
+        match TypeKind::from(self) {
+            TypeKind::Atomic => false,
+            TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance)) => {
+                instance.is_definition_generic(db)
+            }
+            TypeKind::NonAtomic(_) => true,
+        }
+    }
+
+    /// Returns whether this type's structure may contain a type variable.
+    pub(crate) fn may_contain_typevar(self, db: &'db dyn Db) -> bool {
+        self.may_contain_nested_types(db)
+    }
+
+    /// Returns whether this type or its structure may contain a dynamic type.
+    pub(crate) fn may_contain_dynamic(self, db: &'db dyn Db) -> bool {
+        self.is_dynamic() || self.may_contain_nested_types(db)
+    }
+}
+
 impl<'db> From<Type<'db>> for TypeKind<'db> {
     fn from(ty: Type<'db>) -> Self {
         match ty {
@@ -410,13 +432,25 @@ where
         }
     }
 
+    // Atomic roots need neither a visitor nor a recursion guard.
+    let found_matching_type = query(ty);
+    if found_matching_type != T::default() {
+        return found_matching_type;
+    }
+
+    let TypeKind::NonAtomic(non_atomic_type) = TypeKind::from(ty) else {
+        return found_matching_type;
+    };
+
     let visitor = AnyOverTypeVisitor {
         query: &query,
         recursion_guard: TypeCollector::default(),
-        found_matching_type: Cell::default(),
+        found_matching_type: Cell::new(found_matching_type),
         should_visit_lazy_type_attributes,
     };
-    visitor.visit_type(db, ty);
+    let root_was_already_seen = visitor.recursion_guard.type_was_already_seen(ty);
+    debug_assert!(!root_was_already_seen);
+    walk_non_atomic_type(db, non_atomic_type, &visitor);
     visitor.found_matching_type.get()
 }
 
