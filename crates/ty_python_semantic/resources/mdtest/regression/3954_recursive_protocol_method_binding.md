@@ -127,3 +127,36 @@ def check_variadic(value: Variadic) -> None:
 def check_keyword_only(value: KeywordOnly) -> None:
     value.method(value=1)  # error: [too-many-positional-arguments]
 ```
+
+A protocol-bound method stored alongside another callable must not re-check its already-bound
+receiver when the callable union is invoked.
+
+`stored_bound_method.py`:
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+class PeekIterator(Iterator[Any]):
+    def __init__(self, iterator: Iterator[Any]) -> None:
+        self._next = iterator.__next__
+
+    def __next__(self) -> Any:
+        return self._next()
+
+    def use_fallback(self) -> None:
+        self._next = lambda: None
+```
+
+Constructing a class-based protocol through `type` must not count the implicit receiver in an arity
+diagnostic.
+
+`protocol_constructor.py`:
+
+```py
+from collections.abc import Hashable
+
+def construct(value: Hashable) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 0, got 3"
+    type(value)(1970, 1, 1)
+```
