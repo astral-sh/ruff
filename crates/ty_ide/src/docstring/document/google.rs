@@ -32,13 +32,14 @@ use std::cmp::Ordering;
 
 use indexmap::IndexMap;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_trivia::Cursor;
 use ruff_text_size::{TextRange, TextSize};
 
 use super::SectionKind;
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
-    ParsedLine, container_block_end, parse_parenthesized_type, parsed_lines,
-    split_once_unbracketed_colon,
+    ParsedLine, consume_quoted_string, container_block_end, parsed_lines,
+    split_once_at_top_level_colon, split_trailing_parenthetical,
 };
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
@@ -156,12 +157,129 @@ fn extend_parameter_documentation(parameters: &mut Parameters, lines: &[ParsedLi
 
 /// Parses a parameter item into its display name and description.
 fn parse_parameter(line: &str) -> Option<(&str, &str)> {
-    let (name, description) = split_once_unbracketed_colon(line)?;
-    let (display_name, _) = parse_parenthesized_type(name.trim());
+    let (display_name, description) =
+        if let Some((name, description)) = split_once_at_field_delimiter(line) {
+            let (display_name, _ty) = split_name_and_type(name.trim());
+            (display_name, description)
+        } else {
+            // If malformed type syntax hides the delimiter, recover the conventional field shape
+            // and discard the type.
+            recover_parameter_without_type(line)?
+        };
 
     google_parameter_names(display_name)
         .is_some()
         .then_some((display_name, description.trim()))
+}
+
+/// Splits at the field delimiter, skipping top-level colons in reST roles.
+///
+/// For example, ``:exc:`ValueError`: description`` returns
+/// ``(":exc:`ValueError`", " description")``.
+fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
+    let mut cursor = Cursor::new(line);
+    loop {
+        let (before_colon, after_colon) = split_once_at_top_level_colon(cursor.as_str())?;
+        cursor.skip_bytes(before_colon.len());
+
+        if consume_rest_prefix_role(&mut cursor) {
+            continue;
+        }
+
+        return Some((&line[..cursor.offset().to_usize()], after_colon));
+    }
+}
+
+/// Consumes the prefix-role pattern recognized by the field parser, leaving the cursor unchanged
+/// otherwise.
+///
+/// For example, this consumes the entire input:
+///
+/// ```text
+/// :exc:`ValueError`
+/// ```
+fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
+    let mut role = cursor.clone();
+
+    // First, require the candidate delimiter to be the opening colon of a role.
+    if !role.eat_char(':') {
+        return false;
+    }
+
+    // Role names start with a Unicode alphanumeric run. Rejecting punctuation here preserves the
+    // first colon in `value::class:` as the field delimiter.
+    if !role.eat_if(char::is_alphanumeric) {
+        return false;
+    }
+
+    // Next, scan the rest of the role name until its closing colon and the opening content
+    // backtick.
+    loop {
+        role.eat_while(char::is_alphanumeric);
+        if role.eat_char2(':', '`') {
+            break;
+        }
+
+        // `-._+:` separators are allowed, but only internally to alphanumeric characters.
+        if !role.eat_if(|character| matches!(character, '-' | '.' | '_' | '+' | ':'))
+            || !role.eat_if(char::is_alphanumeric)
+        {
+            return false;
+        }
+    }
+
+    // Finally, skip the role content so delimiter scanning resumes after its closing backtick.
+    role.eat_while(|character| character != '`');
+    if !role.eat_char('`') {
+        return false;
+    }
+
+    *cursor = role;
+    true
+}
+
+/// Splits a display name from a trailing parenthesized type.
+///
+/// For example, `"value (str)"` yields `("value", Some("str"))`.
+fn split_name_and_type(value: &str) -> (&str, Option<&str>) {
+    let Some((name, ty)) = split_trailing_parenthetical(value) else {
+        return (value, None);
+    };
+
+    if name.is_empty() || ty.is_empty() {
+        (value, None)
+    } else {
+        (name, Some(ty))
+    }
+}
+
+/// Implements a simple heuristic to recover a parameter name and description
+/// from a line with a malformed type.
+///
+/// This assumes the first `" ("` begins the type and the first unquoted `")"` followed by
+/// optional whitespace and `":"` ends it.
+///
+/// For example, `"value (list[str) : description"` yields the name `"value"` and description
+/// `" description"`.
+fn recover_parameter_without_type(line: &str) -> Option<(&str, &str)> {
+    let (display_name, remainder) = line.split_once(" (")?;
+    let mut cursor = Cursor::new(remainder);
+
+    while let Some(character) = cursor.bump() {
+        match character {
+            '\'' | '"' => consume_quoted_string(&mut cursor, character),
+            ')' => {
+                let mut delimiter = cursor.clone();
+                delimiter.eat_while(char::is_whitespace);
+                if delimiter.eat_char(':') {
+                    return Some((display_name.trim(), delimiter.as_str()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 /// Returns whether `name` is a valid Python parameter name, including variadic prefixes.
@@ -366,7 +484,7 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
         ) => parse_parameter(trimmed).is_some(),
         HeaderKind::Structured(SectionKind::Attributes | SectionKind::Raises) => {
-            split_once_unbracketed_colon(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
+            split_once_at_field_delimiter(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
         }
         HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
         HeaderKind::Opaque => false,
@@ -382,7 +500,7 @@ fn is_inline_section_header(line: &str) -> bool {
         return false;
     }
 
-    let Some((name, description)) = split_once_unbracketed_colon(line) else {
+    let Some((name, description)) = split_once_at_top_level_colon(line) else {
         return false;
     };
 
@@ -438,7 +556,9 @@ mod tests {
     use itertools::Itertools;
     use ruff_text_size::TextSize;
 
-    use super::{SectionKind, parameter_documentation, parsed_lines, sections};
+    use super::{
+        SectionKind, parameter_documentation, parsed_lines, sections, split_once_at_field_delimiter,
+    };
 
     #[test]
     fn extracts_aligned_parameter_items() {
@@ -502,7 +622,7 @@ Partition into non-overlapping windows with padding if needed.
     }
 
     #[test]
-    fn extracts_parameter_with_unbalanced_type_brackets() {
+    fn extracts_parameter_despite_unbalanced_type_brackets() {
         let raw = "\
 Args:
     query_embeddings (`Union[torch.Tensor, list[torch.Tensor]`): Query embeddings.";
@@ -510,6 +630,30 @@ Args:
         assert_snapshot!(display_parameters(raw), @"
         query_embeddings:
           │ Query embeddings.
+        ");
+    }
+
+    #[test]
+    fn recovers_parameter_after_quoted_delimiter_in_malformed_type() {
+        let raw = "\
+Args:
+    value (Literal['):'], list[str): Actual description.";
+
+        assert_snapshot!(display_parameters(raw), @"
+        value:
+          │ Actual description.
+        ");
+    }
+
+    #[test]
+    fn recovers_parameter_after_spaced_delimiter_in_malformed_type() {
+        let raw = "\
+Args:
+    value (list[str) : Description.";
+
+        assert_snapshot!(display_parameters(raw), @"
+        value:
+          │ Description.
         ");
     }
 
@@ -1088,6 +1232,52 @@ Additional details.";
 Returns:
     bool: Result.",
             )]
+        );
+    }
+
+    #[test]
+    fn skips_rest_roles_before_field_delimiter() {
+        assert_eq!(
+            split_once_at_field_delimiter(":py:class:`ValueError`: Invalid value."),
+            Some((":py:class:`ValueError`", " Invalid value."))
+        );
+        assert_eq!(
+            split_once_at_field_delimiter(":external+python:py:class:`ValueError`: Invalid value."),
+            Some((":external+python:py:class:`ValueError`", " Invalid value."))
+        );
+        assert_eq!(
+            split_once_at_field_delimiter(":étiquette:`valeur`: Description."),
+            Some((":étiquette:`valeur`", " Description."))
+        );
+    }
+
+    #[test]
+    fn does_not_skip_invalid_rest_roles() {
+        for (line, description) in [
+            ("value:foo..bar:`X`", "foo..bar:`X`"),
+            ("value:foo-:`X`", "foo-:`X`"),
+        ] {
+            assert_eq!(
+                split_once_at_field_delimiter(line),
+                Some(("value", description)),
+                "{line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn splits_before_rest_role_adjacent_to_field_delimiter() {
+        assert_eq!(
+            split_once_at_field_delimiter("value::class:`Widget` description."),
+            Some(("value", ":class:`Widget` description."))
+        );
+    }
+
+    #[test]
+    fn does_not_split_at_rest_roles_in_prose() {
+        assert_eq!(
+            split_once_at_field_delimiter("Typically :class:`Intermediate` or a subclass is used."),
+            None
         );
     }
 
