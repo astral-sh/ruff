@@ -1318,6 +1318,22 @@ reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
 reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
 ```
 
+An explicit receiver specialization still determines the inferred constructor return type when it
+conflicts with the surrounding type context.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class ExplicitSelf(Generic[T]):
+    def __init__(self: "ExplicitSelf[int]") -> None: ...
+
+def incompatible_context() -> ExplicitSelf[str]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `ExplicitSelf[str]`, found `ExplicitSelf[int]`"
+    return ExplicitSelf()
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py

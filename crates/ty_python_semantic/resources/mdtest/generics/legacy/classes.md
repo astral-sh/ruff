@@ -498,6 +498,33 @@ class A6(Any): ...
 reveal_type(W(C[A1, A2, A3, A4, A5, A6]()))  # revealed: W[A1, A2, A3, A4, A5, A6]
 ```
 
+### Many invariant parameters with an unparameterized constructor context
+
+Applying an unparameterized return context to the bound `self` argument caused constructor inference
+time to grow exponentially in [ty#3972](https://github.com/astral-sh/ty/issues/3972).
+
+```py
+from typing import Generic, TypeVar
+
+T0 = TypeVar("T0")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+T4 = TypeVar("T4")
+T5 = TypeVar("T5")
+T6 = TypeVar("T6")
+T7 = TypeVar("T7")
+T8 = TypeVar("T8")
+T9 = TypeVar("T9")
+T10 = TypeVar("T10")
+
+class C(Generic[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10]):
+    def __init__(self) -> None: ...
+
+def f() -> C:  # error: [missing-type-argument]
+    return C()
+```
+
 ### Identical `__new__` and `__init__` signatures
 
 ```py

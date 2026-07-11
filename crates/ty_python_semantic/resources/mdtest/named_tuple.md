@@ -1216,6 +1216,41 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
+### Many optional generic fields with an unparameterized constructor context
+
+Generic named tuple constructors use a synthetic `type[Self]` receiver. Applying an unparameterized
+return context must not derive every combination of its type variables.
+
+```py
+from typing import Generic, NamedTuple, TypeVar
+
+T0 = TypeVar("T0")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+T4 = TypeVar("T4")
+T5 = TypeVar("T5")
+T6 = TypeVar("T6")
+T7 = TypeVar("T7")
+T8 = TypeVar("T8")
+T9 = TypeVar("T9")
+
+class C(NamedTuple, Generic[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]):
+    x0: T0 | None = None
+    x1: T1 | None = None
+    x2: T2 | None = None
+    x3: T3 | None = None
+    x4: T4 | None = None
+    x5: T5 | None = None
+    x6: T6 | None = None
+    x7: T7 | None = None
+    x8: T8 | None = None
+    x9: T9 | None = None
+
+def f() -> C:  # error: [missing-type-argument]
+    return C()
+```
+
 ### Functional syntax with generics
 
 Generic namedtuples can also be defined using the functional syntax with type variables in the field

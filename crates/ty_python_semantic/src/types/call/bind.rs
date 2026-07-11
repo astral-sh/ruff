@@ -5137,7 +5137,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_types) in
+        let mut preferred_specialization = None;
+
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
@@ -5148,10 +5150,38 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
-                let specialization_result = builder.infer(
-                    declared_type,
-                    matched_parameter.argument_type.unwrap_or(argument_type),
-                );
+                let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
+
+                // Applying the contextual specialization before inferring an implicit `Self`
+                // receiver avoids deriving every combination of the class type variables.
+                let argument_type = if matches!(argument, Argument::Synthetic)
+                    && !preferred_type_mappings.is_empty()
+                    && let Some(generic_context) = self.signature.generic_context
+                    && match declared_type {
+                        Type::TypeVar(typevar) => typevar.typevar(self.db).is_self(self.db),
+                        Type::SubclassOf(subclass_of) => subclass_of
+                            .into_type_var()
+                            .is_some_and(|typevar| typevar.typevar(self.db).is_self(self.db)),
+                        _ => false,
+                    } {
+                    let specialization = *preferred_specialization.get_or_insert_with(|| {
+                        generic_context.specialize_recursive(
+                            self.db,
+                            generic_context.variables(self.db).map(|typevar| {
+                                Some(
+                                    preferred_type_mappings
+                                        .get(&typevar.identity(self.db))
+                                        .copied()
+                                        .unwrap_or(Type::TypeVar(typevar)),
+                                )
+                            }),
+                        )
+                    });
+                    argument_type.apply_specialization(self.db, specialization)
+                } else {
+                    argument_type
+                };
+                let specialization_result = builder.infer(declared_type, argument_type);
 
                 if let Err(error) = specialization_result {
                     specialization_errors.push(BindingError::SpecializationError {
