@@ -26,6 +26,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -549,14 +550,41 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             // For lazy inference between specializations of the same protocol declaration, the
-            // viable nominal constraint is sufficient. Structurally comparing the inherited
-            // interface again recursively expands every overloaded member without introducing a
-            // distinct subclass override.
+            // viable nominal constraint is sufficient if solving it cannot recursively wrap a
+            // type in another specialization of the same protocol. Structurally comparing the
+            // inherited interface in these cases only expands every overloaded member again.
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
                 && !result.is_never_satisfied(db)
                 && source_nominal_view.is_some_and(|source| {
-                    source.class(db).class_literal(db)
-                        == nominal_instance.class(db).class_literal(db)
+                    let source_class = source.class(db);
+                    if source_class.class_literal(db)
+                        != nominal_instance.class(db).class_literal(db)
+                    {
+                        return false;
+                    }
+
+                    let ClassType::Generic(source_alias) = source_class else {
+                        return true;
+                    };
+                    // This is an occurs check at the protocol-declaration level. For example,
+                    // accepting `P[P[Any]]` nominally as `P[T]` can infer another `P[...]` for
+                    // `T` and make each subsequent specialization one level deeper.
+                    !Type::ProtocolInstance(protocol).has_typevar(db)
+                        || !source_alias.specialization(db).types(db).iter().any(|ty| {
+                            any_over_type(db, *ty, false, |nested| {
+                                nested
+                                    .as_nominal_instance()
+                                    .or_else(|| {
+                                        nested
+                                            .as_protocol_instance()
+                                            .and_then(ProtocolInstanceType::to_nominal_instance)
+                                    })
+                                    .is_some_and(|nested| {
+                                        nested.class(db).class_literal(db)
+                                            == source_class.class_literal(db)
+                                    })
+                            })
+                        })
                 })
             {
                 return result;
