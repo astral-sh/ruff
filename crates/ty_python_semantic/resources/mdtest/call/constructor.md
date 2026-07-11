@@ -46,6 +46,19 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+## Class-based protocol constructors
+
+Constructing a class-based protocol through `type` must not count the implicit receiver in an arity
+diagnostic.
+
+```py
+from collections.abc import Hashable
+
+def construct(value: Hashable) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 0, got 3"
+    type(value)(1970, 1, 1)
+```
+
 ## `__new__` present on the class itself
 
 ```py
