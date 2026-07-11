@@ -1126,7 +1126,9 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     pub(crate) fn contains_self(self, db: &'db dyn Db) -> bool {
-        if !self.may_contain_typevar(db) {
+        if let Type::NominalInstance(instance) = self
+            && !instance.may_contain_self(db)
+        {
             return false;
         }
 
@@ -1541,9 +1543,6 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
-        if !self.may_contain_dynamic(db) {
-            return false;
-        }
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }
 

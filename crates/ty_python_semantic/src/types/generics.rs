@@ -2200,7 +2200,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .iter_positive(self.db)
                 .chain(intersection.iter_negative(self.db))
                 .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            _ if !ty.may_contain_typevar(self.db) => false,
             _ => any_over_type(self.db, ty, false, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(self.db);
@@ -2234,23 +2233,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
 
         types.get(&identity).is_some_and(|ty| {
-            ty.may_contain_typevar(self.db)
-                && any_over_type(self.db, *ty, false, |nested| {
-                    nested.as_typevar().is_some_and(|dependency| {
-                        let dependency = dependency.identity(self.db);
-                        // Recursive specialization skips a typevar's own slot. Only references
-                        // through other mappings can recursively expand.
-                        dependency != identity
-                            && generic_context.contains(self.db, dependency)
-                            && self.reaches_pending_typevar(
-                                generic_context,
-                                types,
-                                dependency,
-                                target,
-                                visited,
-                            )
-                    })
+            any_over_type(self.db, *ty, false, |nested| {
+                nested.as_typevar().is_some_and(|dependency| {
+                    let dependency = dependency.identity(self.db);
+                    // Recursive specialization skips a typevar's own slot. Only references
+                    // through other mappings can recursively expand.
+                    dependency != identity
+                        && generic_context.contains(self.db, dependency)
+                        && self.reaches_pending_typevar(
+                            generic_context,
+                            types,
+                            dependency,
+                            target,
+                            visited,
+                        )
                 })
+            })
         })
     }
 

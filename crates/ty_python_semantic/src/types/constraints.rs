@@ -4078,14 +4078,14 @@ impl InteriorNode {
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
                 constraint.typevar.is_inferable(db, bound_typevars)
-                    || constraint.bounds.lower.is_some_and(|lower| {
-                        lower.may_contain_typevar(db)
-                            && any_over_type(db, lower, false, mentions_typevar)
-                    })
-                    || constraint.bounds.upper.is_some_and(|upper| {
-                        upper.may_contain_typevar(db)
-                            && any_over_type(db, upper, false, mentions_typevar)
-                    })
+                    || constraint
+                        .bounds
+                        .lower
+                        .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
             path,
         )
@@ -5709,11 +5709,12 @@ impl SequentMap {
     ) {
         // Keep this precheck aligned with `variance_of`, which visits lazy types.
         let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
-            bounds.lower.is_some_and(|bound| {
-                bound.may_contain_typevar(db) && any_over_type(db, bound, true, Type::is_type_var)
-            }) || bounds.upper.is_some_and(|bound| {
-                bound.may_contain_typevar(db) && any_over_type(db, bound, true, Type::is_type_var)
-            })
+            bounds
+                .lower
+                .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
+                || bounds
+                    .upper
+                    .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
         };
         if !has_typevar_bound(builder.constraint_data(left_constraint).bounds)
             && !has_typevar_bound(builder.constraint_data(right_constraint).bounds)

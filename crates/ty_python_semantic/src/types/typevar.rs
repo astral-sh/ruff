@@ -40,9 +40,6 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
-        if !self.may_contain_typevar(db) {
-            return false;
-        }
         any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
@@ -51,9 +48,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        if !self.may_contain_typevar(db) {
-            return false;
-        }
         any_over_type(db, self, false, |ty| match ty {
             Type::TypeVar(bound_typevar) => typevar_id == bound_typevar.typevar(db).identity(db),
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
@@ -64,9 +58,6 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_non_self_typevar(self, db: &'db dyn Db) -> bool {
-        if !self.may_contain_typevar(db) {
-            return false;
-        }
         any_over_type(
             db,
             self,
@@ -76,9 +67,6 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_typevar_or_typevar_instance(self, db: &'db dyn Db) -> bool {
-        if !self.may_contain_typevar(db) {
-            return false;
-        }
         any_over_type(db, self, false, |ty| {
             matches!(
                 ty,
@@ -88,12 +76,6 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Dynamic(DynamicType::UnspecializedTypeVar) => return true,
-            Type::Dynamic(_) => return false,
-            _ if !self.may_contain_dynamic(db) => return false,
-            _ => {}
-        }
         any_over_type(db, self, false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
         })
@@ -447,9 +429,6 @@ impl<'db> TypeVarInstance<'db> {
             ty: Type<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            if !ty.may_contain_typevar(state.db) {
-                return false;
-            }
             any_over_type(state.db, ty, false, |inner_ty| match inner_ty {
                 Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
                     state,
