@@ -61,6 +61,26 @@ async def check(path: Path) -> None:
     await snapshot(path.turns())
 ```
 
+The nominal shortcut must not recursively embed a protocol specialization inside itself while
+solving a covariant legacy type variable.
+
+`expanding.py`:
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def method(self): ...
+
+def convert(value: Any | Recursive[T_co]) -> list[T_co]:
+    try:
+        raise Exception
+    except:
+        return [value]  # error: [invalid-return-type]
+```
+
 Nested, non-recursive protocol members must still expose an incompatible leaf signature; an active
 signature relation is not sufficient reason to assume that an unrelated nested relation succeeds.
 
