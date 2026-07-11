@@ -415,8 +415,8 @@ impl<T> Parsed<T> {
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
-    pub fn into_errors(self) -> Vec<ParseError> {
-        self.errors.into_vec()
+    pub fn into_errors(self) -> Box<[ParseError]> {
+        self.errors
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
