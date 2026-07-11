@@ -183,6 +183,16 @@ impl Repr {
     }
 
     #[inline]
+    pub(crate) const fn heap_allocation_size(&self) -> usize {
+        if self.is_heap_buffer() {
+            // SAFETY: The representation tag identifies a heap buffer.
+            unsafe { self.as_heap_buffer() }.allocation_size()
+        } else {
+            0
+        }
+    }
+
+    #[inline]
     const fn is_static_buffer(&self) -> bool {
         self.last_byte() == LastByte::StaticMarker as u8
     }
