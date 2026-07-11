@@ -219,8 +219,8 @@ impl<'src> Parser<'src> {
             return Parsed {
                 syntax,
                 tokens: Tokens::new(tokens),
-                errors: parse_errors,
-                unsupported_syntax_errors: self.unsupported_syntax_errors,
+                errors: parse_errors.into_boxed_slice(),
+                unsupported_syntax_errors: self.unsupported_syntax_errors.into_boxed_slice(),
             };
         }
 
@@ -251,8 +251,8 @@ impl<'src> Parser<'src> {
         Parsed {
             syntax,
             tokens: Tokens::new(tokens),
-            errors: merged,
-            unsupported_syntax_errors: self.unsupported_syntax_errors,
+            errors: merged.into_boxed_slice(),
+            unsupported_syntax_errors: self.unsupported_syntax_errors.into_boxed_slice(),
         }
     }
 

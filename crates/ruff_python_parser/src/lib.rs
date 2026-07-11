@@ -367,9 +367,6 @@ pub fn parse_cells_unchecked(
 
     body.shrink_to_fit();
     tokens.shrink_to_fit();
-    errors.shrink_to_fit();
-    unsupported_syntax_errors.shrink_to_fit();
-
     Parsed {
         syntax: ModModule {
             node_index: AtomicNodeIndex::NONE,
@@ -377,8 +374,8 @@ pub fn parse_cells_unchecked(
             body,
         },
         tokens: Tokens::new(tokens),
-        errors,
-        unsupported_syntax_errors,
+        errors: errors.into_boxed_slice(),
+        unsupported_syntax_errors: unsupported_syntax_errors.into_boxed_slice(),
     }
 }
 
@@ -387,8 +384,8 @@ pub fn parse_cells_unchecked(
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
-    errors: Vec<ParseError>,
-    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
+    errors: Box<[ParseError]>,
+    unsupported_syntax_errors: Box<[UnsupportedSyntaxError]>,
 }
 
 impl<T> Parsed<T> {
@@ -419,7 +416,7 @@ impl<T> Parsed<T> {
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
     pub fn into_errors(self) -> Vec<ParseError> {
-        self.errors
+        self.errors.into_vec()
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
