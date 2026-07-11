@@ -46,7 +46,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 .ignore_possibly_undefined()?;
             let symbol = table.symbol(symbol_id);
             let member = Member {
-                name: Name::new(symbol.name()),
+                name: symbol.name().clone(),
                 ty,
             };
             Some(MemberWithDefinition {
@@ -66,7 +66,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
 
                 let symbol = table.symbol(symbol_id);
                 let member = Member {
-                    name: Name::new(symbol.name()),
+                    name: symbol.name().clone(),
                     ty,
                 };
                 Some(MemberWithDefinition {
@@ -101,7 +101,7 @@ pub(crate) fn all_reachable_members<'db>(
                             .place
                             .ignore_possibly_undefined()?;
                         let member = Member {
-                            name: Name::new(symbol.name()),
+                            name: symbol.name().clone(),
                             ty,
                         };
                         Some(MemberWithDefinition {
@@ -117,7 +117,7 @@ pub(crate) fn all_reachable_members<'db>(
                     .and_then(|first_reachable_definition| {
                         let ty = place_with_definition.place.ignore_possibly_undefined()?;
                         let member = Member {
-                            name: Name::new(symbol.name()),
+                            name: symbol.name().clone(),
                             ty,
                         };
                         Some(MemberWithDefinition {
@@ -381,8 +381,7 @@ impl<'db> AllMembers<'db> {
 
                     // Filter private symbols from stubs if they appear to be internal types
                     let is_stub_file = file.path(db).extension() == Some("pyi");
-                    let symbol_name = Name::new(symbol_name);
-                    let is_private_symbol = match NameKind::classify(&symbol_name) {
+                    let is_private_symbol = match NameKind::classify(symbol_name) {
                         NameKind::Dunder | NameKind::Normal => false,
                         NameKind::Sunder => true,
                     };
@@ -414,7 +413,7 @@ impl<'db> AllMembers<'db> {
                     }
 
                     self.members.insert(Member {
-                        name: symbol_name,
+                        name: symbol_name.clone(),
                         ty,
                     });
                 }

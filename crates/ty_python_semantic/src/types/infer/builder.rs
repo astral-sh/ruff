@@ -126,7 +126,7 @@ use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
-use ty_python_core::symbol::{ScopedSymbolId, Symbol};
+use ty_python_core::symbol::{ScopedSymbolId, SymbolRef};
 use ty_python_core::{
     ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
     place_table, unpack::UnpackPosition,
@@ -9139,13 +9139,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // the global handling below. (If we're walking from a prior/inner scope where this
                 // variable is `nonlocal`, then this is a semantic syntax error, but we don't
                 // enforce that here. See `SemanticIndexBuilder::pop_scope`.)
-                if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
+                if enclosing_place
+                    .as_symbol()
+                    .is_some_and(SymbolRef::is_global)
+                {
                     break;
                 }
 
                 // Keep walking until we reach the defining scope of the variable. The synthetic
                 // nested bindings definitions installed there will see everything below it.
-                if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+                if enclosing_place
+                    .as_symbol()
+                    .is_some_and(SymbolRef::is_nonlocal)
+                {
                     continue;
                 }
                 if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
@@ -9200,7 +9206,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_fall_back_to(db, || {
                     self.infer_explicit_global_symbol_load(
                         place_expr,
-                        place_expr.as_symbol().map(Symbol::name),
+                        place_expr.as_symbol().map(|symbol| symbol.name().as_str()),
                         file_scope_id,
                         &mut constraint_keys,
                         false,

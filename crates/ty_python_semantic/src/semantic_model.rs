@@ -25,7 +25,7 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
-use ty_python_core::symbol::Symbol;
+use ty_python_core::symbol::SymbolRef;
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -284,7 +284,7 @@ impl<'db> SemanticModel<'db> {
         let scope = definition.scope(self.db);
         let table = place_table(self.db, scope);
         let place = table.place(definition.place(self.db));
-        place.as_symbol().is_some_and(Symbol::is_reassigned)
+        place.as_symbol().is_some_and(SymbolRef::is_reassigned)
     }
 
     /// Returns the scope in which `node` is defined (handles string annotations).

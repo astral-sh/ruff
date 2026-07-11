@@ -1153,7 +1153,7 @@ pub(crate) fn place_by_id<'db>(
             // See mdtest/known_constants.md#user-defined-type_checking for details.
             let is_considered_non_modifiable = place_id.as_symbol().is_some_and(|symbol_id| {
                 matches!(
-                    place_table(db, scope).symbol(symbol_id).name(),
+                    place_table(db, scope).symbol(symbol_id).name().as_str(),
                     "__slots__" | "TYPE_CHECKING"
                 )
             });
@@ -1997,7 +1997,7 @@ pub(crate) mod implicit_globals {
         ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
     };
     use ruff_python_ast::PythonVersion;
-    use ty_python_core::symbol::Symbol;
+    use ty_python_core::symbol::SymbolRef;
     use ty_python_core::{place_table, use_def_map};
 
     use super::{DefinedPlace, Place, place_from_declarations};
@@ -2165,9 +2165,14 @@ pub(crate) mod implicit_globals {
         module_type_symbol_table
             .symbols()
             .filter(|symbol| symbol.is_declared())
-            .map(Symbol::name)
-            .filter(|symbol_name| !matches!(*symbol_name, "__dict__" | "__getattr__" | "__init__"))
-            .map(ast::name::Name::new)
+            .map(SymbolRef::name)
+            .filter(|symbol_name| {
+                !matches!(
+                    symbol_name.as_str(),
+                    "__dict__" | "__getattr__" | "__init__"
+                )
+            })
+            .cloned()
             .collect()
     }
 

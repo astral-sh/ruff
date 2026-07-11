@@ -5,7 +5,7 @@ use crate::member::{
 };
 use crate::predicate::PatternPredicate;
 use crate::scope::FileScopeId;
-use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use crate::symbol::{ScopedSymbolId, Symbol, SymbolRef, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
@@ -104,13 +104,13 @@ impl std::fmt::Display for PlaceExpr {
 /// Needed so that we can iterate over all places without cloning them.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum PlaceExprRef<'a> {
-    Symbol(&'a Symbol),
+    Symbol(SymbolRef<'a>),
     Member(&'a Member),
 }
 
 impl<'a> PlaceExprRef<'a> {
     /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
-    pub const fn as_symbol(self) -> Option<&'a Symbol> {
+    pub const fn as_symbol(self) -> Option<SymbolRef<'a>> {
         if let PlaceExprRef::Symbol(symbol) = self {
             Some(symbol)
         } else {
@@ -130,7 +130,7 @@ impl<'a> PlaceExprRef<'a> {
         }
     }
 
-    pub fn is_bound(self) -> bool {
+    pub const fn is_bound(self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
             PlaceExprRef::Member(member) => member.is_bound(),
@@ -147,7 +147,7 @@ impl<'a> PlaceExprRef<'a> {
 
 impl<'a> From<&'a Symbol> for PlaceExprRef<'a> {
     fn from(value: &'a Symbol) -> Self {
-        Self::Symbol(value)
+        Self::Symbol(value.into())
     }
 }
 
@@ -160,7 +160,7 @@ impl<'a> From<&'a Member> for PlaceExprRef<'a> {
 impl<'a> From<&'a PlaceExpr> for PlaceExprRef<'a> {
     fn from(value: &'a PlaceExpr) -> Self {
         match value {
-            PlaceExpr::Symbol(symbol) => PlaceExprRef::Symbol(symbol),
+            PlaceExpr::Symbol(symbol) => PlaceExprRef::Symbol(symbol.into()),
             PlaceExpr::Member(member) => PlaceExprRef::Member(member),
         }
     }
@@ -197,14 +197,16 @@ impl PlaceTable {
     pub fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
         match place_expr.into() {
             PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
-            PlaceExprRef::Member(member) => {
-                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
-            }
+            PlaceExprRef::Member(member) => ParentPlaceIter::for_member(
+                member.expression(),
+                SymbolTableRef::Retained(&self.symbols),
+                &self.members,
+            ),
         }
     }
 
     /// Iterator over all symbols in this scope.
-    pub fn symbols(&self) -> std::slice::Iter<'_, Symbol> {
+    pub fn symbols(&self) -> impl Iterator<Item = SymbolRef<'_>> {
         self.symbols.iter()
     }
 
@@ -218,14 +220,14 @@ impl PlaceTable {
     /// ## Panics
     /// If the symbol ID is not found in the table.
     #[track_caller]
-    pub fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+    pub fn symbol(&self, id: ScopedSymbolId) -> SymbolRef<'_> {
         self.symbols.symbol(id)
     }
 
     /// Looks up a symbol by its name and returns a reference to it, if it exists.
     ///
     /// This should only be used in diagnostics and tests.
-    pub fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
+    pub fn symbol_by_name(&self, name: &str) -> Option<SymbolRef<'_>> {
         self.symbols.symbol_id(name).map(|id| self.symbol(id))
     }
 
@@ -262,7 +264,7 @@ impl PlaceTable {
     #[track_caller]
     pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
-            ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
+            ScopedPlaceId::Symbol(symbol) => PlaceExprRef::Symbol(self.symbol(symbol)),
             ScopedPlaceId::Member(member) => self.member(member).into(),
         }
     }
@@ -318,7 +320,7 @@ impl PlaceTableBuilder {
     #[track_caller]
     pub fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
-            ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
+            ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id).into()),
             ScopedPlaceId::Member(id) => PlaceExprRef::Member(self.member.member(id)),
         }
     }
@@ -362,9 +364,11 @@ impl PlaceTableBuilder {
             let member = self.member.member(id);
 
             // iterate over parents
-            for parent_id in
-                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
-            {
+            for parent_id in ParentPlaceIter::for_member(
+                member.expression(),
+                SymbolTableRef::Builder(&self.symbols),
+                &self.member,
+            ) {
                 match parent_id {
                     ScopedPlaceId::Symbol(scoped_symbol_id) => {
                         self.associated_symbol_members[scoped_symbol_id].push(id);
@@ -509,13 +513,28 @@ pub struct ParentPlaceIter<'a> {
     state: Option<ParentPlaceIterState<'a>>,
 }
 
+#[derive(Clone, Copy)]
+enum SymbolTableRef<'a> {
+    Retained(&'a SymbolTable),
+    Builder(&'a SymbolTableBuilder),
+}
+
+impl SymbolTableRef<'_> {
+    fn symbol_id(self, name: &str) -> Option<ScopedSymbolId> {
+        match self {
+            Self::Retained(symbols) => symbols.symbol_id(name),
+            Self::Builder(symbols) => symbols.symbol_id(name),
+        }
+    }
+}
+
 enum ParentPlaceIterState<'a> {
     Symbol {
         symbol_name: &'a str,
-        symbols: &'a SymbolTable,
+        symbols: SymbolTableRef<'a>,
     },
     Member {
-        symbols: &'a SymbolTable,
+        symbols: SymbolTableRef<'a>,
         members: &'a MemberTable,
         next_member: MemberExprRef<'a>,
     },
@@ -524,7 +543,7 @@ enum ParentPlaceIterState<'a> {
 impl<'a> ParentPlaceIterState<'a> {
     fn parent_state(
         expression: &MemberExprRef<'a>,
-        symbols: &'a SymbolTable,
+        symbols: SymbolTableRef<'a>,
         members: &'a MemberTable,
     ) -> Self {
         match expression.parent() {
@@ -546,9 +565,9 @@ impl<'a> ParentPlaceIter<'a> {
         ParentPlaceIter { state: None }
     }
 
-    pub(super) fn for_member(
+    fn for_member(
         expression: &'a MemberExpr,
-        symbol_table: &'a SymbolTable,
+        symbol_table: SymbolTableRef<'a>,
         member_table: &'a MemberTable,
     ) -> Self {
         let expr_ref = expression.as_ref();

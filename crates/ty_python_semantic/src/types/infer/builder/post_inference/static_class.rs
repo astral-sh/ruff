@@ -1054,7 +1054,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         let metaclass_use_def = metaclass_index.use_def_map(body_scope);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
-            metaclass_instance_members.insert(Name::new(metaclass_table.symbol(symbol_id).name()));
+            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
         }
 
         for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
@@ -1392,7 +1392,7 @@ fn check_class_final_without_value<'db>(
         // Per the typing spec, a `Final` attribute declared in a class body without a
         // value must be initialized in `__init__`. Assignments in other methods don't count.
         let symbol = place_table.symbol(symbol_id);
-        if has_binding_in_init(context, body_scope, index, symbol.name()) {
+        if has_binding_in_init(context, body_scope, index, symbol.name().as_str()) {
             continue;
         }
 

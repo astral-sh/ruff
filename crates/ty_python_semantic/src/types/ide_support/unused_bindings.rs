@@ -145,7 +145,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             };
 
             let symbol = place_table.symbol(symbol_id);
-            let name = symbol.name();
+            let name = symbol.name().as_str();
 
             // Skip conventional method receiver parameters.
             if is_parameter && is_method_scope && matches!(name, "self" | "cls") {
@@ -173,7 +173,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
             unused.push(UnusedBinding {
                 range,
-                name: Name::new(symbol.name()),
+                name: symbol.name().clone(),
             });
         }
     }
