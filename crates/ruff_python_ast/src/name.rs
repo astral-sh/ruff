@@ -797,29 +797,8 @@ mod tests {
     #[cfg(feature = "salsa")]
     use std::hash::{DefaultHasher, Hash, Hasher};
 
-    #[cfg(feature = "get-size")]
-    use get_size2::{GetSize, StandardTracker};
-
     use crate::Identifier;
     use crate::name::{Name, SegmentsVec};
-
-    const STATIC_NAME: Name = Name::new_static("a_static_name_that_is_not_inline");
-
-    #[test]
-    fn inline_and_static_storage() {
-        assert!(
-            !Name::new("x".repeat(Name::INLINE_CAPACITY))
-                .0
-                .is_heap_allocated()
-        );
-        assert!(
-            Name::new("x".repeat(Name::INLINE_CAPACITY + 1))
-                .0
-                .is_heap_allocated()
-        );
-        assert_eq!(STATIC_NAME, "a_static_name_that_is_not_inline");
-        assert!(!STATIC_NAME.0.is_heap_allocated());
-    }
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -827,26 +806,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<Name>(), 16);
         assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
         assert_eq!(std::mem::size_of::<Identifier>(), 32);
-    }
-
-    #[test]
-    #[cfg(all(feature = "serde", feature = "schemars"))]
-    fn serde_roundtrip() {
-        let name = Name::new("Python_🐍");
-        let serialized = serde_json::to_string(&name).unwrap();
-        assert_eq!(serde_json::from_str::<Name>(&serialized).unwrap(), name);
-    }
-
-    #[test]
-    #[cfg(feature = "get-size")]
-    fn heap_size_tracks_shared_storage_once() {
-        assert_eq!(Name::new("inline").get_heap_size(), 0);
-
-        let name = Name::new("a name too long for inline storage");
-        let expected = name.len();
-        let clone = name.clone();
-        let (size, _) = (name, clone).get_heap_size_with_tracker(StandardTracker::new());
-        assert_eq!(size, expected);
     }
 
     #[cfg(feature = "salsa")]

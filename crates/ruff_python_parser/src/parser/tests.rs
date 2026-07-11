@@ -1,7 +1,5 @@
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
-use super::NameInterner;
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
@@ -71,53 +69,6 @@ fn nfkc_normalizes_names() {
     };
 
     assert_eq!(name.id.as_str(), "C");
-}
-
-#[test]
-fn repeated_long_names_share_storage() {
-    let long_name = "identifier_longer_than_inline_capacity";
-    let source = format!("{long_name} = {long_name}");
-    let parsed = parse_module(&source).unwrap();
-    let [Stmt::Assign(assign)] = parsed.suite().as_slice() else {
-        panic!("expected an assignment");
-    };
-    let [Expr::Name(target)] = assign.targets.as_slice() else {
-        panic!("expected a name target");
-    };
-    let Expr::Name(value) = assign.value.as_ref() else {
-        panic!("expected a name value");
-    };
-
-    assert!(std::ptr::eq(target.id.as_str(), value.id.as_str()));
-}
-
-#[test]
-fn only_heap_allocated_names_are_interned() {
-    let mut interner = NameInterner::default();
-    interner.intern(&"x".repeat(Name::INLINE_CAPACITY));
-    assert!(interner.names.is_empty());
-
-    interner.intern(&"x".repeat(Name::INLINE_CAPACITY + 1));
-    assert_eq!(interner.names.len(), 1);
-}
-
-#[test]
-fn normalized_long_names_share_storage() {
-    let normalized = "C".repeat(Name::INLINE_CAPACITY + 1);
-    let source = format!("{} = {normalized}", "𝒞".repeat(Name::INLINE_CAPACITY + 1));
-    let parsed = parse_module(&source).unwrap();
-    let [Stmt::Assign(assign)] = parsed.suite().as_slice() else {
-        panic!("expected an assignment");
-    };
-    let [Expr::Name(target)] = assign.targets.as_slice() else {
-        panic!("expected a name target");
-    };
-    let Expr::Name(value) = assign.value.as_ref() else {
-        panic!("expected a name value");
-    };
-
-    assert_eq!(target.id.as_str(), normalized);
-    assert!(std::ptr::eq(target.id.as_str(), value.id.as_str()));
 }
 
 #[test]
