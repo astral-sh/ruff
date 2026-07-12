@@ -113,7 +113,7 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 1. [Who's Using Ruff?](#whos-using-ruff)
 1. [License](#license)
 
-## Getting Started<a id="getting-started"></a>
+## Getting Started
 
 For more, see the [documentation](https://docs.astral.sh/ruff/).
 
