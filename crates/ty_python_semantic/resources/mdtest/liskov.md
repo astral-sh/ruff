@@ -959,6 +959,15 @@ class B4(A4):
     # but this is not necessarily true for `B4.method`: if passed a `bool`,
     # it could return a non-`bool` `int`!
     def method(self, x: int) -> int: ...  # error: [invalid-method-override]
+
+class A5:
+    def method[T, U](self, x: T, y: U) -> T: ...
+
+class B5(A5):
+    def method[S, R](self, x: S, y: R) -> R: ...  # error: [invalid-method-override]
+
+class C5(A5):
+    def method[S](self, x: S, y: object) -> S: ...  # fine
 ```
 
 ## Generic methods on generic classes work as expected

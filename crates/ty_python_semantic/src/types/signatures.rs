@@ -1528,8 +1528,8 @@ impl<'db> Signature<'db> {
 
     /// Returns the source-local variables supported by the initial generic-source relation.
     ///
-    /// The source must bind exactly one unbounded PEP 695 type variable, used only as a bare
-    /// parameter or return annotation. Its specialization can then be chosen existentially for
+    /// Every source variable must be an unbounded PEP 695 type variable used only as a bare
+    /// parameter or return annotation. Their specializations can then be chosen existentially for
     /// each universally quantified target specialization.
     fn simple_generic_source_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         if !self.parameters.is_standard() {
@@ -1537,35 +1537,31 @@ impl<'db> Signature<'db> {
         }
 
         let definition = self.definition?;
-        let mut variables = self.generic_context?.variables(db);
-        let typevar = variables.next()?;
-        if variables.next().is_some()
-            || typevar.kind(db) != TypeVarKind::Pep695TypeVar
-            || typevar.binding_context(db).definition() != Some(definition)
-            || typevar.typevar(db).bound_or_constraints(db).is_some()
-        {
+        let local_identities: FxOrderSet<_> = self
+            .generic_context?
+            .variables(db)
+            .map(|typevar| {
+                (typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                    && typevar.binding_context(db).definition() == Some(definition)
+                    && typevar.typevar(db).bound_or_constraints(db).is_none())
+                .then(|| typevar.identity(db))
+            })
+            .collect::<Option<_>>()?;
+        if local_identities.is_empty() {
             return None;
         }
 
-        let identity = typevar.typevar(db).identity(db);
+        let locals = InferableTypeVars::from_typevars(db, local_identities);
         self.parameters
             .iter()
             .map(Parameter::annotated_type)
             .chain(std::iter::once(self.return_ty))
             .all(|ty| {
-                if ty.references_typevar(db, identity) {
-                    ty.as_typevar()
-                        .is_some_and(|inner| inner.is_same_typevar_as(db, typevar))
-                } else {
-                    Self::is_supported_generic_source_concrete_type(db, ty)
-                }
+                ty.as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, locals))
+                    || Self::is_supported_generic_source_concrete_type(db, ty)
             })
-            .then(|| {
-                InferableTypeVars::from_typevars(
-                    db,
-                    std::iter::once(typevar.identity(db)).collect(),
-                )
-            })
+            .then_some(locals)
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
