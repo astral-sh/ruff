@@ -1482,6 +1482,17 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns whether `ty` is supported as a top-level annotation by the initial higher-rank
+    /// relation.
+    ///
+    /// Direct gradual annotations are supported for assignability, but remain excluded from the
+    /// recursively closed fragment so that gradual unions and invariant containers stay on the
+    /// existing relation path.
+    fn is_supported_higher_rank_annotation(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        matches!(ty, Type::Dynamic(_) | Type::Divergent(_))
+            || Self::is_supported_higher_rank_closed_type(db, ty)
+    }
+
     /// Returns the callable-local variables supported by the initial higher-rank relation.
     ///
     /// Every variable must be an unbounded PEP 695 or legacy type variable bound by this method
@@ -1517,7 +1528,7 @@ impl<'db> Signature<'db> {
             .all(|ty| {
                 ty.as_typevar()
                     .is_some_and(|typevar| typevar.is_inferable(db, locals))
-                    || Self::is_supported_higher_rank_closed_type(db, ty)
+                    || Self::is_supported_higher_rank_annotation(db, ty)
             })
             .then_some(locals)
     }
@@ -1879,7 +1890,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .iter()
                     .map(Parameter::annotated_type)
                     .chain(std::iter::once(source.return_ty))
-                    .all(|ty| Signature::is_supported_higher_rank_closed_type(db, ty))
+                    .all(|ty| Signature::is_supported_higher_rank_annotation(db, ty))
             {
                 return None;
             }
@@ -1896,7 +1907,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        let mut checker = self.with_inferable_typevars(source_locals.merge(db, target_locals));
+        let quantified_typevars = source_locals.merge(db, target_locals);
+        let mut checker = self
+            .with_inferable_typevars(quantified_typevars)
+            .with_quantified_typevars(db, quantified_typevars);
         checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let relation = checker.with_signature_recursion_guard(source, target, || {
             target
