@@ -35,11 +35,12 @@ use crate::types::relation::{
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder,
     VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -1506,6 +1507,67 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns whether `ty` belongs to the closed concrete fragment supported alongside a simple
+    /// generic source local.
+    ///
+    /// Gradual types, aliases, and other type variables keep the signature on the existing
+    /// existential path. This avoids changing generic callable inference outside the relation
+    /// introduced by this branch.
+    fn is_supported_generic_source_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::Never => true,
+            Type::NominalInstance(instance) => {
+                !instance.inherits_from_explicit_any()
+                    && !ty.has_dynamic(db)
+                    && !ty.has_typevar_or_typevar_instance(db)
+                    && !any_over_type(db, ty, false, |nested| matches!(nested, Type::TypeAlias(_)))
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns the source-local variables supported by the initial generic-source relation.
+    ///
+    /// The source must bind exactly one unbounded PEP 695 type variable, used only as a bare
+    /// parameter or return annotation. Its specialization can then be chosen existentially for
+    /// each universally quantified target specialization.
+    fn simple_generic_source_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
+        if !self.parameters.is_standard() {
+            return None;
+        }
+
+        let definition = self.definition?;
+        let mut variables = self.generic_context?.variables(db);
+        let typevar = variables.next()?;
+        if variables.next().is_some()
+            || typevar.kind(db) != TypeVarKind::Pep695TypeVar
+            || typevar.binding_context(db).definition() != Some(definition)
+            || typevar.typevar(db).bound_or_constraints(db).is_some()
+        {
+            return None;
+        }
+
+        let identity = typevar.typevar(db).identity(db);
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| {
+                if ty.references_typevar(db, identity) {
+                    ty.as_typevar()
+                        .is_some_and(|inner| inner.is_same_typevar_as(db, typevar))
+                } else {
+                    Self::is_supported_generic_source_concrete_type(db, ty)
+                }
+            })
+            .then(|| {
+                InferableTypeVars::from_typevars(
+                    db,
+                    std::iter::once(typevar.identity(db)).collect(),
+                )
+            })
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1817,7 +1879,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
     }
-
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
     fn check_callable_signature_pair_inner(
@@ -2011,9 +2072,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, freshen that signature's typevars before considering
-        // them inferable for this relation. The relation only needs to find one specialization of
-        // each generic callable that causes the check to succeed, but those callable-local
-        // specializations must not collide with any same-source typevars in the other signature.
+        // them inferable for this relation. Those callable-local specializations must not collide
+        // with any same-source typevars in the other signature.
         let freshened_source;
         let source = if source.generic_context != target.generic_context
             && let Some(generic_context) = source.generic_context
@@ -2053,13 +2113,40 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             })
         });
+        let universal_source_existential = if self.inferable == InferableTypeVars::None
+            && target_inferable != InferableTypeVars::None
+            && target.generic_context.is_some_and(|context| {
+                let mut variables = context.variables(db);
+                // The inferable set can also include variables referenced by a bound. Do not
+                // universally quantify variables owned by an enclosing context.
+                variables.len() == target_inferable.iter(db).count()
+                    && variables.all(|typevar| {
+                        matches!(
+                            typevar.kind(db),
+                            TypeVarKind::Pep695TypeVar
+                                | TypeVarKind::Pep695ParamSpec
+                                | TypeVarKind::Pep695TypeVarTuple
+                        )
+                    })
+            }) {
+            if source.generic_context.is_none() {
+                Some(InferableTypeVars::None)
+            } else {
+                source.simple_generic_source_typevars(db)
+            }
+        } else {
+            None
+        };
+        let universally_quantify_target = universal_source_existential.is_some();
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
-        // sets are discarded when receiver constraints are merged, so presence alone is enough to
-        // require lazy typevar evaluation here.
-        if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
+        // Receiver constraints and universal target abstraction both require typevar relationships
+        // to remain symbolic until quantification.
+        if source.receiver_constraints.is_some()
+            || target.receiver_constraints.is_some()
+            || universally_quantify_target
+        {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
@@ -2089,14 +2176,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         });
 
-        // The caller does not need to consider the source signature's typevars. A relation only
-        // needs one source specialization to succeed, so existentially quantify those away before
-        // returning.
-        //
-        // Target signature typevars require the opposite quantifier: the relation must hold for
-        // every target specialization, so universally quantify those away before returning.
-        when.reduce_inferable(db, self.constraints, source_inferable)
-            .for_all(db, self.constraints, target_inferable)
+        // A non-generic source, or a supported simple generic source, must satisfy every
+        // specialization of a PEP 695 generic target. Eliminate source locals first so their
+        // specialization can depend on the target specialization. Other generic sources, legacy
+        // target typevars, and enclosing inference remain on the existing existential path.
+        if let Some(source_existential) = universal_source_existential {
+            when.reduce_inferable(db, self.constraints, source_existential)
+                .for_all(db, self.constraints, target_inferable)
+        } else {
+            when.reduce_inferable(db, self.constraints, signature_inferable)
+        }
     }
 
     fn with_signature_recursion_guard(
