@@ -324,6 +324,8 @@ pub(crate) enum ConstraintProjectionError {
     NegatedTypeVarRelation,
     /// A type alias might conceal a projected variable.
     OpaqueTypeAlias,
+    /// A class-based protocol interface might conceal a projected variable.
+    OpaqueProtocol,
     /// An assumption mentions a variable that the projection removes.
     ProjectedTypeVarInAssumption,
 }
@@ -334,6 +336,12 @@ fn contains_type_alias(db: &dyn Db, ty: Type<'_>) -> bool {
             nested,
             Type::TypeAlias(_) | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
         )
+    })
+}
+
+fn contains_protocol(db: &dyn Db, ty: Type<'_>) -> bool {
+    any_over_type(db, ty, false, |nested| {
+        matches!(nested, Type::ProtocolInstance(_))
     })
 }
 
@@ -636,6 +644,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         };
         let mut assumption_mentions_projected = false;
         let mut assumption_contains_alias = false;
+        let mut assumption_contains_protocol = false;
         assumptions
             .node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
@@ -651,9 +660,20 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                         .bounds
                         .upper
                         .is_some_and(|ty| contains_type_alias(db, ty));
+                assumption_contains_protocol |= constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|ty| contains_protocol(db, ty))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|ty| contains_protocol(db, ty));
             });
         if assumption_contains_alias {
             return Err(ConstraintProjectionError::OpaqueTypeAlias);
+        }
+        if assumption_contains_protocol {
+            return Err(ConstraintProjectionError::OpaqueProtocol);
         }
         if assumption_mentions_projected {
             return Err(ConstraintProjectionError::ProjectedTypeVarInAssumption);
@@ -4296,6 +4316,9 @@ impl InteriorNode {
                 {
                     if contains_type_alias(db, bound) {
                         return Err(ConstraintProjectionError::OpaqueTypeAlias);
+                    }
+                    if contains_protocol(db, bound) {
+                        return Err(ConstraintProjectionError::OpaqueProtocol);
                     }
                     if subject_is_removed {
                         if bound.as_typevar().is_none() && contains_any_typevar(bound) {
@@ -7946,6 +7969,55 @@ mod tests {
                 Err(ConstraintProjectionError::OpaqueTypeAlias)
             ));
         }
+    }
+
+    #[test]
+    fn fallible_projection_rejects_opaque_protocols() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/protocol.py",
+            r#"
+            from typing import Protocol
+
+            class P(Protocol):
+                def f(self) -> None: ...
+            "#,
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/protocol.py").unwrap();
+        let protocol_class = global_symbol(&db, module, "P")
+            .place
+            .expect_type()
+            .to_class_type(&db)
+            .expect("expected `P` to be a class");
+        let protocol = Type::instance(&db, protocol_class);
+        assert!(matches!(protocol, Type::ProtocolInstance(_)));
+
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let relation =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, protocol);
+        let source_locals = typevar_set(&db, [source]);
+
+        assert!(matches!(
+            relation.try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
+        assert!(matches!(
+            ConstraintSet::always(&builder).try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                relation,
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
     }
 
     #[test]
