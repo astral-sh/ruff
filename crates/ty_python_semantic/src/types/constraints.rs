@@ -343,6 +343,16 @@ fn contains_protocol(db: &dyn Db, ty: Type<'_>) -> bool {
     any_over_type(db, ty, false, |nested| {
         matches!(nested, Type::ProtocolInstance(_))
             || matches!(nested, Type::NominalInstance(instance) if instance.class(db).is_protocol(db))
+            || matches!(nested, Type::ClassLiteral(class) if class.is_protocol(db))
+            || matches!(nested, Type::GenericAlias(alias) if alias.origin(db).is_protocol(db))
+            || matches!(
+                nested,
+                Type::SubclassOf(subclass)
+                    if subclass
+                        .subclass_of()
+                        .into_class(db)
+                        .is_some_and(|class| class.is_protocol(db))
+            )
     })
 }
 
@@ -8065,6 +8075,33 @@ mod tests {
                 &builder,
                 source_locals,
                 nominal_relation,
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
+
+        let protocol_class_object = protocol_instance.to_meta_type(&db);
+        assert!(matches!(protocol_class_object, Type::SubclassOf(_)));
+        let class_object_relation = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &builder,
+            target,
+            protocol_class_object,
+        );
+        assert!(matches!(
+            class_object_relation.try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
+        assert!(matches!(
+            ConstraintSet::always(&builder).try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                class_object_relation,
             ),
             Err(ConstraintProjectionError::OpaqueProtocol)
         ));
