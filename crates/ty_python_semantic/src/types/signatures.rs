@@ -1568,10 +1568,14 @@ impl<'db> Signature<'db> {
                         });
             }
 
-            Signature::is_supported_higher_rank_closed_type(db, ty)
+            if allow_nominal {
+                Signature::is_supported_higher_rank_annotation(db, ty)
+            } else {
+                Signature::is_supported_higher_rank_closed_type(db, ty)
+            }
         }
 
-        if self.has_explicit_receiver || !self.parameters.is_standard() {
+        if !self.parameters.is_standard() {
             return None;
         }
 
@@ -1948,7 +1952,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        let source_locals = if source.generic_context.is_some() {
+        let source_has_locals = source
+            .generic_context
+            .is_some_and(|context| context.variables(db).next().is_some());
+        let source_locals = if source_has_locals {
             source.bare_unbounded_method_typevars(db)?
         } else {
             if !source.parameters.is_standard()
@@ -1965,7 +1972,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let target_locals = target.bare_unbounded_method_typevars(db).or_else(|| {
-            if source.is_non_generic() {
+            if !source_has_locals {
                 target.single_nested_target_typevar(db)
             } else {
                 None
@@ -5119,6 +5126,11 @@ mod tests {
                 "/src/multiple.py",
                 "def f[T, U](value: list[T]) -> list[U]: ...",
                 false,
+            ),
+            (
+                "/src/gradual.py",
+                "from typing import Any\ndef f[T](value: list[T], context: Any) -> list[T]: ...",
+                true,
             ),
             (
                 "/src/deep.py",

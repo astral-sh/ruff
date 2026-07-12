@@ -3158,6 +3158,9 @@ class NestedFunctionScoped(Protocol):
 class NestedInputFunctionScoped(Protocol):
     def nested_input[T](self, input: list[T]) -> int: ...
 
+class NestedGradualFunctionScoped(Protocol):
+    def nested_gradual[T](self, input: list[T], context: Any) -> list[T]: ...
+
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
@@ -3272,6 +3275,14 @@ class NominalNestedInputConcrete:
 class NominalNestedInputTop:
     def nested_input(self, input: object) -> int:
         return 0
+
+class NominalNestedGradualConcrete:
+    def nested_gradual(self, input: list[int], context: Any) -> list[int]:
+        return input
+
+class NominalNestedConcreteGenericClass[S]:
+    def nested(self, input: list[int]) -> list[int]:
+        return input
 
 class NominalTopBottom:
     def f(self, input: object) -> Never:
@@ -3417,6 +3428,13 @@ static_assert(not is_assignable_to(NominalNestedInputConcrete, NestedInputFuncti
 static_assert(not is_subtype_of(NominalNestedInputConcrete, NestedInputFunctionScoped))
 static_assert(is_assignable_to(NominalNestedInputTop, NestedInputFunctionScoped))
 static_assert(is_subtype_of(NominalNestedInputTop, NestedInputFunctionScoped))
+static_assert(not is_assignable_to(NominalNestedGradualConcrete, NestedGradualFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedGradualConcrete, NestedGradualFunctionScoped))
+static_assert(not is_assignable_to(NominalNestedConcreteGenericClass[str], NestedFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedConcreteGenericClass[str], NestedFunctionScoped))
+
+# error: [invalid-assignment]
+nested: NestedFunctionScoped = NominalNestedConcreteGenericClass[str]()
 
 # A concrete implementation cannot satisfy every specialization of a generic method.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
