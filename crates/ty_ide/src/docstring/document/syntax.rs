@@ -50,6 +50,47 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
         && matches!(bytes.get(digits + 1), Some(b' ' | b'\t'))
 }
 
+/// Returns the length of a complete Markdown code span at the start of `text`.
+///
+/// For example, given `text` equal to ``"`value` trailing"``, the returned length covers only
+/// ``"`value`"``.
+///
+/// Lengths are measured in UTF-8 bytes. A closing backtick run must be the same length as the
+/// opening run.
+pub(in crate::docstring) fn markdown_code_span_len(text: &str) -> Option<TextSize> {
+    let opening = find_backtick_run(text, TextSize::ZERO)?;
+    if opening.start() != TextSize::ZERO {
+        return None;
+    }
+
+    let mut search_from = opening.end();
+    while let Some(closing) = find_backtick_run(text, search_from) {
+        if closing.len() == opening.len() {
+            return Some(closing.end());
+        }
+        search_from = closing.end();
+    }
+
+    None
+}
+
+/// Returns the byte range of the first consecutive backtick run at or after `from`.
+///
+/// For example, searching ``"value `code`"`` from the start returns the range covering the
+/// opening ``"`"``.
+pub(in crate::docstring) fn find_backtick_run(text: &str, from: TextSize) -> Option<TextRange> {
+    let from = from.to_usize();
+    let start = from + text.get(from..)?.find('`')?;
+    let len = text[start..]
+        .bytes()
+        .take_while(|byte| *byte == b'`')
+        .count();
+    Some(TextRange::new(
+        TextSize::of(&text[..start]),
+        TextSize::of(&text[..start + len]),
+    ))
+}
+
 /// Returns the end of an indented Markdown or reStructuredText container block.
 pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
     let marker = lines.get(index)?;
@@ -187,4 +228,30 @@ pub(super) fn indentation(line: &str) -> TextSize {
                 _ => column + 1,
             }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextSize;
+
+    use super::markdown_code_span_len;
+
+    #[test]
+    fn finds_markdown_code_span_len() {
+        assert_eq!(
+            markdown_code_span_len("`value` trailing"),
+            Some(TextSize::of("`value`"))
+        );
+        assert_eq!(
+            markdown_code_span_len("``value`with:ticks``"),
+            Some(TextSize::of("``value`with:ticks``"))
+        );
+        assert_eq!(
+            markdown_code_span_len("`first` second`"),
+            Some(TextSize::of("`first`"))
+        );
+        assert_eq!(markdown_code_span_len("``value```"), None);
+        assert_eq!(markdown_code_span_len("``"), None);
+        assert_eq!(markdown_code_span_len("value"), None);
+    }
 }
