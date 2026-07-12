@@ -3120,8 +3120,15 @@ class NominalGenericReturningInt:
     def f[T](self, input: T) -> int:
         return 1
 
+class NominalMultipleReturningSecond:
+    def multiple[S, R](self, first: S, second: R) -> R:
+        return second
+
 class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
+
+class MultipleFunctionScoped(Protocol):
+    def multiple[T, U](self, first: T, second: U) -> T: ...
 
 FunctionT = TypeVar("FunctionT")
 
@@ -3152,6 +3159,26 @@ class NominalGenericIntInput:
 class NominalGenericDynamic:
     def f[T](self, input: T) -> Any:
         return input
+
+class NominalTwoGenericForSingle:
+    def f[S, R](self, input: S) -> R:
+        raise NotImplementedError
+
+class NominalMultipleGeneric:
+    def multiple[S, R](self, first: S, second: R) -> S:
+        return first
+
+class NominalSingleGenericForMultiple:
+    def multiple[S](self, first: S, second: object) -> S:
+        return first
+
+class NominalMultipleConcrete:
+    def multiple(self, first: int, second: str) -> int:
+        return first
+
+class NominalMultipleDynamic:
+    def multiple[S, R](self, first: S, second: R) -> Any:
+        return first
 
 class NominalLegacy:
     def f(self, input: FunctionT) -> FunctionT:
@@ -3246,6 +3273,18 @@ static_assert(not is_assignable_to(NominalGenericIntInput, NewStyleFunctionScope
 static_assert(not is_subtype_of(NominalGenericIntInput, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalGenericDynamic, NewStyleFunctionScoped))
 static_assert(not is_subtype_of(NominalGenericDynamic, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalTwoGenericForSingle, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalTwoGenericForSingle, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalMultipleGeneric, MultipleFunctionScoped))
+static_assert(is_subtype_of(NominalMultipleGeneric, MultipleFunctionScoped))
+static_assert(is_assignable_to(NominalSingleGenericForMultiple, MultipleFunctionScoped))
+static_assert(is_subtype_of(NominalSingleGenericForMultiple, MultipleFunctionScoped))
+static_assert(not is_assignable_to(NominalMultipleReturningSecond, MultipleFunctionScoped))
+static_assert(not is_subtype_of(NominalMultipleReturningSecond, MultipleFunctionScoped))
+static_assert(not is_assignable_to(NominalMultipleConcrete, MultipleFunctionScoped))
+static_assert(not is_subtype_of(NominalMultipleConcrete, MultipleFunctionScoped))
+static_assert(is_assignable_to(NominalMultipleDynamic, MultipleFunctionScoped))
+static_assert(not is_subtype_of(NominalMultipleDynamic, MultipleFunctionScoped))
 
 static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))

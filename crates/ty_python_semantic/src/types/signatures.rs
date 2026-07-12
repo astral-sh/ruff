@@ -1477,40 +1477,41 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns the single callable-local variable supported by the initial higher-rank relation.
+    /// Returns the callable-local variables supported by the initial higher-rank relation.
     ///
-    /// The variable must be an unbounded PEP 695 type variable used only as a bare parameter or
+    /// Every variable must be an unbounded PEP 695 type variable used only as a bare parameter or
     /// return annotation after binding. In particular, this excludes nested occurrences.
-    fn bare_unbounded_pep695_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+    fn bare_unbounded_pep695_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         if !self.parameters.is_standard() {
             return None;
         }
 
         let definition = self.definition?;
-        let mut typevars = self.generic_context?.variables(db);
-        let typevar = typevars.next()?;
-        if typevars.next().is_some()
-            || typevar.kind(db) != TypeVarKind::Pep695TypeVar
-            || typevar.binding_context(db).definition() != Some(definition)
-            || typevar.typevar(db).bound_or_constraints(db).is_some()
-        {
+        let local_identities: FxOrderSet<_> = self
+            .generic_context?
+            .variables(db)
+            .map(|typevar| {
+                (typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                    && typevar.binding_context(db).definition() == Some(definition)
+                    && typevar.typevar(db).bound_or_constraints(db).is_none())
+                .then(|| typevar.identity(db))
+            })
+            .collect::<Option<_>>()?;
+        if local_identities.is_empty() {
             return None;
         }
 
-        let identity = typevar.typevar(db).identity(db);
+        let locals = InferableTypeVars::from_typevars(db, local_identities);
         self.parameters
             .iter()
             .map(Parameter::annotated_type)
             .chain(std::iter::once(self.return_ty))
             .all(|ty| {
-                if ty.references_typevar(db, identity) {
-                    ty.as_typevar()
-                        .is_some_and(|inner| inner.is_same_typevar_as(db, typevar))
-                } else {
-                    Self::is_supported_higher_rank_concrete_type(db, ty)
-                }
+                ty.as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, locals))
+                    || Self::is_supported_higher_rank_concrete_type(db, ty)
             })
-            .then_some(typevar)
+            .then_some(locals)
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
@@ -1834,10 +1835,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     /// Check the initial closed fragment of higher-rank generic callable relations.
     ///
-    /// The source may have one unbounded local type variable whose specialization can depend on
-    /// each receiver-compatible specialization of the target's one unbounded local type variable.
-    /// Overloads, declared domains, nested occurrences, and enclosing inference variables remain
-    /// on the existing relation path.
+    /// The source's unbounded local type variables may depend on each receiver-compatible
+    /// specialization of the target's unbounded local type variables. Overloads, declared domains,
+    /// nested occurrences, and enclosing inference variables remain on the existing relation path.
     ///
     /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
     /// the latter must work for every `T`.
@@ -1862,8 +1862,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        let source_typevar = if source.generic_context.is_some() {
-            Some(source.bare_unbounded_pep695_typevar(db)?)
+        let source_locals = if source.generic_context.is_some() {
+            source.bare_unbounded_pep695_typevars(db)?
         } else {
             if !source.parameters.is_standard()
                 || !source
@@ -1875,24 +1875,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return None;
             }
-            None
+            InferableTypeVars::None
         };
 
-        let target_typevar = target.bare_unbounded_pep695_typevar(db)?;
+        let target_locals = target.bare_unbounded_pep695_typevars(db)?;
         // The quantifiers must bind distinct occurrences. A signature compared with itself can
         // stay on the existing relation path instead of treating one occurrence as both binders.
-        if source_typevar.is_some_and(|source| source.is_same_typevar_as(db, target_typevar)) {
+        if source_locals
+            .iter(db)
+            .any(|source| source.is_inferable(db, target_locals))
+        {
             return None;
         }
 
-        let source_local = source_typevar.map_or(InferableTypeVars::None, |source| {
-            InferableTypeVars::from_typevars(db, std::iter::once(source.identity(db)).collect())
-        });
-        let target_local = InferableTypeVars::from_typevars(
-            db,
-            std::iter::once(target_typevar.identity(db)).collect(),
-        );
-        let mut checker = self.with_inferable_typevars(source_local.merge(db, target_local));
+        let mut checker = self.with_inferable_typevars(source_locals.merge(db, target_locals));
         checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let relation = checker.with_signature_recursion_guard(source, target, || {
             target
@@ -1907,11 +1903,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         });
 
         // The source specialization may depend on the target specialization, so eliminate the
-        // source local existentially before eliminating the target local universally.
+        // source locals existentially before eliminating the target locals universally.
         Some(
             relation
-                .reduce_inferable(db, self.constraints, source_local)
-                .for_all(db, self.constraints, target_local),
+                .reduce_inferable(db, self.constraints, source_locals)
+                .for_all(db, self.constraints, target_locals),
         )
     }
 
