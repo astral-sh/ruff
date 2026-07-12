@@ -1459,14 +1459,19 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns whether `ty` belongs to the closed concrete fragment that the initial higher-rank
+    /// Returns whether `ty` belongs to the closed static fragment that the initial higher-rank
     /// relation can quantify without losing type-variable relationships.
     ///
-    /// This deliberately excludes gradual types, type variables, and aliases, even when their
-    /// current expansion is nominal.
-    fn is_supported_higher_rank_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    /// This deliberately excludes gradual types, type variables, and aliases. Unions are supported
+    /// when each of their elements belongs to the fragment.
+    fn is_supported_higher_rank_closed_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
-            Type::Never => true,
+            Type::Never | Type::LiteralValue(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .copied()
+                .all(|element| Self::is_supported_higher_rank_closed_type(db, element)),
             Type::NominalInstance(instance) => {
                 !instance.inherits_from_explicit_any()
                     && !ty.has_dynamic(db)
@@ -1512,7 +1517,7 @@ impl<'db> Signature<'db> {
             .all(|ty| {
                 ty.as_typevar()
                     .is_some_and(|typevar| typevar.is_inferable(db, locals))
-                    || Self::is_supported_higher_rank_concrete_type(db, ty)
+                    || Self::is_supported_higher_rank_closed_type(db, ty)
             })
             .then_some(locals)
     }
@@ -1874,7 +1879,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .iter()
                     .map(Parameter::annotated_type)
                     .chain(std::iter::once(source.return_ty))
-                    .all(|ty| Signature::is_supported_higher_rank_concrete_type(db, ty))
+                    .all(|ty| Signature::is_supported_higher_rank_closed_type(db, ty))
             {
                 return None;
             }

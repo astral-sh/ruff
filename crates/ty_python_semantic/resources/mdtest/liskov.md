@@ -868,7 +868,7 @@ python-version = "3.12"
 ```
 
 ```pyi
-from typing import Never, Self, TypeVar
+from typing import Literal, Never, Self, TypeVar
 
 class A:
     def method[T](self, x: T) -> T: ...
@@ -981,6 +981,15 @@ class B6(A6):
 
 class C6(A6):
     def method(self, x: LegacyS) -> int: ...  # error: [invalid-method-override]
+
+class A7:
+    def method[T](self, x: T, option: int | Literal["strict"]) -> T: ...
+
+class B7(A7):
+    def method(self, x: int, option: int | Literal["strict"]) -> int: ...  # error: [invalid-method-override]
+
+class C7(A7):
+    def method[S](self, x: S, option: int | Literal["strict"]) -> S: ...
 ```
 
 ## Generic methods on generic classes work as expected

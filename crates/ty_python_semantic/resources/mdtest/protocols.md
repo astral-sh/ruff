@@ -3055,7 +3055,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Never, final, overload
+from typing import Any, Literal, Never, final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3143,6 +3143,9 @@ class LegacyFunctionScoped(Protocol):
 class LegacyMultipleFunctionScoped(Protocol):
     def multiple(self, first: LegacyFirst, second: LegacySecond) -> LegacyFirst: ...
 
+class ClosedStaticFunctionScoped(Protocol):
+    def transform[T](self, input: T, option: int | Literal["strict"]) -> T: ...
+
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
@@ -3186,6 +3189,14 @@ class NominalSingleGenericForMultiple:
 class NominalMultipleConcrete:
     def multiple(self, first: int, second: str) -> int:
         return first
+
+class NominalClosedStaticGeneric:
+    def transform[S](self, input: S, option: int | Literal["strict"]) -> S:
+        return input
+
+class NominalClosedStaticConcrete:
+    def transform(self, input: int, option: int | Literal["strict"]) -> int:
+        return input
 
 class NominalMultipleDynamic:
     def multiple[S, R](self, first: S, second: R) -> Any:
@@ -3306,6 +3317,10 @@ static_assert(not is_assignable_to(NominalMultipleReturningSecond, MultipleFunct
 static_assert(not is_subtype_of(NominalMultipleReturningSecond, MultipleFunctionScoped))
 static_assert(not is_assignable_to(NominalMultipleConcrete, MultipleFunctionScoped))
 static_assert(not is_subtype_of(NominalMultipleConcrete, MultipleFunctionScoped))
+static_assert(is_assignable_to(NominalClosedStaticGeneric, ClosedStaticFunctionScoped))
+static_assert(is_subtype_of(NominalClosedStaticGeneric, ClosedStaticFunctionScoped))
+static_assert(not is_assignable_to(NominalClosedStaticConcrete, ClosedStaticFunctionScoped))
+static_assert(not is_subtype_of(NominalClosedStaticConcrete, ClosedStaticFunctionScoped))
 static_assert(is_assignable_to(NominalMultipleDynamic, MultipleFunctionScoped))
 static_assert(not is_subtype_of(NominalMultipleDynamic, MultipleFunctionScoped))
 
