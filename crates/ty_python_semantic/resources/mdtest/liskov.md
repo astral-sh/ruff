@@ -1005,6 +1005,24 @@ class B8(A8):
 
 class C8(A8):
     def method[S](self, x: S, context: Any) -> S: ...
+
+class A9:
+    def method[T](self, x: list[T]) -> list[T]: ...
+
+class B9(A9):
+    def method(self, x: list[int]) -> list[int]: ...  # error: [invalid-method-override]
+
+class C9(A9):
+    def method(self, x: object) -> Never: ...  # fine
+
+class A10:
+    def method[T](self, x: list[T]) -> int: ...
+
+class B10(A10):
+    def method(self, x: list[int]) -> int: ...  # error: [invalid-method-override]
+
+class C10(A10):
+    def method(self, x: object) -> int: ...  # fine
 ```
 
 ## Generic methods on generic classes work as expected

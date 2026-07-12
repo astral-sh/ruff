@@ -3152,6 +3152,12 @@ class GradualFunctionScoped(Protocol):
 class GradualReturnFunctionScoped(Protocol):
     def f[T](self, input: T) -> Any: ...
 
+class NestedFunctionScoped(Protocol):
+    def nested[T](self, input: list[T]) -> list[T]: ...
+
+class NestedInputFunctionScoped(Protocol):
+    def nested_input[T](self, input: list[T]) -> int: ...
+
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
@@ -3250,6 +3256,22 @@ class NominalDynamic:
 class NominalUnannotated:
     def f(self, input):
         return input
+
+class NominalNestedConcrete:
+    def nested(self, input: list[int]) -> list[int]:
+        return input
+
+class NominalNestedTopBottom:
+    def nested(self, input: object) -> Never:
+        raise NotImplementedError
+
+class NominalNestedInputConcrete:
+    def nested_input(self, input: list[int]) -> int:
+        return 0
+
+class NominalNestedInputTop:
+    def nested_input(self, input: object) -> int:
+        return 0
 
 class NominalTopBottom:
     def f(self, input: object) -> Never:
@@ -3386,6 +3408,15 @@ static_assert(is_assignable_to(NominalUnannotated, NewStyleFunctionScoped))
 static_assert(not is_subtype_of(NominalUnannotated, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalTopBottom, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
+
+static_assert(not is_assignable_to(NominalNestedConcrete, NestedFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedConcrete, NestedFunctionScoped))
+static_assert(is_assignable_to(NominalNestedTopBottom, NestedFunctionScoped))
+static_assert(is_subtype_of(NominalNestedTopBottom, NestedFunctionScoped))
+static_assert(not is_assignable_to(NominalNestedInputConcrete, NestedInputFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedInputConcrete, NestedInputFunctionScoped))
+static_assert(is_assignable_to(NominalNestedInputTop, NestedInputFunctionScoped))
+static_assert(is_subtype_of(NominalNestedInputTop, NestedInputFunctionScoped))
 
 # A concrete implementation cannot satisfy every specialization of a generic method.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))

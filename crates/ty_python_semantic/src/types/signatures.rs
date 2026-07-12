@@ -1533,6 +1533,71 @@ impl<'db> Signature<'db> {
             .then_some(locals)
     }
 
+    /// Returns the single target-local variable supported in a shallow nominal annotation.
+    ///
+    /// This extends the initial higher-rank fragment only for non-generic source signatures.
+    /// Keeping the target to one unbounded PEP 695 variable, at most two occurrences, and one nominal
+    /// layer avoids both dependent source projection and independent-variable TDD expansion.
+    fn single_nested_target_typevar(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
+        fn is_supported<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            local: BoundTypeVarInstance<'db>,
+            allow_nominal: bool,
+            occurrences: &mut u8,
+        ) -> bool {
+            if ty
+                .as_typevar()
+                .is_some_and(|typevar| typevar.is_same_typevar_as(db, local))
+            {
+                *occurrences += 1;
+                return *occurrences <= 2;
+            }
+
+            if allow_nominal && let Type::NominalInstance(instance) = ty {
+                return instance.own_tuple_spec(db).is_none()
+                    && !instance.inherits_from_explicit_any()
+                    && instance
+                        .class(db)
+                        .class_literal_and_specialization(db)
+                        .1
+                        .is_none_or(|specialization| {
+                            specialization.types(db).iter().copied().all(|argument| {
+                                is_supported(db, argument, local, false, occurrences)
+                            })
+                        });
+            }
+
+            Signature::is_supported_higher_rank_closed_type(db, ty)
+        }
+
+        if self.has_explicit_receiver || !self.parameters.is_standard() {
+            return None;
+        }
+
+        let definition = self.definition?;
+        let mut typevars = self.generic_context?.variables(db);
+        let local = typevars.next()?;
+        if typevars.next().is_some()
+            || local.kind(db) != TypeVarKind::Pep695TypeVar
+            || local.binding_context(db).definition() != Some(definition)
+            || local.typevar(db).bound_or_constraints(db).is_some()
+        {
+            return None;
+        }
+
+        let mut occurrences = 0;
+        let supported = self
+            .parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| is_supported(db, ty, local, true, &mut occurrences));
+        (supported && occurrences > 0).then(|| {
+            InferableTypeVars::from_typevars(db, std::iter::once(local.identity(db)).collect())
+        })
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1855,8 +1920,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Check the initial closed fragment of higher-rank generic callable relations.
     ///
     /// The source's unbounded local type variables may depend on each receiver-compatible
-    /// specialization of the target's unbounded local type variables. Overloads, declared domains,
-    /// nested occurrences, and enclosing inference variables remain on the existing relation path.
+    /// specialization of the target's unbounded local type variables. A non-generic source may also
+    /// be checked against a target with one unbounded local occurring in a shallow nominal
+    /// annotation. Overloads, declared domains, other nested occurrences, and enclosing inference
+    /// variables remain on the existing relation path.
     ///
     /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
     /// the latter must work for every `T`.
@@ -1897,7 +1964,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             InferableTypeVars::None
         };
 
-        let target_locals = target.bare_unbounded_method_typevars(db)?;
+        let target_locals = target.bare_unbounded_method_typevars(db).or_else(|| {
+            if source.is_non_generic() {
+                target.single_nested_target_typevar(db)
+            } else {
+                None
+            }
+        })?;
         // The quantifiers must bind distinct occurrences. A signature compared with itself can
         // stay on the existing relation path instead of treating one occurrence as both binders.
         if source_locals
@@ -5032,6 +5105,54 @@ mod tests {
 
         assert!(sig.return_ty.is_unknown());
         assert_params(&sig, &[]);
+    }
+
+    #[test]
+    fn single_nested_target_typevar_is_narrowly_supported() {
+        for (path, source, supported) in [
+            (
+                "/src/supported.py",
+                "def f[T](value: list[T]) -> list[T]: ...",
+                true,
+            ),
+            (
+                "/src/multiple.py",
+                "def f[T, U](value: list[T]) -> list[U]: ...",
+                false,
+            ),
+            (
+                "/src/deep.py",
+                "def f[T](value: list[list[T]]) -> list[list[T]]: ...",
+                false,
+            ),
+            (
+                "/src/tuple.py",
+                "def f[T](value: tuple[list[T], object]) -> None: ...",
+                false,
+            ),
+            (
+                "/src/union.py",
+                "def f[T](value: list[T] | None) -> None: ...",
+                false,
+            ),
+            (
+                "/src/repeated.py",
+                "def f[T](first: list[T], second: list[T]) -> list[T]: ...",
+                false,
+            ),
+        ] {
+            let mut db = setup_db();
+            db.write_dedented(path, source).unwrap();
+            let signature = get_function_f(&db, path)
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+
+            assert_eq!(
+                signature.single_nested_target_typevar(&db).is_some(),
+                supported
+            );
+        }
     }
 
     #[test]
