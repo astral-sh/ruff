@@ -868,7 +868,7 @@ python-version = "3.12"
 ```
 
 ```pyi
-from typing import Literal, Never, Self, TypeVar
+from typing import Any, Literal, Never, Self, TypeVar
 
 class A:
     def method[T](self, x: T) -> T: ...
@@ -887,6 +887,12 @@ class D(A):
 class E(A):
     # `E.method` accepts every argument, but does not preserve its type in the return.
     def method[S](self, x: S) -> int: ...  # error: [invalid-method-override]
+
+class F(A):
+    def method(self, x: Any) -> Any: ...  # fine
+
+class G(A):
+    def method(self, x): ...  # fine
 
 class A2:
     def method(self, x: int) -> int: ...
@@ -989,6 +995,15 @@ class B7(A7):
 
 class C7(A7):
     def method[S](self, x: S, option: int | Literal["strict"]) -> S: ...
+
+class A8:
+    def method[T](self, x: T, context: Any) -> T: ...
+
+class B8(A8):
+    def method(self, x: int, context: Any) -> int: ...  # error: [invalid-method-override]
+
+class C8(A8):
+    def method[S](self, x: S, context: Any) -> S: ...
 ```
 
 ## Generic methods on generic classes work as expected

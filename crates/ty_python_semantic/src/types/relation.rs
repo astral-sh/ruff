@@ -344,6 +344,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -381,6 +382,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -588,6 +590,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            quantified_typevars: InferableTypeVars::None,
             relation,
             typevar_evaluation,
             context_tree: None,
@@ -743,6 +746,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
+    quantified_typevars: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -772,6 +776,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -793,6 +798,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
@@ -814,6 +820,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
@@ -835,6 +842,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            quantified_typevars: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -849,6 +857,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
+            ..self.clone()
+        }
+    }
+
+    /// Marks type variables that are locally quantified by this relation.
+    ///
+    /// Direct gradual assignability to these variables must be evaluated before lazy constraint
+    /// capture. A gradual bound is useful evidence for caller-owned inference variables, but does
+    /// not restrict a local variable that is subsequently quantified away.
+    pub(super) fn with_quantified_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: InferableTypeVars<'db>,
+    ) -> Self {
+        Self {
+            quantified_typevars: self.quantified_typevars.merge(db, typevars),
             ..self.clone()
         }
     }
@@ -1059,6 +1083,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self
                 .given
                 .implies_subtype_of(db, self.constraints, source, target);
+        }
+
+        // A gradual type is assignable to and from every specialization of a locally quantified
+        // type variable. Preserve that behavior before lazy evaluation captures the comparison as
+        // a rigid bound. Caller-owned inference variables remain constrained by gradual evidence.
+        if self.relation.is_assignability()
+            && match (source, target) {
+                (Type::TypeVar(typevar), Type::Dynamic(_))
+                | (Type::Dynamic(_), Type::TypeVar(typevar)) => {
+                    typevar.is_inferable(db, self.quantified_typevars)
+                        || typevar.typevar(db).is_self(db)
+                }
+                _ => false,
+            }
+        {
+            return self.always();
         }
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -2403,6 +2443,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: None,
             given: self.given,
             inferable: InferableTypeVars::None,
+            quantified_typevars: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2486,6 +2527,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
+            quantified_typevars: InferableTypeVars::None,
             context_tree: None,
             given: self.given,
             relation_visitor: self.relation_visitor,

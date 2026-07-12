@@ -3630,7 +3630,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Literal, final, overload
+from typing import Any, Literal, Never, final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3721,6 +3721,12 @@ class LegacyMultipleFunctionScoped(Protocol):
 class ClosedStaticFunctionScoped(Protocol):
     def transform[T](self, input: T, option: int | Literal["strict"]) -> T: ...
 
+class GradualFunctionScoped(Protocol):
+    def contextual[T](self, input: T, context: Any) -> T: ...
+
+class GradualReturnFunctionScoped(Protocol):
+    def f[T](self, input: T) -> Any: ...
+
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
@@ -3767,6 +3773,14 @@ class NominalClosedStaticConcrete:
     def transform(self, input: int, option: int | Literal["strict"]) -> int:
         return input
 
+class NominalGradualGeneric:
+    def contextual[S](self, input: S, context: Any) -> S:
+        return input
+
+class NominalGradualConcrete:
+    def contextual(self, input: int, context: Any) -> int:
+        return input
+
 class NominalMultipleDynamic:
     def multiple[S, R](self, first: S, second: R) -> Any:
         return first
@@ -3794,6 +3808,18 @@ class NominalLegacyReceiver:
 class NominalWithSelf:
     def g(self: Self) -> Self:
         return self
+
+class NominalDynamic:
+    def f(self, input: Any) -> Any:
+        return input
+
+class NominalUnannotated:
+    def f(self, input):
+        return input
+
+class NominalTopBottom:
+    def f(self, input: object) -> Never:
+        raise NotImplementedError
 
 class NominalNotGeneric:
     def f(self, input: int) -> int:
@@ -3886,8 +3912,16 @@ static_assert(is_assignable_to(NominalClosedStaticGeneric, ClosedStaticFunctionS
 static_assert(is_subtype_of(NominalClosedStaticGeneric, ClosedStaticFunctionScoped))
 static_assert(not is_assignable_to(NominalClosedStaticConcrete, ClosedStaticFunctionScoped))
 static_assert(not is_subtype_of(NominalClosedStaticConcrete, ClosedStaticFunctionScoped))
+static_assert(is_assignable_to(NominalGradualGeneric, GradualFunctionScoped))
+static_assert(not is_subtype_of(NominalGradualGeneric, GradualFunctionScoped))
+static_assert(not is_assignable_to(NominalGradualConcrete, GradualFunctionScoped))
+static_assert(not is_subtype_of(NominalGradualConcrete, GradualFunctionScoped))
 static_assert(is_assignable_to(NominalMultipleDynamic, MultipleFunctionScoped))
 static_assert(not is_subtype_of(NominalMultipleDynamic, MultipleFunctionScoped))
+static_assert(is_assignable_to(NominalNewStyle, GradualReturnFunctionScoped))
+static_assert(not is_subtype_of(NominalNewStyle, GradualReturnFunctionScoped))
+static_assert(not is_assignable_to(NominalNotGeneric, GradualReturnFunctionScoped))
+static_assert(not is_subtype_of(NominalNotGeneric, GradualReturnFunctionScoped))
 
 static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
@@ -3913,6 +3947,12 @@ static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 static_assert(not is_assignable_to(NominalLegacyReceiver, UsesLegacyReceiver))
 static_assert(not is_subtype_of(NominalLegacyReceiver, UsesLegacyReceiver))
+static_assert(is_assignable_to(NominalDynamic, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalDynamic, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalUnannotated, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalUnannotated, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalTopBottom, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
 
 # A non-generic method cannot implement the generic target for every specialization.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))

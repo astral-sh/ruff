@@ -1530,6 +1530,17 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns whether `ty` is supported as a top-level annotation alongside simple generic
+    /// source locals.
+    ///
+    /// Direct gradual annotations are supported for assignability, but remain excluded from the
+    /// recursively closed fragment so that gradual unions and invariant containers stay on the
+    /// existing relation path.
+    fn is_supported_generic_source_annotation(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        matches!(ty, Type::Dynamic(_) | Type::Divergent(_))
+            || Self::is_supported_generic_source_closed_type(db, ty)
+    }
+
     /// Returns the method-local variables supported by the simple generic-signature relation.
     ///
     /// Every variable must be an unbounded PEP 695 or legacy type variable bound by this method
@@ -1565,7 +1576,7 @@ impl<'db> Signature<'db> {
             .all(|ty| {
                 ty.as_typevar()
                     .is_some_and(|typevar| typevar.is_inferable(db, locals))
-                    || Self::is_supported_generic_source_closed_type(db, ty)
+                    || Self::is_supported_generic_source_annotation(db, ty)
             })
             .then_some(locals)
     }
@@ -2140,9 +2151,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             None
         };
         let universally_quantify_target = universal_source_existential.is_some();
+        let quantified_typevars = universal_source_existential
+            .map_or(InferableTypeVars::None, |source_existential| {
+                source_existential.merge(db, target_inferable)
+            });
 
         // `inner` will create a constraint set that references these newly inferable typevars.
-        let mut checker = self.with_inferable_typevars(inferable);
+        let mut checker = self
+            .with_inferable_typevars(inferable)
+            .with_quantified_typevars(db, quantified_typevars);
         // Receiver constraints and universal target abstraction both require typevar relationships
         // to remain symbolic until quantification.
         if source.receiver_constraints.is_some()
