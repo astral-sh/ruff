@@ -14,6 +14,11 @@ pub(crate) struct TokenSource<'src> {
     /// The underlying source for the tokens.
     lexer: LexerSource<'src>,
 
+    /// The current non-trivia token. Keeping this separate from the pre-lexed stream avoids an
+    /// enum match and an indexed load for every parser predicate.
+    #[cfg(target_arch = "aarch64")]
+    current: Token,
+
     #[cfg(target_arch = "aarch64")]
     source: &'src str,
     #[cfg(target_arch = "aarch64")]
@@ -38,7 +43,7 @@ enum LexerSource<'src> {
     #[cfg(target_arch = "aarch64")]
     TwoPass {
         tokens: TwoPassTokens,
-        position: Option<usize>,
+        position: usize,
         nesting: u32,
     },
 }
@@ -56,6 +61,12 @@ impl<'src> TokenSource<'src> {
 
         TokenSource {
             lexer: LexerSource::Streaming(lexer),
+            #[cfg(target_arch = "aarch64")]
+            current: Token::new(
+                TokenKind::EndOfFile,
+                TextRange::empty(start_offset),
+                TokenFlags::empty(),
+            ),
             #[cfg(target_arch = "aarch64")]
             source,
             #[cfg(target_arch = "aarch64")]
@@ -87,9 +98,14 @@ impl<'src> TokenSource<'src> {
             let mut source = TokenSource {
                 lexer: LexerSource::TwoPass {
                     tokens,
-                    position: None,
+                    position: usize::MAX,
                     nesting: 0,
                 },
+                current: Token::new(
+                    TokenKind::EndOfFile,
+                    TextRange::empty(start_offset),
+                    TokenFlags::empty(),
+                ),
                 source,
                 mode,
                 start_offset,
@@ -111,24 +127,24 @@ impl<'src> TokenSource<'src> {
     /// Returns the kind of the current token.
     #[inline]
     pub(crate) fn current_kind(&self) -> TokenKind {
+        #[cfg(target_arch = "aarch64")]
+        return self.current.kind();
+
+        #[cfg(not(target_arch = "aarch64"))]
         match &self.lexer {
             LexerSource::Streaming(lexer) => lexer.current_kind(),
-            #[cfg(target_arch = "aarch64")]
-            LexerSource::TwoPass {
-                tokens, position, ..
-            } => tokens.tokens[position.unwrap_or(0)].kind(),
         }
     }
 
     /// Returns the range of the current token.
     #[inline]
     pub(crate) fn current_range(&self) -> TextRange {
+        #[cfg(target_arch = "aarch64")]
+        return self.current.range();
+
+        #[cfg(not(target_arch = "aarch64"))]
         match &self.lexer {
             LexerSource::Streaming(lexer) => lexer.current_range(),
-            #[cfg(target_arch = "aarch64")]
-            LexerSource::TwoPass {
-                tokens, position, ..
-            } => tokens.tokens[position.unwrap_or(0)].range(),
         }
     }
 
@@ -145,12 +161,12 @@ impl<'src> TokenSource<'src> {
     /// Returns the flags for the current token.
     #[inline]
     pub(crate) fn current_flags(&self) -> TokenFlags {
+        #[cfg(target_arch = "aarch64")]
+        return self.current.flags();
+
+        #[cfg(not(target_arch = "aarch64"))]
         match &self.lexer {
             LexerSource::Streaming(lexer) => lexer.current_flags(),
-            #[cfg(target_arch = "aarch64")]
-            LexerSource::TwoPass {
-                tokens, position, ..
-            } => tokens.tokens[position.unwrap_or(0)].flags(),
         }
     }
 
@@ -203,6 +219,9 @@ impl<'src> TokenSource<'src> {
         // Trim the already bumped logical line token (and comments coming after it) as it might now have become a logical line token
         self.tokens.truncate(non_logical_line_index);
 
+        #[cfg(target_arch = "aarch64")]
+        self.refresh_current();
+
         #[cfg(debug_assertions)]
         {
             let last_non_trivia_end_now = {
@@ -244,6 +263,9 @@ impl<'src> TokenSource<'src> {
         if let LexerSource::Streaming(lexer) = &mut self.lexer {
             lexer.re_lex_string_token_in_interpolation_element(kind);
         }
+
+        #[cfg(target_arch = "aarch64")]
+        self.refresh_current();
     }
 
     #[cfg_attr(
@@ -267,6 +289,9 @@ impl<'src> TokenSource<'src> {
         if let LexerSource::Streaming(lexer) = &mut self.lexer {
             lexer.re_lex_raw_string_in_format_spec();
         }
+
+        #[cfg(target_arch = "aarch64")]
+        self.refresh_current();
     }
 
     /// Returns the next non-trivia token without consuming it.
@@ -286,7 +311,7 @@ impl<'src> TokenSource<'src> {
             #[cfg(target_arch = "aarch64")]
             LexerSource::TwoPass {
                 tokens, position, ..
-            } => next_pre_lexed_token(tokens, position.unwrap_or(0) + 1).0,
+            } => next_pre_lexed_token(tokens, *position + 1).0,
         }
     }
 
@@ -309,7 +334,7 @@ impl<'src> TokenSource<'src> {
             LexerSource::TwoPass {
                 tokens, position, ..
             } => {
-                let (first, position) = next_pre_lexed_token(tokens, position.unwrap_or(0) + 1);
+                let (first, position) = next_pre_lexed_token(tokens, *position + 1);
                 let (second, _) = next_pre_lexed_token(tokens, position + 1);
                 (first, second)
             }
@@ -331,14 +356,19 @@ impl<'src> TokenSource<'src> {
             }
             #[cfg(target_arch = "aarch64")]
             LexerSource::TwoPass {
-                tokens, position, ..
+                tokens,
+                position,
+                nesting,
             } => {
-                let position = position.unwrap_or(0);
-                let token = tokens.tokens[position];
+                let current_position = *position;
+                let token = self.current;
                 if token.kind() != kind {
-                    tokens.rewrites.push((position, token));
-                    tokens.tokens[position] = Token::new(kind, token.range(), token.flags());
+                    tokens.rewrites.push((current_position, token));
+                    tokens.tokens[current_position] =
+                        Token::new(kind, token.range(), token.flags());
                 }
+                self.current = bump_pre_lexed_token(tokens, position, nesting);
+                return;
             }
         }
         self.do_bump();
@@ -349,43 +379,36 @@ impl<'src> TokenSource<'src> {
     #[inline]
     fn do_bump(&mut self) {
         match &mut self.lexer {
-            LexerSource::Streaming(lexer) => loop {
-                let kind = lexer.next_token();
-                if kind.is_trivia() {
-                    self.tokens.push(Token::new(
-                        kind,
+            LexerSource::Streaming(lexer) => {
+                loop {
+                    let kind = lexer.next_token();
+                    if kind.is_trivia() {
+                        self.tokens.push(Token::new(
+                            kind,
+                            lexer.current_range(),
+                            lexer.current_flags(),
+                        ));
+                        continue;
+                    }
+                    break;
+                }
+
+                #[cfg(target_arch = "aarch64")]
+                {
+                    self.current = Token::new(
+                        lexer.current_kind(),
                         lexer.current_range(),
                         lexer.current_flags(),
-                    ));
-                    continue;
+                    );
                 }
-                break;
-            },
+            }
             #[cfg(target_arch = "aarch64")]
             LexerSource::TwoPass {
                 tokens,
                 position,
                 nesting,
             } => {
-                let mut next = position
-                    .map_or(0, |position| position + 1)
-                    .min(tokens.tokens.len() - 1);
-                loop {
-                    let kind = tokens.tokens[next].kind();
-                    match kind {
-                        TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
-                        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                            *nesting = nesting.saturating_sub(1);
-                        }
-                        _ => {}
-                    }
-                    *position = Some(next);
-                    if kind.is_trivia() {
-                        next += 1;
-                        continue;
-                    }
-                    break;
-                }
+                self.current = bump_pre_lexed_token(tokens, position, nesting);
             }
         }
     }
@@ -455,6 +478,9 @@ impl<'src> TokenSource<'src> {
             }
         }
         self.tokens.truncate(tokens_position);
+
+        #[cfg(target_arch = "aarch64")]
+        self.refresh_current();
     }
 
     /// Returns a slice of [`Token`] that are within the given `range`.
@@ -464,7 +490,7 @@ impl<'src> TokenSource<'src> {
             #[cfg(target_arch = "aarch64")]
             LexerSource::TwoPass {
                 tokens, position, ..
-            } => &tokens.tokens[..=position.unwrap_or(0)],
+            } => &tokens.tokens[..=*position],
         };
         let start = tokens.iter().rposition(|tok| tok.start() == range.start());
         let end = tokens.iter().rposition(|tok| tok.end() == range.end());
@@ -511,9 +537,7 @@ impl<'src> TokenSource<'src> {
         else {
             return;
         };
-        let Some(position) = *position else {
-            return;
-        };
+        let position = *position;
 
         let mut lexer = Lexer::new(self.source, self.mode, self.start_offset);
         for index in 0..=position {
@@ -531,6 +555,21 @@ impl<'src> TokenSource<'src> {
             self.two_pass_backup = Some(tokens);
         }
     }
+
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    fn refresh_current(&mut self) {
+        self.current = match &self.lexer {
+            LexerSource::Streaming(lexer) => Token::new(
+                lexer.current_kind(),
+                lexer.current_range(),
+                lexer.current_flags(),
+            ),
+            LexerSource::TwoPass {
+                tokens, position, ..
+            } => tokens.tokens[*position],
+        };
+    }
 }
 
 pub(crate) struct TokenSourceCheckpoint {
@@ -542,7 +581,7 @@ enum LexerSourceCheckpoint {
     Streaming(LexerCheckpoint),
     #[cfg(target_arch = "aarch64")]
     TwoPass {
-        position: Option<usize>,
+        position: usize,
         nesting: u32,
         rewrites_position: usize,
     },
@@ -564,6 +603,27 @@ fn next_pre_lexed_token(tokens: &TwoPassTokens, mut position: usize) -> (TokenKi
         position += 1;
     }
     (tokens.tokens[position].kind(), position)
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn bump_pre_lexed_token(tokens: &TwoPassTokens, position: &mut usize, nesting: &mut u32) -> Token {
+    let mut next = position.wrapping_add(1).min(tokens.tokens.len() - 1);
+    loop {
+        let token = tokens.tokens[next];
+        match token.kind() {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                *nesting = nesting.saturating_sub(1);
+            }
+            _ => {}
+        }
+        if !token.kind().is_trivia() {
+            *position = next;
+            return token;
+        }
+        next += 1;
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
