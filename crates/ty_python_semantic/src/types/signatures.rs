@@ -1268,6 +1268,11 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns whether `ty` belongs to the closed concrete fragment that the initial higher-rank
+    /// relation can quantify without losing type-variable relationships.
+    ///
+    /// This deliberately excludes gradual types, type variables, and aliases, even when their
+    /// current expansion is nominal.
     fn is_supported_higher_rank_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
             Type::Never => true,
@@ -1281,15 +1286,10 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn has_only_supported_higher_rank_concrete_types(&self, db: &'db dyn Db) -> bool {
-        self.parameters
-            .iter()
-            .map(Parameter::annotated_type)
-            .chain(std::iter::once(self.return_ty))
-            .all(|ty| Self::is_supported_higher_rank_concrete_type(db, ty))
-    }
-
-    /// Return the single callable-local variable supported by the initial higher-rank relation.
+    /// Returns the single callable-local variable supported by the initial higher-rank relation.
+    ///
+    /// The variable must be an unbounded PEP 695 type variable used only as a bare parameter or
+    /// return annotation. In particular, this excludes receiver-bound and nested occurrences.
     fn bare_unbounded_pep695_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
         if self.has_explicit_receiver || !self.parameters.is_standard() {
             return None;
@@ -1635,6 +1635,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// A non-generic source must satisfy every specialization of an unbounded target-local type
     /// variable. Generic sources, overloads, declared domains, nested occurrences, receiver-bound
     /// variables, and enclosing inference variables remain on the existing relation path.
+    ///
+    /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
+    /// the latter must work for every `T`.
+    ///
+    /// ```python
+    /// class Generic(Protocol):
+    ///     def f[T](self, value: T) -> T: ...
+    ///
+    /// class Concrete:
+    ///     def f(self, value: int) -> int: ...
+    /// ```
     fn try_check_nongeneric_source_with_universal_target(
         &self,
         db: &'db dyn Db,
@@ -1644,7 +1655,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if self.inferable != InferableTypeVars::None
             || source.generic_context.is_some()
             || !source.parameters.is_standard()
-            || !source.has_only_supported_higher_rank_concrete_types(db)
+            || !source
+                .parameters
+                .iter()
+                .map(Parameter::annotated_type)
+                .chain(std::iter::once(source.return_ty))
+                .all(|ty| Signature::is_supported_higher_rank_concrete_type(db, ty))
         {
             return None;
         }
