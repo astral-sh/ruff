@@ -16,6 +16,8 @@ use std::arch::x86_64::{
     _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
 };
 
+/// Structural starts for one source batch. Each set bit begins a word run, whitespace run, or
+/// single structural byte; `ascii_source` lets the carver avoid per-identifier Unicode checks.
 #[derive(Debug, Default)]
 pub(super) struct Classified {
     pub(super) starts: Vec<u64>,
@@ -40,6 +42,7 @@ pub(super) fn classify(source: &[u8]) -> Classified {
     classified
 }
 
+/// Reuses `classified` to identify token boundaries across the complete source batch.
 pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let blocks = source.len().div_ceil(64);
     classified.starts.clear();
@@ -48,14 +51,12 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let mut previous_word = 0;
     let mut previous_whitespace = 0;
 
-    #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     let mut chunks = source.chunks_exact(64);
     #[cfg(target_arch = "aarch64")]
     let mut source_or = unsafe { vdupq_n_u8(0) };
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     let mut source_or = unsafe { _mm_setzero_si128() };
 
-    #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     for chunk in &mut chunks {
         // SAFETY: `chunks_exact(64)` guarantees that all four 16-byte loads are in bounds.
         let (word, whitespace, chunk_or) = unsafe { classify_chunk(chunk.as_ptr()) };
@@ -90,15 +91,11 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
         classified.ascii_source = unsafe { _mm_movemask_epi8(source_or) == 0 };
     }
 
-    #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     let tail = chunks.remainder();
-    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
-    let tail = source;
-
-    for chunk in tail.chunks(64) {
+    if !tail.is_empty() {
         let mut word = 0;
         let mut whitespace = 0;
-        for (bit, byte) in chunk.iter().copied().enumerate() {
+        for (bit, byte) in tail.iter().copied().enumerate() {
             let is_non_ascii = !byte.is_ascii();
             classified.ascii_source &= !is_non_ascii;
             if byte.is_ascii_alphanumeric() || byte == b'_' || is_non_ascii {
@@ -107,11 +104,7 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
                 whitespace |= 1 << bit;
             }
         }
-        let valid = if chunk.len() == 64 {
-            u64::MAX
-        } else {
-            (1 << chunk.len()) - 1
-        };
+        let valid = (1 << tail.len()) - 1;
         push_block(
             classified,
             word,
@@ -123,6 +116,7 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     }
 }
 
+/// Converts word and whitespace masks into structural starts while carrying runs across blocks.
 fn push_block(
     classified: &mut Classified,
     word: u64,

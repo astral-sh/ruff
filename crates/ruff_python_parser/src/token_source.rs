@@ -41,10 +41,45 @@ enum LexerSource<'src> {
 }
 
 impl<'src> TokenSource<'src> {
-    /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>, source: &'src str, start_offset: TextSize) -> Self {
-        TokenSource {
-            lexer: LexerSource::Streaming(lexer),
+    /// Creates a token source, using chunked lexing for complete modules when the first batch is
+    /// supported and the streaming lexer otherwise.
+    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+        #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
+        if mode == Mode::Module
+            && start_offset == TextSize::new(0)
+            && let Some(mut lexer) = ChunkedLexer::new(source)
+            && lexer.fill().is_some()
+        {
+            let mut source = TokenSource {
+                lexer: LexerSource::Chunked {
+                    lexer,
+                    position: usize::MAX,
+                    nesting: 0,
+                },
+                current: Token::new(
+                    TokenKind::EndOfFile,
+                    TextRange::empty(start_offset),
+                    TokenFlags::empty(),
+                ),
+                needs_legacy_reparse: false,
+                tokens: Vec::new(),
+            };
+            source.do_bump();
+            return source;
+        }
+
+        Self::from_streaming_source(source, mode, start_offset)
+    }
+
+    /// Creates a token source that always uses the streaming lexer, including when reparsing a
+    /// module after a late chunked-lexer failure.
+    pub(crate) fn from_streaming_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+    ) -> Self {
+        let mut source = TokenSource {
+            lexer: LexerSource::Streaming(Lexer::new(source, mode, start_offset)),
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
             current: Token::new(
                 TokenKind::EndOfFile,
@@ -54,46 +89,7 @@ impl<'src> TokenSource<'src> {
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
             needs_legacy_reparse: false,
             tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),
-        }
-    }
-
-    /// Create a new token source from the given source code which starts at the given offset.
-    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
-        #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-        if mode == Mode::Module
-            && start_offset == TextSize::new(0)
-            && let Some(mut lexer) = ChunkedLexer::new(source)
-        {
-            if lexer.fill().is_some() {
-                let mut source = TokenSource {
-                    lexer: LexerSource::Chunked {
-                        lexer,
-                        position: usize::MAX,
-                        nesting: 0,
-                    },
-                    current: Token::new(
-                        TokenKind::EndOfFile,
-                        TextRange::empty(start_offset),
-                        TokenFlags::empty(),
-                    ),
-                    needs_legacy_reparse: false,
-                    tokens: Vec::new(),
-                };
-                source.do_bump();
-                return source;
-            }
-        }
-
-        Self::from_streaming_source(source, mode, start_offset)
-    }
-
-    pub(crate) fn from_streaming_source(
-        source: &'src str,
-        mode: Mode,
-        start_offset: TextSize,
-    ) -> Self {
-        let lexer = Lexer::new(source, mode, start_offset);
-        let mut source = TokenSource::new(lexer, source, start_offset);
+        };
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
@@ -220,43 +216,31 @@ impl<'src> TokenSource<'src> {
         }
     }
 
-    #[cfg_attr(
-        not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")),
-        expect(irrefutable_let_patterns, reason = "the chunked variant is SIMD-only")
-    )]
+    /// Re-lexes a string token in an interpolation element for the streaming lexer. Chunked
+    /// f/t-strings are emitted as complete token sequences and need no adjustment.
     pub(crate) fn re_lex_string_token_in_interpolation_element(
         &mut self,
         kind: InterpolatedStringKind,
     ) {
-        #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-        {
-            if matches!(self.lexer, LexerSource::Chunked { .. }) {
-                return;
+        match &mut self.lexer {
+            LexerSource::Streaming(lexer) => {
+                lexer.re_lex_string_token_in_interpolation_element(kind);
             }
-        }
-
-        if let LexerSource::Streaming(lexer) = &mut self.lexer {
-            lexer.re_lex_string_token_in_interpolation_element(kind);
+            #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
+            LexerSource::Chunked { .. } => return,
         }
 
         #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
         self.refresh_current();
     }
 
-    #[cfg_attr(
-        not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")),
-        expect(irrefutable_let_patterns, reason = "the chunked variant is SIMD-only")
-    )]
+    /// Re-lexes a raw string in a format spec for the streaming lexer; this is already resolved
+    /// when the chunked lexer appends an interpolated string.
     pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
-        #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-        {
-            if matches!(self.lexer, LexerSource::Chunked { .. }) {
-                return;
-            }
-        }
-
-        if let LexerSource::Streaming(lexer) = &mut self.lexer {
-            lexer.re_lex_raw_string_in_format_spec();
+        match &mut self.lexer {
+            LexerSource::Streaming(lexer) => lexer.re_lex_raw_string_in_format_spec(),
+            #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
+            LexerSource::Chunked { .. } => return,
         }
 
         #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
@@ -470,9 +454,7 @@ impl<'src> TokenSource<'src> {
         &tokens[start..=end]
     }
 
-    /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
-    /// encountered during lexing. The token collection includes both the trivia and non-trivia
-    /// tokens.
+    /// Consumes the token source, returning all trivia and non-trivia tokens plus lexical errors.
     pub(crate) fn finish(self) -> (Vec<Token>, Vec<LexicalError>) {
         assert_eq!(
             self.current_kind(),
@@ -496,6 +478,7 @@ impl<'src> TokenSource<'src> {
         (tokens, errors)
     }
 
+    /// Returns whether chunked lexing or parser-directed re-lexing requires a streaming reparse.
     #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     pub(crate) fn should_reparse_with_legacy_lexer(&self) -> bool {
         self.needs_legacy_reparse
@@ -541,6 +524,7 @@ fn next_non_trivia_token(lexer: &mut Lexer) -> TokenKind {
     }
 }
 
+/// Finds the next non-trivia buffered token, refilling on demand without advancing the parser.
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 fn next_buffered_token(
     lexer: &mut ChunkedLexer,
@@ -557,6 +541,7 @@ fn next_buffered_token(
     }
 }
 
+/// Advances to the next non-trivia buffered token and maintains delimiter nesting for the parser.
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 fn bump_buffered_token(
@@ -599,6 +584,8 @@ fn ensure_buffered_token(
     position.min(lexer.tokens.tokens.len() - 1)
 }
 
+/// Refills through `position`. A failed batch appends a synthetic EOF and requests one streaming
+/// reparse, preventing repeated failed refills during error recovery.
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 #[cold]
 fn refill_buffered_tokens(
@@ -631,6 +618,7 @@ fn refill_buffered_tokens(
     }
 }
 
+/// Restores contextual token-kind rewrites made after a parser checkpoint.
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 fn rewind_rewrites(lexer: &mut ChunkedLexer, position: usize) {
     for (index, token) in lexer.tokens.rewrites.drain(position..).rev() {

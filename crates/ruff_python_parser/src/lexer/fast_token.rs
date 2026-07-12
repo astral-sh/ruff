@@ -1,5 +1,6 @@
 use ruff_python_ast::token::TokenKind;
 
+/// Classifies an already-delimited identifier as a keyword or name.
 #[inline]
 pub(super) fn keyword(text: &[u8]) -> TokenKind {
     match text {
@@ -46,6 +47,7 @@ pub(super) fn keyword(text: &[u8]) -> TokenKind {
     }
 }
 
+/// Matches the longest Python operator or delimiter beginning at `start`.
 #[inline]
 pub(super) fn operator(source: &[u8], start: usize) -> Option<(TokenKind, usize)> {
     let source = source.get(start..)?;
@@ -105,6 +107,12 @@ pub(super) fn operator(source: &[u8], start: usize) -> Option<(TokenKind, usize)
     Some((kind, start + len))
 }
 
+/// Scans a Python numeric literal and returns its kind and end. Malformed or ambiguous literals
+/// return `None` so the streaming lexer can produce the canonical diagnostic.
+///
+/// ```python
+/// value = 0x_f + 1_000e-2j + .5
+/// ```
 #[inline]
 pub(super) fn number(source: &[u8], start: usize) -> Option<(TokenKind, usize)> {
     let first = *source.get(start)?;

@@ -19,13 +19,6 @@ pub(crate) struct ChunkedTokens {
 }
 
 impl ChunkedTokens {
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            tokens: Vec::with_capacity(capacity),
-            rewrites: Vec::new(),
-        }
-    }
-
     #[inline]
     fn push(&mut self, kind: TokenKind, start: usize, end: usize, flags: TokenFlags) {
         self.tokens.push(Token::new(
@@ -43,6 +36,9 @@ impl ChunkedTokens {
 
 const CHUNK_SIZE: usize = 32 * 1024;
 
+/// An on-demand lexer that classifies fixed-size source batches with SIMD and buffers complete
+/// tokens for the parser. Unsupported or malformed input returns `None` so parsing can restart
+/// with the streaming lexer.
 #[derive(Debug)]
 pub(crate) struct ChunkedLexer<'src> {
     pub(crate) tokens: ChunkedTokens,
@@ -59,10 +55,14 @@ pub(crate) struct ChunkedLexer<'src> {
 }
 
 impl<'src> ChunkedLexer<'src> {
+    /// Creates a chunked lexer for a source whose byte offsets fit in [`TextSize`].
     pub(crate) fn new(source: &'src str) -> Option<Self> {
         u32::try_from(source.len()).ok()?;
         Some(Self {
-            tokens: ChunkedTokens::with_capacity(source.len() / 8),
+            tokens: ChunkedTokens {
+                tokens: Vec::with_capacity(source.len() / 8),
+                rewrites: Vec::new(),
+            },
             source,
             offset: 0,
             classified: Classified::default(),
@@ -346,6 +346,12 @@ const fn is_whitespace(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\x0c')
 }
 
+/// Appends one complete f-string or t-string, including nested interpolation tokens, using the
+/// streaming lexer to preserve its context-sensitive tokenization.
+///
+/// ```python
+/// value = f"{item!r:{width}}"
+/// ```
 fn append_interpolated_string(
     source: &str,
     start: usize,
@@ -374,6 +380,7 @@ fn append_interpolated_string(
     }
 }
 
+/// Converts a valid Python string prefix into token flags, preserving raw-prefix casing.
 fn string_prefix(text: &[u8]) -> Option<TokenFlags> {
     let flags = match text {
         b"f" | b"F" => TokenFlags::F_STRING,
@@ -405,6 +412,9 @@ fn string_prefix(text: &[u8]) -> Option<TokenFlags> {
     Some(flags)
 }
 
+/// Scans a non-interpolated string from its opening quote and returns its end and quote flags.
+/// Unterminated strings and single-quoted strings containing a newline fall back to the streaming
+/// lexer for diagnostics.
 fn string(source: &[u8], quote: usize, mut flags: TokenFlags) -> Option<(usize, TokenFlags)> {
     let quote_byte = *source.get(quote)?;
     if quote_byte == b'"' {
@@ -455,6 +465,8 @@ fn valid_identifier(text: &str) -> bool {
     (first == '_' || is_xid_start(first)) && chars.all(is_xid_continue)
 }
 
+/// Iterates structural-token starts from the classifier bitmap and can skip the interior of a
+/// token that was coalesced by the scalar pass.
 struct Starts<'a> {
     bitmap: &'a [u64],
     block: usize,
@@ -497,6 +509,7 @@ impl<'a> Starts<'a> {
             })
     }
 
+    /// Discards every pending structural start before `offset`.
     #[inline]
     fn seek(&mut self, offset: usize) {
         let offset = offset - self.base;
@@ -541,10 +554,7 @@ mod tests {
 
     fn assert_matches(source: &str) {
         let actual = lex(source).expect("chunked lexer to accept the source");
-        assert_eq!(
-            format!("{:?}", actual.tokens),
-            format!("{:?}", legacy(source))
-        );
+        assert_eq!(actual.tokens, legacy(source));
     }
 
     #[test]
