@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, Stmt};
-use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -105,18 +104,10 @@ pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
             return;
         }
 
-        let range = stmt.range();
+        let edit = checker.importer().add_import_at_start(stmt);
 
-        // Include comments but not the trailing newline (so we don't insert an extra newline).
-        let text_range = TextRange::new(range.start(), locator.line_end(range.end()));
-
-        let edit = checker
-            .importer()
-            .add_at_start(checker.source()[text_range].trim_whitespace(), None);
-
-        // Include comments *and* the trailing newline, so that we do remove the whole line.
-        let removal_range =
-            TextRange::new(text_range.start(), locator.full_line_end(text_range.end()));
+        // Include trailing comments and the newline in the removal.
+        let removal_range = TextRange::new(stmt.start(), locator.full_line_end(stmt.end()));
 
         diagnostic.set_fix(Fix::unsafe_edits(
             Edit::range_deletion(removal_range),
