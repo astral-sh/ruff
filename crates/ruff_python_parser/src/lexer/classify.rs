@@ -3,28 +3,34 @@
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{
     uint8x16_t, vandq_u8, vceqq_u8, vcgeq_u8, vcleq_u8, vdupq_n_u8, vgetq_lane_u64, vld1q_u8,
-    vorrq_u8, vpaddq_u8, vreinterpretq_u64_u8, vsubq_u8,
+    vmaxvq_u8, vorrq_u8, vpaddq_u8, vreinterpretq_u64_u8, vsubq_u8,
 };
 
 pub(super) struct Classified {
     pub(super) starts: Vec<u64>,
+    pub(super) ascii_source: bool,
 }
 
 pub(super) fn classify(source: &[u8]) -> Classified {
     let blocks = source.len().div_ceil(64);
     let mut classified = Classified {
         starts: Vec::with_capacity(blocks),
+        ascii_source: true,
     };
     let mut previous_word = 0;
     let mut previous_whitespace = 0;
 
     #[cfg(target_arch = "aarch64")]
     let mut chunks = source.chunks_exact(64);
+    #[cfg(target_arch = "aarch64")]
+    let mut source_or = unsafe { vdupq_n_u8(0) };
 
     #[cfg(target_arch = "aarch64")]
     for chunk in &mut chunks {
         // SAFETY: `chunks_exact(64)` guarantees that all four 16-byte loads are in bounds.
-        let (word, whitespace) = unsafe { classify_chunk(chunk.as_ptr()) };
+        let (word, whitespace, chunk_or) = unsafe { classify_chunk(chunk.as_ptr()) };
+        // SAFETY: All NEON operations are valid for arbitrary byte vectors.
+        source_or = unsafe { vorrq_u8(source_or, chunk_or) };
         push_block(
             &mut classified,
             word,
@@ -33,6 +39,12 @@ pub(super) fn classify(source: &[u8]) -> Classified {
             &mut previous_whitespace,
             u64::MAX,
         );
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        // SAFETY: All NEON operations are valid for arbitrary byte vectors.
+        classified.ascii_source = unsafe { vmaxvq_u8(source_or) < 0x80 };
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -45,6 +57,7 @@ pub(super) fn classify(source: &[u8]) -> Classified {
         let mut whitespace = 0;
         for (bit, byte) in chunk.iter().copied().enumerate() {
             let is_non_ascii = !byte.is_ascii();
+            classified.ascii_source &= !is_non_ascii;
             if byte.is_ascii_alphanumeric() || byte == b'_' || is_non_ascii {
                 word |= 1 << bit;
             } else if matches!(byte, b' ' | b'\t' | b'\x0c') {
@@ -91,7 +104,7 @@ fn push_block(
 
 #[cfg(target_arch = "aarch64")]
 #[inline]
-unsafe fn classify_chunk(source: *const u8) -> (u64, u64) {
+unsafe fn classify_chunk(source: *const u8) -> (u64, u64, uint8x16_t) {
     // SAFETY: The caller guarantees that `source..source + 64` is valid.
     unsafe {
         let first = vld1q_u8(source);
@@ -114,7 +127,8 @@ unsafe fn classify_chunk(source: *const u8) -> (u64, u64) {
             whitespace_predicate(third),
             whitespace_predicate(fourth),
         );
-        (word, whitespace)
+        let source_or = vorrq_u8(vorrq_u8(first, second), vorrq_u8(third, fourth));
+        (word, whitespace, source_or)
     }
 }
 
@@ -194,6 +208,7 @@ mod tests {
         }
 
         assert_eq!(classified.starts, expected_starts);
+        assert_eq!(classified.ascii_source, source.is_ascii());
     }
 
     #[test]
@@ -235,5 +250,15 @@ mod tests {
     fn non_ascii_is_part_of_a_word_run() {
         let source = "before \u{03bb}\u{53d8}\u{91cf}_2 + after".as_bytes();
         assert_matches_scalar(source);
+    }
+
+    #[test]
+    fn non_ascii_is_detected_at_chunk_boundaries() {
+        for offset in [0, 15, 16, 31, 32, 47, 48, 63, 64, 65, 127, 128, 129] {
+            let mut source = vec![b'a'; offset];
+            source.push(0x80);
+            source.extend(std::iter::repeat_n(b'a', 65));
+            assert_matches_scalar(&source);
+        }
     }
 }

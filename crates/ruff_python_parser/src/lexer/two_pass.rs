@@ -52,7 +52,6 @@ pub(crate) fn lex(source: &str) -> Option<TwoPassTokens> {
         return None;
     }
     let classified = classify(bytes);
-    let ascii_source = bytes.is_ascii();
     let mut structural = Starts::new(&classified.starts);
     let mut tokens = TwoPassTokens::with_capacity(bytes.len() / 8);
     let mut indentations = Indentations::default();
@@ -174,7 +173,7 @@ pub(crate) fn lex(source: &str) -> Option<TwoPassTokens> {
                 continue;
             }
 
-            let (kind, flags) = if ascii_source {
+            let (kind, flags) = if classified.ascii_source {
                 (keyword(&bytes[start..end]), TokenFlags::empty())
             } else {
                 let text = &source[start..end];
