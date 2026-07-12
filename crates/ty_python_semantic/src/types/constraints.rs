@@ -109,8 +109,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionType,
+    BoundTypeVarInstance, IntersectionType, KnownInstanceType, Type, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -329,7 +329,12 @@ pub(crate) enum ConstraintProjectionError {
 }
 
 fn contains_type_alias(db: &dyn Db, ty: Type<'_>) -> bool {
-    any_over_type(db, ty, false, |nested| matches!(nested, Type::TypeAlias(_)))
+    any_over_type(db, ty, false, |nested| {
+        matches!(
+            nested,
+            Type::TypeAlias(_) | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
+        )
+    })
 }
 
 /// A set of constraints under which a type property holds.
@@ -7271,7 +7276,7 @@ mod tests {
         class.to_instance(db)
     }
 
-    fn identity_alias<'db>(db: &'db TestDb, argument: Type<'db>) -> Type<'db> {
+    fn specialized_identity_alias<'db>(db: &'db TestDb, argument: Type<'db>) -> TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/alias.py").unwrap();
         let alias = global_symbol(db, module, "Identity").place.expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
@@ -7279,9 +7284,9 @@ mod tests {
         else {
             panic!("expected `Identity` to be a PEP 695 type alias");
         };
-        Type::TypeAlias(TypeAliasType::PEP695(
+        TypeAliasType::PEP695(
             alias.apply_specialization(db, |context| context.specialize(db, &[argument])),
-        ))
+        )
     }
 
     #[test]
@@ -7909,29 +7914,38 @@ mod tests {
         let source = create_typevar(&db, "S");
         let target = create_typevar(&db, "T");
         let builder = ConstraintSetBuilder::new();
-        let alias_of_source = identity_alias(&db, Type::TypeVar(source));
-        let alias_relation =
-            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, alias_of_source);
         let source_locals = typevar_set(&db, [source]);
+        let alias = specialized_identity_alias(&db, Type::TypeVar(source));
 
-        assert!(matches!(
-            alias_relation.try_exists_assuming(
+        for alias_of_source in [
+            Type::TypeAlias(alias),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)),
+        ] {
+            let alias_relation = ConstraintSet::constrain_typevar_lower_bound(
                 &db,
                 &builder,
-                source_locals,
-                ConstraintSet::always(&builder),
-            ),
-            Err(ConstraintProjectionError::OpaqueTypeAlias)
-        ));
-        assert!(matches!(
-            ConstraintSet::always(&builder).try_exists_assuming(
-                &db,
-                &builder,
-                source_locals,
-                alias_relation,
-            ),
-            Err(ConstraintProjectionError::OpaqueTypeAlias)
-        ));
+                target,
+                alias_of_source,
+            );
+            assert!(matches!(
+                alias_relation.try_exists_assuming(
+                    &db,
+                    &builder,
+                    source_locals,
+                    ConstraintSet::always(&builder),
+                ),
+                Err(ConstraintProjectionError::OpaqueTypeAlias)
+            ));
+            assert!(matches!(
+                ConstraintSet::always(&builder).try_exists_assuming(
+                    &db,
+                    &builder,
+                    source_locals,
+                    alias_relation,
+                ),
+                Err(ConstraintProjectionError::OpaqueTypeAlias)
+            ));
+        }
     }
 
     #[test]
