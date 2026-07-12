@@ -175,7 +175,7 @@ impl ProjectDatabase {
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
-        self.project().check_file(self, file)
+        crate::check_file(self, file)
     }
 
     /// Set the check mode for the project.
@@ -560,8 +560,14 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl ty_python_core::Db for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
-        self.project
-            .is_some_and(|project| project.should_check_file(self, file))
+        let path = file.path(self);
+        if path.is_vendored_path() {
+            tracing::trace!("Not checking {path} because it is a vendored path");
+            false
+        } else {
+            self.project
+                .is_some_and(|_| crate::should_check_file(self, file))
+        }
     }
 }
 
@@ -754,7 +760,13 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
-            !file.path(self).is_vendored_path()
+            let path = file.path(self);
+            if path.is_vendored_path() {
+                tracing::trace!("Not checking {path} because it is a vendored path");
+                false
+            } else {
+                crate::should_check_file(self, file)
+            }
         }
     }
 
@@ -762,7 +774,7 @@ pub(crate) mod testing {
     impl ty_python_semantic::Db for TestDb {
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
-            self.project().check_file(self, file)
+            crate::check_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
