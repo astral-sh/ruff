@@ -1526,12 +1526,12 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns the source-local variables supported by the initial generic-source relation.
+    /// Returns the method-local variables supported by the simple generic-signature relation.
     ///
-    /// Every source variable must be an unbounded PEP 695 type variable used only as a bare
-    /// parameter or return annotation. Their specializations can then be chosen existentially for
-    /// each universally quantified target specialization.
-    fn simple_generic_source_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
+    /// Every variable must be an unbounded PEP 695 or legacy type variable bound by this method
+    /// and used only as a bare parameter or return annotation. Their specializations can then be
+    /// quantified without capturing class-scoped variables or changing nested inference.
+    fn simple_generic_method_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         if !self.parameters.is_standard() {
             return None;
         }
@@ -1541,8 +1541,10 @@ impl<'db> Signature<'db> {
             .generic_context?
             .variables(db)
             .map(|typevar| {
-                (typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                    && typevar.binding_context(db).definition() == Some(definition)
+                (matches!(
+                    typevar.kind(db),
+                    TypeVarKind::Pep695TypeVar | TypeVarKind::LegacyTypeVar
+                ) && typevar.binding_context(db).definition() == Some(definition)
                     && typevar.typevar(db).bound_or_constraints(db).is_none())
                 .then(|| typevar.identity(db))
             })
@@ -2116,19 +2118,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // The inferable set can also include variables referenced by a bound. Do not
                 // universally quantify variables owned by an enclosing context.
                 variables.len() == target_inferable.iter(db).count()
-                    && variables.all(|typevar| {
+                    && (variables.all(|typevar| {
                         matches!(
                             typevar.kind(db),
                             TypeVarKind::Pep695TypeVar
                                 | TypeVarKind::Pep695ParamSpec
                                 | TypeVarKind::Pep695TypeVarTuple
                         )
-                    })
+                    }) || target.simple_generic_method_typevars(db) == Some(target_inferable))
             }) {
             if source.generic_context.is_none() {
                 Some(InferableTypeVars::None)
             } else {
-                source.simple_generic_source_typevars(db)
+                source.simple_generic_method_typevars(db)
             }
         } else {
             None
@@ -2173,9 +2175,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         });
 
         // A non-generic source, or a supported simple generic source, must satisfy every
-        // specialization of a PEP 695 generic target. Eliminate source locals first so their
-        // specialization can depend on the target specialization. Other generic sources, legacy
-        // target typevars, and enclosing inference remain on the existing existential path.
+        // specialization of a supported generic target. Eliminate source locals first so their
+        // specialization can depend on the target specialization. More complex generic sources,
+        // non-local or bounded legacy target typevars, and enclosing inference remain on the
+        // existing existential path.
         if let Some(source_existential) = universal_source_existential {
             when.reduce_inferable(db, self.constraints, source_existential)
                 .for_all(db, self.constraints, target_inferable)
