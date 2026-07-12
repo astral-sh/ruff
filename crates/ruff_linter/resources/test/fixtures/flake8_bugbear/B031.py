@@ -235,3 +235,10 @@ for name, group in groupby(items):
     collect_shop_items("Jane", items)
     # This shouldn't be flagged as the `groupby` function is different
     collect_shop_items("Joe", items)
+
+# Regression test: match statement with groupby reference should not panic.
+# Issue #26624
+for key, group in groupby(items):
+    match list(group):
+        case _:
+            pass
