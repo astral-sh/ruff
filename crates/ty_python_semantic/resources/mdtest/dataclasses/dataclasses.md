@@ -156,6 +156,26 @@ class BadWithInitFalse:
     z: float
 ```
 
+Class-level `init=False` suppresses the ordering check because no constructor is generated:
+
+```py
+@dataclass(init=False)
+class GoodWithClassInitFalse:
+    x: int = 1
+    y: str
+
+    def __init__(self, y: str) -> None:
+        self.y = y
+
+GoodWithClassInitFalse("value")
+
+# Re-enabling `init` makes the inherited default-before-required ordering invalid at runtime.
+# TODO: error: [dataclass-field-order]
+@dataclass
+class BadWithReenabledInit(GoodWithClassInitFalse):
+    pass
+```
+
 Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
 
 ```toml
