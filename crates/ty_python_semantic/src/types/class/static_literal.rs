@@ -267,6 +267,11 @@ impl<'db> StaticClassLiteral<'db> {
         None
     }
 
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
