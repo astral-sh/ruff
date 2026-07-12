@@ -1010,6 +1010,12 @@ class B9(A9):
 class C9(A9):
     def method(self, x: object) -> Never: ...  # fine
 
+class D9(A9):
+    def method[S](self, x: S) -> S: ...  # fine
+
+class E9(A9):
+    def method[S](self, x: S) -> int: ...  # error: [invalid-method-override]
+
 class A10:
     def method[T](self, x: list[T]) -> int: ...
 
@@ -1018,6 +1024,9 @@ class B10(A10):
 
 class C10(A10):
     def method(self, x: object) -> int: ...  # fine
+
+class D10(A10):
+    def method[S](self, x: S) -> int: ...  # fine
 
 class A11:
     def method[T](self, x: list[T], context: Any) -> list[T]: ...

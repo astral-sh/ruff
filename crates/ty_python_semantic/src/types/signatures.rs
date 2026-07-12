@@ -1344,10 +1344,9 @@ impl<'db> Signature<'db> {
 
     /// Returns the single target-local variable supported in a shallow nominal annotation.
     ///
-    /// This extends the initial higher-rank fragment only for non-generic source signatures.
-    /// Keeping the target to one unbounded PEP 695 variable and one nominal layer avoids both
-    /// dependent source projection and independent-variable TDD expansion. Bare class-scoped
-    /// variables in other annotations remain rigid.
+    /// Keeping the target to one unbounded PEP 695 variable and one nominal layer avoids
+    /// independent-variable TDD expansion and bounds dependent source projection. Bare
+    /// class-scoped variables in other annotations remain rigid.
     fn single_nested_target_typevar(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         fn is_supported<'db>(
             db: &'db dyn Db,
@@ -1723,10 +1722,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Check the initial closed fragment of higher-rank generic callable relations.
     ///
     /// The source's unbounded local type variables may depend on the target's unbounded local type
-    /// variables. A non-generic source may also be checked against a target with one unbounded local
-    /// occurring in a shallow nominal annotation. Overloads, declared domains, other nested
-    /// occurrences, receiver-bound variables, and enclosing inference variables that occur in
-    /// either signature remain on the existing relation path.
+    /// variables. A target may also contain one unbounded local in a shallow nominal annotation;
+    /// a generic source can specialize its bare local to that annotation. Overloads, declared
+    /// domains, other nested occurrences, receiver-bound variables, and enclosing inference
+    /// variables that occur in either signature remain on the existing relation path.
     ///
     /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
     /// the latter must work for every `T`.
@@ -1789,16 +1788,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_has_locals = source_locals != InferableTypeVars::None;
 
         let bare_target_locals = target.bare_unbounded_method_typevars(db);
-        let nested_target_locals = if bare_target_locals.is_none() && !source_has_locals {
+        let nested_target_local = if bare_target_locals.is_none() {
             target.single_nested_target_typevar(db)
         } else {
             None
         };
-        let target_locals = bare_target_locals.or(nested_target_locals)?;
+        let target_locals = bare_target_locals.or(nested_target_local)?;
 
         // A large closed union cannot cover every specialization of an unbounded target local.
         // Reject it before invariant comparison distributes the union into a large constraint set.
-        if nested_target_locals.is_some()
+        if nested_target_local.is_some()
             && source
                 .parameters
                 .iter()
@@ -1823,6 +1822,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             return Some(self.never());
         }
+        if nested_target_local.is_some()
+            && source_has_locals
+            && source_locals.iter(db).nth(1).is_some()
+        {
+            return None;
+        }
         // The quantifiers must bind distinct occurrences. A signature compared with itself can
         // stay on the existing relation path instead of treating one occurrence as both binders.
         if source_locals
@@ -1843,11 +1848,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // The source specialization may depend on the target specialization, so eliminate the
         // source locals existentially before eliminating the target locals universally.
-        Some(
+        let projected = if source_has_locals && nested_target_local.is_some() {
             relation
-                .reduce_inferable(db, self.constraints, source_locals)
-                .for_all(db, self.constraints, target_locals),
-        )
+                .try_exists_assuming(db, self.constraints, source_locals, self.always())
+                .unwrap_or_else(|_| self.never())
+        } else {
+            relation.reduce_inferable(db, self.constraints, source_locals)
+        };
+        Some(projected.for_all(db, self.constraints, target_locals))
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable

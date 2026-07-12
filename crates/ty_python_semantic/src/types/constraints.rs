@@ -628,14 +628,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// `assumptions` must not mention any variable in `to_remove`; because they are independent of
     /// those variables, they are conjoined only after projection and remain factored during the
     /// abstraction traversal. Type aliases are rejected conservatively because their opaque values
-    /// might contain a projected variable.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "used by quantified signature projection in the stacked follow-up"
-        )
-    )]
+    /// might contain a projected variable. A projected subject may have shallow nominal bounds
+    /// containing surviving variables; deeper or recursively dependent bounds remain unsupported.
     pub(crate) fn try_exists_assuming(
         self,
         db: &'db dyn Db,
@@ -4337,7 +4331,25 @@ impl InteriorNode {
                     }
                     if subject_is_removed {
                         if bound.as_typevar().is_none() && contains_any_typevar(bound) {
-                            return Err(ConstraintProjectionError::NestedTypeVarRelation);
+                            let Type::NominalInstance(instance) = bound else {
+                                return Err(ConstraintProjectionError::NestedTypeVarRelation);
+                            };
+                            if instance.own_tuple_spec(db).is_some()
+                                || instance.inherits_from_explicit_any()
+                                || contains_removed(bound)
+                                || instance
+                                    .class(db)
+                                    .class_literal_and_specialization(db)
+                                    .1
+                                    .is_some_and(|specialization| {
+                                        specialization.types(db).iter().copied().any(|argument| {
+                                            argument.as_typevar().is_none()
+                                                && contains_any_typevar(argument)
+                                        })
+                                    })
+                            {
+                                return Err(ConstraintProjectionError::NestedTypeVarRelation);
+                            }
                         }
                     } else if contains_removed(bound) {
                         if !bound.as_typevar().is_some_and(is_removed) {
@@ -7904,7 +7916,7 @@ mod tests {
     }
 
     #[test]
-    fn fallible_projection_rejects_nested_relations() {
+    fn fallible_projection_preserves_shallow_subject_bounds() {
         let db = setup_db();
         let source = create_typevar(&db, "S");
         let target = create_typevar(&db, "T");
@@ -7914,8 +7926,65 @@ mod tests {
         let source_below_list =
             ConstraintSet::constrain_typevar_upper_bound(&db, &builder, source, list_of_target);
 
+        let projected = source_below_list
+            .try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            )
+            .expect("an unbounded source variable can specialize to a shallow nominal type");
+        assert!(projected.is_always_satisfied(&db));
+
+        let source_above_list =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, source, list_of_target);
+        let projected = source_above_list
+            .try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            )
+            .expect("an unbounded source variable can specialize to a shallow nominal type");
+        assert!(projected.is_always_satisfied(&db));
+
+        let exact_source =
+            ConstraintSet::constrain_typevar(&db, &builder, source, list_of_target, list_of_target);
+        let projected = exact_source
+            .try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            )
+            .expect("an unbounded source variable can specialize to a shallow nominal type");
+        assert!(projected.is_always_satisfied(&db));
+
+        let list_of_int =
+            KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+        let restricted_source =
+            ConstraintSet::constrain_typevar(&db, &builder, source, list_of_target, list_of_int);
+        let projected = restricted_source
+            .try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            )
+            .expect("shallow source bounds preserve their relationship during projection")
+            .for_all(&db, &builder, typevar_set(&db, [target]));
+        assert!(projected.is_never_satisfied(&db));
+
+        let nested_list_of_target =
+            KnownClass::List.to_specialized_instance(&db, &[list_of_target]);
+        let source_below_nested_list = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            source,
+            nested_list_of_target,
+        );
         assert!(matches!(
-            source_below_list.try_exists_assuming(
+            source_below_nested_list.try_exists_assuming(
                 &db,
                 &builder,
                 typevar_set(&db, [source]),

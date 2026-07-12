@@ -3221,6 +3221,18 @@ class NominalNestedConcreteGenericClass[S]:
     def nested(self, input: list[int]) -> list[int]:
         return input
 
+class NominalNestedGenericIdentity:
+    def nested[S](self, input: S) -> S:
+        return input
+
+class NominalNestedGenericReturnsInt:
+    def nested[S](self, input: S) -> int:
+        return 0
+
+class NominalNestedInputGeneric:
+    def nested_input[S](self, input: S) -> int:
+        return 0
+
 class NominalTopBottom:
     def f(self, input: object) -> Never:
         raise NotImplementedError
@@ -3338,6 +3350,13 @@ def consume_nested[U](value: NestedFunctionScoped, other: U) -> U:
 # error: [invalid-argument-type]
 consume_nested(NominalNestedConcrete(), 1)
 consume_nested(NominalNestedTopBottom(), 1)
+
+static_assert(is_assignable_to(NominalNestedGenericIdentity, NestedFunctionScoped))
+static_assert(is_subtype_of(NominalNestedGenericIdentity, NestedFunctionScoped))
+static_assert(not is_assignable_to(NominalNestedGenericReturnsInt, NestedFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedGenericReturnsInt, NestedFunctionScoped))
+static_assert(is_assignable_to(NominalNestedInputGeneric, NestedInputFunctionScoped))
+static_assert(is_subtype_of(NominalNestedInputGeneric, NestedInputFunctionScoped))
 
 # A concrete implementation cannot satisfy every specialization of a generic method.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
