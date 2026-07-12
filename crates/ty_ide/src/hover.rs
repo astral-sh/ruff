@@ -3880,11 +3880,11 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        str
+        assert_snapshot!(test.hover(), @r#"
+        Literal["a", "b"]
         ---------------------------------------------
         ```python
-        str
+        Literal["a", "b"]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3896,7 +3896,7 @@ def function():
           |                 |Cursor offset
           |                 source
           |
-        ");
+        "#);
     }
 
     #[test]

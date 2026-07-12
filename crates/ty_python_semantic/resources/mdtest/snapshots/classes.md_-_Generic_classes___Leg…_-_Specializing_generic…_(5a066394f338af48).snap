@@ -139,6 +139,7 @@ error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound
 14 | BoundedT = TypeVar("BoundedT", bound=int)
    | -------- Type variable defined here
    |
+info: element `str` of union `int | str` is not assignable to `int`
 
 ```
 

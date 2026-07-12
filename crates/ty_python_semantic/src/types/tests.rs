@@ -60,6 +60,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 }
 
 #[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
@@ -359,9 +360,9 @@ fn type_alias_variance() {
     fn get_bound_typevar<'db>(
         db: &'db TestDb,
         type_alias: PEP695TypeAliasType<'db>,
-    ) -> BoundTypeVarInstance<'db> {
+    ) -> BoundTypeVarIdentity<'db> {
         let generic_context = type_alias.generic_context(db).unwrap();
-        generic_context.variables(db).next().unwrap()
+        generic_context.variables(db).next().unwrap().identity(db)
     }
 
     let mut db = setup_db();

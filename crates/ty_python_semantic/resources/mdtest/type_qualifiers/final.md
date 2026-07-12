@@ -259,9 +259,13 @@ class Meta(type):
     META_FINAL_A: Final[int] = 1
     META_FINAL_B: Final = 1
 
+    def CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR(cls) -> int:
+        return 1
+
 class C(metaclass=Meta):
     CLASS_FINAL_A: Final[int] = 1
     CLASS_FINAL_B: Final = 1
+    CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR: Final[int] = 1
 
     def __init__(self):
         self.INSTANCE_FINAL_A: Final[int] = 1
@@ -282,6 +286,8 @@ C.CLASS_FINAL_A = 2
 C.CLASS_FINAL_B = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
 C.CLASS_FINAL_A += 1
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR` on type `<class 'C'>`"
+C.CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR = 2
 
 c = C()
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `C`"
@@ -689,7 +695,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated, TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1

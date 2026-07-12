@@ -452,6 +452,65 @@ info: Method defined here
   |
 ```
 
+## Calls to protocol methods
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    def method(self, value: int) -> None: ...
+
+def f(p: P) -> None:
+    p.method("bad")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `P.method` is incorrect
+ --> src/mdtest_snippet.py:7:14
+  |
+7 |     p.method("bad")  # snapshot: invalid-argument-type
+  |              ^^^^^ Expected `int`, found `Literal["bad"]`
+  |
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def method(self, value: int) -> None: ...
+  |         ^^^^^^       ---------- Parameter declared here
+  |
+```
+
+## Calls to overloaded protocol methods
+
+```py
+from typing import Protocol, overload
+
+class P(Protocol):
+    @overload
+    def method(self, value: int) -> None: ...
+    @overload
+    def method(self, value: int, extra: int) -> None: ...
+
+def f(p: P) -> None:
+    p.method("bad")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `P.method` is incorrect
+  --> src/mdtest_snippet.py:10:14
+   |
+10 |     p.method("bad")  # snapshot: invalid-argument-type
+   |              ^^^^^ Expected `int`, found `Literal["bad"]`
+   |
+info: Matching overload defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def method(self, value: int) -> None: ...
+  |         ^^^^^^       ---------- Parameter declared here
+  |
+info: Non-matching overloads for bound method `method`:
+info:   (self, /, value: int, extra: int) -> None
+```
+
 ## Types with the same name but from different files
 
 `module.py`:

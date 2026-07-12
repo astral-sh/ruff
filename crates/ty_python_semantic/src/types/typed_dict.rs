@@ -53,7 +53,9 @@ impl Default for TypedDictParams {
 /// An implicitly open `TypedDict` may contain hidden items, but those items are not directly
 /// accessible through most operations. A `TypedDict` with explicit extra items exposes those items
 /// with a known type.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub enum TypedDictOpenness<'db> {
     /// Undeclared items may exist at runtime, but are not directly accessible through most
     /// `TypedDict` operations.
@@ -167,7 +169,7 @@ impl<'db> TypedDictOpenness<'db> {
 /// This represents either an explicit `extra_items` declaration or the synthetic read-only
 /// `object` policy returned for an implicitly open `TypedDict` by
 /// [`TypedDictOpenness::effective_extra_items`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct TypedDictExtraItems<'db> {
     pub(crate) declared_ty: Type<'db>,
     is_read_only: bool,
@@ -200,7 +202,7 @@ pub(super) fn functional_typed_dict_field(
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
@@ -210,7 +212,7 @@ pub enum TypedDictType<'db> {
     Synthesized(SynthesizedTypedDictType<'db>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SynthesizedTypedDictKind {
     Schema,
     Patch,
@@ -234,6 +236,7 @@ impl<'db> TypedDictType<'db> {
     /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -729,19 +732,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // required target fields
                 let Some(source_item_field) = source_items.get(target_item_name) else {
                     // Self is missing a required field.
-                    self.provide_context(|| ErrorContext::TypedDictFieldMissing {
-                        field_name: target_item_name.clone(),
-                        source,
-                    });
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::TypedDictFieldMissing {
+                            field_name: target_item_name.clone(),
+                            source,
+                        });
+                    }
                     return self.never();
                 };
                 if !source_item_field.is_required() {
                     // A required field is not required in self.
-                    self.provide_context(|| ErrorContext::TypedDictFieldNotRequiredInSource {
-                        field_name: target_item_name.clone(),
-                        source,
-                        target,
-                    });
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::TypedDictFieldNotRequiredInSource {
+                            field_name: target_item_name.clone(),
+                            source,
+                            target,
+                        });
+                    }
                     return self.never();
                 }
                 if target_item_field.is_read_only() {
@@ -757,11 +764,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 } else {
                     if source_item_field.is_read_only() {
                         // A read-only field can't be assigned to a mutable target.
-                        self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
-                            field_name: target_item_name.clone(),
-                            source,
-                            target,
-                        });
+                        if let Some(context) = self.report_context() {
+                            context.push(ErrorContext::TypedDictFieldReadOnlyInSource {
+                                field_name: target_item_name.clone(),
+                                source,
+                                target,
+                            });
+                        }
                         return self.never();
                     }
                     // For mutable fields in the target, the relation needs to apply both
@@ -809,23 +818,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         if source_item_field.is_read_only() {
                             // A read-only field can't be assigned to a mutable target.
-                            self.provide_context(|| ErrorContext::TypedDictFieldReadOnlyInSource {
-                                field_name: target_item_name.clone(),
-                                source,
-                                target,
-                            });
+                            if let Some(context) = self.report_context() {
+                                context.push(ErrorContext::TypedDictFieldReadOnlyInSource {
+                                    field_name: target_item_name.clone(),
+                                    source,
+                                    target,
+                                });
+                            }
                             return self.never();
                         }
                         if source_item_field.is_required() {
                             // A required field can't be assigned to a not-required, mutable field
                             // in the target, because `del` is allowed on the target field.
-                            self.provide_context(|| {
-                                ErrorContext::TypedDictFieldNotRequiredAndMutableInTarget {
-                                    field_name: target_item_name.clone(),
-                                    source,
-                                    target,
-                                }
-                            });
+                            if let Some(context) = self.report_context() {
+                                context.push(
+                                    ErrorContext::TypedDictFieldNotRequiredAndMutableInTarget {
+                                        field_name: target_item_name.clone(),
+                                        source,
+                                        target,
+                                    },
+                                );
+                            }
                             return self.never();
                         }
 
@@ -868,8 +881,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             result.intersect(db, self.constraints, field_constraints);
             if result.is_never_satisfied(db) {
-                if let Some(source_item_field) = source_items.get(target_item_name) {
-                    self.provide_context(|| ErrorContext::TypedDictFieldIncompatible {
+                if let Some(context) = self.report_context()
+                    && let Some(source_item_field) = source_items.get(target_item_name)
+                {
+                    context.push(ErrorContext::TypedDictFieldIncompatible {
                         field_name: target_item_name.clone(),
                         source,
                         target,
@@ -1310,6 +1325,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -2871,8 +2887,10 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
+    #[returns(copy)]
     pub(crate) kind: SynthesizedTypedDictKind,
     /// Whether keys absent from `items` are hidden, forbidden, or explicitly typed.
+    #[returns(copy)]
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
@@ -2930,7 +2948,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
 
 impl<'db> TypedDictSchema<'db> {
@@ -2987,7 +3005,7 @@ impl<'db> FromIterator<(Name, TypedDictField<'db>)> for TypedDictSchema<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct TypedDictField<'db> {
     pub(super) declared_ty: Type<'db>,
     flags: TypedDictFieldFlags,
@@ -3083,7 +3101,7 @@ impl<'db> TypedDictFieldBuilder<'db> {
 }
 
 bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct TypedDictFieldFlags: u8 {
         const REQUIRED = 1 << 0;
         const READ_ONLY = 1 << 1;

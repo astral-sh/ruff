@@ -236,6 +236,7 @@ use ty_python_core::{
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
         result.cycle_normalized(db, *previous, cycle)
@@ -265,6 +266,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
         result.cycle_normalized(db, *previous, cycle)
@@ -461,6 +463,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 /// re-analyze each pattern O(N) times (once per reference), leading to O(N²) total work.
 /// With memoization, each pattern is analyzed exactly once.
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
     heap_size = get_size2::GetSize::get_heap_size
 )]
@@ -1250,6 +1253,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 /// Cycle recovery conservatively treats the call as returning so that a cyclic type inference
 /// dependency cannot make subsequent code unreachable.
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
     heap_size = get_size2::GetSize::get_heap_size
 )]

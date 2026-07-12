@@ -17,6 +17,7 @@ type Dict = ExprName;
 /// ## Example
 ///
 /// ```python
+/// dictionary = {}
 /// if key in dictionary:
 ///     del dictionary[key]
 /// ```
@@ -24,6 +25,7 @@ type Dict = ExprName;
 /// Use instead:
 ///
 /// ```python
+/// dictionary = {}
 /// dictionary.pop(key, None)
 /// ```
 ///

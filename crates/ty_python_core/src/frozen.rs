@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
 /// lookup. A sorted slice avoids retaining hash-table capacity for every indexed file.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenMap<K, V>(Box<[(K, V)]>);
 
 impl<K, V> FrozenMap<K, V> {
@@ -115,7 +115,7 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
 }
 
 #[newtype_index]
-#[derive(get_size2::GetSize, salsa::Update)]
+#[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct FrozenValueIndex;
 
 /// Sorts entries by key and removes duplicate keys, retaining the last value for each key.
@@ -159,7 +159,7 @@ where
 }
 
 /// Compact immutable key-value entries that deduplicate repeated values.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenValueMap<K, V> {
     entries: FrozenMap<K, FrozenValueIndex>,
     values: FrozenIndexVec<FrozenValueIndex, V>,
@@ -244,7 +244,7 @@ impl<K, V> Default for FrozenValueMap<K, V> {
 ///
 /// Analysis builds these sets with hash sets, but after construction they only need membership
 /// tests and iteration. A sorted slice avoids retaining hash-table capacity.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct FrozenSet<K>(Box<[K]>);
 
 impl<K: Ord, S> From<std::collections::HashSet<K, S>> for FrozenSet<K> {

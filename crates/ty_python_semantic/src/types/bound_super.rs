@@ -222,7 +222,7 @@ impl<'db> BoundSuperError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 enum DescriptorReceiverKind {
     /// Bind descriptors as if `super()` were owned by a class object, i.e. via
     /// `__get__(None, owner)`.
@@ -232,7 +232,7 @@ enum DescriptorReceiverKind {
     Instance,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
     /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
@@ -286,7 +286,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
@@ -345,7 +345,9 @@ impl<'db> SuperOwnerKind<'db> {
 /// Represent a bound super object like `super(PivotClass, owner)`
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundSuperType<'db> {
+    #[returns(copy)]
     pub pivot_class: ClassBase<'db>,
+    #[returns(copy)]
     pub owner: SuperOwnerKind<'db>,
 }
 
@@ -934,7 +936,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
                 .with_annotated_type(Type::unknown());
-            let parameters = Parameters::new(db, [item_parameter]);
+            let parameters = Parameters::standard([item_parameter]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();

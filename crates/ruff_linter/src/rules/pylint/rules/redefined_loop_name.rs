@@ -7,6 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::is_mutable_expr;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -193,7 +194,23 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     ),
                 );
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign {
+                target, value, op, ..
+            }) => {
+                // Check for in-place update of mutable type
+                if is_mutable_expr(value, self.context)
+                    && matches!(
+                        op,
+                        ast::Operator::Add
+                            | ast::Operator::Sub
+                            | ast::Operator::BitOr
+                            | ast::Operator::BitAnd
+                            | ast::Operator::BitXor
+                    )
+                {
+                    return;
+                }
+
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {

@@ -12,7 +12,7 @@ use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
 
 /// Representation of a Python module.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
 pub enum Module<'db> {
     File(FileModule<'db>),
     Namespace(NamespacePackage<'db>),
@@ -256,10 +256,13 @@ fn all_submodule_names_for_package<'db>(
 pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
     pub(super) kind: ModuleKind,
     #[returns(ref)]
     pub(super) search_path: SearchPath,
+    #[returns(copy)]
     pub(super) file: File,
+    #[returns(copy)]
     pub(super) known: Option<KnownModule>,
 }
 
@@ -291,7 +294,7 @@ impl ModuleKind {
     }
 }
 
-/// Enumeration of various core stdlib modules in which important types are located
+/// Enumeration of modules in which types with dedicated semantic behavior are located.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
@@ -307,6 +310,10 @@ pub enum KnownModule {
     Os,
     Tempfile,
     Pathlib,
+    Datetime,
+    Decimal,
+    Ipaddress,
+    Re,
     Abc,
     Dataclasses,
     Functools,
@@ -321,6 +328,10 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "ty_extensions._internal")]
+    TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.pydantic")]
+    TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -330,6 +341,19 @@ pub enum KnownModule {
     Numbers,
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
+    // Third-party modules
+    #[strum(serialize = "pydantic.config")]
+    PydanticConfig,
+    #[strum(serialize = "pydantic.fields")]
+    PydanticFields,
+    #[strum(serialize = "pydantic.main")]
+    PydanticMain,
+    #[strum(serialize = "pydantic.root_model")]
+    PydanticRootModel,
+    #[strum(serialize = "pydantic_settings.main")]
+    PydanticSettingsMain,
+    #[strum(serialize = "pydantic.types")]
+    PydanticTypes,
 }
 
 impl KnownModule {
@@ -345,6 +369,10 @@ impl KnownModule {
             Self::Os => "os",
             Self::Tempfile => "tempfile",
             Self::Pathlib => "pathlib",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
+            Self::Ipaddress => "ipaddress",
+            Self::Re => "re",
             Self::Abc => "abc",
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
@@ -354,6 +382,8 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -361,6 +391,12 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::PydanticConfig => "pydantic.config",
+            Self::PydanticFields => "pydantic.fields",
+            Self::PydanticMain => "pydantic.main",
+            Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticSettingsMain => "pydantic_settings.main",
+            Self::PydanticTypes => "pydantic.types",
         }
     }
 
@@ -370,10 +406,58 @@ impl KnownModule {
     }
 
     fn try_from_search_path_and_name(search_path: &SearchPath, name: &ModuleName) -> Option<Self> {
-        if search_path.is_standard_library() {
-            Self::from_str(name.as_str()).ok()
+        let known_module = Self::from_str(name.as_str()).ok()?;
+
+        let is_expected_search_path = if known_module.is_third_party() {
+            search_path.is_third_party()
         } else {
-            None
+            search_path.is_standard_library()
+        };
+
+        is_expected_search_path.then_some(known_module)
+    }
+
+    /// Return `true` if this module is provided by a supported third-party package.
+    pub const fn is_third_party(self) -> bool {
+        match self {
+            Self::PydanticConfig
+            | Self::PydanticFields
+            | Self::PydanticMain
+            | Self::PydanticRootModel
+            | Self::PydanticSettingsMain
+            | Self::PydanticTypes => true,
+            Self::Builtins
+            | Self::Enum
+            | Self::Types
+            | Self::Typeshed
+            | Self::TypingExtensions
+            | Self::Typing
+            | Self::Sys
+            | Self::Os
+            | Self::Tempfile
+            | Self::Pathlib
+            | Self::Datetime
+            | Self::Decimal
+            | Self::Ipaddress
+            | Self::Re
+            | Self::Abc
+            | Self::Dataclasses
+            | Self::Functools
+            | Self::Collections
+            | Self::CollectionsAbc
+            | Self::CollectionsAbcInternal
+            | Self::Inspect
+            | Self::Templatelib
+            | Self::TypeCheckerInternals
+            | Self::TyExtensions
+            | Self::TyExtensionsInternal
+            | Self::TyExtensionsPydantic
+            | Self::ImportLib
+            | Self::UnittestMock
+            | Self::Uuid
+            | Self::Warnings
+            | Self::Numbers
+            | Self::Struct => false,
         }
     }
 
@@ -391,6 +475,10 @@ impl KnownModule {
 
     pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
+    }
+
+    pub const fn is_ty_extensions_internal(self) -> bool {
+        matches!(self, Self::TyExtensionsInternal)
     }
 
     pub const fn is_inspect(self) -> bool {
@@ -425,7 +513,7 @@ mod tests {
     fn known_module_roundtrip_from_str() {
         let stdlib_search_path = SearchPath::vendored_stdlib();
 
-        for module in KnownModule::iter() {
+        for module in KnownModule::iter().filter(|module| !module.is_third_party()) {
             let module_name = module.name();
 
             assert_eq!(

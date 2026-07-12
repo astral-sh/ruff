@@ -5,8 +5,8 @@ use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
+    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     TypedDictType, UnionType, todo_type,
 };
@@ -14,7 +14,7 @@ use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SubclassOfType<'db> {
     // Keep this field private, so that the only way of constructing the struct is through the `from` method.
     subclass_of: SubclassOfInner<'db>,
@@ -293,7 +293,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
+    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarIdentity<'_>) -> TypeVarVariance {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, typevar),
             SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
@@ -379,7 +379,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// Note that this enum is similar to the [`super::ClassBase`] enum,
 /// but does not include the `ClassBase::Protocol` and `ClassBase::Generic` variants
 /// (`type[Protocol]` and `type[Generic]` are not valid types).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
     Dynamic(DynamicType<'db>),

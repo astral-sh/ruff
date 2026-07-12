@@ -410,6 +410,55 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Multiple matching overrides inherit global options from higher-precedence layers.
+#[test]
+fn multiple_overrides_inherit_cli_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            possibly-unresolved-reference = "ignore"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            prin(y)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command().args(["--ignore", "unresolved-reference"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
 /// Override with exclude patterns
 #[test]
 fn overrides_exclude() -> anyhow::Result<()> {

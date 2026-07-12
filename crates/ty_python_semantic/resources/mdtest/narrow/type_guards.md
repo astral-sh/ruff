@@ -6,7 +6,8 @@ User-defined type guards are functions of which the return type is either `TypeG
 ## Display
 
 ```py
-from ty_extensions import Intersection, Not, TypeOf
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import TypeOf
 from typing_extensions import TypeGuard, TypeIs
 
 def _(
@@ -105,6 +106,30 @@ def _(a: int) -> TypeIs[str]: ...
 
 # error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
 def _(a: bool | str) -> TypeIs[int]: ...
+```
+
+## Overloaded definitions
+
+Each overload is checked exactly once, and distinct invalid overloads each report their own
+diagnostic.
+
+```pyi
+from typing import overload
+from typing_extensions import Never, TypeIs
+
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def one_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+def one_invalid(value: object) -> TypeIs[str]: ...
+
+# Two distinct invalid overloads should each report their own diagnostic.
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def two_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+def two_invalid(value: int) -> TypeIs[str]: ...
 ```
 
 ## Methods

@@ -1,8 +1,8 @@
+use compact_str::CompactString;
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use ruff_db::files::FileRootKind;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::name::Name;
 use ruff_ranged_value::ValueSource;
 use std::sync::Arc;
 use thiserror::Error;
@@ -10,7 +10,6 @@ use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::Db;
-use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -27,31 +26,50 @@ pub mod value;
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
-    pub(super) name: Name,
+    name: ProjectName,
 
     pub(super) root: SystemPathBuf,
 
-    /// The raw options
+    /// The highest-precedence options, such as CLI flags or inline editor configuration.
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    override_options: Option<Box<Options>>,
+
+    /// The raw (unmerged, unresolved) options from the project's configuration.
+    /// When [`Self::config_file_override`] is `None`, then these are the options from the
+    /// project's `ty.toml` or `pyproject.toml`. The options come from
+    /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
     pub(super) options: Options,
 
-    /// Paths of configurations other than the project's configuration that were combined into [`Self::options`].
+    /// The user-level configuration path and its options.
     ///
-    /// This field stores the paths of the configuration files, mainly for
-    /// knowing which files to watch for changes.
+    /// Its options have lower precedence than [`Self::override_options`] and [`Self::options`],
+    /// but higher precedence than [`Self::fallback_options`].
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    user_configuration: Option<Box<(SystemPathBuf, Options)>>,
+
+    /// The lowest-precedence options, such as the editor-selected Python environment.
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    fallback_options: Option<Box<Options>>,
+
+    /// The explicit configuration file that replaces normal project discovery.
     ///
-    /// The path ordering doesn't imply precedence.
-    #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
-    pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
+    /// Can be specified using `--config-file <path>`. When `Some`, [`Self::options`] were loaded from this file
+    /// instead of from the project's `pyproject.toml` or `ty.toml` file.
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    config_file_override: Option<SystemPathBuf>,
 }
 
 impl ProjectMetadata {
     /// Creates a project with the given name and root that uses the default options.
-    pub fn new(name: Name, root: SystemPathBuf) -> Self {
+    pub fn new(name: impl AsRef<str>, root: SystemPathBuf) -> Self {
         Self {
-            name,
+            name: ProjectName::new(name),
             root,
-            extra_configuration_paths: Vec::default(),
             options: Options::default(),
+            override_options: None,
+            user_configuration: None,
+            fallback_options: None,
+            config_file_override: None,
         }
     }
 
@@ -72,10 +90,13 @@ impl ProjectMetadata {
         let options = config_file.into_options();
 
         Ok(Self {
-            name: Name::new(root.file_name().unwrap_or("root")),
+            name: ProjectName::new(root.file_name().unwrap_or("root")),
             root: root.to_path_buf(),
             options,
-            extra_configuration_paths: vec![path],
+            override_options: None,
+            user_configuration: None,
+            fallback_options: None,
+            config_file_override: Some(path),
         })
     }
 
@@ -101,8 +122,8 @@ impl ProjectMetadata {
     ) -> Result<Self, Strategy::Error<ResolveRequiresPythonError>> {
         let name = project
             .and_then(|project| project.name.as_deref())
-            .map(|name| Name::new(&**name))
-            .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
+            .map(|name| ProjectName::new(&**name))
+            .unwrap_or_else(|| ProjectName::new(root.file_name().unwrap_or("root")));
 
         // If the `options` don't specify a python version but the `project.requires-python` field is set,
         // use that as a lower bound instead.
@@ -130,7 +151,10 @@ impl ProjectMetadata {
             name,
             root,
             options,
-            extra_configuration_paths: Vec::new(),
+            override_options: None,
+            user_configuration: None,
+            fallback_options: None,
+            config_file_override: None,
         })
     }
 
@@ -258,11 +282,29 @@ impl ProjectMetadata {
             );
 
             // Create a project with a default configuration
-            Self::new(
-                path.file_name().unwrap_or("root").into(),
-                path.to_path_buf(),
-            )
+            Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
+
+        Ok(metadata)
+    }
+
+    /// Rediscovers the project, while preserving applied options.
+    pub(crate) fn rediscover(&self, system: &dyn System) -> Result<Self, ProjectMetadataError> {
+        let mut metadata = if let Some(config_file) = self.config_file_override() {
+            Self::from_config_file(config_file.to_path_buf(), self.root(), system)?
+        } else {
+            // The active project root may have been deleted. Start rediscovery from the closest
+            // existing ancestor so ty can fall back to an enclosing project.
+            let rediscovery_path = self
+                .root()
+                .ancestors()
+                .find(|path| system.is_directory(path))
+                .unwrap_or_else(|| self.root());
+            Self::discover(rediscovery_path, system)?
+        };
+
+        metadata.override_options.clone_from(&self.override_options);
+        metadata.fallback_options.clone_from(&self.fallback_options);
 
         Ok(metadata)
     }
@@ -272,15 +314,25 @@ impl ProjectMetadata {
     }
 
     pub fn name(&self) -> &str {
-        &self.name
+        self.name.as_str()
     }
 
     pub fn options(&self) -> &Options {
         &self.options
     }
 
-    pub fn extra_configuration_paths(&self) -> &[SystemPathBuf] {
-        &self.extra_configuration_paths
+    /// Returns the explicit configuration file that replaces normal project discovery, if any.
+    pub(crate) fn config_file_override(&self) -> Option<&SystemPath> {
+        self.config_file_override.as_deref()
+    }
+
+    /// Returns configuration paths outside normal project discovery that should be watched.
+    pub fn extra_configuration_paths(&self) -> impl Iterator<Item = &SystemPath> {
+        self.config_file_override().into_iter().chain(
+            self.user_configuration
+                .as_deref()
+                .map(|(path, _)| path.as_path()),
+        )
     }
 
     pub(crate) fn try_add_project_root(&self, db: &dyn Db) {
@@ -292,35 +344,59 @@ impl ProjectMetadata {
             .try_add_root(db, self.root(), FileRootKind::Project);
     }
 
-    pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
-        &self,
-        system: &dyn System,
-        vendored: &VendoredFileSystem,
-        strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
-        self.options
-            .to_program_settings(self.root(), self.name(), system, vendored, strategy)
+    /// Applies higher-precedence options to this project.
+    ///
+    /// Options applied later take precedence over options applied earlier.
+    pub fn apply_override_options(&mut self, options: Options) {
+        if let Some(existing) = self.override_options.as_mut() {
+            let previous = std::mem::replace(existing.as_mut(), options);
+            existing.combine_with(previous);
+        } else {
+            self.override_options = Some(Box::new(options));
+        }
     }
 
-    pub fn to_settings<Strategy: MisconfigurationStrategy>(
-        &self,
-        db: &dyn Db,
-        strategy: &Strategy,
-    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        self.options.to_settings(db, self.root(), strategy)
+    /// Applies lower-precedence options to this project.
+    ///
+    /// Options applied later take precedence over options applied earlier, but all fallback options
+    /// have lower precedence than the raw and user-level options.
+    pub fn apply_fallback_options(&mut self, options: Options) {
+        if let Some(existing) = self.fallback_options.as_mut() {
+            let previous = std::mem::replace(existing.as_mut(), options);
+            existing.combine_with(previous);
+        } else {
+            self.fallback_options = Some(Box::new(options));
+        }
     }
 
-    pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {
-        self.options = overrides.apply_to(std::mem::take(&mut self.options));
+    /// Returns the project's option layers from highest to lowest precedence.
+    ///
+    /// `options` is used as the raw base layer between the override and user-level options.
+    /// Layers can be merged by passing them to [`Options::combine_with`] in iterator order:
+    ///
+    /// ```ignore
+    /// let mut merged = Options::default();
+    /// for layer in metadata.options_in_precedence_order(metadata.options()) {
+    ///     merged.combine_with(layer.clone());
+    /// }
+    /// ```
+    pub(crate) fn options_in_precedence_order<'a>(
+        &'a self,
+        options: &'a Options,
+    ) -> impl Iterator<Item = &'a Options> {
+        self.override_options
+            .as_deref()
+            .into_iter()
+            .chain(std::iter::once(options))
+            .chain(
+                self.user_configuration
+                    .as_deref()
+                    .map(|(_, options)| options),
+            )
+            .chain(self.fallback_options.as_deref())
     }
 
-    /// Combine the project options with the CLI options where the CLI options take precedence.
-    pub fn apply_options(&mut self, options: Options) {
-        self.options = options.combine(std::mem::take(&mut self.options));
-    }
-
-    /// Applies the options from the configuration files to the project's options.
+    /// Loads the lower-precedence options from configuration files.
     ///
     /// This includes:
     ///
@@ -329,22 +405,82 @@ impl ProjectMetadata {
         &mut self,
         system: &dyn System,
     ) -> Result<(), ConfigurationFileError> {
+        self.user_configuration = None;
+
         if let Some(user) = ConfigurationFile::user(system)? {
             tracing::debug!(
                 "Applying user-level configuration loaded from `{path}`.",
                 path = user.path()
             );
-            self.apply_configuration_file(user);
+            self.user_configuration = Some(Box::new((user.path().to_owned(), user.into_options())));
         }
 
         Ok(())
     }
 
-    /// Applies a lower-precedence configuration files to the project's options.
-    fn apply_configuration_file(&mut self, options: ConfigurationFile) {
-        self.extra_configuration_paths
-            .push(options.path().to_owned());
-        self.options.combine_with(options.into_options());
+    /// Returns all option layers merged according to their precedence.
+    pub fn to_merged_options(&self) -> MergedOptions<'_> {
+        let mut options = Options::default();
+
+        for layer in self.options_in_precedence_order(&self.options) {
+            options.combine_with(layer.clone());
+        }
+
+        MergedOptions {
+            metadata: self,
+            options,
+        }
+    }
+}
+
+/// The merged options for a project and the metadata needed to resolve them.
+pub struct MergedOptions<'a> {
+    metadata: &'a ProjectMetadata,
+    options: Options,
+}
+
+impl MergedOptions<'_> {
+    /// Returns the merged raw options.
+    pub fn options(&self) -> &Options {
+        &self.options
+    }
+
+    pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
+        &self,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
+        strategy: &Strategy,
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
+        self.options.to_program_settings(
+            self.metadata.root(),
+            self.metadata.name(),
+            system,
+            vendored,
+            strategy,
+        )
+    }
+
+    pub fn to_settings<Strategy: MisconfigurationStrategy>(
+        &self,
+        db: &dyn Db,
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
+        self.options.to_settings(db, self.metadata.root(), strategy)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+struct ProjectName(CompactString);
+
+impl ProjectName {
+    fn new(name: impl AsRef<str>) -> Self {
+        Self(CompactString::new(name))
+    }
+
+    fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 
@@ -407,7 +543,7 @@ mod tests {
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
-              name: Name("app"),
+              name: ProjectName("app"),
               root: "/app",
               options: Options(),
             )
@@ -445,7 +581,7 @@ mod tests {
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
-              name: Name("backend"),
+              name: ProjectName("backend"),
               root: "/app",
               options: Options(),
             )
@@ -537,7 +673,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
-              name: Name("nested-project"),
+              name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(
                 src: Some(SrcOptions(
@@ -587,7 +723,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("project-root"),
+              name: ProjectName("project-root"),
               root: "/app",
               options: Options(
                 src: Some(SrcOptions(
@@ -631,7 +767,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
-              name: Name("nested-project"),
+              name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(),
             )
@@ -674,7 +810,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("project-root"),
+              name: ProjectName("project-root"),
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
@@ -726,7 +862,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("super-app"),
+              name: ProjectName("super-app"),
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(

@@ -15,7 +15,8 @@ For concrete types, constraint implication is exactly the same as subtyping. (A 
 fully static type that does not contain a typevar.)
 
 ```py
-from ty_extensions import ConstraintSet, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_subtype_of
 
 def equivalent_to_other_relationships[T]():
     static_assert(is_subtype_of(bool, int))
@@ -31,7 +32,7 @@ there isn't a valid specialization for the typevars we are considering.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 def even_given_constraints[T]():
     constraints = ConstraintSet.range(Never, T, int)
@@ -50,7 +51,8 @@ question when considering a typevar, by translating the desired relationship int
 
 ```py
 from typing import Any
-from ty_extensions import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to, is_subtype_of
 
 def assignability[T]():
     # TODO: is_assignable_to should eventually work the way is_constraint_set_assignable_to does
@@ -178,7 +180,8 @@ considering.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def given_constraints[T]():
     static_assert(not ConstraintSet.always().implies_subtype_of(T, int))
@@ -250,7 +253,8 @@ All of the relationships in the above section also apply when a typevar appears 
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -463,7 +467,8 @@ the generic callable.)
 
 ```py
 from typing import Callable
-from ty_extensions import RegularCallableTypeOf, ConstraintSet, TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, ConstraintSet, is_subtype_of
 
 def identity[T](t: T) -> T:
     return t
@@ -549,13 +554,35 @@ def identity2[T](t: T) -> T:
     return t
 ```
 
+When comparing two generic callables, all callable-local typevars must be quantified together. The
+parameter and return types below produce the constraint set `(int ≤ T ≤ U) ∧ (U ≤ V)`. Quantifying
+the callable-local `T` and `U` preserves the resulting `int ≤ V` constraint on the enclosing
+typevar.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def quantifies_callable_typevars_together[V]():
+    def source[T](first: T, second: V) -> T:
+        raise NotImplementedError
+
+    def target[U](first: int, second: U) -> U:
+        raise NotImplementedError
+
+    actual = ConstraintSet.always().implies_subtype_of(RegularCallableTypeOf[source], RegularCallableTypeOf[target])
+    expected = ConstraintSet.range(int, V, object)
+    static_assert(actual == expected)
+```
+
 Invariant generic classes in a generic callable's return type should preserve cross-typevar
 constraints that remain after the callable's own typevars are quantified away. Here, `listify` can
 be used as a `Callable[[U], list[V]]` when the surrounding constraints imply `U ≤ V`.
 
 ```py
 from typing import Callable
-from ty_extensions import ConstraintSet, TypeOf, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, ConstraintSet
 
 def listify[T](t: T) -> list[T]:
     return [t]
@@ -590,7 +617,8 @@ def recursive_listify[T](t: T) -> list[T]:
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def concrete_pivot[T, U]():
     # If [int ≤ T ∧ T ≤ U], then [int ≤ U] must be true as well.
@@ -602,7 +630,8 @@ def concrete_pivot[T, U]():
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def concrete_pivot[T, U]():
     # If [T ≤ int ∧ int ≤ U], then [T ≤ U] must be true as well.
@@ -614,7 +643,8 @@ def concrete_pivot[T, U]():
 
 ```py
 from typing import Any, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def concrete_pivot[T, U]():
     # If [T ≤ Any ∧ Any ≤ U], then the two `Any`s might materialize to different types. That means
@@ -630,7 +660,8 @@ propagate the bound "into" the generic type.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -674,7 +705,8 @@ constraints is flipped.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Contravariant[T]:
     def set(self, value: T):
@@ -722,7 +754,8 @@ one-sided bound (upper or lower only) is not sufficient.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Invariant[T]:
     def get(self) -> T:
@@ -769,7 +802,8 @@ covariant type inside a contravariant type yields contravariant overall.
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -818,7 +852,8 @@ typevars.)
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -885,7 +920,8 @@ TODO: This is not implemented yet, since it requires different detection machine
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -910,7 +946,8 @@ def lower_bound_into_upper[B, C]():
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -974,7 +1011,8 @@ can decompose the bounds to extract constraints on the nested typevar. For insta
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Covariant[T]:
     def get(self) -> T:
@@ -1054,7 +1092,8 @@ def subclass_lower_bound[T, A]():
 
 ```py
 from typing import Never, TypeVar, Union
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def impossible_result[A, T, U]():
     constraint_a = ConstraintSet.range(int, A, Union[T, U])

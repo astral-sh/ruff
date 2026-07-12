@@ -2596,6 +2596,115 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn add_ignore() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def first_square():
+            return [x * x for x in range(20)][0]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=RUF015")
+            .arg("--preview")
+            .arg("--add-ignore"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 ignore comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def first_square():
+            return [x * x for x in range(20)][0]  # ruff:ignore[unnecessary-iterable-allocation-for-first-element]
+        ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_requires_preview() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("noqa.py", "import os\n")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=F401")
+            .arg("--add-ignore"),
+        @"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: `--add-ignore` requires preview mode, but preview is disabled for `[TMP]/noqa.py`
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(test_code, @"import os");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_ignore() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+            pass
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=ANN001,ANN201,ARG001,D103")
+            .arg("--add-noqa"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        warning: #ruff:ignore comment found but not active, enable preview mode
+        Added 1 noqa directive.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+            pass
+        ",
+    );
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
@@ -3536,6 +3645,7 @@ d: Literal[None,] | Literal[None]
         .args(["--stdin-filename", "test.py"])
         .arg("--preview")
         .arg("--diff")
+        .arg("--unsafe-fixes")
         .arg("-")
         .pass_stdin(snippet), @"
     success: false
@@ -3608,6 +3718,48 @@ def func(t: _T) -> _T:
     Found 7 errors (7 fixed, 0 remaining).
     "
     );
+}
+
+/// Test that `noqa` comments with rule codes
+/// 1. Get replaced with Ruff-specific suppression comments (RUF105)
+/// 2. Use human-readable rule names instead of codes (RUF106)
+#[test]
+fn noqa_comments_to_human_readable_ruff_ignores() -> Result<()> {
+    let fixture = CliTest::new()?;
+    let source = "# ruff: noqa: F401
+import os
+
+def foo():
+    value = 1  # noqa: F841
+";
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args([
+                "--select=F401,F841,RUF105,RUF106",
+                "--stdin-filename=test.py",
+                "--fix",
+                "--preview",
+                "-",
+            ])
+            .pass_stdin(source),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        # ruff:file-ignore[unused-import]
+        import os
+
+        def foo():
+            value = 1  # ruff:ignore[unused-variable]
+
+        ----- stderr -----
+        Found 4 errors (4 fixed, 0 remaining).
+        ",
+    );
+
+    Ok(())
 }
 
 /// Test that we do not rename two different type parameters to the same name

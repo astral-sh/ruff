@@ -21,15 +21,15 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
-use crate::suppression::Suppressions;
+use crate::suppression::{self, Suppressions};
 
-/// Generates an array of edits that matches the length of `messages`.
+/// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
-/// Each edit will add a `noqa` comment to the appropriate line in the source to hide
+/// Each edit will add a suppression comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
 #[expect(clippy::too_many_arguments)]
-pub fn generate_noqa_edits(
+pub fn generate_suppression_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -38,19 +38,21 @@ pub fn generate_noqa_edits(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     suppressions: &Suppressions,
+    suppression_kind: SuppressionKind,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
-    let comments = find_noqa_comments(
+    let comments = find_suppression_comments(
         diagnostics,
         locator,
         &exemption,
         &directives,
         noqa_line_for,
         suppressions,
+        suppression_kind,
     );
-    build_noqa_edits_by_diagnostic(comments, locator, line_ending, None)
+    build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
 }
 
 /// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
@@ -61,6 +63,15 @@ pub(crate) enum Directive<'a> {
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
     Codes(Codes<'a>),
+}
+
+impl Ranged for Directive<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Directive::All(all) => all.range(),
+            Directive::Codes(codes) => codes.range(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -119,6 +130,10 @@ impl Codes<'_> {
     pub(crate) fn includes<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
         self.iter()
             .any(|code| *needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.codes.len()
     }
 }
 
@@ -743,9 +758,18 @@ impl Display for LexicalError {
 
 impl Error for LexicalError {}
 
-/// Adds noqa comments to suppress all messages of a file.
+/// The kind of suppression comment to be added to suppress a diagnostic.
+#[derive(Copy, Clone, Debug)]
+pub enum SuppressionKind {
+    /// A `noqa` comment
+    Noqa,
+    /// A `ruff:ignore` comment
+    Ignore,
+}
+
+/// Adds suppression comments to suppress all messages of a file.
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn add_noqa(
+pub(crate) fn add_suppression(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -755,8 +779,9 @@ pub(crate) fn add_noqa(
     line_ending: LineEnding,
     reason: Option<&str>,
     suppressions: &Suppressions,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(
+    let (count, output) = add_suppression_inner(
         path,
         diagnostics,
         locator,
@@ -766,6 +791,7 @@ pub(crate) fn add_noqa(
         line_ending,
         reason,
         suppressions,
+        suppression_kind,
     );
 
     fs::write(path, output)?;
@@ -773,7 +799,7 @@ pub(crate) fn add_noqa(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn add_noqa_inner(
+fn add_suppression_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -783,6 +809,7 @@ fn add_noqa_inner(
     line_ending: LineEnding,
     reason: Option<&str>,
     suppressions: &Suppressions,
+    suppression_kind: SuppressionKind,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -792,16 +819,18 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    let comments = find_noqa_comments(
+    let comments = find_suppression_comments(
         diagnostics,
         locator,
         &exemption,
         &directives,
         noqa_line_for,
         suppressions,
+        suppression_kind,
     );
 
-    let edits = build_noqa_edits_by_line(comments, locator, line_ending, reason);
+    let edits =
+        build_suppression_edits_by_line(comments, locator, line_ending, reason, suppression_kind);
 
     let contents = locator.contents();
 
@@ -823,26 +852,27 @@ fn add_noqa_inner(
     (count, output)
 }
 
-fn build_noqa_edits_by_diagnostic(
-    comments: Vec<Option<NoqaComment>>,
+fn build_suppression_edits_by_diagnostic(
+    comments: Vec<Option<SuppressionComment>>,
     locator: &Locator,
     line_ending: LineEnding,
     reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Vec<Option<Edit>> {
     let mut edits = Vec::default();
     for comment in comments {
         match comment {
             Some(comment) => {
-                if let Some(noqa_edit) = generate_noqa_edit(
+                let suppression_edit = generate_suppression_edit(
                     comment.directive,
                     comment.line,
-                    FxHashSet::from_iter([comment.code]),
+                    FxHashSet::from_iter([comment.identifier]),
                     locator,
                     line_ending,
                     reason,
-                ) {
-                    edits.push(Some(noqa_edit.into_edit()));
-                }
+                    suppression_kind,
+                );
+                edits.push(Some(suppression_edit.into_edit()));
             }
             None => edits.push(None),
         }
@@ -850,12 +880,13 @@ fn build_noqa_edits_by_diagnostic(
     edits
 }
 
-fn build_noqa_edits_by_line<'a>(
-    comments: Vec<Option<NoqaComment<'a>>>,
-    locator: &Locator,
+fn build_suppression_edits_by_line<'a>(
+    comments: Vec<Option<SuppressionComment<'a>>>,
+    locator: &Locator<'a>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
-) -> BTreeMap<TextSize, NoqaEdit<'a>> {
+    suppression_kind: SuppressionKind,
+) -> BTreeMap<TextSize, SuppressionEdit<'a>> {
     let mut comments_by_line = BTreeMap::default();
     for comment in comments.into_iter().flatten() {
         comments_by_line
@@ -869,39 +900,55 @@ fn build_noqa_edits_by_line<'a>(
             continue;
         };
         let directive = first_match.directive;
-        if let Some(edit) = generate_noqa_edit(
+        let suppression_edit = generate_suppression_edit(
             directive,
             offset,
             matches
                 .into_iter()
-                .map(|NoqaComment { code, .. }| code)
+                .map(|comment| comment.identifier)
                 .collect(),
             locator,
             line_ending,
             reason,
-        ) {
-            edits.insert(offset, edit);
-        }
+            suppression_kind,
+        );
+        edits.insert(offset, suppression_edit);
     }
     edits
 }
 
-struct NoqaComment<'a> {
+struct SuppressionComment<'a> {
     line: TextSize,
-    code: &'a SecondaryCode,
-    directive: Option<&'a Directive<'a>>,
+    identifier: &'a str,
+    directive: Option<ExistingDirective<'a>>,
 }
 
-fn find_noqa_comments<'a>(
+#[derive(Copy, Clone)]
+enum ExistingDirective<'a> {
+    Noqa(&'a Codes<'a>),
+    Ignore(&'a suppression::SuppressionComment),
+}
+
+impl Ranged for ExistingDirective<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            ExistingDirective::Noqa(codes) => codes.range(),
+            ExistingDirective::Ignore(comment) => comment.range(),
+        }
+    }
+}
+
+fn find_suppression_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
     suppressions: &'a Suppressions,
-) -> Vec<Option<NoqaComment<'a>>> {
-    // List of noqa comments, ordered to match up with `messages`
-    let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
+    suppression_kind: SuppressionKind,
+) -> Vec<Option<SuppressionComment<'a>>> {
+    // List of suppression comments, ordered to match up with `messages`
+    let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
@@ -946,47 +993,60 @@ fn find_noqa_comments<'a>(
             .map(|range| noqa_line_for.resolve(range.start()))
             .unwrap_or_default();
 
-        // Or ignored by the directive itself?
-        if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
-            match &directive_line.directive {
-                Directive::All(_) => {
-                    comments_by_line.push(None);
-                    continue;
-                }
-                directive @ Directive::Codes(codes) => {
-                    if !codes.includes(code) {
-                        comments_by_line.push(Some(NoqaComment {
-                            line: directive_line.start(),
-                            code,
-                            directive: Some(directive),
-                        }));
+        // Or ignored by a `noqa` directive on the diagnostic's line itself?
+        let existing_noqa =
+            if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
+                match &directive_line.directive {
+                    Directive::All(_) => {
+                        comments_by_line.push(None);
+                        continue;
                     }
-                    continue;
+                    Directive::Codes(codes) => {
+                        if codes.includes(code) {
+                            comments_by_line.push(None);
+                            continue;
+                        }
+                        Some(ExistingDirective::Noqa(codes))
+                    }
                 }
-            }
-        }
+            } else {
+                None
+            };
 
-        // There's no existing noqa directive that suppresses the diagnostic.
-        comments_by_line.push(Some(NoqaComment {
-            line: locator.line_start(noqa_offset),
-            code,
-            directive: None,
+        // Reuse an existing directive that matches the requested suppression style.
+        let directive = match suppression_kind {
+            SuppressionKind::Noqa => existing_noqa,
+            SuppressionKind::Ignore => suppressions
+                .find_applicable_ignore(message)
+                .map(ExistingDirective::Ignore),
+        };
+
+        let identifier = match suppression_kind {
+            SuppressionKind::Noqa => code.as_str(),
+            SuppressionKind::Ignore => message.name(),
+        };
+
+        comments_by_line.push(Some(SuppressionComment {
+            line: locator.line_start(directive.map_or(noqa_offset, |directive| directive.start())),
+            identifier,
+            directive,
         }));
     }
 
     comments_by_line
 }
 
-struct NoqaEdit<'a> {
+struct SuppressionEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: FxHashSet<&'a SecondaryCode>,
-    codes: Option<&'a Codes<'a>>,
+    noqa_codes: FxHashSet<&'a str>,
+    existing_codes: Vec<&'a str>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
     blank_line: bool,
+    suppression_kind: SuppressionKind,
 }
 
-impl NoqaEdit<'_> {
+impl SuppressionEdit<'_> {
     fn into_edit(self) -> Edit {
         let mut edit_content = String::new();
         self.write(&mut edit_content);
@@ -998,21 +1058,20 @@ impl NoqaEdit<'_> {
         if !self.blank_line {
             write!(writer, "  ").unwrap();
         }
-        write!(writer, "# noqa: ").unwrap();
-        match self.codes {
-            Some(codes) => {
-                push_codes(
-                    writer,
-                    self.noqa_codes
-                        .iter()
-                        .map(|code| code.as_str())
-                        .chain(codes.iter().map(Code::as_str))
-                        .sorted_unstable(),
-                );
-            }
-            None => {
-                push_codes(writer, self.noqa_codes.iter().sorted_unstable());
-            }
+        match self.suppression_kind {
+            SuppressionKind::Noqa => write!(writer, "# noqa: ").unwrap(),
+            SuppressionKind::Ignore => write!(writer, "# ruff:ignore[").unwrap(),
+        }
+        push_codes(
+            writer,
+            self.noqa_codes
+                .iter()
+                .chain(self.existing_codes.iter())
+                .sorted_unstable(),
+        );
+        match self.suppression_kind {
+            SuppressionKind::Noqa => {}
+            SuppressionKind::Ignore => write!(writer, "]").unwrap(),
         }
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
@@ -1021,54 +1080,72 @@ impl NoqaEdit<'_> {
     }
 }
 
-impl Ranged for NoqaEdit<'_> {
+impl Ranged for SuppressionEdit<'_> {
     fn range(&self) -> TextRange {
         self.edit_range
     }
 }
 
-fn generate_noqa_edit<'a>(
-    directive: Option<&'a Directive>,
+fn generate_suppression_edit<'a>(
+    directive: Option<ExistingDirective<'a>>,
     offset: TextSize,
-    noqa_codes: FxHashSet<&'a SecondaryCode>,
-    locator: &Locator,
+    noqa_codes: FxHashSet<&'a str>,
+    locator: &Locator<'a>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
-) -> Option<NoqaEdit<'a>> {
+    suppression_kind: SuppressionKind,
+) -> SuppressionEdit<'a> {
     let line_range = locator.full_line_range(offset);
 
     let edit_range;
-    let codes;
+    let mut existing_codes = Vec::new();
     let blank_line;
 
-    // Add codes.
-    match directive {
-        None => {
+    match (directive, suppression_kind) {
+        // Add additional rule codes to an existing `noqa` comment.
+        (Some(ExistingDirective::Noqa(codes)), SuppressionKind::Noqa) => {
+            (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
+            existing_codes.extend(codes.iter().map(Code::as_str));
+        }
+        // Add additional rule names to an existing `ruff:ignore` comment.
+        (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
+            (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
+            existing_codes.extend(comment.codes_as_str(locator.contents()));
+        }
+        // Add a new comment when one doesn't exist, or the "wrong" kind is present. In either case,
+        // append a new comment.
+        (None | Some(_), _) => {
             let trimmed_line = locator.slice(line_range).trim_end();
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
-            codes = None;
         }
-        Some(Directive::Codes(existing_codes)) => {
-            // find trimmed line without the noqa
-            let trimmed_line = locator
-                .slice(TextRange::new(line_range.start(), existing_codes.start()))
-                .trim_end();
-            blank_line = false;
-            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
-            codes = Some(existing_codes);
-        }
-        Some(Directive::All(_)) => return None,
     }
 
-    Some(NoqaEdit {
+    SuppressionEdit {
         edit_range,
         noqa_codes,
-        codes,
+        existing_codes,
         line_ending,
         reason,
         blank_line,
-    })
+        suppression_kind,
+    }
+}
+
+/// Returns the range to replace when updating an existing suppression directive, along with whether
+/// the directive is on an otherwise blank line.
+fn suppression_edit_range(
+    locator: &Locator,
+    line_range: TextRange,
+    directive_start: TextSize,
+) -> (TextRange, bool) {
+    let prefix = locator.slice(TextRange::new(line_range.start(), directive_start));
+    if prefix.trim_whitespace().is_empty() {
+        (TextRange::new(directive_start, line_range.end()), true)
+    } else {
+        let edit_start = line_range.start() + prefix.trim_end().text_len();
+        (TextRange::new(edit_start, line_range.end()), false)
+    }
 }
 
 fn push_codes<I: Display>(writer: &mut dyn std::fmt::Write, codes: impl Iterator<Item = I>) {
@@ -1268,24 +1345,131 @@ impl FromIterator<TextRange> for NoqaMapping {
 #[cfg(test)]
 mod tests {
 
+    use std::fmt::Write;
     use std::path::Path;
 
-    use insta::assert_debug_snapshot;
+    use anyhow::{Result, anyhow};
+    use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use ruff_python_trivia::CommentRanges;
+    use ruff_diagnostics::SourceMap;
+    use ruff_python_ast::{PySourceType, SourceType};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_index::Indexer;
+    use ruff_python_trivia::{CommentRanges, textwrap::dedent};
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::codes::Rule;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::noqa::{
-        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
-        lex_file_exemption, lex_inline_noqa,
+        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, SuppressionKind,
+        add_suppression_inner, lex_codes, lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::settings::{LinterSettings, flags};
+    use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
-    use crate::{Edit, Violation};
-    use crate::{Locator, generate_noqa_edits};
+    use crate::test::{print_messages, test_contents};
+    use crate::{Edit, Violation, directives};
+    use crate::{Locator, generate_suppression_edits};
+
+    fn add_suppressions(
+        path: &Path,
+        source_kind: &SourceKind,
+        settings: &LinterSettings,
+        suppression_kind: SuppressionKind,
+    ) -> (usize, String) {
+        let source_type = source_kind.py_source_type();
+        let target_version = settings.resolve_target_version(path);
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
+        let locator = Locator::new(source_kind.source_code());
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
+        let directives = directives::extract_directives(
+            parsed.tokens(),
+            directives::Flags::from_settings(settings),
+            &locator,
+            &indexer,
+        );
+        let suppressions =
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
+        let diagnostics = check_path(
+            path,
+            None,
+            &locator,
+            &stylist,
+            &indexer,
+            &directives,
+            settings,
+            flags::Noqa::Disabled,
+            source_kind,
+            source_type,
+            &parsed,
+            target_version,
+            &suppressions,
+        );
+
+        add_suppression_inner(
+            path,
+            &diagnostics,
+            &locator,
+            indexer.comment_ranges(),
+            &settings.external,
+            &directives.noqa_line_for,
+            stylist.line_ending(),
+            None,
+            &suppressions,
+            suppression_kind,
+        )
+    }
+
+    #[track_caller]
+    fn add_suppressions_in(
+        source: &str,
+        suppression_kind: SuppressionKind,
+        settings: &LinterSettings,
+    ) -> Result<String> {
+        let path = Path::new("<filename>");
+        let source_map = SourceMap::default();
+        let source_kind = SourceKind::from_source_code(
+            dedent(source).trim().to_string(),
+            SourceType::Python(PySourceType::Python),
+        )?
+        .ok_or_else(|| anyhow!("test file should be Python"))?;
+
+        let (count, fixed) = add_suppressions(path, &source_kind, settings, suppression_kind);
+        let plural = if count == 1 { "" } else { "s" };
+        let mut output = String::new();
+        writeln!(
+            output,
+            "Added {count} suppression{plural}\n\n## Fixed source\n\n```py\n{fixed}\n```\n"
+        )?;
+
+        let source_kind = source_kind.updated(fixed, &source_map);
+        let (second_count, fixed) =
+            add_suppressions(path, &source_kind, settings, suppression_kind);
+        if second_count > 0 {
+            writeln!(
+                output,
+                "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
+            )?;
+        }
+
+        let source_kind = source_kind.updated(fixed, &source_map);
+        let (diagnostics, _) = test_contents(&source_kind, path, settings);
+        if !diagnostics.is_empty() {
+            writeln!(
+                output,
+                "## New diagnostics after re-checking file\n\n{diagnostics}\n",
+                diagnostics = print_messages(&diagnostics)
+            )?;
+        }
+
+        Ok(output)
+    }
 
     fn assert_lexed_ranges_match_slices(
         directive: Result<Option<NoqaLexerOutput>, LexicalError>,
@@ -2865,12 +3049,275 @@ mod tests {
     }
 
     #[test]
+    fn add_noqa_to_existing_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Noqa,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ]),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_noqa_to_existing_ignore_preview() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Noqa,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_to_existing_noqa() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # noqa: ANN001, ARG001, D103
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff:ignore[missing-return-type-undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_noqa_ruf105() -> Result<()> {
+        let settings =
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
+
+        assert_snapshot!(
+            add_suppressions_in(
+                "import math  # noqa: F401",
+                SuppressionKind::Noqa,
+                &settings,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import math  # noqa: F401, RUF105
+
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_ruf105() -> Result<()> {
+        let settings =
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
+
+        assert_snapshot!(
+            add_suppressions_in(
+                "import math  # noqa: F401",
+                SuppressionKind::Ignore,
+                &settings,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import math  # noqa: F401  # ruff:ignore[noqa-comments]
+
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_to_existing_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_multiple_codes() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_multiline_diagnostic() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                import z
+                import c
+                import a
+                "#,
+                SuppressionKind::Ignore,
+                &LinterSettings::for_rules([Rule::UnsortedImports]).with_preview_mode(),
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import z  # ruff:ignore[unsorted-imports]
+        import c
+        import a
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_existing_own_line_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                # ruff:ignore[ANN001]
+                def public(x):
+                    """Return x."""
+                    return x
+                "#,
+                SuppressionKind::Ignore,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
+            )?,
+            @r#"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
+        def public(x):
+            """Return x."""
+            return x
+        ```
+        "#
+        );
+        Ok(())
+    }
+
+    #[test]
     fn modification() {
         let path = Path::new("/tmp/foo.txt");
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &[],
             &Locator::new(contents),
@@ -2880,6 +3327,7 @@ mod tests {
             LineEnding::Lf,
             None,
             &Suppressions::default(),
+            SuppressionKind::Noqa,
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -2895,7 +3343,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -2905,6 +3353,7 @@ mod tests {
             LineEnding::Lf,
             None,
             &Suppressions::default(),
+            SuppressionKind::Noqa,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -2927,7 +3376,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -2937,6 +3386,7 @@ mod tests {
             LineEnding::Lf,
             None,
             &Suppressions::default(),
+            SuppressionKind::Noqa,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -2959,7 +3409,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -2969,6 +3419,7 @@ mod tests {
             LineEnding::Lf,
             None,
             &Suppressions::default(),
+            SuppressionKind::Noqa,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -2992,7 +3443,7 @@ print(
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_noqa_edits(
+        let edits = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),
@@ -3001,6 +3452,7 @@ print(
             &noqa_line_for,
             LineEnding::Lf,
             &suppressions,
+            SuppressionKind::Noqa,
         );
         assert_eq!(
             edits,
@@ -3025,7 +3477,7 @@ bar =
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_noqa_edits(
+        let edits = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),
@@ -3034,6 +3486,7 @@ bar =
             &noqa_line_for,
             LineEnding::Lf,
             &suppressions,
+            SuppressionKind::Noqa,
         );
         assert_eq!(
             edits,

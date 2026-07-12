@@ -156,6 +156,26 @@ class BadWithInitFalse:
     z: float
 ```
 
+Class-level `init=False` suppresses the ordering check because no constructor is generated:
+
+```py
+@dataclass(init=False)
+class GoodWithClassInitFalse:
+    x: int = 1
+    y: str
+
+    def __init__(self, y: str) -> None:
+        self.y = y
+
+GoodWithClassInitFalse("value")
+
+# Re-enabling `init` makes the inherited default-before-required ordering invalid at runtime.
+# TODO: error: [dataclass-field-order]
+@dataclass
+class BadWithReenabledInit(GoodWithClassInitFalse):
+    pass
+```
+
 Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
 
 ```toml
@@ -253,7 +273,7 @@ But if there is a variable annotation with a function or class literal type, the
 `__init__` will include this field:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 class SomeClass: ...
 
@@ -1781,6 +1801,7 @@ class Foo:
 foo = Foo(1)
 
 reveal_type(foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(type(foo).__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 reveal_type(asdict(foo))  # revealed: dict[str, Any]
 ```
@@ -1801,8 +1822,7 @@ reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 But calling `asdict` on the class object is not allowed:
 
 ```py
-# TODO: this should be a invalid-argument-type error, but we don't properly check the
-# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
+# error: [invalid-argument-type] "Argument to function `asdict` is incorrect: Expected `DataclassInstance`, found `<class 'Foo'>`"
 asdict(Foo)
 ```
 
@@ -2043,7 +2063,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 @dataclass
 class Person:
@@ -2078,7 +2098,8 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import CallableTypeOf, TypeOf, is_subtype_of, is_assignable_to, is_equivalent_to
 
 @dataclass(order=True)
 class C:

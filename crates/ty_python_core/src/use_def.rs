@@ -280,20 +280,20 @@ pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
 /// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(get_size2::GetSize)]
 pub struct LoopHeaderId;
 
 /// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct InternedBindingsId;
 
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct InternedDeclarationsId;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct InternedPlaceStateId(InternedBindingsId, InternedDeclarationsId);
 
 impl InternedPlaceStateId {
@@ -443,7 +443,7 @@ impl PlaceStateInterner {
 /// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
 /// binding state. Neither is needed after the semantic index is built, so the retained map stores
 /// cumulative end offsets into one contiguous array instead.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
     live_bindings: Box<[LiveBinding]>,
@@ -512,7 +512,7 @@ impl Index<InternedBindingsId> for RetainedBindings {
 }
 
 /// Compact, retained representation of the interned declaration vectors for a scope.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct RetainedDeclarations {
     /// The exclusive end of each state in `live_declarations`; its start is the previous end.
     ends: FrozenIndexVec<InternedDeclarationsId, u32>,
@@ -567,26 +567,26 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 struct RetainedPlaceStates<T> {
     end_of_scope: T,
     reachable: T,
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionsAtDefinition<B, D> {
     bindings: B,
     declarations: Option<D>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum InternedEnclosingSnapshotId {
     Constraint(ScopedNarrowingConstraint),
     Bindings(InternedBindingsId),
 }
 
 /// Lookup tables needed to evaluate reachability and narrowing constraints.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ConstraintTables<'db> {
     predicates: Predicates<'db>,
     reachability_constraints: ReachabilityConstraints,
@@ -597,7 +597,7 @@ struct ConstraintTables<'db> {
 ///
 /// These fields share an allocation to avoid storing five collection headers in every
 /// [`UseDefMap`]. They are not otherwise semantically related.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
@@ -625,7 +625,13 @@ static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
         narrowing_constraints: NarrowingConstraintsBuilder::default().build(),
     });
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+static ALWAYS_UNBOUND_BINDINGS: LazyLock<Bindings> =
+    LazyLock::new(|| Bindings::unbound(ScopedReachabilityConstraintId::ALWAYS_TRUE));
+
+static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
+    LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum RetainedDefinitionState<'db> {
     Unused(Definition<'db>),
     Used(Definition<'db>),
@@ -667,7 +673,7 @@ impl<'db> RetainedDefinitionState<'db> {
 static_assertions::assert_eq_size!(RetainedDefinitionState<'static>, DefinitionState<'static>);
 
 /// Retained definition states, excluding the implicit unbound definition at index zero.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct RetainedDefinitions<'db> {
     states: Box<[RetainedDefinitionState<'db>]>,
 }
@@ -721,7 +727,7 @@ impl<'db> RetainedDefinitions<'db> {
 }
 
 /// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UseDefMap<'db> {
     /// Definition states in this scope, plus an implicit "unbound"/"undeclared" definition at
     /// index zero.
@@ -754,6 +760,10 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need the bindings to find
     /// previous bindings to that symbol. If there are any, the assignment is invalid.
+    ///
+    /// Entries whose prior state is the start-of-scope default (always unbound and, if present,
+    /// always undeclared) are omitted. Lookups use [`ALWAYS_UNBOUND_BINDINGS`] and
+    /// [`ALWAYS_UNDECLARED_DECLARATIONS`], which are initialized lazily and shared by every map.
     definitions_by_definition: FrozenMap<
         Definition<'db>,
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
@@ -786,13 +796,22 @@ pub struct UseDefMap<'db> {
 }
 
 /// Information about a given range of source code.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct RangeInfo {
     reachability: ScopedReachabilityConstraintId,
     in_type_checking_block: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+impl Default for RangeInfo {
+    fn default() -> Self {
+        Self {
+            reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            in_type_checking_block: false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
 
 impl MultiBindingsByUse {
@@ -1042,24 +1061,26 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
-        self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        let bindings = self.definitions_by_definition.get(&definition).map_or_else(
+            || ALWAYS_UNBOUND_BINDINGS.as_slice(),
+            |definitions| &self.interned_bindings[definitions.bindings],
+        );
+        self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
     pub fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
-            .declarations
-            .expect("binding definition should have retained declarations");
-        self.declarations_iterator(
-            &self.interned_declarations[declarations_id],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        let declarations = self.definitions_by_definition.get(&binding).map_or_else(
+            || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
+            |definitions| {
+                &self.interned_declarations[definitions
+                    .declarations
+                    .expect("binding definition should have retained declarations")]
+            },
+        );
+        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
     pub fn end_of_scope_declarations<'map>(
@@ -1333,7 +1354,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct ReachableDefinitions {
     bindings: Bindings,
     declarations: Declarations,
@@ -2583,6 +2604,11 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
+        // Keep default entries while building so they remain barriers between non-contiguous
+        // ranges with the same metadata. Once construction is complete, absence represents the
+        // default of reachable code outside a `TYPE_CHECKING` block.
+        self.range_reachability
+            .retain(|(_, info)| *info != RangeInfo::default());
         for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
@@ -2681,6 +2707,15 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
+            // Lookups use the shared start-of-scope defaults for these omitted entries.
+            if bindings.is_always_unbound()
+                && declarations
+                    .as_ref()
+                    .is_none_or(Declarations::is_always_undeclared)
+            {
+                continue;
+            }
+
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));

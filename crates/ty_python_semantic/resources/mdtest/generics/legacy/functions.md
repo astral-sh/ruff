@@ -391,6 +391,31 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+## Upper-bound inference preserves intersection order
+
+When a typevar occurs contravariantly, argument matching can provide only upper bounds for its
+solution. Multiple upper bounds are intersected in the order in which they occur at the call site.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+class P(Protocol):
+    def p(self) -> None: ...
+
+class Q(Protocol):
+    def q(self) -> None: ...
+
+T = TypeVar("T")
+
+def accepts_p(value: P) -> None: ...
+def accepts_q(value: Q) -> None: ...
+def infer_from_callbacks(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_from_callbacks(accepts_p, accepts_q))  # revealed: P & Q
+reveal_type(infer_from_callbacks(accepts_q, accepts_p))  # revealed: Q & P
+```
+
 ## Recursive generic calls
 
 Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
@@ -908,6 +933,98 @@ y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
 ```
 
+## Prefer specific compatible constraints over union constraints
+
+When multiple declared constraints are compatible with a lower bound, we prefer the most specific
+one. This does not depend on the order in which the constraints were declared.
+
+```py
+from typing import TypeVar
+
+BroadFirst = TypeVar("BroadFirst", str | bytes, str, bytes)
+NarrowFirst = TypeVar("NarrowFirst", str, bytes, str | bytes)
+
+def broad_first(value: BroadFirst) -> BroadFirst:
+    return value
+
+def narrow_first(value: NarrowFirst) -> NarrowFirst:
+    return value
+
+def check(value: str) -> None:
+    reveal_type(broad_first(value))  # revealed: str
+    reveal_type(narrow_first(value))  # revealed: str
+```
+
+## Prefer general constraints for upper-bound-only inference
+
+When inference provides only an upper bound, we prefer the most general compatible declared
+constraint. This also does not depend on declaration order.
+
+```py
+from typing import Callable, TypeVar
+
+NarrowFirst = TypeVar("NarrowFirst", int, object)
+BroadFirst = TypeVar("BroadFirst", object, int)
+
+def narrow_first(callback: Callable[[NarrowFirst], None]) -> NarrowFirst:
+    raise NotImplementedError
+
+def broad_first(callback: Callable[[BroadFirst], None]) -> BroadFirst:
+    raise NotImplementedError
+
+def accepts_object(value: object) -> None: ...
+
+reveal_type(narrow_first(accepts_object))  # revealed: object
+reveal_type(broad_first(accepts_object))  # revealed: object
+```
+
+## Ambiguous constrained TypeVar inference from `Any`
+
+A gradual argument alone provides no evidence for choosing between multiple compatible constraints.
+We currently fall back to `Unknown` rather than choosing an arbitrary concrete constraint. Ideally,
+we would preserve `Any` instead.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def identity(value: T) -> T:
+    return value
+
+def choose(left: T, right: T) -> T:
+    return left
+
+def caller(value: Any) -> None:
+    reveal_type(identity(value))  # revealed: Any
+    # TODO: revealed: Any
+    reveal_type(choose(value, 1))  # revealed: int
+
+def list_caller(value: list[Any]) -> None:
+    reveal_type(identity(value))  # revealed: int | list[int]
+    reveal_type(choose(value, 1))  # revealed: int | list[int]
+    reveal_type(choose(value, [1]))  # revealed: int | list[int]
+```
+
+## Ambiguous constrained TypeVar inference from a gradual callable return
+
+Constraint-set-native inference also preserves gradual evidence nested inside a callable. As above,
+we currently fall back to `Unknown` when that evidence matches multiple constraints.
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def call(callback: Callable[[], T]) -> T:
+    return callback()
+
+def callback() -> Any:
+    return 1
+
+reveal_type(call(callback))  # revealed: Any
+```
+
 ## Bounded TypeVar with callable parameter
 
 When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
@@ -935,6 +1052,25 @@ reveal_type(result)  # revealed: Derived
 
 # Accessing an attribute that only exists on Derived should work
 print(result.attr)  # No error
+```
+
+## Callable instances
+
+Generic parameters can be inferred from the `__call__` method of a class instance.
+
+```py
+from typing import Callable, TypeVar
+
+R = TypeVar("R")
+
+def call(callable: Callable[[], R]) -> R:
+    return callable()
+
+class MyCallable:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(call(MyCallable()))  # revealed: int
 ```
 
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar

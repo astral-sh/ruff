@@ -77,3 +77,59 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+An `await` expression in the generator expression's implicit scope also makes it asynchronous:
+
+```py
+async def is_even(value: int) -> bool:
+    return value % 2 == 0
+
+async def filter_values() -> None:
+    values: list[int] = [1, 2, 3]
+    generator = (value for value in values if await is_even(value))
+    reveal_type(generator)  # revealed: AsyncGeneratorType[int, None]
+    await anext(generator, None)
+```
+
+This includes `await` expressions in the yielded element and in the iterable of any `for` clause
+after the first:
+
+```py
+async def get_values(value: int = 0) -> list[int]:
+    return [value]
+
+async def get_value(value: int) -> int:
+    return value
+
+async def await_locations() -> None:
+    reveal_type([await get_value(x)] for x in [1])  # revealed: AsyncGeneratorType[list[int], None]
+    reveal_type(y for x in [1] for y in await get_values(x))  # revealed: AsyncGeneratorType[int, None]
+```
+
+The iterable in the first `for` clause is evaluated in the enclosing scope, so an `await` there does
+not make the generator expression asynchronous. The same rule means that the first iterable of a
+nested generator expression can make the outer generator asynchronous:
+
+```py
+async def first_iterable() -> None:
+    reveal_type(x for x in await get_values())  # revealed: GeneratorType[int, None, None]
+    outer = ((y for y in await get_values()) for _ in [1])
+    reveal_type(outer)  # revealed: AsyncGeneratorType[GeneratorType[int, None, None], None]
+```
+
+An asynchronous nested generator expression does not make the outer generator asynchronous, but an
+asynchronous nested container comprehension does:
+
+```py
+from collections.abc import AsyncIterator
+
+async def async_values() -> AsyncIterator[int]:
+    yield 1
+
+async def nested_comprehensions() -> None:
+    nested_generator = ((await get_value(x) for x in [1]) for _ in [1])
+    reveal_type(nested_generator)  # revealed: GeneratorType[AsyncGeneratorType[int, None], None, None]
+    reveal_type([x async for x in async_values()] for _ in [1])  # revealed: AsyncGeneratorType[list[int], None]
+    reveal_type({x async for x in async_values()} for _ in [1])  # revealed: AsyncGeneratorType[set[int], None]
+    reveal_type({x: x async for x in async_values()} for _ in [1])  # revealed: AsyncGeneratorType[dict[int, int], None]
+```

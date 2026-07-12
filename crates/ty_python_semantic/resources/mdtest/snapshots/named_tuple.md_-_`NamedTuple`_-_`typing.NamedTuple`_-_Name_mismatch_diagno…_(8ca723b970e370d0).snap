@@ -14,7 +14,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
 
 ```
 1 | from typing import NamedTuple
-2 | from ty_extensions import is_subtype_of
+2 | from ty_extensions._internal import is_subtype_of
 3 | 
 4 | # error: [mismatched-type-name]
 5 | Mismatch = NamedTuple("WrongName", [("x", int)])

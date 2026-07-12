@@ -705,7 +705,8 @@ Protocol types can be used as TypeVar bounds, just like nominal types.
 
 ```py
 from typing import Any, Protocol
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class SupportsClose(Protocol):
     def close(self) -> None: ...
@@ -966,7 +967,7 @@ reveal_type(name)  # revealed: Name
 
 ## `self` in PEP 695 generic methods
 
-When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+When a generic method uses a PEP 695 generic context, an implicit or explicit annotation of
 `self: Self` is still part of the full generic context:
 
 ```py
@@ -1005,7 +1006,7 @@ specializations of a generic function.
 
 ```py
 from typing import Any, Callable, NoReturn, overload, Self
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
@@ -1134,16 +1135,33 @@ class GenericClass[T]:
 def _(x: list[str]):
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_regular_callable(GenericClass))
-    # revealed: ty_extensions.GenericContext[T@GenericClass]
+    # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_regular_callable(GenericClass)))
 
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
-    # revealed: ty_extensions.GenericContext[T@GenericClass]
+    # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
 
     # revealed: GenericClass[str]
     reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### Callable instances
+
+Generic parameters can be inferred from the `__call__` method of a class instance.
+
+```py
+from typing import Callable
+
+def call[R](callable: Callable[[], R]) -> R:
+    return callable()
+
+class MyCallable:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(call(MyCallable()))  # revealed: int
 ```
 
 ### `Callable`s that return union types

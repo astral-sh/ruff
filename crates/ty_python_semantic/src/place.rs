@@ -97,7 +97,7 @@ impl PublicTypePolicy {
 }
 
 /// The source definition provenance for a place.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Provenance<'db> {
     /// No source definition is known.
     #[default]
@@ -136,7 +136,7 @@ impl<'db> Provenance<'db> {
 }
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
@@ -215,7 +215,7 @@ impl<'db> DefinedPlace<'db> {
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Place<'db> {
     Defined(DefinedPlace<'db>),
     #[default]
@@ -501,7 +501,7 @@ pub(crate) fn global_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     explicit_global_symbol(db, file, name)
-        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
+        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, file, name))
 }
 
 /// Infers the public type of an imported symbol.
@@ -599,7 +599,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
-            module_type_implicit_global_symbol(db, symbol)
+            module_type_implicit_global_symbol(db, file, symbol)
         });
         // If this symbol is not present in project-level builtins, search in the default ones.
         found_symbol
@@ -776,7 +776,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
@@ -982,6 +982,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         place.cycle_normalized(db, *previous, cycle)
@@ -1332,6 +1333,7 @@ fn symbol_impl<'db>(
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
+    returns(clone),
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
@@ -1424,7 +1426,7 @@ fn loop_header_reachability_impl<'db>(
 }
 
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
@@ -1454,7 +1456,7 @@ impl<'db> LoopHeaderReachability<'db> {
 }
 
 /// A single reachable loop-back binding with its narrowing constraint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ReachableLoopBinding<'db> {
     pub(crate) definition: Definition<'db>,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
@@ -1985,11 +1987,13 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 }
 
 pub(crate) mod implicit_globals {
+    use ruff_db::files::File;
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
 
     use crate::Program;
     use crate::db::Db;
+    use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::types::{
         ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
@@ -2045,6 +2049,7 @@ pub(crate) mod implicit_globals {
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
+        file: File,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match name {
@@ -2052,6 +2057,16 @@ pub(crate) mod implicit_globals {
             // lookup in a Python module, it is always a string, even though typeshed says `str |
             // None`.
             "__file__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+
+            // We special-case `__doc__` because a module with a literal docstring has `__doc__`
+            // set to that string at runtime. We only narrow when a docstring is present: `__doc__`
+            // may be set dynamically, so we fall back to the typeshed's `str | None`.
+            "__doc__" if module_docstring(db, file).is_some() => {
+                // Docstrings are stripped in `-OO` optimized mode, but here we assume that the
+                // existence of an actual docstring AND the usage of `__doc__` is reason enough to
+                // believe that it will exist at runtime.
+                Place::bound(KnownClass::Str.to_instance(db)).into()
+            }
 
             "__builtins__" => Place::bound(Type::any()).into(),
 
@@ -2074,11 +2089,10 @@ pub(crate) mod implicit_globals {
             // if at least one global symbol is annotated in the module.
             "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
                 let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("format")))
-                            .with_annotated_type(KnownClass::Int.to_instance(db))],
-                    ),
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "format",
+                    )))
+                    .with_annotated_type(KnownClass::Int.to_instance(db))]),
                     KnownClass::Dict.to_specialized_instance(
                         db,
                         &[KnownClass::Str.to_instance(db), Type::any()],
@@ -2171,6 +2185,7 @@ pub(crate) mod implicit_globals {
     /// for the current module, not `str | None`).
     pub(crate) fn all_implicit_module_globals(
         db: &dyn Db,
+        file: File,
     ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
         // Special-cased implicit globals that are not in `module_type_symbols`
         let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
@@ -2184,7 +2199,7 @@ pub(crate) mod implicit_globals {
         special_cased
             .chain(module_type_syms)
             .filter_map(move |name| {
-                let place = module_type_implicit_global_symbol(db, name.as_str());
+                let place = module_type_implicit_global_symbol(db, file, name.as_str());
                 // Only include bound symbols
                 place.place.ignore_possibly_undefined().map(|ty| (name, ty))
             })
@@ -2264,7 +2279,7 @@ impl RequiresExplicitReExport {
 ///     if flag():
 ///         x = 3
 /// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ConsideredDefinitions {
     /// Consider only the definitions that are "live" at the end of the scope, i.e. those
     /// that have not been shadowed or deleted.

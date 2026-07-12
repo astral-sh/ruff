@@ -23,7 +23,8 @@ use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA,
+    UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -75,13 +76,19 @@ pub(crate) struct SuppressionComment {
 
 impl SuppressionComment {
     /// Return the suppressed codes as strings
-    fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
+    pub(crate) fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
     }
 
     /// Return whether the comment is nested within a wider comment token.
     fn is_nested(&self) -> bool {
         self.token_range != self.range
+    }
+}
+
+impl Ranged for SuppressionComment {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -138,6 +145,20 @@ impl Suppression {
                 ..
             })
         )
+    }
+
+    /// Returns whether the suppression's range applies to a diagnostic.
+    ///
+    /// `ruff:ignore` comments only need to contain the start of the diagnostic range (or its
+    /// parent), while range suppression comments must contain the entire diagnostic range.
+    fn applies_to_diagnostic(&self, range: TextRange, parent: Option<TextSize>) -> bool {
+        if self.is_ignore() {
+            self.range.contains(range.start())
+                || range.is_empty() && self.range.end() == range.start()
+                || parent.is_some_and(|parent| self.range.contains(parent))
+        } else {
+            self.range.contains_range(range)
+        }
     }
 
     /// Return the [`Rule`] associated with this suppression.
@@ -266,6 +287,21 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
+    pub(crate) fn find_applicable_ignore(
+        &self,
+        diagnostic: &Diagnostic,
+    ) -> Option<&SuppressionComment> {
+        let range = diagnostic.primary_span()?.range()?;
+
+        self.valid
+            .iter()
+            .find(|suppression| {
+                suppression.is_ignore()
+                    && suppression.applies_to_diagnostic(range, diagnostic.parent())
+            })
+            .map(|suppression| suppression.comments.first())
+    }
+
     /// Check if a diagnostic is suppressed by any known range suppressions.
     ///
     /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
@@ -310,40 +346,97 @@ impl Suppressions {
             return false;
         };
 
+        self.check_suppression(
+            diagnostic.secondary_code(),
+            diagnostic.name(),
+            range,
+            diagnostic.parent(),
+        )
+    }
+
+    /// Check whether a rule is suppressed at the given range and mark the suppression as used.
+    pub(crate) fn check_rule(
+        &self,
+        rule: Rule,
+        range: TextRange,
+        parent: Option<TextSize>,
+    ) -> bool {
+        self.check_suppression(Some(&rule.noqa_code()), rule.name().as_str(), range, parent)
+    }
+
+    /// Check whether the given rule code or name corresponds to a valid suppression comment at
+    /// `range` itself or the `parent` offset.
+    fn check_suppression<C>(
+        &self,
+        code: Option<&C>,
+        name: &str,
+        range: TextRange,
+        parent: Option<TextSize>,
+    ) -> bool
+    where
+        C: for<'a> PartialEq<&'a str>,
+    {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
 
-            let code_matches = diagnostic
-                .secondary_code()
-                .is_some_and(|code| *code == suppression_code);
-
-            let name_matches = is_human_readable_names_enabled(self.preview)
-                && diagnostic.name() == suppression_code;
+            let code_matches = code.is_some_and(|code| code == &suppression_code);
+            let name_matches =
+                is_human_readable_names_enabled(self.preview) && name == suppression_code;
 
             if !code_matches && !name_matches {
                 continue;
             }
 
-            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
-            // its parent) is covered by the suppression. Range suppression comments must fully
-            // contain the diagnostic range.
-            let suppressed = if suppression.is_ignore() {
-                suppression.range.contains(range.start())
-                    || range.is_empty() && suppression.range.end() == range.start()
-                    || diagnostic
-                        .parent()
-                        .is_some_and(|parent| suppression.range.contains(parent))
-            } else {
-                suppression.range.contains_range(range)
-            };
-
-            if suppressed {
+            if suppression.applies_to_diagnostic(range, parent) {
                 suppression.used.set(true);
                 return true;
             }
         }
         false
+    }
+
+    /// Check for rule codes in valid suppression comments.
+    pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
+        if !context.is_rule_enabled(Rule::RuleCodesInSuppressionComments) {
+            return;
+        }
+
+        // Each comment or matched pair produces one valid suppression per code, all sharing the
+        // same first comment range.
+        let mut seen_comments = FxHashSet::default();
+
+        for suppression in &self.valid {
+            let first_comment = suppression.comments.first();
+            if !seen_comments.insert(first_comment.range) {
+                continue;
+            }
+
+            let second_comment = suppression.comments.second();
+            for (index, range) in first_comment.codes.iter().enumerate() {
+                let original = locator.slice(range);
+                let code = get_redirect_target(original).unwrap_or(original);
+                let Ok(rule) = Rule::from_code(code) else {
+                    continue;
+                };
+
+                let mut diagnostic =
+                    context.report_diagnostic(RuleCodesInSuppressionComments, *range);
+                let name = rule.name().to_string();
+                let fix = if let Some(second_range) =
+                    second_comment.and_then(|comment| comment.codes.get(index))
+                {
+                    diagnostic.secondary_annotation_without_message(*second_range);
+                    Fix::safe_edits(
+                        Edit::range_replacement(name.clone(), *range),
+                        [Edit::range_replacement(name, *second_range)],
+                    )
+                } else {
+                    Fix::safe_edit(Edit::range_replacement(name, *range))
+                };
+                diagnostic.set_fix(fix);
+            }
+        }
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {

@@ -14,7 +14,8 @@ materializations of `B`, and all materializations of `B` are also materializatio
 
 ```py
 from typing_extensions import Literal, LiteralString, Protocol, Never
-from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import Unknown, static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -71,7 +72,8 @@ static_assert(is_equivalent_to(type, type[object]))
 ```py
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Any, Any))
 static_assert(is_equivalent_to(Unknown, Unknown))
@@ -86,7 +88,8 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 
 ```pyi
 from typing import Any, Literal, TypeAlias
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
@@ -149,7 +152,8 @@ static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 ## Tuples
 
 ```py
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
@@ -161,7 +165,8 @@ static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
 ```pyi
-from ty_extensions import is_equivalent_to, TypeOf, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from typing import Literal
 
 class P: ...
@@ -177,7 +182,8 @@ static_assert(is_equivalent_to(tuple[P & Q | R & ~S], tuple[~S & R | Q & P]))
 ## Unions containing tuples containing tuples containing unions (etc.)
 
 ```pyi
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -199,7 +205,8 @@ static_assert(
 ## Intersections containing tuples containing unions
 
 ```pyi
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -216,7 +223,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class A: ...
 class B: ...
@@ -234,7 +242,8 @@ the parameter in one of the callable has a default value then the corresponding 
 other callable should also have a default value.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 
 def f1(a: int = 1) -> None: ...
@@ -282,7 +291,8 @@ static_assert(
 There are multiple cases when two callable types are not equivalent which are enumerated below.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 ```
 
@@ -361,7 +371,8 @@ Two unions containing different `Callable` types are equivalent even if the unio
 ordered:
 
 ```py
-from ty_extensions import RegularCallableTypeOf, Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 
 def f(x): ...
 def g(x: Unknown): ...
@@ -375,7 +386,8 @@ Differently ordered unions inside `Callable`s inside unions can still be equival
 
 ```py
 from typing import Callable
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
 ```
@@ -402,7 +414,8 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import Grandparent, Parent, Child, overloaded
 
 def grandparent(a: Grandparent) -> None: ...
@@ -435,7 +448,8 @@ def cpg(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import pg, cpg
 
 static_assert(is_equivalent_to(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
@@ -452,7 +466,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, TypeOf, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 def f(): ...
 
@@ -474,7 +489,8 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -606,7 +622,8 @@ import typing
 ```py
 import typing
 from module import typing as other_typing
-from ty_extensions import TypeOf, static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 static_assert(is_equivalent_to(TypeOf[typing], TypeOf[other_typing]))
 static_assert(is_equivalent_to(TypeOf[typing] | int | str, str | int | TypeOf[other_typing]))
@@ -640,7 +657,8 @@ import imported.abc
 ```py
 import imported
 from module2 import imported as other_imported
-from ty_extensions import TypeOf, static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 # error: [possibly-missing-submodule]
 reveal_type(imported.abc)  # revealed: Unknown
@@ -660,7 +678,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, TypeOf, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 class Foo[T]:
     x: T

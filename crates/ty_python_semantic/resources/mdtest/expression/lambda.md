@@ -46,7 +46,7 @@ And, variadic parameter:
 reveal_type(lambda *args: args)  # revealed: (*args) -> tuple[Unknown, ...]
 ```
 
-And, keyword-varidic parameter:
+And, keyword-variadic parameter:
 
 ```py
 reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> dict[str, Unknown]

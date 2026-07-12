@@ -554,9 +554,9 @@ the subject after that pattern succeeds.
 ### Value-pattern aliases
 
 Value patterns use `==`, and `as` binds the original subject rather than the value written in the
-pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
-remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
-literal `1` and `True`, which compares equal to `1`, but not the rest of either class.
+pattern. Broad builtin types are treated as if they use builtin equality, so matching `1` narrows
+`x` to the integer and boolean literals that compare equal to it. After that pattern fails, matching
+`"foo"` narrows `x` to that string literal.
 
 ```py
 def _(target: int | str):
@@ -565,14 +565,33 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: int | str
+            reveal_type(x)  # revealed: Literal[1, True]
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
+            reveal_type(x)  # revealed: Literal["foo"]
         case _:
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
+### Enabling strict literal narrowing
+
+With strict literal narrowing enabled, broad builtin types are preserved both in the capture and
+when narrowing the subject for later cases:
+
+```toml
+[analysis]
+strict-literal-narrowing = true
+```
+
+```py
+def _(target: int | str):
+    match target:
+        case 1 as x:
+            reveal_type(x)  # revealed: int | str
+        case "foo" as x:
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
 ```
 
 ### Narrowing a value alias

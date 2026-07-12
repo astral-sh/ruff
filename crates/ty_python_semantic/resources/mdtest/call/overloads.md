@@ -1469,7 +1469,8 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
 ```pyi
 from typing_extensions import Iterable, overload, LiteralString, Protocol
-from ty_extensions import Unknown, is_assignable_to
+from ty_extensions import Unknown
+from ty_extensions._internal import is_assignable_to
 
 class Foo:
     @overload
@@ -1744,7 +1745,7 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
-### Varidic argument with generics
+### Variadic argument with generics
 
 `overloaded.pyi`:
 
@@ -1812,7 +1813,7 @@ reveal_type(f3(z=1))  # revealed: dict[str, Any]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
 ```
 
-### Varidic argument with generic iterable
+### Variadic argument with generic iterable
 
 `overloaded.pyi`:
 

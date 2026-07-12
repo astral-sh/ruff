@@ -361,6 +361,9 @@ index 71fca60c8d..e92d839f1b 100644
 +from typing import Iterable  # noqa: UP035
 ```
 
+To add `# ruff:ignore[...]` comments with human-readable rule names instead, use the
+`--add-ignore` flag with preview mode enabled.
+
 ## Integrations
 
 This tutorial has focused on Ruff's command-line interface, but Ruff can also be used as a
@@ -369,7 +372,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.20
+  rev: v0.15.21
   hooks:
     # Run the linter.
     - id: ruff-check

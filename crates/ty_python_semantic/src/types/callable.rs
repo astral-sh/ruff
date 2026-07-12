@@ -251,11 +251,8 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_only(None)
-                                .with_annotated_type(newtype.base(db).instance_type(db))],
-                        ),
+                        Parameters::standard([Parameter::positional_only(None)
+                            .with_annotated_type(newtype.base(db).instance_type(db))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))
@@ -270,9 +267,10 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Some(CallableTypes::one(partial.partial(db)))
-            }
+            Type::KnownInstance(
+                KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial),
+            ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::Intersection(intersection) => {
                 intersection
@@ -319,6 +317,12 @@ pub enum CallableTypeKind {
     /// `NamedTuples`. These callables act like real functions when accessed as attributes on
     /// instances, i.e. they bind `self`.
     FunctionLike,
+
+    /// Represents a `Callable[P, R]`-typed dunder attribute.
+    ///
+    /// This is distinct from [`Self::Regular`] so that the dunder descriptor heuristic does not
+    /// turn the callable into a function-like object after `P` is specialized.
+    DunderParamSpec,
 
     /// A callable type that represents a staticmethod. These callables do not bind `self`
     /// when accessed as attributes on instances - they return the underlying function as-is.
@@ -412,6 +416,7 @@ pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
+    #[returns(copy)]
     pub(super) kind: CallableTypeKind,
 
     /// Source-function return-annotation provenance retained by this callable.
@@ -426,6 +431,7 @@ pub struct CallableType<'db> {
     /// ```python
     /// def decorator_factory() -> Callable[[type[object]], object]: ...
     /// ```
+    #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
 }
 
@@ -480,6 +486,14 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    pub(crate) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
+    }
+
+    pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::Regular)
     }
 
     pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
@@ -544,10 +558,32 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        if self.is_dunder_paramspec(db) {
+            return self.into_regular(db);
+        }
+
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
+            self.provenance(db),
+        )
+    }
+
+    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db),
+            CallableTypeKind::FunctionLike,
+            self.provenance(db),
+        )
+    }
+
+    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db),
+            CallableTypeKind::DunderParamSpec,
             self.provenance(db),
         )
     }
@@ -628,7 +664,7 @@ impl<'db> CallableType<'db> {
 ///
 /// Note that this type is guaranteed to contain at least one callable. If you need to support "no
 /// callables" as a possibility, use `Option<CallableTypes>`.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {

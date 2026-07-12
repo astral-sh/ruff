@@ -13,9 +13,10 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use super::dedicated::pydantic;
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -70,7 +71,7 @@ bitflags::bitflags! {
     ///
     /// This combines properties derived from the MRO into the existing class-classification
     /// query, avoiding a separate cached query for each property.
-    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash, salsa::Update)]
+    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
     pub(super) struct ClassInstanceFlags: u8 {
         /// The class is, or inherits from, a `TypedDict` specification.
         const TYPED_DICT = 1 << 0;
@@ -82,10 +83,12 @@ bitflags::bitflags! {
 impl get_size2::GetSize for ClassInstanceFlags {}
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
+    /// Classes inheriting from Pydantic's `BaseModel`.
+    Pydantic(pydantic::ModelMetadata<'db>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
     /// Classes inheriting from `typing.TypedDict` or `typing_extensions.TypedDict`
@@ -96,8 +99,8 @@ impl<'db> CodeGeneratorKind<'db> {
     /// Return the code-generation behavior for a class.
     ///
     /// This is invariant across generic specializations. Type arguments affect the types of
-    /// synthesized members, but not whether the class is dataclass-like, a `NamedTuple`, or a
-    /// `TypedDict`.
+    /// synthesized members, but not whether the class is dataclass-like, a Pydantic model, a
+    /// `NamedTuple`, or a `TypedDict`.
     pub(crate) fn from_class(db: &'db dyn Db, class: ClassLiteral<'db>) -> Option<Self> {
         match class {
             ClassLiteral::Static(static_class) => Self::from_static_class(db, static_class),
@@ -117,7 +120,9 @@ impl<'db> CodeGeneratorKind<'db> {
             return None;
         }
 
-        #[salsa::tracked(cycle_initial=|_, _, _| None,
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -134,7 +139,11 @@ impl<'db> CodeGeneratorKind<'db> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
-                Some(CodeGeneratorKind::DataclassLike(Some(info.params)))
+                Some(CodeGeneratorKind::from_dataclass_transformer(
+                    db,
+                    class,
+                    info.params,
+                ))
             } else if KnownClass::Type
                 .try_to_class_literal(db)
                 .is_none_or(|type_class| {
@@ -153,7 +162,11 @@ impl<'db> CodeGeneratorKind<'db> {
                         })
                     })
             {
-                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+                Some(CodeGeneratorKind::from_dataclass_transformer(
+                    db,
+                    class,
+                    transformer_params,
+                ))
             } else if class
                 .explicit_bases(db)
                 .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
@@ -169,8 +182,26 @@ impl<'db> CodeGeneratorKind<'db> {
         code_generator_of_static_class(db, class)
     }
 
+    fn from_dataclass_transformer(
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+        transformer_params: DataclassTransformerParams<'db>,
+    ) -> Self {
+        if pydantic::is_model(db, class) {
+            Self::Pydantic(pydantic::ModelMetadata::from_class(
+                db,
+                class,
+                transformer_params,
+            ))
+        } else {
+            Self::DataclassLike(Some(transformer_params))
+        }
+    }
+
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(cycle_initial=|_, _, _| None,
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_dynamic_class<'db>(
@@ -200,6 +231,7 @@ impl<'db> CodeGeneratorKind<'db> {
         matches!(
             (CodeGeneratorKind::from_class(db, class), self),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
+                | (Some(Self::Pydantic(_)), Self::Pydantic(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
                 | (Some(Self::TypedDict), Self::TypedDict)
         )
@@ -208,7 +240,72 @@ impl<'db> CodeGeneratorKind<'db> {
     pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
         match self {
             Self::DataclassLike(params) => params,
+            Self::Pydantic(_) | Self::NamedTuple | Self::TypedDict => None,
+        }
+    }
+
+    pub(super) fn field_specifiers(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
+        match self {
+            Self::DataclassLike(params) => Some(params?.field_specifiers(db)),
+            Self::Pydantic(metadata) => Some(metadata.field_specifiers(db)),
             Self::NamedTuple | Self::TypedDict => None,
+        }
+    }
+
+    pub(super) const fn name(self) -> &'static str {
+        match self {
+            Self::DataclassLike(_) => "dataclass",
+            Self::Pydantic(_) => "Pydantic model",
+            Self::NamedTuple => "named tuple",
+            Self::TypedDict => "TypedDict",
+        }
+    }
+
+    pub(super) const fn is_dataclass_like(self) -> bool {
+        matches!(self, Self::DataclassLike(_))
+    }
+
+    pub(super) const fn is_pydantic(self) -> bool {
+        matches!(self, Self::Pydantic(_))
+    }
+
+    /// Return `true` if field declarations should be treated as instance attributes.
+    ///
+    /// For example, a bare annotation in a dataclass body is seen as evidence for the
+    /// existence of an instance attribute, since the field will be set in the generated
+    /// constructor.
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// def f(c: C):
+    ///     c.value  # okay, `value` will be set by `C`'s constructor
+    /// ```
+    pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
+        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    }
+
+    /// Return `true` if the class constructor is synthesized from its fields.
+    ///
+    /// For example, a dataclass field becomes a parameter in the generated constructor:
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// C(value=42)
+    /// ```
+    pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
+        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    }
+
+    pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
+        match self {
+            Self::Pydantic(metadata) => Some(metadata),
+            Self::DataclassLike(_) | Self::NamedTuple | Self::TypedDict => None,
         }
     }
 }
@@ -216,7 +313,9 @@ impl<'db> CodeGeneratorKind<'db> {
 /// A specialization of a generic class with a particular assignment of types to typevars.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericAlias<'db> {
+    #[returns(copy)]
     pub(crate) origin: StaticClassLiteral<'db>,
+    #[returns(copy)]
     pub(crate) specialization: Specialization<'db>,
 }
 
@@ -316,10 +415,11 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
         let specialization = self.specialization(db);
@@ -348,7 +448,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                     let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                     origin
                         .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, generic_typevar)
+                        .variance_of(db, generic_typevar.identity(db))
                 }
             })
             .collect()
@@ -357,7 +457,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 /// A class literal, either defined via a `class` statement or a `type` function call.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum ClassLiteral<'db> {
     /// A class defined via a `class` statement.
@@ -900,7 +1000,7 @@ impl<'db> From<DynamicEnumLiteral<'db>> for ClassLiteral<'db> {
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum ClassType<'db> {
     // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
@@ -1299,6 +1399,7 @@ impl<'db> ClassType<'db> {
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -1552,14 +1653,13 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> Member<'db> {
         fn synthesize_getitem_overload_signature<'db>(
-            db: &'db dyn Db,
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
         ) -> Signature<'db> {
             let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::new(db, [self_parameter, index_parameter]);
+            let parameters = Parameters::standard([self_parameter, index_parameter]);
             Signature::new(parameters, return_annotation)
         }
 
@@ -1595,11 +1695,10 @@ impl<'db> ClassType<'db> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                let parameters = Parameters::new(
-                    db,
-                    [Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(Type::instance(db, self))],
-                );
+                let parameters = Parameters::standard([Parameter::positional_only(Some(
+                    Name::new_static("self"),
+                ))
+                .with_annotated_type(Type::instance(db, self))]);
 
                 let synthesized_dunder_method =
                     Type::function_like_callable(db, Signature::new(parameters, return_type));
@@ -1732,7 +1831,6 @@ impl<'db> ClassType<'db> {
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
-                                    db,
                                     index_annotation,
                                     return_type,
                                 ))
@@ -1750,7 +1848,6 @@ impl<'db> ClassType<'db> {
                         //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::SupportsIndex.to_instance(db),
                             all_elements_unioned,
                         ));
@@ -1760,7 +1857,6 @@ impl<'db> ClassType<'db> {
                             [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
                         );
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::Slice.to_specialized_instance(
                                 db,
                                 &[slice_bound, slice_bound, slice_bound],
@@ -1837,14 +1933,11 @@ impl<'db> ClassType<'db> {
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
-                let parameters = Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(SubclassOfType::from(db, self)),
-                        iterable_parameter,
-                    ],
-                );
+                let parameters = Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(SubclassOfType::from(db, self)),
+                    iterable_parameter,
+                ]);
 
                 let synthesized_dunder = Type::function_like_callable(
                     db,
@@ -2195,7 +2288,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, typevar),
             Self::NonGeneric(
@@ -2287,7 +2380,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct AbstractMethod<'db> {
     pub(super) defining_class: ClassType<'db>,
     pub(super) definition: Definition<'db>,
@@ -2328,7 +2421,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -2350,6 +2443,17 @@ pub(crate) enum FieldKind<'db> {
         /// output type (return type of the converter callable).
         converter: Option<(Type<'db>, Type<'db>)>,
     },
+    /// Pydantic model field metadata
+    Pydantic {
+        /// The type of the default value for this field
+        default_ty: Option<Type<'db>>,
+        /// Whether or not this field should appear in the synthesized constructor signature.
+        init: bool,
+        /// The name for this field in the synthesized constructor signature, if specified.
+        alias: Option<Box<str>>,
+        /// The mode selected by Pydantic's `strict` argument.
+        strict: pydantic::ConfigBoolean,
+    },
     /// `TypedDict` field metadata
     TypedDict {
         /// Whether this field is required
@@ -2360,7 +2464,7 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
@@ -2378,6 +2482,9 @@ impl Field<'_> {
             // A dataclass field is NOT required if `default` (or `default_factory`) is set
             // or if `init` has been set to `False`.
             FieldKind::Dataclass {
+                init, default_ty, ..
+            } => default_ty.is_none() && *init,
+            FieldKind::Pydantic {
                 init, default_ty, ..
             } => default_ty.is_none() && *init,
             FieldKind::TypedDict { is_required, .. } => *is_required,
@@ -2401,7 +2508,7 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::Static(class) => class.variance_of(db, typevar),
             Self::Dynamic(_)
@@ -2739,7 +2846,7 @@ impl std::fmt::Display for QualifiedClassName<'_> {
 /// `TypeError`s resulting from class definitions.
 ///
 /// [PEP 800]: https://peps.python.org/pep-0800/
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct DisjointBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: DisjointBaseKind,
@@ -2780,7 +2887,7 @@ impl<'db> DisjointBase<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum DisjointBaseKind {
     /// We know the class is a disjoint base because it's either hardcoded in ty
     /// or has the `@disjoint_base` decorator.
@@ -2789,7 +2896,7 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
 }
@@ -2801,7 +2908,7 @@ impl<'db> MetaclassError<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum MetaclassErrorKind<'db> {
     /// The class has incompatible metaclasses in its inheritance hierarchy.
     ///

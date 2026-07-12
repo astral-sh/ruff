@@ -11,22 +11,11 @@ mod markdown;
 
 use indexmap::IndexMap;
 use regex::Regex;
-use ruff_python_trivia::{PythonWhitespace, leading_indentation};
+use ruff_python_trivia::{PythonWhitespace, expand_tabs, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::sync::LazyLock;
 
 use crate::MarkupKind;
-
-// Static regex instances to avoid recompilation
-static GOOGLE_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\s*(Args|Arguments|Parameters)\s*:\s*$")
-        .expect("Google section regex should be valid")
-});
-
-static GOOGLE_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\s*(.+)")
-        .expect("Google parameter regex should be valid")
-});
 
 static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\s*Parameters\s*$").expect("NumPy section regex should be valid")
@@ -69,18 +58,8 @@ impl Docstring {
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
     pub fn parameter_documentation(&self) -> IndexMap<String, String> {
-        let mut param_docs = IndexMap::new();
-
-        // Google-style docstrings
-        param_docs.extend(extract_google_style_params(&self.0));
-
-        // NumPy-style docstrings
-        param_docs.extend(extract_numpy_style_params(&self.0));
-
-        // reST/Sphinx-style docstrings
-        param_docs.extend(document::parameter_documentation(&self.0));
-
-        param_docs
+        let normalized_source = documentation_trim(&self.0);
+        document::parameter_documentation(&normalized_source, extract_numpy_style_params(&self.0))
     }
 }
 
@@ -105,7 +84,7 @@ impl DocstringFragment {
 
 /// Normalizes an extracted docstring fragment without removing meaningful relative indentation.
 fn documentation_fragment_trim(docs: &str) -> String {
-    let expanded = docs.trim_end().replace('\t', "        ");
+    let expanded = expand_tabs(docs.trim_end());
     let mut output = String::with_capacity(expanded.len());
     for line in expanded.universal_newlines() {
         output.push_str(line.as_str().trim_whitespace_end());
@@ -118,13 +97,13 @@ fn documentation_fragment_trim(docs: &str) -> String {
 ///
 /// See: <https://peps.python.org/pep-0257/#handling-docstring-indentation>
 fn documentation_trim(docs: &str) -> String {
-    // First apply tab expansion as we don't want tabs in our output
-    // (python says tabs are equal to 8 spaces).
+    // First apply tab expansion as we don't want tabs in our output. Python advances tabs to the
+    // next eight-column tab stop.
     //
     // We also trim off all trailing whitespace here to eliminate trailing newlines so we
     // don't need to handle trailing blank lines later. We can't trim away leading
     // whitespace yet, because we need to identify the first line and handle it specially.
-    let expanded = docs.trim_end().replace('\t', "        ");
+    let expanded = expand_tabs(docs.trim_end());
 
     // Compute the minimum indention of all non-empty non-first lines
     // and statistics about leading blank lines to help trim them later.
@@ -175,89 +154,6 @@ fn documentation_trim(docs: &str) -> String {
     }
 
     output
-}
-
-/// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> IndexMap<String, String> {
-    let mut param_docs = IndexMap::new();
-
-    let mut in_args_section = false;
-    let mut current_param: Option<String> = None;
-    let mut current_doc = String::new();
-
-    for line_obj in docstring.universal_newlines() {
-        let line = line_obj.as_str();
-        if GOOGLE_SECTION_REGEX.is_match(line) {
-            in_args_section = true;
-            continue;
-        }
-
-        if in_args_section {
-            // Check if we hit another section (starts with a word followed by colon at line start)
-            if !line.starts_with(' ') && !line.starts_with('\t') && line.contains(':') {
-                if let Some(colon_pos) = line.find(':') {
-                    let section_name = line[..colon_pos].trim();
-                    // If this looks like another section, stop processing args
-                    if !section_name.is_empty()
-                        && section_name
-                            .chars()
-                            .all(|c| c.is_alphabetic() || c.is_whitespace())
-                    {
-                        // Check if this is a known section name
-                        let known_sections = [
-                            "Returns", "Return", "Raises", "Yields", "Yield", "Examples",
-                            "Example", "Note", "Notes", "Warning", "Warnings",
-                        ];
-                        if known_sections.contains(&section_name) {
-                            if let Some(param_name) = current_param.take() {
-                                param_docs.insert(param_name, current_doc.trim().to_string());
-                                current_doc.clear();
-                            }
-                            in_args_section = false;
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            if let Some(captures) = GOOGLE_PARAM_REGEX.captures(line) {
-                // Save previous parameter if exists
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-
-                // Start new parameter
-                if let (Some(param), Some(desc)) = (captures.get(1), captures.get(3)) {
-                    current_param = Some(param.as_str().to_string());
-                    current_doc = desc.as_str().to_string();
-                }
-            } else if line.starts_with(' ') || line.starts_with('\t') {
-                // This is a continuation of the current parameter documentation
-                if current_param.is_some() {
-                    if !current_doc.is_empty() {
-                        current_doc.push('\n');
-                    }
-                    current_doc.push_str(line.trim());
-                }
-            } else {
-                // This is a line that doesn't start with whitespace and isn't a parameter
-                // It might be a section or other content, so stop processing args
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                in_args_section = false;
-            }
-        }
-    }
-
-    // Don't forget the last parameter
-    if let Some(param_name) = current_param {
-        param_docs.insert(param_name, current_doc.trim().to_string());
-    }
-
-    param_docs
 }
 
 /// Calculate the indentation level of a line.
@@ -451,6 +347,23 @@ mod tests {
         // so tests are stable and the expected output stays readable.
         settings.add_filter("  \n", "<HB>\n");
         settings.bind_to_scope()
+    }
+
+    #[test]
+    fn expands_tabs_to_tab_stops_when_trimming_documentation() {
+        assert_snapshot!(
+            documentation_trim(
+                "\
+Summary.
+    baseline
+  \tindented",
+            ),
+            @"
+        Summary.
+        baseline
+            indented
+        "
+        );
     }
 
     // A nice doctest that is surrounded by prose
@@ -1035,12 +948,13 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(docstring.render_markdown(), @r"
         My cool func:<HB>
         <HB>
-        ``````we still think this is a codefence```
-            x_y = thing_do();
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``````we still think this is a codefence```<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;x\_y = thing\_do();<HB>
         ```````````` and are sloppy as heck with indentation and closing shrugggg
+        ````````````
         ");
     }
 
@@ -1919,71 +1833,35 @@ mod tests {
         let param_docs_mac = docstring_mac.parameter_documentation();
         let param_docs_unix = docstring_unix.parameter_documentation();
 
-        // All should produce the same results
+        assert_eq!(param_docs_mac, param_docs_windows);
+        assert_eq!(param_docs_unix, param_docs_windows);
         assert_eq!(param_docs_windows.len(), 2);
-        assert_eq!(param_docs_mac.len(), 2);
-        assert_eq!(param_docs_unix.len(), 2);
-
         assert_eq!(
             param_docs_windows.get("param1"),
             Some(&"The first parameter".to_string())
         );
-        assert_eq!(
-            param_docs_mac.get("param1"),
-            Some(&"The first parameter".to_string())
-        );
-        assert_eq!(
-            param_docs_unix.get("param1"),
-            Some(&"The first parameter".to_string())
-        );
 
-        assert_snapshot!(docstring_windows.render_plaintext(), @"
+        let plaintext = docstring_windows.render_plaintext();
+        assert_snapshot!(plaintext.as_str(), @"
         This is a function description.
 
         Args:
             param1 (str): The first parameter
             param2 (int): The second parameter
         ");
+        assert_eq!(docstring_mac.render_plaintext(), plaintext);
+        assert_eq!(docstring_unix.render_plaintext(), plaintext);
 
-        assert_snapshot!(docstring_windows.render_markdown(), @"
+        let markdown = docstring_windows.render_markdown();
+        assert_snapshot!(markdown.as_str(), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
-
-        assert_snapshot!(docstring_mac.render_plaintext(), @"
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_mac.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_unix.render_plaintext(), @"
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_unix.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
-        ");
+        assert_eq!(docstring_mac.render_markdown(), markdown);
+        assert_eq!(docstring_unix.render_markdown(), markdown);
     }
 
     // Regression test: a doctest followed by a literal block with blank lines inside.

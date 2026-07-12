@@ -68,8 +68,8 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python"),
-                "Supported file types are: py (or python), pyi, and ignore"
+                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb"),
+                "Supported file types are: py (or python), pyi, ipynb, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
@@ -106,9 +106,14 @@ fn run_test(
         .filter_map(|test_file| {
             let mdtest_result = attempt_test(
                 |file| {
-                    let source_kind = SourceKind::Python {
-                        code: source_text(db, file).as_str().to_string(),
-                        is_stub: file.is_stub(db),
+                    let source = source_text(db, file);
+                    let source_kind = if let Some(notebook) = source.as_notebook() {
+                        SourceKind::ipy_notebook(notebook.clone())
+                    } else {
+                        SourceKind::Python {
+                            code: source.as_str().to_string(),
+                            is_stub: file.is_stub(db),
+                        }
                     };
                     let path = file
                         .path(db)

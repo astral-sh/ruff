@@ -9,9 +9,9 @@ use crate::Expr;
 use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
-#[cfg_attr(feature = "salsa", derive(salsa::Update))]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
@@ -131,6 +131,48 @@ impl From<Name> for compact_str::CompactString {
     #[inline]
     fn from(name: Name) -> Self {
         name.0
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        self.0
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for &Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        self.0.clone()
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &Name) -> bool {
+        self == data.as_str()
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&Name) -> bool {
+        self == data.as_str()
     }
 }
 

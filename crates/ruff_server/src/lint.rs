@@ -16,10 +16,10 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator,
+    Locator, SuppressionKind,
     directives::{Flags, extract_directives},
-    generate_noqa_edits,
-    linter::check_path,
+    generate_suppression_edits,
+    linter::{check_path, parse_unchecked_source},
     package::PackageRoot,
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
@@ -30,7 +30,6 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -44,7 +43,7 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -61,7 +60,7 @@ pub(crate) struct DiagnosticFix {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -109,13 +108,8 @@ pub(crate) fn check(
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 
-    let parse_options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
-        .try_into_module()
-        .expect("PySourceType always parses to a ModModule");
+    let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -154,7 +148,7 @@ pub(crate) fn check(
         &suppressions,
     );
 
-    let noqa_edits = generate_noqa_edits(
+    let suppression_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -163,6 +157,11 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
+        if is_human_readable_names_enabled(settings.linter.preview) {
+            SuppressionKind::Ignore
+        } else {
+            SuppressionKind::Noqa
+        },
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,
@@ -192,7 +191,7 @@ pub(crate) fn check(
     let lsp_diagnostics =
         diagnostics
             .into_iter()
-            .zip(noqa_edits)
+            .zip(suppression_edits)
             .filter_map(|(message, noqa_edit)| {
                 if message.is_invalid_syntax() && !show_syntax_errors {
                     None

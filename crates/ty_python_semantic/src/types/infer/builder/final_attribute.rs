@@ -7,7 +7,10 @@ use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
-    types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
+    types::{
+        Type, attribute_write::assignment_attribute_members, diagnostic::INVALID_ASSIGNMENT,
+        infer::TypeInferenceBuilder,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
@@ -314,25 +317,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
-        else {
+        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
             return;
         };
 
-        if !self.invalid_assignment_to_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-        ) && let Some(fallback_attr) = fallback_attr
-        {
-            self.invalid_assignment_to_final_attribute(
+        for member in members.effective_members() {
+            if self.invalid_assignment_to_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
-            );
+                member.qualifiers,
+            ) {
+                break;
+            }
         }
     }
 
@@ -343,24 +340,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
-        else {
+        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
             return false;
         };
 
-        self.invalid_deletion_of_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-            emit_diagnostics,
-        ) || fallback_attr.is_some_and(|fallback_attr| {
+        members.effective_members().any(|member| {
             self.invalid_deletion_of_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
+                member.qualifiers,
                 emit_diagnostics,
             )
         })

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.15.20"
+version = "0.15.21"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -59,9 +59,13 @@ exclude = [
 dev = [
     "prek==0.4.5",
 ]
+release = [
+    "rooster==0.1.1",
+]
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
+release = { requires-python = ">=3.12" }
 
 [tool.ruff]
 target-version = "py38"
@@ -106,7 +110,7 @@ combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
-"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
+"crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''

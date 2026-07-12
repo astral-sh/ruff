@@ -26,7 +26,7 @@ pub use node_key::ExpressionNodeKey;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize)]
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FrozenMap<ExpressionNodeKey, ScopedUseId>,
@@ -136,7 +136,16 @@ pub(crate) mod node_key {
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
     #[derive(
-        Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+        Copy,
+        Clone,
+        Eq,
+        PartialEq,
+        Ord,
+        PartialOrd,
+        Hash,
+        Debug,
+        get_size2::GetSize,
+        salsa::SalsaValue,
     )]
     pub struct ExpressionNodeKey(NodeKey);
 

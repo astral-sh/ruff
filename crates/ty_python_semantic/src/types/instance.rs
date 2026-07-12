@@ -8,8 +8,8 @@ use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
-    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -167,7 +167,7 @@ impl<'db> Type<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct NominalInstanceType<'db>(
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
@@ -568,8 +568,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
-        if structurally_satisfied.is_never_satisfied(db) {
-            self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
+        if let Some(context) = self.report_context()
+            && structurally_satisfied.is_never_satisfied(db)
+        {
+            context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
                 protocol: Type::ProtocolInstance(protocol),
             });
@@ -644,6 +646,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// The class of a nominal instance whose MRO contains an explicit `Any` base.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ExplicitAnyInstanceClass<'db> {
+    #[returns(copy)]
     class: ClassType<'db>,
 }
 
@@ -654,7 +657,7 @@ impl get_size2::GetSize for ExplicitAnyInstanceClass<'_> {}
 ///
 /// Interning the uncommon explicit-`Any` case lets this type store the additional semantic bit
 /// without increasing the size of [`Type`].
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum NominalInstanceClass<'db> {
     Plain(ClassType<'db>),
     InheritsFromExplicitAny(ExplicitAnyInstanceClass<'db>),
@@ -693,7 +696,7 @@ impl<'db> NominalInstanceClass<'db> {
 /// [`NominalInstanceType`] is split into several variants internally as a pure optimization to
 /// avoid having to materialize the [`ClassType`] for tuple instances where it would be unnecessary
 /// (this is somewhat expensive!).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum NominalInstanceInner<'db> {
     /// An instance of `object`.
     ///
@@ -729,14 +732,14 @@ pub(crate) struct SliceLiteral {
 }
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.class(db).variance_of(db, typevar)
     }
 }
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -835,7 +838,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
@@ -921,14 +924,14 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.inner.variance_of(db, typevar)
     }
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum Protocol<'db> {
     FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -965,7 +968,7 @@ impl<'db> Protocol<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Protocol::FromClass(class_type) => class_type.variance_of(db, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
@@ -978,14 +981,15 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
-        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
+        FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, TypeVarVariance,
+        VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
@@ -1037,7 +1041,7 @@ mod synthesized_protocol {
         fn variance_of(
             self,
             db: &'db dyn Db,
-            typevar: BoundTypeVarInstance<'db>,
+            typevar: BoundTypeVarIdentity<'db>,
         ) -> TypeVarVariance {
             self.0.variance_of(db, typevar)
         }

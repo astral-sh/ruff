@@ -662,7 +662,12 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
             reveal_type(len(whole))  # revealed: int
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
+```
 
+Information from a failed sequence pattern must also be discarded before a mutable sequence is
+changed and matched again:
+
+```py
 def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
     value: list[int],
 ) -> None:
@@ -674,6 +679,20 @@ def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
             match whole:
                 case []:
                     reveal_type(whole)  # revealed: list[int]
+
+def failed_sequence_pattern_does_not_narrow_mutable_subject(
+    value: list[int],
+) -> None:
+    match value:
+        case []:
+            pass
+        case _:
+            # Reaching this arm means the preceding `[]` pattern failed, but clearing the list
+            # invalidates the resulting non-empty constraint.
+            value.clear()
+            match value:
+                case []:
+                    reveal_type(value)  # revealed: list[int]
 ```
 
 ## Indirect class patterns
@@ -710,6 +729,7 @@ def test_union_class_pattern_uses_members_from_matching_class(
     match value:
         case PatternClass(tag="int", payload=item):
             reveal_type(item)  # revealed: int
+            reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
 ## Class pattern aliases
@@ -1302,7 +1322,7 @@ def test_match_generic_container_member_keeps_loop_reachable(
     match value:
         case GenericListOverlapB(values=items):
             for item in items:
-                reveal_type(item)  # revealed: Unknown
+                reveal_type(item)  # revealed: object
 ```
 
 ## Class pattern captures from `Any` and `Unknown`
@@ -1592,6 +1612,125 @@ def test_required_typed_dict_key_excludes_fallback_binding(
         case {"value": item} | item:
             reveal_type(item)  # revealed: int | Token
             return item
+```
+
+## Narrowing the match subject
+
+When a class, mapping, or sequence pattern succeeds, it can narrow the original match subject even
+if the pattern does not bind a name for the whole value. Nested patterns can remove union members,
+and an `or` pattern combines the possibilities from its alternatives. A class or mapping pattern
+also keeps the uncertainty of an `Any` or `Unknown` subject.
+
+```py
+from typing import Any, Generic, Literal, TypeVar, final
+from typing_extensions import TypedDict
+from ty_extensions import Unknown
+
+TagT = TypeVar("TagT")
+PayloadT = TypeVar("PayloadT")
+
+class TaggedPayload(Generic[TagT, PayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: TagT
+    payload: PayloadT
+
+class GradualSubjectBox: ...
+
+def match_patterns_preserve_any_and_unknown(
+    any_value: Any,
+    unknown_value: Unknown,
+) -> None:
+    match any_value:
+        case GradualSubjectBox():
+            reveal_type(any_value)  # revealed: Any & GradualSubjectBox
+
+    match unknown_value:
+        case {"key": _}:
+            reveal_type(unknown_value)  # revealed: Unknown & Top[Mapping[Unknown, object]]
+
+def match_class_narrows_subject(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str],
+) -> None:
+    match value:
+        case TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
+
+def builtin_class_pattern_narrows_subject(value: bool) -> None:
+    match value:
+        case bool(True):
+            reveal_type(value)  # revealed: Literal[True]
+
+def list_class_pattern_does_not_keep_index_types_after_mutation(
+    value: list[int | str],
+) -> None:
+    match value:
+        case list([int(), str()]):
+            # Reversing the list invalidates the indexed-element facts established by the pattern.
+            value.reverse()
+            reveal_type(value[0])  # revealed: int | str
+
+def nested_list_pattern_does_not_keep_index_types_after_mutation(
+    value: tuple[list[int | str]],
+) -> None:
+    match value:
+        case [[int(), str()]]:
+            # The inner list is mutable, so the indexed-element facts established by the pattern
+            # cannot be retained through the outer tuple after this mutation.
+            value[0].reverse()
+            reveal_type(value[0][0])  # revealed: int | str
+
+def match_class_or_pattern_narrows_subject(
+    value: (TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool]),
+) -> None:
+    match value:
+        case TaggedPayload("int", _) | TaggedPayload("str", _):
+            # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
+            reveal_type(value)
+
+def match_sequence_narrows_tuple_element_subject(
+    value: tuple[Literal[1, 2]],
+) -> None:
+    match value:
+        case [1]:
+            reveal_type(value[0])  # revealed: Literal[1]
+
+@final
+class FinalWithoutRequestedAttribute: ...
+
+def missing_final_class_attribute_rejects_subject_alternative(
+    value: FinalWithoutRequestedAttribute | TaggedPayload[Literal["int"], int],
+) -> None:
+    match value:
+        case FinalWithoutRequestedAttribute(missing=_) | TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
+
+class IntPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class StrPayload(TypedDict):
+    tag: Literal["str"]
+    value: str
+
+def match_mapping_narrows_subject(value: IntPayload | StrPayload) -> None:
+    match value:
+        case {"tag": "int"}:
+            reveal_type(value)  # revealed: IntPayload
+
+class PayloadContainer:
+    payload: IntPayload | StrPayload
+
+def mapping_pattern_narrows_attribute_subject(container: PayloadContainer) -> None:
+    match container.payload:
+        case {"tag": "int"}:
+            reveal_type(container.payload)  # revealed: IntPayload
+
+def nested_mapping_narrows_sequence_subject(
+    value: tuple[IntPayload] | tuple[StrPayload],
+) -> None:
+    match value:
+        case [{"tag": "int"}]:
+            reveal_type(value)  # revealed: tuple[IntPayload]
 ```
 
 ## Exhaustive positional patterns for built-in classes
@@ -2052,6 +2191,78 @@ def possibly_missing_attribute_is_not_exhaustive(
             return 1
 ```
 
+## Exhaustiveness for types containing `Any`
+
+When `Any` appears within a type, it stands for many possible static types. An exhaustive pattern
+must eliminate all of them; otherwise, a contradictory type such as
+`Mapping[str, Any] & ~Mapping[str, Any]` can remain in the final case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The order of the first two cases below reproduces issue #3904:
+
+```py
+from collections.abc import Mapping
+from typing import Any, assert_never
+
+def mapping_with_any_is_exhaustive(value: Mapping[str, Any] | int) -> None:
+    match value:
+        case Mapping():
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
+Class patterns over generic classes follow the same rule:
+
+```py
+class Box[T]:
+    value: T
+
+def generic_class_with_any_is_exhaustive(value: Box[Any] | int) -> None:
+    match value:
+        case Box(value=_):
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
+A nested pattern can be exhaustive for only part of a union. Here the first case removes
+`Box[Mapping[str, Any]]` but must leave `Box[int]` in the final case:
+
+```py
+def nested_pattern_keeps_unmatched_box(
+    value: Box[Mapping[str, Any]] | Box[int],
+) -> None:
+    match value:
+        case Box(value=Mapping()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Box[int]
+```
+
+The same check applies to a class pattern nested inside a sequence pattern:
+
+```py
+def nested_sequence_pattern_is_exhaustive(
+    value: tuple[Mapping[str, Any]] | int,
+) -> None:
+    match value:
+        case [Mapping()]:
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
@@ -2127,6 +2338,22 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             pass
         case _:
             reveal_type(value)  # revealed: list[int]
+```
+
+Narrowing with a sequence pattern must not bring back a type removed by an earlier case. After the
+first two cases below, only `str` remains:
+
+```py
+def sequence_pattern_preserves_earlier_case(
+    value: tuple[int] | int | str,
+) -> None:
+    match value:
+        case int():
+            pass
+        case [int()]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
 ```
 
 Named tuples are statically known tuple subclasses, rather than exact `tuple[...]` instances.
@@ -2220,6 +2447,16 @@ narrows the corresponding narrowable elements. If a multi-element pattern fails,
 which element failed to match.
 
 ```py
+from typing import Generic, Literal, TypeVar
+
+DisplayTagT = TypeVar("DisplayTagT")
+DisplayPayloadT = TypeVar("DisplayPayloadT")
+
+class DisplayTaggedPayload(Generic[DisplayTagT, DisplayPayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: DisplayTagT
+    payload: DisplayPayloadT
+
 class TupleSubjectA: ...
 class TupleSubjectA1(TupleSubjectA): ...
 class TupleSubjectB: ...
@@ -2242,6 +2479,13 @@ def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1
             reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_class_pattern(
+    value: (DisplayTaggedPayload[Literal["int"], int] | DisplayTaggedPayload[Literal["str"], str]),
+) -> None:
+    match (value,):
+        case (DisplayTaggedPayload("int", _),):
+            reveal_type(value)  # revealed: DisplayTaggedPayload[Literal["int"], int]
 ```
 
 ## Nested sequence display subjects
@@ -2288,12 +2532,27 @@ Element narrowing respects later cases, OR patterns, impossible alternatives, re
 expressions, and starred sequence patterns.
 
 ```py
+from typing import final
+
 class TupleSubjectA: ...
 class TupleSubjectA1(TupleSubjectA): ...
 class TupleSubjectA2(TupleSubjectA): ...
 class TupleSubjectB: ...
 class TupleSubjectB1(TupleSubjectB): ...
 class TupleSubjectB2(TupleSubjectB): ...
+class OrDisplayA: ...
+
+@final
+class OrDisplayA1(OrDisplayA): ...
+
+@final
+class OrDisplayA2(OrDisplayA): ...
+
+@final
+class OrDisplayB1: ...
+
+@final
+class OrDisplayB2: ...
 
 def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
     match a, b:
@@ -2327,6 +2586,14 @@ def match_tuple_expression_or_impossible_alternative(
         case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_or_drops_impossible_class_pattern(
+    a: OrDisplayA,
+    b: OrDisplayB1,
+) -> None:
+    match a, b:
+        case (OrDisplayA1(), OrDisplayB2()) | (OrDisplayA2(), OrDisplayB1()):
+            reveal_type(a)  # revealed: OrDisplayA2
 
 def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
     match a, a:
@@ -2498,8 +2765,49 @@ match capture_from_later_global():
 
 ## Value patterns
 
-Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
-one can only give us information where we know how the subject type implements equality.
+Value patterns are evaluated by equality, which is overridable. Apart from the optimistic treatment
+of broad builtin types described below, successfully matching one only gives us information where we
+know how the subject type implements equality.
+
+Broad builtin types are treated as if they use the builtin equality implementation, so literal
+patterns narrow `str`, `int`, and `bytes`:
+
+```py
+def string_pattern(value: str):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: Literal["a"]
+
+def integer_pattern(value: int):
+    match value:
+        case 1:
+            reveal_type(value)  # revealed: Literal[1, True]
+
+def bytes_pattern(value: bytes):
+    match value:
+        case b"a":
+            reveal_type(value)  # revealed: Literal[b"a"]
+```
+
+Explicit subclass and custom comparison arms are still preserved:
+
+```py
+class StringSubclass(str): ...
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def subclass_pattern(value: StringSubclass):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: StringSubclass
+
+def custom_comparison_pattern(value: str | AlwaysEqual):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
+```
 
 Consider the following example.
 
@@ -2509,19 +2817,16 @@ from typing import Literal
 def _(x: Literal["foo"] | int):
     match x:
         case "foo":
-            reveal_type(x)  # revealed: Literal["foo"] | int
+            reveal_type(x)  # revealed: Literal["foo"]
 
     match x:
         case "bar":
-            reveal_type(x)  # revealed: int
+            reveal_type(x)  # revealed: Never
 ```
 
-In the first `match`'s `case "foo"` all we know is `x == "foo"`. `x` could be an instance of an
-arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow to
-`Literal["foo"]`.
-
-In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
-rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
+In the first `match`, the broad `int` arm is assumed to use builtin equality and cannot compare
+equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabling
+`strict-literal-narrowing` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
 disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
@@ -2616,15 +2921,15 @@ class C:
 def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
     match x:
         case "foo":
-            reveal_type(x)  # revealed: Literal["foo"] | int | float | complex
+            reveal_type(x)  # revealed: Literal["foo"] | float | complex
         case 42:
-            reveal_type(x)  # revealed: int | float | complex
+            reveal_type(x)  # revealed: Literal[42] | float | complex
         case 6.0:
             reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
         case 1j:
             reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
         case b"foo":
-            reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
+            reveal_type(x)  # revealed: Literal[b"foo"] | float | complex
         case _:
             reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
 ```
@@ -2865,11 +3170,11 @@ class C:
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" if reveal_type(x):  # revealed: Literal["foo"] | int
+        case "foo" if reveal_type(x):  # revealed: Literal["foo"]
             pass
-        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
-        case 42 if reveal_type(x):  # revealed: int
+        case 42 if reveal_type(x):  # revealed: Literal[42]
             pass
 ```
 
@@ -2965,9 +3270,9 @@ from typing import Literal
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo"] | int
+        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo", 42]
             pass
-        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
             pass

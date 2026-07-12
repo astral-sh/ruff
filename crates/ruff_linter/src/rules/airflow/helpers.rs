@@ -101,7 +101,7 @@ pub(crate) fn is_guarded_by_try_except(
             try_block_contains_undeprecated_attribute(try_node, module, name, semantic)
         }
         Expr::Name(ExprName { id, .. }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);
@@ -247,7 +247,7 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
     let semantic = checker.semantic();
     let binding = semantic
         .resolve_name(head)
-        .or_else(|| checker.semantic().lookup_symbol(&head.id))
+        .or_else(|| checker.semantic().lookup_symbol(&head.id).binding_id())
         .map(|id| checker.semantic().binding(id))?;
     let stmt = binding.statement(semantic)?;
     let remove_edit = remove_unused_imports(

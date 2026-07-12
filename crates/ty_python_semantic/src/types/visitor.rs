@@ -1,4 +1,7 @@
-use rustc_hash::FxHashSet;
+use std::hash::Hash;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::{
     Db,
@@ -300,11 +303,69 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
+    }
+}
+
+// Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
+type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+
+/// A set optimized for values that usually contain only a few distinct elements.
+#[derive(Debug)]
+enum SmallSet<T, const INLINE_CAPACITY: usize> {
+    Inline(SmallVec<[T; INLINE_CAPACITY]>),
+    Spilled(FxHashSet<T>),
+}
+
+impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
+    fn default() -> Self {
+        Self::Inline(SmallVec::new())
+    }
+}
+
+impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+    #[inline]
+    pub(super) fn insert(&mut self, value: T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => {
+                if inline.contains(&value) {
+                    return false;
+                }
+
+                if inline.len() < INLINE_CAPACITY {
+                    inline.push(value);
+                    return true;
+                }
+
+                *self = Self::Spilled(Self::spill(inline, value));
+                true
+            }
+            Self::Spilled(set) => set.insert(value),
+        }
+    }
+
+    #[cold]
+    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T>
+    where
+        T: Hash + Eq,
+    {
+        let mut set = FxHashSet::with_capacity_and_hasher(inline.len() + 1, FxBuildHasher);
+        set.extend(inline.drain(..));
+        let inserted = set.insert(value);
+        debug_assert!(inserted);
+        set
+    }
+
+    #[cfg(test)]
+    pub(super) const fn is_spilled(&self) -> bool {
+        matches!(self, Self::Spilled(_))
     }
 }
 
@@ -399,4 +460,36 @@ where
     T: Copy + PartialEq,
 {
     any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::{DynamicType, Type};
+
+    use super::CollectedTypes;
+
+    #[test]
+    fn collected_types_spills_without_losing_deduplication() {
+        let mut collected = CollectedTypes::default();
+        let types = [
+            Type::Never,
+            Type::AlwaysTruthy,
+            Type::AlwaysFalsy,
+            Type::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(DynamicType::UnspecializedTypeVar),
+            Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+            Type::Dynamic(DynamicType::AmbiguousOverload),
+            Type::Dynamic(DynamicType::TodoUnpack),
+        ];
+
+        for ty in types {
+            assert!(collected.insert(ty));
+        }
+
+        assert!(collected.is_spilled());
+        assert!(!collected.insert(Type::Never));
+        assert!(!collected.insert(Type::Dynamic(DynamicType::TodoUnpack)));
+        assert!(collected.insert(Type::Dynamic(DynamicType::TodoStarredExpression)));
+    }
 }

@@ -1,12 +1,13 @@
 use super::variance::VarianceInferable;
 use super::{
-    BoundTypeVarInstance, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
+    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
     visitor,
 };
 use crate::Db;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
+    #[returns(copy)]
     pub(crate) type_argument: Type<'db>,
 }
 
@@ -92,7 +93,7 @@ impl<'db> Type<'db> {
 
 impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     // `TypeForm` is covariant in its type argument.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.type_argument(db).variance_of(db, typevar)
     }
 }

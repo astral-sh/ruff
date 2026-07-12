@@ -124,10 +124,11 @@ impl ProjectDatabase {
         // cache key before loading the DB. Because of that, access to the `db` (other than system and vendored) is
         // strictly forbidden before resolving the `program_settings`.
 
+        let merged_options = project_metadata.to_merged_options();
+
         // Initialize the `Program` singleton
-        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
-            project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
-        )?;
+        let (program_settings, program_settings_diagnostics) = strategy
+            .to_anyhow(merged_options.to_program_settings(db.system(), db.vendored(), strategy))?;
 
         // This must be called before `from_settings`, or the `SearchPath` root
         // will take precedence over the `Project` root, resulting in
@@ -136,12 +137,10 @@ impl ProjectDatabase {
 
         Program::from_settings(&db, program_settings);
 
-        let (settings, settings_diagnostics) = strategy.map_err(
-            project_metadata
-                .options()
-                .to_settings(&db, project_metadata.root(), strategy),
-            |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?;
+        let (settings, settings_diagnostics) = strategy
+            .map_err(merged_options.to_settings(&db, strategy), |error| {
+                anyhow::anyhow!("{}", error.pretty(&db))
+            })?;
 
         db.project = Some(Project::from_metadata(
             &db,
@@ -176,7 +175,7 @@ impl ProjectDatabase {
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
-        self.project().check_file(self, file)
+        crate::check_file(self, file)
     }
 
     /// Set the check mode for the project.
@@ -561,8 +560,13 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl ty_python_core::Db for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
+        // Avoid creating a dependency on the `should_check_file` query for vendored files.
+        if file.path(self).is_vendored_path() {
+            return false;
+        }
+
         self.project
-            .is_some_and(|project| project.should_check_file(self, file))
+            .is_some_and(|_| crate::should_check_file(self, file))
     }
 }
 
@@ -666,8 +670,8 @@ pub(crate) mod testing {
             };
 
             let (settings, settings_diagnostics) = project
-                .options()
-                .to_settings(&db, project.root(), &FallibleStrategy)
+                .to_merged_options()
+                .to_settings(&db, &FallibleStrategy)
                 .unwrap();
             let project =
                 Project::from_metadata(&db, project, settings, settings_diagnostics, Vec::new());
@@ -755,7 +759,7 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
-            !file.path(self).is_vendored_path()
+            crate::should_check_file(self, file)
         }
     }
 
@@ -763,7 +767,7 @@ pub(crate) mod testing {
     impl ty_python_semantic::Db for TestDb {
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
-            self.project().check_file(self, file)
+            crate::check_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {

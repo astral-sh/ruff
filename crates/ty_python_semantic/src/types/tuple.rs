@@ -204,7 +204,7 @@ impl<'db> TupleType<'db> {
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
-    #[salsa::tracked(cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
@@ -296,8 +296,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
-                if !equal_length && self.is_eager_assignability() {
-                    self.provide_context(|| ErrorContext::TupleLengthMismatch {
+                if let Some(context) = self.report_context()
+                    && !equal_length
+                    && self.is_eager_assignability()
+                {
+                    context.push(ErrorContext::TupleLengthMismatch {
                         source_len: source_tuple.0.len(),
                         target_len: target_tuple.len(),
                     });
@@ -313,14 +316,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
-                                if constraint_set.is_never_satisfied(db) {
-                                    self.provide_context(|| {
-                                        ErrorContext::TupleElementNotCompatible {
-                                            source,
-                                            target,
-                                            element_index: n,
-                                            element_count: source_tuple.0.len(),
-                                        }
+                                if let Some(context) = self.report_context()
+                                    && constraint_set.is_never_satisfied(db)
+                                {
+                                    context.push(ErrorContext::TupleElementNotCompatible {
+                                        source,
+                                        target,
+                                        element_index: n,
+                                        element_count: source_tuple.0.len(),
                                     });
                                 }
 
@@ -622,7 +625,7 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FixedLengthTuple<T>(Box<[T]>);
 
 impl<T> FixedLengthTuple<T> {
@@ -801,7 +804,7 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct VariableLengthTuple<T> {
     pub(crate) elements: smallvec::SmallVec<[T; 1]>,
     variable_index: usize,
@@ -1941,7 +1944,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum Tuple<T> {
     Fixed(FixedLengthTuple<T>),
     Variable(VariableLengthTuple<T>),
@@ -2275,7 +2278,7 @@ impl<'db> Tuple<Type<'db>> {
         let release_level_ty = {
             let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
                 .iter()
-                .map(|level| Type::string_literal(db, level))
+                .map(|level| Type::string_literal(db, *level))
                 .collect();
 
             // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;

@@ -41,13 +41,6 @@ pub(crate) const fn is_comprehension_with_min_max_sum_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/12657
-pub(crate) const fn is_check_comprehensions_in_tuple_call_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/issues/15347
 pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()

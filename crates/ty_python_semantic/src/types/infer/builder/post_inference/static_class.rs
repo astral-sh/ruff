@@ -13,9 +13,9 @@ use crate::{
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -319,7 +319,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance = base_alias.variance_of(db, typevar);
+                            let required_variance =
+                                base_alias.variance_of(db, typevar.identity(db));
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -896,6 +897,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         CodeGeneratorKind::from_class(db, class.into())
     {
         let specialization = None;
+        let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
 
         let mut kw_only_sentinel_fields = vec![];
         let mut required_after_default_field_names = vec![];
@@ -918,8 +920,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             };
 
-            // Fields with init=False or kw_only=true don't participate in ordering check
-            if !init || *kw_only == Some(true) {
+            // Classes or fields with init=False and kw_only fields don't participate in ordering.
+            if !class_init || !init || *kw_only == Some(true) {
                 continue;
             }
 
@@ -1364,8 +1366,10 @@ fn check_class_final_without_value<'db>(
     let place_table = index.place_table(body_scope_id);
 
     // In dataclasses (and similar code-generated classes), Final fields without
-    // defaults are initialized by the synthesized __init__, so they are valid.
-    if CodeGeneratorKind::from_class(db, class.into()).is_some() {
+    // defaults are initialized by the synthesized __init__. In protocols, the
+    // declaration describes a required instance attribute rather than storage
+    // that must be initialized by the protocol class itself.
+    if CodeGeneratorKind::from_class(db, class.into()).is_some() || class.is_protocol(db) {
         return;
     }
 

@@ -13,6 +13,11 @@ fn field_lists(raw: &str) -> Vec<FieldList> {
     FieldList::parse_all(raw)
 }
 
+/// Returns whether `line` starts a reST field-list item.
+pub(in crate::docstring) fn is_field_list_marker(line: &str) -> bool {
+    FieldHeader::parse_list_member(line).is_some()
+}
+
 /// Returns top-level field lists that begin at a reST block boundary.
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
@@ -27,11 +32,13 @@ pub(in crate::docstring) fn top_level_field_lists(
 }
 
 /// Returns the parameter documentation recognized in a reST docstring.
-pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
+///
+/// `normalized_source` must have already undergone PEP-257 trimming and universal newline
+/// normalization.
+pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
     let mut parameters = IndexMap::new();
-    let source = crate::docstring::documentation_trim(raw);
 
-    for field_list in top_level_field_lists(&source) {
+    for field_list in top_level_field_lists(normalized_source) {
         for field in field_list.fields {
             let Field::Parameter {
                 lookup_name,
@@ -1105,6 +1112,29 @@ Section::
     }
 
     #[test]
+    fn parser_recovers_after_dedented_doctest() {
+        let docstring = r#"
+        >>> identity(1)
+        1
+    :param value: Parameter documentation.
+"#;
+
+        let parsed = field_lists(docstring);
+
+        assert_eq!(parsed.len(), 1);
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
+        [
+            Parameter {
+                display_name: "value",
+                lookup_name: "value",
+                ty: None,
+                description: "Parameter documentation.",
+            },
+        ]
+        "#);
+    }
+
+    #[test]
     fn doctests_take_precedence_over_markdown_fences_in_preformatted_blocks() {
         let docstring = "\
 >>> print(\"field list\")
@@ -1119,7 +1149,8 @@ Section::
     }
 
     fn parameter_documentation(docstring: &str) -> String {
-        let parameters = super::parameter_documentation(docstring);
+        let normalized_source = crate::docstring::documentation_trim(docstring);
+        let parameters = super::parameter_documentation(&normalized_source);
         let mut rendered = String::new();
 
         for (name, description) in parameters {

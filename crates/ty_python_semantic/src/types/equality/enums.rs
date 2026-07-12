@@ -783,7 +783,7 @@ impl<'db> EnumValueSet<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct EnumClassKeyProfile<'db> {
     members_are_exhaustive: bool,
     semantics: Option<KnownComparisonSemantics>,
@@ -823,7 +823,7 @@ fn enum_class_key_profile<'db>(
 }
 
 /// Whether distinct declared members are known to have distinct runtime comparison keys.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 enum SameEnumComparisonKeys {
     /// Different member names cannot compare equal.
     Distinct,
@@ -832,14 +832,14 @@ enum SameEnumComparisonKeys {
 }
 
 /// Same-class facts that are unnecessary when projecting keys across different classes.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct SameEnumComparisonProfile {
     members_are_exhaustive: bool,
     members_compare_by_identity: bool,
     comparison_keys: Option<SameEnumComparisonKeys>,
 }
 
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn same_enum_comparison_profile<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,

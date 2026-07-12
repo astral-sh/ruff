@@ -2424,7 +2424,7 @@ struct DisplayParameter<'a, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
-            f.write_str(&name)?;
+            write!(f, "{name}")?;
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
@@ -3188,12 +3188,14 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
             }
             KnownInstanceType::GenericContext(generic_context) => {
-                f.with_type(ty).write_str("ty_extensions.GenericContext")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.GenericContext")?;
                 write!(f, "{}", generic_context.display_full(self.db))
             }
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
-                f.with_type(ty).write_str("ty_extensions.Specialization")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.Specialization")?;
                 write!(f, "{}", specialization.display_full(self.db))
             }
             KnownInstanceType::UnionType(union) => {
@@ -3272,6 +3274,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Range { .. } => f
                 .with_type(KnownClass::Range.to_class_literal(self.db))
                 .write_str("range"),
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)
+            }
         }
     }
 }
@@ -3309,7 +3316,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db)
@@ -3322,7 +3329,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, super::DisplaySettings::default().multiline())

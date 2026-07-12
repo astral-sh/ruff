@@ -18,7 +18,7 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions};
+use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
@@ -231,11 +231,11 @@ pub fn test_contents<'a>(
 ) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
-    let options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
-        .try_into_module()
-        .expect("PySourceType always parses into a module");
+    let parsed = crate::linter::parse_unchecked_source(
+        source_kind,
+        source_type,
+        target_version.parser_version(),
+    );
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -299,10 +299,11 @@ pub fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
-                    .try_into_module()
-                    .expect("PySourceType always parses into a module");
+            let parsed = crate::linter::parse_unchecked_source(
+                &transformed,
+                source_type,
+                target_version.parser_version(),
+            );
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

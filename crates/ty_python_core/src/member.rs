@@ -421,7 +421,7 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd, get_size2::GetSize, salsa::Update)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedMemberId;
 
 /// Map from member path to its ID.

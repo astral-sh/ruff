@@ -191,15 +191,17 @@ fn check_class_declaration<'db>(
                 diagnostic.info("This will cause the class creation to fail at runtime");
             }
         }
-        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => check_post_init_signature(
-            context,
-            configuration,
-            class,
-            member,
-            *first_reachable_definition,
-            policy,
-        ),
-        Some(CodeGeneratorKind::TypedDict) | None => {}
+        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => {
+            check_post_init_signature(
+                context,
+                configuration,
+                class,
+                member,
+                *first_reachable_definition,
+                policy,
+            );
+        }
+        Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
     }
 
     if configuration.check_invalid_named_tuple_field_overrides()
@@ -552,7 +554,7 @@ fn check_class_declaration<'db>(
 
             // Synthesized `__replace__` methods on dataclasses are not checked
             if &member.name == "__replace__"
-                && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
+                && class_kind.is_some_and(CodeGeneratorKind::is_dataclass_like)
             {
                 continue;
             }
@@ -667,7 +669,7 @@ fn check_class_declaration<'db>(
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
@@ -731,7 +733,7 @@ fn superclass_variable_kind<'db>(
 ///     x: ClassVar[int] = 2
 /// ```
 #[allow(clippy::needless_pass_by_value)]
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn effective_superclass_variable_kind<'db>(
     db: &'db dyn Db,
     superclass: ClassType<'db>,
@@ -813,7 +815,7 @@ fn effective_superclass_variable_kind<'db>(
 /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
 /// which might be in a different Python module. If this weren't a tracked query, we could
 /// introduce cross-module dependencies and over-invalidation.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_function_definition<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -1442,10 +1444,8 @@ fn check_post_init_signature<'db>(
         Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
     });
 
-    let parameters = Parameters::new(
-        db,
-        std::iter::chain([first_parameter], following_parameters),
-    );
+    let parameters =
+        Parameters::standard(std::iter::chain([first_parameter], following_parameters));
 
     let expected_signature = CallableType::single(db, Signature::new(parameters, Type::object()));
 

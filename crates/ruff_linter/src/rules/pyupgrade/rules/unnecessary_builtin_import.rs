@@ -137,7 +137,7 @@ pub(crate) fn unnecessary_builtin_import(
             if &alias.name == "*" {
                 return true;
             }
-            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

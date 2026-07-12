@@ -17,7 +17,7 @@ use args::{GlobalConfigArgs, ServerCommand};
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_linter::{SuppressionKind, fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
@@ -326,25 +326,44 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         warn_user!("Detected debug build without --no-cache.");
     }
 
-    if let Some(reason) = &cli.add_noqa {
+    let suppression = cli
+        .add_noqa
+        .as_ref()
+        .map(|reason| (reason, SuppressionKind::Noqa, "--add-noqa"))
+        .or_else(|| {
+            cli.add_ignore
+                .as_ref()
+                .map(|reason| (reason, SuppressionKind::Ignore, "--add-ignore"))
+        });
+
+    if let Some((reason, suppression_kind, flag)) = suppression {
         if !fix_mode.is_generate() {
-            warn_user!("--fix is incompatible with --add-noqa.");
+            warn_user!("--fix is incompatible with {flag}.");
         }
         if reason.contains(['\n', '\r']) {
             return Err(anyhow::anyhow!(
-                "--add-noqa <reason> cannot contain newline characters"
+                "{flag} <reason> cannot contain newline characters"
             ));
         }
 
         let reason_opt = (!reason.is_empty()).then_some(reason.as_str());
 
-        let modifications =
-            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments, reason_opt)?;
+        let modifications = commands::add_noqa::add_noqa(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            reason_opt,
+            suppression_kind,
+        )?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
+            let suppression = match suppression_kind {
+                SuppressionKind::Noqa => "noqa directive",
+                SuppressionKind::Ignore => "ignore comment",
+            };
             #[expect(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directive{s}.");
+                eprintln!("Added {modifications} {suppression}{s}.");
             }
         }
         return Ok(ExitStatus::Success);

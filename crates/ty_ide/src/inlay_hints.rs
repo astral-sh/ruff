@@ -809,10 +809,8 @@ mod tests {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
-        let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-            "test".into(),
-            SystemPathBuf::from("/"),
-        ));
+        let mut db =
+            ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
         db.init_program().unwrap();
 
@@ -2087,7 +2085,7 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -2246,9 +2244,22 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
-                    x[: str] = ab
+                    x[: Literal["a", "b"]] = ab
 
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | ^^^^^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: Literal["a", "b"]] = ab
+           |                 ^^^^^^^
+           |
+
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
            |
@@ -2256,19 +2267,36 @@ Source with applied edits:
            |       ^^^
            |
         info: Source
-          --> main2.py:LL:17
+          --> main2.py:LL:25
            |
-        LL |             x[: str] = ab
-           |                 ^^^
+        LL |             x[: Literal["a", "b"]] = ab
+           |                         ^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:30
+           |
+        LL |             x[: Literal["a", "b"]] = ab
+           |                              ^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        4 |         case ["get", ("a" | "b") as ab]:
+        1 + from typing import Literal
+        2 |
+        3 | def my_func(command: str):
+        4 |     match command.split():
+        5 |         case ["get", ("a" | "b") as ab]:
           -             x = ab
-        5 +             x: str = ab
+        6 +             x: Literal["a", "b"] = ab
           |
         "#);
     }
@@ -2659,7 +2687,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -5427,7 +5455,7 @@ Source with applied edits:
         bar([a=]1, [b=]2)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -5440,7 +5468,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -6539,7 +6567,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -7137,7 +7165,7 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Top: _SpecialForm
            | ^^^
@@ -7163,7 +7191,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
