@@ -676,6 +676,11 @@ pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
     // be quite helpful for narrowing down the issue. The messages are at TRACE because they are
     // extremely noisy.
 
+    if path.is_vendored_path() {
+        tracing::trace!("Not checking {path} because it is a vendored path");
+        return false;
+    }
+
     match project.check_mode(db) {
         CheckMode::OpenFiles => {
             let should_check = project.open_files(db).contains(&file);

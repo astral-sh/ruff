@@ -560,14 +560,13 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl ty_python_core::Db for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
-        let path = file.path(self);
-        if path.is_vendored_path() {
-            tracing::trace!("Not checking {path} because it is a vendored path");
-            false
-        } else {
-            self.project
-                .is_some_and(|_| crate::should_check_file(self, file))
+        // Avoid creating a dependency on the `should_check_file` query for vendored files.
+        if file.path(self).is_vendored_path() {
+            return false;
         }
+
+        self.project
+            .is_some_and(|_| crate::should_check_file(self, file))
     }
 }
 
@@ -760,13 +759,7 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
-            let path = file.path(self);
-            if path.is_vendored_path() {
-                tracing::trace!("Not checking {path} because it is a vendored path");
-                false
-            } else {
-                crate::should_check_file(self, file)
-            }
+            crate::should_check_file(self, file)
         }
     }
 
