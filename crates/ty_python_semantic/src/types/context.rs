@@ -433,12 +433,12 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db.should_check_file(ctx.file) {
-            return None;
-        }
         // Skip over diagnostics if the rule
         // is disabled.
         let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint)?;
+        if !ctx.db.should_check_file(ctx.file) {
+            return None;
+        }
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
