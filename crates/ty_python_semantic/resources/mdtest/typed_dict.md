@@ -2579,6 +2579,13 @@ Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
+# Runtime narrowing retains a `Top[dict[Unknown, Unknown]]` intersection around each `TypedDict`.
+# Those intersections should still reuse the common protocol constraints of the union.
+# Regression test for https://github.com/astral-sh/ty/issues/3974.
+def _(item: Item | str) -> None:
+    if isinstance(item, dict):
+        reveal_type(dict(item))  # revealed: dict[str, object]
+
 type FirstGroup = A | B | C | D | E | F | G | H
 type SecondGroup = I | J | K | L | M | N | O | P
 type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
@@ -2649,7 +2656,7 @@ Generic protocol inference must preserve structural constraints that differ from
 ```py
 from _collections_abc import dict_items
 from collections.abc import Callable
-from typing import Protocol, TypeVar, TypedDict
+from typing import Protocol, TypeVar, TypedDict, runtime_checkable
 
 ItemsT = TypeVar("ItemsT")
 
@@ -2666,6 +2673,30 @@ def accept(value: HasItems[ItemsT], callback: Callable[[ItemsT], None]) -> None:
 def takes_dict_items(value: dict_items[str, object]) -> None: ...
 def _(value: ItemsA | ItemsB) -> None:
     accept(value, takes_dict_items)
+
+ClearT = TypeVar("ClearT", covariant=True)
+
+@runtime_checkable
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+class ClearResult(Protocol[ClearT]):
+    def clear(self) -> ClearT: ...
+
+class ClearA(TypedDict):
+    a: int
+
+class ClearB(TypedDict):
+    b: int
+
+def clear_result(value: ClearResult[ClearT]) -> ClearT:
+    raise NotImplementedError
+
+def _(value: ClearA | ClearB) -> None:
+    if isinstance(value, HasClear):
+        # Preserve the protocol constraints added by narrowing instead of extracting only the
+        # positive `TypedDict` elements from these intersections.
+        reveal_type(clear_result(value))  # revealed: None
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference:
