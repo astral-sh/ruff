@@ -1507,15 +1507,19 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns whether `ty` belongs to the closed concrete fragment supported alongside a simple
-    /// generic source local.
+    /// Returns whether `ty` belongs to the closed static fragment supported alongside simple
+    /// generic source locals.
     ///
     /// Gradual types, aliases, and other type variables keep the signature on the existing
-    /// existential path. This avoids changing generic callable inference outside the relation
-    /// introduced by this branch.
-    fn is_supported_generic_source_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    /// existential path. Unions are supported when each element belongs to this fragment.
+    fn is_supported_generic_source_closed_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
-            Type::Never => true,
+            Type::Never | Type::LiteralValue(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .copied()
+                .all(|element| Self::is_supported_generic_source_closed_type(db, element)),
             Type::NominalInstance(instance) => {
                 !instance.inherits_from_explicit_any()
                     && !ty.has_dynamic(db)
@@ -1561,7 +1565,7 @@ impl<'db> Signature<'db> {
             .all(|ty| {
                 ty.as_typevar()
                     .is_some_and(|typevar| typevar.is_inferable(db, locals))
-                    || Self::is_supported_generic_source_concrete_type(db, ty)
+                    || Self::is_supported_generic_source_closed_type(db, ty)
             })
             .then_some(locals)
     }
