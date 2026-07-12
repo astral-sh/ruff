@@ -342,6 +342,7 @@ fn contains_type_alias(db: &dyn Db, ty: Type<'_>) -> bool {
 fn contains_protocol(db: &dyn Db, ty: Type<'_>) -> bool {
     any_over_type(db, ty, false, |nested| {
         matches!(nested, Type::ProtocolInstance(_))
+            || matches!(nested, Type::NominalInstance(instance) if instance.class(db).is_protocol(db))
     })
 }
 
@@ -8003,7 +8004,9 @@ mod tests {
             .to_class_type(&db)
             .expect("expected `P` to be a class");
         let protocol = Type::instance(&db, protocol_class);
-        assert!(matches!(protocol, Type::ProtocolInstance(_)));
+        let Type::ProtocolInstance(protocol_instance) = protocol else {
+            panic!("expected `P` to be a protocol instance");
+        };
 
         let source = create_typevar(&db, "S");
         let target = create_typevar(&db, "T");
@@ -8036,6 +8039,32 @@ mod tests {
                 &builder,
                 source_locals,
                 relation,
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
+
+        let nominal_protocol = Type::NominalInstance(
+            protocol_instance
+                .to_nominal_instance()
+                .expect("a class-based protocol has a nominal representation"),
+        );
+        let nominal_relation =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, nominal_protocol);
+        assert!(matches!(
+            nominal_relation.try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::OpaqueProtocol)
+        ));
+        assert!(matches!(
+            ConstraintSet::always(&builder).try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                nominal_relation,
             ),
             Err(ConstraintProjectionError::OpaqueProtocol)
         ));
