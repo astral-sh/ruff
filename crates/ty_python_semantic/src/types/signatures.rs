@@ -1848,7 +1848,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // The source specialization may depend on the target specialization, so eliminate the
         // source locals existentially before eliminating the target locals universally.
         let projected = if source_has_locals && nested_target_local.is_some() {
-            relation
+            let valid_free_specializations = relation.free_typevar_valid_specializations(
+                db,
+                self.constraints,
+                quantified_typevars,
+            );
+            valid_free_specializations
+                .implies(db, self.constraints, || relation)
                 .try_exists_assuming(db, self.constraints, source_locals, self.always())
                 .unwrap_or_else(|_| self.never())
         } else {

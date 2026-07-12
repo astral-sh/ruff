@@ -692,6 +692,50 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Ok(projected.and(db, builder, || assumptions))
     }
 
+    /// Returns the valid-specialization constraints for free type variables mentioned by this
+    /// constraint set.
+    pub(crate) fn free_typevar_valid_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        quantified: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        let typevars = RefCell::new(FxOrderSet::default());
+        let collect = |typevar: BoundTypeVarInstance<'db>| {
+            if !typevar.is_inferable(db, quantified) {
+                typevars.borrow_mut().insert(typevar);
+            }
+        };
+        self.node
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                collect(constraint.typevar);
+                for bound in constraint
+                    .bounds
+                    .lower
+                    .into_iter()
+                    .chain(constraint.bounds.upper)
+                {
+                    any_over_type(db, bound, false, |nested| {
+                        if let Some(typevar) = nested.as_typevar() {
+                            collect(typevar);
+                        }
+                        false
+                    });
+                }
+            });
+
+        typevars
+            .into_inner()
+            .into_iter()
+            .fold(Self::always(builder), |domain, typevar| {
+                domain.and(db, builder, || {
+                    Self::from_node(builder, typevar.valid_specializations(db, builder))
+                })
+            })
+    }
+
     /// Universally abstracts constraints involving the given type variables from this TDD.
     ///
     /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and

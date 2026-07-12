@@ -1083,6 +1083,21 @@ class B3[S](A3[S]):
 
 class C3[S](A3[S]):
     def method(self, x: object, context: S) -> Never: ...  # fine
+
+class A4[U: Never]:
+    def method[T](self, x: list[T], context: U) -> list[T]: ...
+
+class B4[U: Never](A4[U]):
+    # The override only needs to hold for valid specializations of `U`. There are none, so it is
+    # vacuously valid.
+    def method[S](self, x: S, context: S) -> S: ...  # fine
+
+class A5[U: object]:
+    def method[T](self, x: list[T], context: U) -> list[T]: ...
+
+class B5[U: object](A5[U]):
+    # The bound on `U` does not make this concrete implementation generic in `T`.
+    def method(self, x: list[int], context: U) -> list[int]: ...  # error: [invalid-method-override]
 ```
 
 ## Fully qualified names are used in diagnostics where appropriate
