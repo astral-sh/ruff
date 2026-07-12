@@ -169,11 +169,17 @@ class GoodWithClassInitFalse:
 
 GoodWithClassInitFalse("value")
 
-# Re-enabling `init` makes the inherited default-before-required ordering invalid at runtime.
-# TODO: error: [dataclass-field-order]
 @dataclass
-class BadWithReenabledInit(GoodWithClassInitFalse):
+class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-order]
     pass
+
+@dataclass(init=False)
+class DefaultedInitFalseBase:
+    defaulted: int = 1
+
+@dataclass
+class BadFieldfulReenabledInit(DefaultedInitFalseBase):  # error: [dataclass-field-order]
+    required: str
 ```
 
 Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:

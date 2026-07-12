@@ -16,7 +16,7 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin, place_from_bindings, place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, binding_reachability},
+    reachability::{DeclarationsIteratorExtension, binding_reachability, evaluate_reachability},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
@@ -119,6 +119,46 @@ pub struct StaticClassLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
+
+#[salsa::tracked(returns(copy))]
+fn own_annotations_are_simple_dataclass_fields<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    let scope = class.body_scope(db);
+    let use_def = use_def_map(db, scope);
+    let module = parsed_module(db, class.file(db)).load(db);
+    let index = semantic_index(db, class.file(db));
+    let table = place_table(db, scope);
+    let fields = class.own_fields(db, None, CodeGeneratorKind::DataclassLike(None));
+
+    use_def
+        .all_reachable_symbols()
+        .all(|(symbol_id, declarations, _)| {
+            let mut annotation_count = 0;
+            for declaration in declarations {
+                let Some(definition) = declaration.declaration.definition() else {
+                    continue;
+                };
+                if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
+                    continue;
+                }
+                annotation_count += 1;
+                if annotation_count > 1
+                    || !fields.contains_key(table.symbol(symbol_id).name())
+                    || !evaluate_reachability(db, use_def, declaration.reachability_constraint)
+                        .is_always_true()
+                    || index.is_in_type_checking_block(
+                        scope.file_scope_id(db),
+                        definition.full_range(db, &module).range(),
+                    )
+                {
+                    return false;
+                }
+            }
+            true
+        })
+}
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
@@ -1967,6 +2007,67 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         self.fields_inner(db, specialization, field_policy)
+    }
+
+    /// Return the first field-order violation deferred by a direct `init=False` base.
+    ///
+    /// This intentionally handles only the reset case where the base does not itself participate
+    /// in dataclass inheritance and neither class overrides a field. More involved field merging,
+    /// including overrides between fields and `ClassVar`, is left to the general dataclass field
+    /// model.
+    pub(crate) fn init_false_base_field_order_violation(self, db: &'db dyn Db) -> Option<Name> {
+        let field_policy = CodeGeneratorKind::DataclassLike(None);
+        if self.find_dataclass_decorator_position(db).is_none()
+            || !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
+            || !own_annotations_are_simple_dataclass_fields(db, self)
+        {
+            return None;
+        }
+
+        let [base] = self.explicit_bases(db) else {
+            return None;
+        };
+        let (base, _) = base.to_class_type(db)?.static_class_literal(db)?;
+        if base.find_dataclass_decorator_position(db).is_none()
+            || base.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
+            || !base.explicit_bases(db).is_empty()
+            || !own_annotations_are_simple_dataclass_fields(db, base)
+        {
+            return None;
+        }
+
+        let mut has_seen_default = false;
+        let mut names = FxIndexSet::default();
+        for (name, field) in base
+            .own_fields(db, None, field_policy)
+            .iter()
+            .chain(self.own_fields(db, None, field_policy))
+        {
+            if !names.insert(name) {
+                return None;
+            }
+            if field.is_kw_only_sentinel(db) {
+                continue;
+            }
+            let FieldKind::Dataclass {
+                default_ty,
+                init,
+                kw_only,
+                ..
+            } = &field.kind
+            else {
+                return None;
+            };
+            if !init || *kw_only == Some(true) {
+                continue;
+            }
+            if default_ty.is_some() {
+                has_seen_default = true;
+            } else if has_seen_default {
+                return Some(name.clone());
+            }
+        }
+        None
     }
 
     #[salsa::tracked(

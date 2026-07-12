@@ -981,6 +981,13 @@ pub(crate) fn check_static_class_definitions<'db>(
                     break;
                 }
             }
+        } else if let Some(name) = class.init_false_base_field_order_violation(db)
+            && let Some(builder) =
+                context.report_lint(&DATACLASS_FIELD_ORDER, class.header_range(db))
+        {
+            builder.into_diagnostic(format_args!(
+                "Required field `{name}` cannot be defined after fields with default values",
+            ));
         }
     }
 
