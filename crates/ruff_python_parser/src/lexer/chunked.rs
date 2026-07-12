@@ -6,7 +6,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 
 use crate::Mode;
 use crate::lexer::Lexer;
-use crate::lexer::classify::{Classified, ClassifiedBlock, classify_into};
+use crate::lexer::classify::{Classified, classify_into};
 use crate::lexer::fast_token::{keyword, number, operator};
 use crate::lexer::indentation::{Indentation, Indentations};
 
@@ -51,14 +51,12 @@ pub(crate) struct ChunkedLexer<'src> {
     at_logical_line_start: bool,
     logical_line_has_token: bool,
     nesting: u32,
-    max_nesting_depth: u32,
     finished: bool,
 }
 
 impl<'src> ChunkedLexer<'src> {
-    /// Creates a chunked lexer for a source whose byte offsets fit in [`TextSize`], falling back
-    /// when delimiter nesting exceeds `max_nesting_depth`.
-    pub(crate) fn new(source: &'src str, max_nesting_depth: u32) -> Option<Self> {
+    /// Creates a chunked lexer for a source whose byte offsets fit in [`TextSize`].
+    pub(crate) fn new(source: &'src str) -> Option<Self> {
         u32::try_from(source.len()).ok()?;
         Some(Self {
             tokens: ChunkedTokens {
@@ -74,7 +72,6 @@ impl<'src> ChunkedLexer<'src> {
             at_logical_line_start: true,
             logical_line_has_token: false,
             nesting: 0,
-            max_nesting_depth,
             finished: false,
         })
     }
@@ -108,7 +105,7 @@ impl<'src> ChunkedLexer<'src> {
         }
 
         classify_into(&bytes[chunk_start..chunk_end], &mut self.classified);
-        let mut structural = Starts::new(&self.classified.blocks, chunk_start);
+        let mut structural = Starts::new(&self.classified.starts, chunk_start);
         let mut next_offset = chunk_end;
         let mut indentation = self.indentation;
         let mut line_start = self.line_start;
@@ -116,10 +113,10 @@ impl<'src> ChunkedLexer<'src> {
         let mut logical_line_has_token = self.logical_line_has_token;
         let mut nesting = self.nesting;
 
-        while let Some((start, word, whitespace)) = structural.next() {
+        while let Some(start) = structural.next() {
             let byte = bytes[start];
 
-            if whitespace {
+            if matches!(byte, b' ' | b'\t' | b'\x0c') {
                 let end = structural.peek().unwrap_or(chunk_end);
                 if at_logical_line_start && nesting == 0 {
                     for byte in &bytes[start..end] {
@@ -209,20 +206,14 @@ impl<'src> ChunkedLexer<'src> {
                 at_logical_line_start = false;
             }
 
-            if word {
+            if byte.is_ascii_alphanumeric() || byte == b'_' || !byte.is_ascii() {
                 let end = structural.peek().unwrap_or(chunk_end);
 
                 if matches!(bytes.get(end), Some(b'\'' | b'"'))
                     && let Some(flags) = string_prefix(&bytes[start..end])
                 {
                     let end = if flags.intersects(TokenFlags::F_STRING | TokenFlags::T_STRING) {
-                        append_interpolated_string(
-                            source,
-                            start,
-                            tokens,
-                            nesting,
-                            self.max_nesting_depth,
-                        )?
+                        append_interpolated_string(source, start, tokens)?
                     } else {
                         let (end, flags) = string(bytes, end, flags)?;
                         tokens.push(TokenKind::String, start, end, flags);
@@ -284,12 +275,7 @@ impl<'src> ChunkedLexer<'src> {
             }
             let (kind, end) = operator(bytes, start)?;
             match kind {
-                TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
-                    nesting += 1;
-                    if nesting > self.max_nesting_depth {
-                        return None;
-                    }
-                }
+                TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => nesting += 1,
                 TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
                     nesting = nesting.saturating_sub(1);
                 }
@@ -345,7 +331,7 @@ impl<'src> ChunkedLexer<'src> {
 
 /// Drain the chunked lexer for standalone lexer benchmarks and differential tests.
 pub(crate) fn lex(source: &str) -> Option<ChunkedTokens> {
-    let mut lexer = ChunkedLexer::new(source, u32::MAX)?;
+    let mut lexer = ChunkedLexer::new(source)?;
     while !lexer.is_finished() {
         lexer.fill()?;
     }
@@ -361,7 +347,7 @@ const fn is_whitespace(byte: u8) -> bool {
 }
 
 /// Appends one complete f-string or t-string, including nested interpolation tokens, using the
-/// streaming lexer to preserve its context-sensitive tokenization and nesting limit.
+/// streaming lexer to preserve its context-sensitive tokenization.
 ///
 /// ```python
 /// value = f"{item!r:{width}}"
@@ -370,8 +356,6 @@ fn append_interpolated_string(
     source: &str,
     start: usize,
     tokens: &mut ChunkedTokens,
-    mut nesting: u32,
-    max_nesting_depth: u32,
 ) -> Option<usize> {
     let mut lexer = Lexer::new(source, Mode::ParenthesizedExpression, text_size(start));
     let mut depth = 0_u32;
@@ -380,15 +364,6 @@ fn append_interpolated_string(
         let kind = lexer.next_token();
         match kind {
             TokenKind::FStringStart | TokenKind::TStringStart => depth += 1,
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
-                nesting += 1;
-                if nesting > max_nesting_depth {
-                    return None;
-                }
-            }
-            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                nesting = nesting.saturating_sub(1);
-            }
             TokenKind::FStringEnd | TokenKind::TStringEnd => {
                 depth = depth.checked_sub(1)?;
                 tokens.push_range(kind, lexer.current_range(), lexer.current_flags());
@@ -490,39 +465,34 @@ fn valid_identifier(text: &str) -> bool {
     (first == '_' || is_xid_start(first)) && chars.all(is_xid_continue)
 }
 
-/// Iterates structural-token starts and their coarse kinds from the classifier blocks and can skip
-/// the interior of a token that was coalesced by the scalar pass.
+/// Iterates structural-token starts from the classifier bitmap and can skip the interior of a
+/// token that was coalesced by the scalar pass.
 struct Starts<'a> {
-    blocks: &'a [ClassifiedBlock],
+    bitmap: &'a [u64],
     block: usize,
     pending: u64,
     base: usize,
 }
 
 impl<'a> Starts<'a> {
-    fn new(blocks: &'a [ClassifiedBlock], base: usize) -> Self {
+    fn new(bitmap: &'a [u64], base: usize) -> Self {
         Self {
-            blocks,
+            bitmap,
             block: 0,
-            pending: blocks.first().map_or(0, |block| block.starts),
+            pending: bitmap.first().copied().unwrap_or(0),
             base,
         }
     }
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, bool, bool)> {
+    fn next(&mut self) -> Option<usize> {
         while self.pending == 0 {
             self.block += 1;
-            self.pending = self.blocks.get(self.block)?.starts;
+            self.pending = *self.bitmap.get(self.block)?;
         }
         let bit = self.pending.trailing_zeros() as usize;
         self.pending &= self.pending - 1;
-        let block = &self.blocks[self.block];
-        Some((
-            self.base + self.block * 64 + bit,
-            block.word_starts & (1 << bit) != 0,
-            block.whitespace_starts & (1 << bit) != 0,
-        ))
+        Some(self.base + self.block * 64 + bit)
     }
 
     #[inline]
@@ -530,12 +500,12 @@ impl<'a> Starts<'a> {
         if self.pending != 0 {
             return Some(self.base + self.block * 64 + self.pending.trailing_zeros() as usize);
         }
-        self.blocks[self.block + 1..]
+        self.bitmap[self.block + 1..]
             .iter()
-            .position(|block| block.starts != 0)
+            .position(|&word| word != 0)
             .map(|index| {
                 let block = self.block + index + 1;
-                self.base + block * 64 + self.blocks[block].starts.trailing_zeros() as usize
+                self.base + block * 64 + self.bitmap[block].trailing_zeros() as usize
             })
     }
 
@@ -544,8 +514,8 @@ impl<'a> Starts<'a> {
     fn seek(&mut self, offset: usize) {
         let offset = offset - self.base;
         self.block = offset / 64;
-        self.pending = self.blocks.get(self.block).map_or(0, |block| block.starts)
-            & (u64::MAX << (offset % 64));
+        self.pending =
+            self.bitmap.get(self.block).copied().unwrap_or(0) & (u64::MAX << (offset % 64));
     }
 }
 

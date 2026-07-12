@@ -16,20 +16,12 @@ use std::arch::x86_64::{
     _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
 };
 
-/// Structural starts and coarse word/whitespace kinds for one source batch. Each set bit begins a
-/// word run, whitespace run, or single structural byte; `ascii_source` lets the carver avoid
-/// per-identifier Unicode checks.
+/// Structural starts for one source batch. Each set bit begins a word run, whitespace run, or
+/// single structural byte; `ascii_source` lets the carver avoid per-identifier Unicode checks.
 #[derive(Debug, Default)]
 pub(super) struct Classified {
-    pub(super) blocks: Vec<ClassifiedBlock>,
+    pub(super) starts: Vec<u64>,
     pub(super) ascii_source: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct ClassifiedBlock {
-    pub(super) starts: u64,
-    pub(super) word_starts: u64,
-    pub(super) whitespace_starts: u64,
 }
 
 /// Intersecting the low- and high-nibble entries classifies a byte. Bits 0..=4 are ASCII word
@@ -53,8 +45,8 @@ pub(super) fn classify(source: &[u8]) -> Classified {
 /// Reuses `classified` to identify token boundaries across the complete source batch.
 pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let blocks = source.len().div_ceil(64);
-    classified.blocks.clear();
-    classified.blocks.reserve(blocks);
+    classified.starts.clear();
+    classified.starts.reserve(blocks);
     classified.ascii_source = true;
     let mut previous_word = 0;
     let mut previous_whitespace = 0;
@@ -137,11 +129,9 @@ fn push_block(
     let whitespace_starts = whitespace & !((whitespace << 1) | *previous_whitespace);
     let other = !(word | whitespace) & valid;
 
-    classified.blocks.push(ClassifiedBlock {
-        starts: word_starts | whitespace_starts | other,
-        word_starts,
-        whitespace_starts,
-    });
+    classified
+        .starts
+        .push(word_starts | whitespace_starts | other);
 
     *previous_word = word >> 63;
     *previous_whitespace = whitespace >> 63;
@@ -287,11 +277,11 @@ unsafe fn mask64_x86(first: __m128i, second: __m128i, third: __m128i, fourth: __
 
 #[cfg(test)]
 mod tests {
-    use super::{ClassifiedBlock, classify};
+    use super::classify;
 
     fn assert_matches_scalar(source: &[u8]) {
         let classified = classify(source);
-        let mut expected = vec![ClassifiedBlock::default(); source.len().div_ceil(64)];
+        let mut expected_starts = vec![0; source.len().div_ceil(64)];
         let mut previous_word = false;
         let mut previous_whitespace = false;
 
@@ -305,19 +295,14 @@ mod tests {
                 || (word && !previous_word)
                 || (whitespace && !previous_whitespace)
             {
-                expected[block].starts |= bit;
-                if word {
-                    expected[block].word_starts |= bit;
-                } else if whitespace {
-                    expected[block].whitespace_starts |= bit;
-                }
+                expected_starts[block] |= bit;
             }
 
             previous_word = word;
             previous_whitespace = whitespace;
         }
 
-        assert_eq!(classified.blocks, expected);
+        assert_eq!(classified.starts, expected_starts);
         assert_eq!(classified.ascii_source, source.is_ascii());
     }
 
