@@ -1366,8 +1366,8 @@ impl get_size2::GetSize for TypeVarIdentity<'_> {}
 
 impl<'db> TypeVarIdentity<'db> {
     fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        let name = format!("{}'{}", self.name(db), suffix);
-        Self::new(db, Name::from(name), self.definition(db), self.kind(db))
+        let name = Name::join(&[self.name(db).as_str(), "'", suffix], "");
+        Self::new(db, name, self.definition(db), self.kind(db))
     }
 }
 

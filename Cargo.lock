@@ -437,7 +437,7 @@ dependencies = [
 [[package]]
 name = "char_str"
 version = "0.0.1"
-source = "git+https://github.com/astral-sh/char_str?rev=27a03a07c60809860a02936ca50d87fd3a75a2d2#27a03a07c60809860a02936ca50d87fd3a75a2d2"
+source = "git+https://github.com/astral-sh/char_str?rev=d2d138b274b2f01913cd8391082b225f2ade2d53#d2d138b274b2f01913cd8391082b225f2ade2d53"
 dependencies = [
  "castaway",
  "get-size2",

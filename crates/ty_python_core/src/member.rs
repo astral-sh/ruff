@@ -3,12 +3,11 @@ use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
-use char_str::{CharStr, CharString};
+use char_str::{CharStr, CharString, format_char};
 use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
-use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -334,11 +333,10 @@ impl MemberExprBuilder {
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(index),
                 ..
-            }) => {
-                let mut text = CharString::new();
-                let _ = write!(text, "{index}");
-                Some((SegmentKind::IntSubscript, MemberPathPart::Owned(text)))
-            }
+            }) => Some((
+                SegmentKind::IntSubscript,
+                MemberPathPart::Owned(format_char!("{index}")),
+            )),
             // Handle negative integer subscripts, like `x[-1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::USub,
@@ -348,11 +346,10 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let mut text = CharString::new();
-                    let _ = write!(text, "-{index}");
-                    Some((SegmentKind::IntSubscript, MemberPathPart::Owned(text)))
-                }
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("-{index}")),
+                )),
                 _ => None,
             },
             // Handle positive integer subscripts with explicit plus, like `x[+1]`.
@@ -364,11 +361,10 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let mut text = CharString::new();
-                    let _ = write!(text, "{index}");
-                    Some((SegmentKind::IntSubscript, MemberPathPart::Owned(text)))
-                }
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("{index}")),
+                )),
                 _ => None,
             },
             // Handle boolean subscripts, like `x[True]` or `x[False]`.

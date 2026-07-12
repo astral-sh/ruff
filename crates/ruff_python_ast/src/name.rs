@@ -22,7 +22,7 @@ pub struct Name(CharStr);
 
 impl Name {
     /// The maximum number of UTF-8 bytes stored inline in a name.
-    pub const INLINE_CAPACITY: usize = std::mem::size_of::<CharStr>();
+    pub const INLINE_CAPACITY: usize = CharStr::INLINE_CAPACITY;
 
     #[inline]
     pub fn empty() -> Self {

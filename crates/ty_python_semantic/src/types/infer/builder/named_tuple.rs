@@ -1,5 +1,3 @@
-use std::fmt::Write as _;
-
 use crate::{
     Db,
     types::{
@@ -18,7 +16,7 @@ use crate::{
         infer::TypeInferenceBuilder,
     },
 };
-use char_str::CharString;
+use char_str::format_char;
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
@@ -498,9 +496,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     || !is_identifier(name_str)
                     || seen_names.contains(name_str);
                 if needs_rename {
-                    let mut name = CharString::new();
-                    let _ = write!(name, "_{i}");
-                    *field_name = Name::from(name);
+                    *field_name = Name::from(format_char!("_{i}"));
                 }
                 seen_names.insert(field_name.as_str());
             }
