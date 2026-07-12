@@ -1536,23 +1536,21 @@ impl<'db> Signature<'db> {
     /// Returns the single target-local variable supported in a shallow nominal annotation.
     ///
     /// This extends the initial higher-rank fragment only for non-generic source signatures.
-    /// Keeping the target to one unbounded PEP 695 variable, at most two occurrences, and one nominal
-    /// layer avoids both dependent source projection and independent-variable TDD expansion. Bare
-    /// class-scoped variables in other annotations remain rigid.
+    /// Keeping the target to one unbounded PEP 695 variable and one nominal layer avoids both
+    /// dependent source projection and independent-variable TDD expansion. Bare class-scoped
+    /// variables in other annotations remain rigid.
     fn single_nested_target_typevar(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         fn is_supported<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
             local: BoundTypeVarInstance<'db>,
             allow_nominal: bool,
-            occurrences: &mut u8,
         ) -> bool {
             if ty
                 .as_typevar()
                 .is_some_and(|typevar| typevar.is_same_typevar_as(db, local))
             {
-                *occurrences += 1;
-                return *occurrences <= 2;
+                return true;
             }
 
             if allow_nominal && let Type::NominalInstance(instance) = ty {
@@ -1563,9 +1561,11 @@ impl<'db> Signature<'db> {
                         .class_literal_and_specialization(db)
                         .1
                         .is_none_or(|specialization| {
-                            specialization.types(db).iter().copied().all(|argument| {
-                                is_supported(db, argument, local, false, occurrences)
-                            })
+                            specialization
+                                .types(db)
+                                .iter()
+                                .copied()
+                                .all(|argument| is_supported(db, argument, local, false))
                         });
             }
 
@@ -1593,16 +1593,14 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let mut occurrences = 0;
-        let supported = self
-            .parameters
+        self.parameters
             .iter()
             .map(Parameter::annotated_type)
             .chain(std::iter::once(self.return_ty))
-            .all(|ty| is_supported(db, ty, local, true, &mut occurrences));
-        (supported && occurrences > 0).then(|| {
-            InferableTypeVars::from_typevars(db, std::iter::once(local.identity(db)).collect())
-        })
+            .all(|ty| is_supported(db, ty, local, true))
+            .then(|| {
+                InferableTypeVars::from_typevars(db, std::iter::once(local.identity(db)).collect())
+            })
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
@@ -1971,13 +1969,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        let source_has_locals = source.generic_context.is_some_and(|context| {
-            context
-                .variables(db)
-                .any(|typevar| typevar.binding_context(db).definition() == source.definition)
-        });
-        let source_locals = if source_has_locals {
-            source.bare_unbounded_method_typevars(db)?
+        let source_locals = if let Some(source_locals) = source.bare_unbounded_method_typevars(db) {
+            source_locals
         } else {
             if !source.parameters.is_standard()
                 || !source
@@ -1995,6 +1988,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             InferableTypeVars::None
         };
+        let source_has_locals = source_locals != InferableTypeVars::None;
 
         let bare_target_locals = target.bare_unbounded_method_typevars(db);
         let nested_target_locals = if bare_target_locals.is_none() && !source_has_locals {
@@ -5203,7 +5197,7 @@ mod tests {
             (
                 "/src/repeated.py",
                 "def f[T](first: list[T], second: list[T]) -> list[T]: ...",
-                false,
+                true,
             ),
         ] {
             let mut db = setup_db();

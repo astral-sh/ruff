@@ -3158,6 +3158,9 @@ class NestedFunctionScoped(Protocol):
 class NestedInputFunctionScoped(Protocol):
     def nested_input[T](self, input: list[T]) -> int: ...
 
+class RepeatedNestedFunctionScoped(Protocol):
+    def repeated[T](self, first: list[T], second: list[T]) -> list[T]: ...
+
 class NestedGradualFunctionScoped(Protocol):
     def nested_gradual[T](self, input: list[T], context: Any) -> list[T]: ...
 
@@ -3281,6 +3284,10 @@ class NominalNestedInputConcrete:
 class NominalNestedInputTop:
     def nested_input(self, input: object) -> int:
         return 0
+
+class NominalRepeatedNestedConcrete:
+    def repeated(self, first: list[int], second: list[int]) -> list[int]:
+        return first
 
 class NominalNestedGradualConcrete:
     def nested_gradual(self, input: list[int], context: Any) -> list[int]:
@@ -3436,6 +3443,8 @@ static_assert(not is_assignable_to(NominalNestedInputConcrete, NestedInputFuncti
 static_assert(not is_subtype_of(NominalNestedInputConcrete, NestedInputFunctionScoped))
 static_assert(is_assignable_to(NominalNestedInputTop, NestedInputFunctionScoped))
 static_assert(is_subtype_of(NominalNestedInputTop, NestedInputFunctionScoped))
+static_assert(not is_assignable_to(NominalRepeatedNestedConcrete, RepeatedNestedFunctionScoped))
+static_assert(not is_subtype_of(NominalRepeatedNestedConcrete, RepeatedNestedFunctionScoped))
 static_assert(not is_assignable_to(NominalNestedGradualConcrete, NestedGradualFunctionScoped))
 static_assert(not is_subtype_of(NominalNestedGradualConcrete, NestedGradualFunctionScoped))
 static_assert(not is_assignable_to(NominalNestedConcreteGenericClass[str], NestedFunctionScoped))
