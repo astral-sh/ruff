@@ -635,6 +635,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         assumptions.verify_builder(builder);
 
+        if to_remove == InferableTypeVars::None {
+            return Ok(self.and(db, builder, || assumptions));
+        }
+
         let type_mentions_projected = |ty: Type<'db>| {
             any_over_type(db, ty, false, |nested| {
                 nested
@@ -7950,6 +7954,14 @@ mod tests {
                 target,
                 alias_of_source,
             );
+            let unchanged = ConstraintSet::always(&builder)
+                .try_exists_assuming(&db, &builder, InferableTypeVars::None, alias_relation)
+                .expect("projecting no variables is an identity operation");
+            assert!(
+                unchanged
+                    .iff(&db, &builder, alias_relation)
+                    .is_always_satisfied(&db)
+            );
             assert!(matches!(
                 alias_relation.try_exists_assuming(
                     &db,
@@ -7999,6 +8011,15 @@ mod tests {
         let relation =
             ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, protocol);
         let source_locals = typevar_set(&db, [source]);
+
+        let unchanged = ConstraintSet::always(&builder)
+            .try_exists_assuming(&db, &builder, InferableTypeVars::None, relation)
+            .expect("projecting no variables is an identity operation");
+        assert!(
+            unchanged
+                .iff(&db, &builder, relation)
+                .is_always_satisfied(&db)
+        );
 
         assert!(matches!(
             relation.try_exists_assuming(
