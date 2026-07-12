@@ -20,6 +20,9 @@ pub(crate) struct ProjectFilesFilter<'a> {
     /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
 
+    /// Whether any paths were explicitly included on the CLI.
+    has_explicit_paths: bool,
+
     /// The resolved `src.include` and `src.exclude` filter.
     src_filter: &'a IncludeExcludeFilter,
 
@@ -30,6 +33,7 @@ impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
         Self {
             included_paths: project.included_paths_or_root(db),
+            has_explicit_paths: !project.included_paths_list(db).is_empty(),
             src_filter: &project.settings(db).src().files,
             force_exclude: project.force_exclude(db),
         }
@@ -42,26 +46,31 @@ impl<'a> ProjectFilesFilter<'a> {
     fn match_included_paths(
         &self,
         path: &SystemPath,
-        mode: GlobFilterCheckMode,
-    ) -> Option<CheckPathMatch> {
+        mode: GlobFilterCheckMode<'_>,
+    ) -> Option<CheckPathMatch<'_>> {
         match mode {
-            GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
-            GlobFilterCheckMode::Adhoc => {
-                self.included_paths
+            GlobFilterCheckMode::TopDown => {
+                Some(CheckPathMatch::Partial(GlobFilterCheckMode::TopDown))
+            }
+            GlobFilterCheckMode::Adhoc { .. } => {
+                let included_path = self
+                    .included_paths
                     .iter()
-                    .filter_map(|included_path| {
-                        if let Ok(relative_path) = path.strip_prefix(included_path) {
-                            // Exact matches are always included, unless forced to exclude
-                            if relative_path.as_str().is_empty() && !self.force_exclude {
-                                Some(CheckPathMatch::Full)
-                            } else {
-                                Some(CheckPathMatch::Partial)
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .max()
+                    .filter(|included_path| path.starts_with(included_path))
+                    .max_by_key(|included_path| included_path.as_str().len())?;
+                let included_path = included_path.as_path();
+
+                if self.force_exclude || !self.has_explicit_paths {
+                    Some(CheckPathMatch::Partial(GlobFilterCheckMode::Adhoc {
+                        stop_at: None,
+                    }))
+                } else if path == included_path {
+                    Some(CheckPathMatch::Full)
+                } else {
+                    Some(CheckPathMatch::Partial(GlobFilterCheckMode::Adhoc {
+                        stop_at: Some(included_path),
+                    }))
+                }
             }
         }
     }
@@ -82,11 +91,11 @@ impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn is_file_included(
         &self,
         path: &SystemPath,
-        mode: GlobFilterCheckMode,
+        mode: GlobFilterCheckMode<'_>,
     ) -> IncludeResult {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
-            Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
+            Some(CheckPathMatch::Partial(mode)) => self.src_filter.is_file_included(path, mode),
             Some(CheckPathMatch::Full) => IncludeResult::Included {
                 literal_match: Some(true),
             },
@@ -96,11 +105,11 @@ impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn is_directory_included(
         &self,
         path: &SystemPath,
-        mode: GlobFilterCheckMode,
+        mode: GlobFilterCheckMode<'_>,
     ) -> IncludeResult {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
-            Some(CheckPathMatch::Partial) => {
+            Some(CheckPathMatch::Partial(mode)) => {
                 self.src_filter.is_directory_maybe_included(path, mode)
             }
             Some(CheckPathMatch::Full) => IncludeResult::Included {
@@ -110,10 +119,10 @@ impl<'a> ProjectFilesFilter<'a> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum CheckPathMatch {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum CheckPathMatch<'a> {
     /// The path is a partial match of the checked path (it's a sub path)
-    Partial,
+    Partial(GlobFilterCheckMode<'a>),
 
     /// The path matches a check path exactly.
     Full,
@@ -222,7 +231,7 @@ impl ProjectFilesWalker {
                             // check if they're included in the project.
                             if entry.depth() > 0 || force_exclude {
                                 let match_mode = if entry.depth() == 0 && force_exclude {
-                                    GlobFilterCheckMode::Adhoc
+                                    GlobFilterCheckMode::Adhoc { stop_at: None }
                                 } else {
                                     GlobFilterCheckMode::TopDown
                                 };
