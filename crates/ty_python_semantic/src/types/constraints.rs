@@ -320,8 +320,14 @@ impl OwnedConstraintSetInner<'_> {
 pub(crate) enum ConstraintProjectionError {
     /// A projected variable occurs inside a type-level bound that cannot yet be preserved.
     NestedTypeVarRelation,
+    /// A type alias might conceal a projected variable.
+    OpaqueTypeAlias,
     /// An assumption mentions a variable that the projection removes.
     ProjectedTypeVarInAssumption,
+}
+
+fn contains_type_alias(db: &dyn Db, ty: Type<'_>) -> bool {
+    any_over_type(db, ty, false, |nested| matches!(nested, Type::TypeAlias(_)))
 }
 
 /// A set of constraints under which a type property holds.
@@ -595,7 +601,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// type-level relationship that the constraint representation cannot preserve exactly.
     /// `assumptions` must not mention any variable in `to_remove`; because they are independent of
     /// those variables, they are conjoined only after projection and remain factored during the
-    /// abstraction traversal.
+    /// abstraction traversal. Type aliases are rejected conservatively because their opaque values
+    /// might contain a projected variable.
     #[cfg_attr(
         not(test),
         expect(
@@ -621,6 +628,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             })
         };
         let mut assumption_mentions_projected = false;
+        let mut assumption_contains_alias = false;
         assumptions
             .node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
@@ -628,7 +636,18 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 assumption_mentions_projected |= constraint.typevar.is_inferable(db, to_remove)
                     || constraint.bounds.lower.is_some_and(type_mentions_projected)
                     || constraint.bounds.upper.is_some_and(type_mentions_projected);
+                assumption_contains_alias |= constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|ty| contains_type_alias(db, ty))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|ty| contains_type_alias(db, ty));
             });
+        if assumption_contains_alias {
+            return Err(ConstraintProjectionError::OpaqueTypeAlias);
+        }
         if assumption_mentions_projected {
             return Err(ConstraintProjectionError::ProjectedTypeVarInAssumption);
         }
@@ -4214,6 +4233,9 @@ impl InteriorNode {
                     .into_iter()
                     .chain(constraint.bounds.upper)
                 {
+                    if contains_type_alias(db, bound) {
+                        return Err(ConstraintProjectionError::OpaqueTypeAlias);
+                    }
                     if subject_is_removed {
                         if bound.as_typevar().is_none() && contains_any_typevar(bound) {
                             return Err(ConstraintProjectionError::NestedTypeVarRelation);
@@ -7153,9 +7175,13 @@ mod tests {
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use ruff_db::system::DbWithWritableSystem;
 
-    use crate::db::tests::setup_db;
-    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::{
+        BoundTypeVarInstance, KnownClass, KnownInstanceType, TypeAliasType, TypeVarVariance,
+    };
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
@@ -7187,6 +7213,19 @@ mod tests {
 
     fn known_instance(db: &dyn Db, class: KnownClass) -> Type<'_> {
         class.to_instance(db)
+    }
+
+    fn identity_alias<'db>(db: &'db TestDb, argument: Type<'db>) -> Type<'db> {
+        let module = ruff_db::files::system_path_to_file(db, "/src/alias.py").unwrap();
+        let alias = global_symbol(db, module, "Identity").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias
+        else {
+            panic!("expected `Identity` to be a PEP 695 type alias");
+        };
+        Type::TypeAlias(TypeAliasType::PEP695(
+            alias.apply_specialization(db, |context| context.specialize(db, &[argument])),
+        ))
     }
 
     #[test]
@@ -7767,6 +7806,44 @@ mod tests {
                 ConstraintSet::always(&builder),
             ),
             Err(ConstraintProjectionError::NestedTypeVarRelation)
+        ));
+    }
+
+    #[test]
+    fn fallible_projection_rejects_opaque_aliases() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/alias.py",
+            r#"
+            type Identity[T] = T
+            "#,
+        )
+        .unwrap();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let alias_of_source = identity_alias(&db, Type::TypeVar(source));
+        let alias_relation =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, alias_of_source);
+        let source_locals = typevar_set(&db, [source]);
+
+        assert!(matches!(
+            alias_relation.try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::OpaqueTypeAlias)
+        ));
+        assert!(matches!(
+            ConstraintSet::always(&builder).try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                alias_relation,
+            ),
+            Err(ConstraintProjectionError::OpaqueTypeAlias)
         ));
     }
 
