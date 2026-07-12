@@ -65,9 +65,9 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
 }
 
 #[cfg(target_arch = "aarch64")]
-fn benchmark_two_pass_lexer(criterion: &mut Criterion<WallTime>) {
+fn benchmark_chunked_lexer(criterion: &mut Criterion<WallTime>) {
     let test_cases = create_test_cases();
-    let mut group = criterion.benchmark_group("lexer_two_pass");
+    let mut group = criterion.benchmark_group("lexer_chunked");
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
@@ -76,8 +76,8 @@ fn benchmark_two_pass_lexer(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    lexer::lex_two_pass(case.code())
-                        .expect("Input should be supported by the two-pass lexer")
+                    lexer::lex_chunked(case.code())
+                        .expect("Input should be supported by the chunked lexer")
                 });
             },
         );
@@ -87,7 +87,7 @@ fn benchmark_two_pass_lexer(criterion: &mut Criterion<WallTime>) {
 }
 
 #[cfg(target_arch = "aarch64")]
-criterion_group!(lexer, benchmark_lexer, benchmark_two_pass_lexer);
+criterion_group!(lexer, benchmark_lexer, benchmark_chunked_lexer);
 #[cfg(not(target_arch = "aarch64"))]
 criterion_group!(lexer, benchmark_lexer);
 criterion_main!(lexer);

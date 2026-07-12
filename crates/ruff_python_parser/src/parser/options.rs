@@ -45,8 +45,8 @@ pub struct ParseOptions {
     /// nested expression / statement / pattern nodes are on the parser's call
     /// stack. Defaults to [`DEFAULT_MAX_RECURSION_DEPTH`].
     pub(crate) max_recursion_depth: u16,
-    /// Whether the parser may use the experimental ARM two-pass lexer.
-    pub(crate) two_pass_lexer: bool,
+    /// Whether the parser may use the experimental ARM chunked lexer.
+    pub(crate) chunked_lexer: bool,
 }
 
 impl ParseOptions {
@@ -71,10 +71,10 @@ impl ParseOptions {
         self.max_recursion_depth
     }
 
-    /// Enable or disable the experimental ARM two-pass lexer.
+    /// Enable or disable the experimental ARM chunked lexer.
     #[must_use]
-    pub fn with_two_pass_lexer(mut self, enabled: bool) -> Self {
-        self.two_pass_lexer = enabled;
+    pub fn with_chunked_lexer(mut self, enabled: bool) -> Self {
+        self.chunked_lexer = enabled;
         self
     }
 }
@@ -85,7 +85,7 @@ impl From<Mode> for ParseOptions {
             mode,
             target_version: PythonVersion::default(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
-            two_pass_lexer: true,
+            chunked_lexer: true,
         }
     }
 }
@@ -96,7 +96,7 @@ impl From<PySourceType> for ParseOptions {
             mode: source_type.as_mode(),
             target_version: PythonVersion::default(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
-            two_pass_lexer: true,
+            chunked_lexer: true,
         }
     }
 }

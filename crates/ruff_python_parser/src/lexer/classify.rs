@@ -6,17 +6,24 @@ use std::arch::aarch64::{
     vmaxvq_u8, vorrq_u8, vpaddq_u8, vreinterpretq_u64_u8, vsubq_u8,
 };
 
+#[derive(Debug, Default)]
 pub(super) struct Classified {
     pub(super) starts: Vec<u64>,
     pub(super) ascii_source: bool,
 }
 
+#[cfg(test)]
 pub(super) fn classify(source: &[u8]) -> Classified {
+    let mut classified = Classified::default();
+    classify_into(source, &mut classified);
+    classified
+}
+
+pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let blocks = source.len().div_ceil(64);
-    let mut classified = Classified {
-        starts: Vec::with_capacity(blocks),
-        ascii_source: true,
-    };
+    classified.starts.clear();
+    classified.starts.reserve(blocks);
+    classified.ascii_source = true;
     let mut previous_word = 0;
     let mut previous_whitespace = 0;
 
@@ -32,7 +39,7 @@ pub(super) fn classify(source: &[u8]) -> Classified {
         // SAFETY: All NEON operations are valid for arbitrary byte vectors.
         source_or = unsafe { vorrq_u8(source_or, chunk_or) };
         push_block(
-            &mut classified,
+            classified,
             word,
             whitespace,
             &mut previous_word,
@@ -70,7 +77,7 @@ pub(super) fn classify(source: &[u8]) -> Classified {
             (1 << chunk.len()) - 1
         };
         push_block(
-            &mut classified,
+            classified,
             word,
             whitespace,
             &mut previous_word,
@@ -78,8 +85,6 @@ pub(super) fn classify(source: &[u8]) -> Classified {
             valid,
         );
     }
-
-    classified
 }
 
 fn push_block(

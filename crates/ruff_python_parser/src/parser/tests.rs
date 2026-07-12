@@ -10,6 +10,26 @@ fn test_modes() {
     assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
 }
 
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn chunked_lexer_reparses_after_late_error() {
+    let prefix = "value = 1\n".repeat(2_000);
+    let options = ParseOptions::from(Mode::Module);
+
+    for suffix in [
+        "value = 01\n",
+        "value = 'unterminated\n",
+        "(value\n",
+        "value = 1\\\n",
+        "values = [\n    first,\n    second\nif condition:\n    pass\n",
+    ] {
+        let source = format!("{prefix}{suffix}");
+        let streaming = crate::parse_unchecked(&source, options.clone().with_chunked_lexer(false));
+        let chunked = crate::parse_unchecked(&source, options.clone().with_chunked_lexer(true));
+        assert_eq!(streaming, chunked, "{suffix:?}");
+    }
+}
+
 #[test]
 fn test_expr_mode_invalid_syntax1() {
     let source = "first second";

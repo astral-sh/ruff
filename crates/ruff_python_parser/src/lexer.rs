@@ -26,14 +26,14 @@ use crate::lexer::interpolated_string::{
 use crate::string::InterpolatedStringKind;
 
 #[cfg(target_arch = "aarch64")]
+pub(crate) mod chunked;
+#[cfg(target_arch = "aarch64")]
 mod classify;
 mod cursor;
 #[cfg(target_arch = "aarch64")]
 mod fast_token;
 mod indentation;
 mod interpolated_string;
-#[cfg(target_arch = "aarch64")]
-pub(crate) mod two_pass;
 
 const BOM: char = '\u{feff}';
 
@@ -1612,11 +1612,11 @@ pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 
-/// Lex a Python module with the experimental ARM two-pass lexer, returning the number of tokens
+/// Lex a Python module with the experimental ARM chunked lexer, returning the number of tokens
 /// (including EOF) on success. `None` indicates that the source requires the streaming lexer.
 #[cfg(target_arch = "aarch64")]
-pub fn lex_two_pass(source: &str) -> Option<usize> {
-    two_pass::lex(source).map(|tokens| tokens.tokens.len())
+pub fn lex_chunked(source: &str) -> Option<usize> {
+    chunked::lex(source).map(|tokens| tokens.tokens.len())
 }
 
 #[cfg(test)]
