@@ -2499,6 +2499,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
+                Type::Intersection(intersection)
+                    if intersection
+                        .iter_positive(db)
+                        .any(|element| element.resolve_type_alias(db).is_typed_dict()) =>
+                {
+                    // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
+                    // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
+                    // constraint-equivalence check below remains authoritative.
+                    typed_dicts.insert(ty);
+                    true
+                }
                 _ => false,
             };
             completed.insert(ty, result);
