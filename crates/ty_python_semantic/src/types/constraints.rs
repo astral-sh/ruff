@@ -4298,8 +4298,13 @@ impl InteriorNode {
                     .lower
                     .into_iter()
                     .chain(constraint.bounds.upper)
-                    .filter_map(Type::as_typevar)
-                    .any(|bound| subject_is_removed != is_removed(bound));
+                    .any(|bound| {
+                        any_over_type(db, bound, false, |nested| {
+                            nested
+                                .as_typevar()
+                                .is_some_and(|typevar| subject_is_removed != is_removed(typevar))
+                        })
+                    });
             });
         if relates_removed_to_surviving
             && self.0.has_negative_branch(builder, &mut |constraint| {
@@ -7846,6 +7851,36 @@ mod tests {
             Type::TypeVar(target),
         );
         let relation = source_is_not_above_int.and(&db, &builder, || source_equals_target);
+
+        assert!(matches!(
+            relation.try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::NegatedTypeVarRelation)
+        ));
+    }
+
+    #[test]
+    fn fallible_projection_rejects_negated_shallow_relations() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let list_of_int =
+            KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+        let list_of_target =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(target)]);
+
+        let source_is_not_above_list_int =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, source, list_of_int)
+                .negate(&db, &builder);
+        let source_equals_list_target =
+            ConstraintSet::constrain_typevar(&db, &builder, source, list_of_target, list_of_target);
+        let relation =
+            source_is_not_above_list_int.and(&db, &builder, || source_equals_list_target);
 
         assert!(matches!(
             relation.try_exists_assuming(
