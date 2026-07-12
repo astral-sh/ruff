@@ -1067,6 +1067,15 @@ class A2[T]:
 
 class B2[T](A2[T]):
     def method[S](self, x: T, y: S) -> S: ...  # fine
+
+class A3[S]:
+    def method[T](self, x: list[T], context: S) -> list[T]: ...
+
+class B3[S](A3[S]):
+    def method(self, x: list[int], context: S) -> list[int]: ...  # error: [invalid-method-override]
+
+class C3[S](A3[S]):
+    def method(self, x: object, context: S) -> Never: ...  # fine
 ```
 
 ## Fully qualified names are used in diagnostics where appropriate

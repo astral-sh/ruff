@@ -3264,6 +3264,12 @@ class NominalNestedConcrete:
     def nested(self, input: list[int]) -> list[int]:
         return input
 
+# fmt: off
+class NominalNestedLargeLiteralUnion:
+    def nested_input(self, input: list[Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65]]) -> int:
+        return 0
+# fmt: on
+
 class NominalNestedTopBottom:
     def nested(self, input: object) -> Never:
         raise NotImplementedError
@@ -3422,6 +3428,8 @@ static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
 
 static_assert(not is_assignable_to(NominalNestedConcrete, NestedFunctionScoped))
 static_assert(not is_subtype_of(NominalNestedConcrete, NestedFunctionScoped))
+static_assert(not is_assignable_to(NominalNestedLargeLiteralUnion, NestedInputFunctionScoped))
+static_assert(not is_subtype_of(NominalNestedLargeLiteralUnion, NestedInputFunctionScoped))
 static_assert(is_assignable_to(NominalNestedTopBottom, NestedFunctionScoped))
 static_assert(is_subtype_of(NominalNestedTopBottom, NestedFunctionScoped))
 static_assert(not is_assignable_to(NominalNestedInputConcrete, NestedInputFunctionScoped))
@@ -3435,6 +3443,13 @@ static_assert(not is_subtype_of(NominalNestedConcreteGenericClass[str], NestedFu
 
 # error: [invalid-assignment]
 nested: NestedFunctionScoped = NominalNestedConcreteGenericClass[str]()
+
+def consume_nested[U](value: NestedFunctionScoped, other: U) -> U:
+    return other
+
+# error: [invalid-argument-type]
+consume_nested(NominalNestedConcrete(), 1)
+consume_nested(NominalNestedTopBottom(), 1)
 
 # A concrete implementation cannot satisfy every specialization of a generic method.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))

@@ -1537,7 +1537,8 @@ impl<'db> Signature<'db> {
     ///
     /// This extends the initial higher-rank fragment only for non-generic source signatures.
     /// Keeping the target to one unbounded PEP 695 variable, at most two occurrences, and one nominal
-    /// layer avoids both dependent source projection and independent-variable TDD expansion.
+    /// layer avoids both dependent source projection and independent-variable TDD expansion. Bare
+    /// class-scoped variables in other annotations remain rigid.
     fn single_nested_target_typevar(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         fn is_supported<'db>(
             db: &'db dyn Db,
@@ -1569,7 +1570,9 @@ impl<'db> Signature<'db> {
             }
 
             if allow_nominal {
-                Signature::is_supported_higher_rank_annotation(db, ty)
+                ty.as_typevar()
+                    .is_some_and(|typevar| typevar.binding_context(db) != local.binding_context(db))
+                    || Signature::is_supported_higher_rank_annotation(db, ty)
             } else {
                 Signature::is_supported_higher_rank_closed_type(db, ty)
             }
@@ -1927,7 +1930,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// specialization of the target's unbounded local type variables. A non-generic source may also
     /// be checked against a target with one unbounded local occurring in a shallow nominal
     /// annotation. Overloads, declared domains, other nested occurrences, and enclosing inference
-    /// variables remain on the existing relation path.
+    /// variables that occur in either signature remain on the existing relation path.
     ///
     /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
     /// the latter must work for every `T`.
@@ -1948,13 +1951,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.inferable != InferableTypeVars::None {
+        const MAX_HIGHER_RANK_UNION_ELEMENTS: usize = 64;
+
+        let mentions_caller_inferable = |signature: &Signature<'db>| {
+            signature
+                .parameters
+                .iter()
+                .map(Parameter::annotated_type)
+                .chain(std::iter::once(signature.return_ty))
+                .any(|ty| {
+                    any_over_type(db, ty, false, |nested| {
+                        nested
+                            .as_typevar()
+                            .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+                    })
+                })
+        };
+        if mentions_caller_inferable(source) || mentions_caller_inferable(target) {
             return None;
         }
 
-        let source_has_locals = source
-            .generic_context
-            .is_some_and(|context| context.variables(db).next().is_some());
+        let source_has_locals = source.generic_context.is_some_and(|context| {
+            context
+                .variables(db)
+                .any(|typevar| typevar.binding_context(db).definition() == source.definition)
+        });
         let source_locals = if source_has_locals {
             source.bare_unbounded_method_typevars(db)?
         } else {
@@ -1964,20 +1985,52 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .iter()
                     .map(Parameter::annotated_type)
                     .chain(std::iter::once(source.return_ty))
-                    .all(|ty| Signature::is_supported_higher_rank_annotation(db, ty))
+                    .all(|ty| {
+                        ty.as_typevar().is_some_and(|typevar| {
+                            typevar.binding_context(db).definition() != source.definition
+                        }) || Signature::is_supported_higher_rank_annotation(db, ty)
+                    })
             {
                 return None;
             }
             InferableTypeVars::None
         };
 
-        let target_locals = target.bare_unbounded_method_typevars(db).or_else(|| {
-            if !source_has_locals {
-                target.single_nested_target_typevar(db)
-            } else {
-                None
-            }
-        })?;
+        let bare_target_locals = target.bare_unbounded_method_typevars(db);
+        let nested_target_locals = if bare_target_locals.is_none() && !source_has_locals {
+            target.single_nested_target_typevar(db)
+        } else {
+            None
+        };
+        let target_locals = bare_target_locals.or(nested_target_locals)?;
+
+        // A large closed union cannot cover every specialization of an unbounded target local.
+        // Reject it before invariant comparison distributes the union into a large constraint set.
+        if nested_target_locals.is_some()
+            && source
+                .parameters
+                .iter()
+                .map(Parameter::annotated_type)
+                .chain(std::iter::once(source.return_ty))
+                .zip(
+                    target
+                        .parameters
+                        .iter()
+                        .map(Parameter::annotated_type)
+                        .chain(std::iter::once(target.return_ty)),
+                )
+                .any(|(source_ty, target_ty)| {
+                    any_over_type(db, target_ty, false, |nested| {
+                        nested
+                            .as_typevar()
+                            .is_some_and(|typevar| typevar.is_inferable(db, target_locals))
+                    }) && any_over_type(db, source_ty, false, |nested| {
+                        matches!(nested, Type::Union(union) if union.elements(db).len() > MAX_HIGHER_RANK_UNION_ELEMENTS)
+                    })
+                })
+        {
+            return Some(self.never());
+        }
         // The quantifiers must bind distinct occurrences. A signature compared with itself can
         // stay on the existing relation path instead of treating one occurrence as both binders.
         if source_locals
@@ -1989,7 +2042,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let quantified_typevars = source_locals.merge(db, target_locals);
         let mut checker = self
-            .with_inferable_typevars(quantified_typevars)
+            .with_inferable_typevars(self.inferable.merge(db, quantified_typevars))
             .with_quantified_typevars(db, quantified_typevars);
         checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let relation = checker.with_signature_recursion_guard(source, target, || {
