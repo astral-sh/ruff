@@ -2420,6 +2420,63 @@ def mixed(movie_or_int: Movie | int) -> None:
     dict(movie_or_int)  # error: [no-matching-overload]
 ```
 
+Narrowing away a non-`TypedDict` member should preserve the efficient path:
+
+```py
+from typing import Literal, TypedDict
+
+Variant00 = TypedDict("Variant00", {"tag": Literal["variant_00"]}, total=False)
+Variant01 = TypedDict("Variant01", {"tag": Literal["variant_01"]}, total=False)
+Variant02 = TypedDict("Variant02", {"tag": Literal["variant_02"]}, total=False)
+Variant03 = TypedDict("Variant03", {"tag": Literal["variant_03"]}, total=False)
+Variant04 = TypedDict("Variant04", {"tag": Literal["variant_04"]}, total=False)
+Variant05 = TypedDict("Variant05", {"tag": Literal["variant_05"]}, total=False)
+Variant06 = TypedDict("Variant06", {"tag": Literal["variant_06"]}, total=False)
+Variant07 = TypedDict("Variant07", {"tag": Literal["variant_07"]}, total=False)
+Variant08 = TypedDict("Variant08", {"tag": Literal["variant_08"]}, total=False)
+Variant09 = TypedDict("Variant09", {"tag": Literal["variant_09"]}, total=False)
+Variant10 = TypedDict("Variant10", {"tag": Literal["variant_10"]}, total=False)
+Variant11 = TypedDict("Variant11", {"tag": Literal["variant_11"]}, total=False)
+Variant12 = TypedDict("Variant12", {"tag": Literal["variant_12"]}, total=False)
+Variant13 = TypedDict("Variant13", {"tag": Literal["variant_13"]}, total=False)
+Variant14 = TypedDict("Variant14", {"tag": Literal["variant_14"]}, total=False)
+Variant15 = TypedDict("Variant15", {"tag": Literal["variant_15"]}, total=False)
+Variant16 = TypedDict("Variant16", {"tag": Literal["variant_16"]}, total=False)
+Variant17 = TypedDict("Variant17", {"tag": Literal["variant_17"]}, total=False)
+Variant18 = TypedDict("Variant18", {"tag": Literal["variant_18"]}, total=False)
+Variant19 = TypedDict("Variant19", {"tag": Literal["variant_19"]}, total=False)
+Variant20 = TypedDict("Variant20", {"tag": Literal["variant_20"]}, total=False)
+
+Variant = (
+    Variant00
+    | Variant01
+    | Variant02
+    | Variant03
+    | Variant04
+    | Variant05
+    | Variant06
+    | Variant07
+    | Variant08
+    | Variant09
+    | Variant10
+    | Variant11
+    | Variant12
+    | Variant13
+    | Variant14
+    | Variant15
+    | Variant16
+    | Variant17
+    | Variant18
+    | Variant19
+    | Variant20
+    | str
+)
+
+def _(value: Variant) -> None:
+    if isinstance(value, dict):
+        reveal_type(dict(value))  # revealed: dict[str, object]
+```
+
 The same result is inferred efficiently for a union of `TypedDict`s:
 
 ```toml

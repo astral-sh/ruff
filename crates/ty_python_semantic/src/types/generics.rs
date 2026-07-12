@@ -2360,6 +2360,30 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
+                Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                    // `isinstance(value, dict)` adds a `dict` constraint to each `TypedDict` arm.
+                    // That constraint only represents the runtime check, so it can be ignored
+                    // here. Other constraints may affect the result and must still be rejected.
+                    let dict_constraint = KnownClass::Dict.to_instance(db).top_materialization(db);
+                    let mut typed_dict = None;
+                    let is_typed_dict_runtime_intersection =
+                        intersection.positive(db).iter().all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            match element {
+                                Type::TypedDict(_) if typed_dict.is_none() => {
+                                    typed_dict = Some(element);
+                                    true
+                                }
+                                _ if element == dict_constraint => true,
+                                _ => false,
+                            }
+                        });
+
+                    is_typed_dict_runtime_intersection
+                        && typed_dict.is_some_and(|typed_dict| {
+                            collect_typed_dicts(db, typed_dict, resolving, completed, typed_dicts)
+                        })
+                }
                 _ => false,
             };
             completed.insert(ty, result);
