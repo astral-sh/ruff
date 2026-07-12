@@ -82,8 +82,25 @@ impl<'src> Parser<'src> {
         start_offset: TextSize,
         options: ParseOptions,
     ) -> Self {
-        let tokens =
-            TokenSource::from_source(source, options.mode, start_offset, options.chunked_lexer);
+        let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        Self::new_with_token_source(source, start_offset, options, tokens)
+    }
+
+    fn new_starts_at_with_legacy_lexer(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+    ) -> Self {
+        let tokens = TokenSource::from_streaming_source(source, options.mode, start_offset);
+        Self::new_with_token_source(source, start_offset, options, tokens)
+    }
+
+    fn new_with_token_source(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+        tokens: TokenSource<'src>,
+    ) -> Self {
         let depth_remaining = options.max_recursion_depth;
         let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
@@ -143,10 +160,10 @@ impl<'src> Parser<'src> {
 
         #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
         if self.tokens.should_reparse_with_legacy_lexer() {
-            return Parser::new_starts_at(
+            return Parser::new_starts_at_with_legacy_lexer(
                 self.source,
                 self.start_offset,
-                self.options.with_chunked_lexer(false),
+                self.options,
             )
             .parse();
         }

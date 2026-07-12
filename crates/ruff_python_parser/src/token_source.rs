@@ -58,18 +58,9 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
-    pub(crate) fn from_source(
-        source: &'src str,
-        mode: Mode,
-        start_offset: TextSize,
-        chunked_lexer: bool,
-    ) -> Self {
-        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
-        let _ = chunked_lexer;
-
+    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-        if chunked_lexer
-            && mode == Mode::Module
+        if mode == Mode::Module
             && start_offset == TextSize::new(0)
             && let Some(mut lexer) = ChunkedLexer::new(source)
         {
@@ -93,6 +84,14 @@ impl<'src> TokenSource<'src> {
             }
         }
 
+        Self::from_streaming_source(source, mode, start_offset)
+    }
+
+    pub(crate) fn from_streaming_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+    ) -> Self {
         let lexer = Lexer::new(source, mode, start_offset);
         let mut source = TokenSource::new(lexer, source, start_offset);
 
@@ -655,4 +654,21 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     // Stay on a power-of-two bucket so that later geometric growth does not preserve an
     // arbitrary capacity offset.
     Vec::with_capacity(1 << capacity_hint.ilog2())
+}
+
+#[cfg(all(
+    test,
+    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+))]
+mod tests {
+    use ruff_text_size::TextSize;
+
+    use crate::Mode;
+    use crate::token_source::{LexerSource, TokenSource};
+
+    #[test]
+    fn module_uses_chunked_lexer() {
+        let source = TokenSource::from_source("value = 1\n", Mode::Module, TextSize::new(0));
+        assert!(matches!(source.lexer, LexerSource::Chunked { .. }));
+    }
 }

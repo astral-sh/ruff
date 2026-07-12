@@ -2,6 +2,8 @@ use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, St
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
+use super::Parser;
+
 #[test]
 fn test_modes() {
     let source = "a[0][1][2][3][4]";
@@ -24,8 +26,9 @@ fn chunked_lexer_reparses_after_late_error() {
         "values = [\n    first,\n    second\nif condition:\n    pass\n",
     ] {
         let source = format!("{prefix}{suffix}");
-        let streaming = crate::parse_unchecked(&source, options.clone().with_chunked_lexer(false));
-        let chunked = crate::parse_unchecked(&source, options.clone().with_chunked_lexer(true));
+        let streaming =
+            Parser::new_starts_at_with_legacy_lexer(&source, 0.into(), options.clone()).parse();
+        let chunked = crate::parse_unchecked(&source, options.clone());
         assert_eq!(streaming, chunked, "{suffix:?}");
     }
 }
