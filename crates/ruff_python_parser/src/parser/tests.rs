@@ -10,7 +10,7 @@ fn test_modes() {
     assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 #[test]
 fn chunked_lexer_reparses_after_late_error() {
     let prefix = "value = 1\n".repeat(2_000);

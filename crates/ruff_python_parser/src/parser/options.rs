@@ -45,7 +45,7 @@ pub struct ParseOptions {
     /// nested expression / statement / pattern nodes are on the parser's call
     /// stack. Defaults to [`DEFAULT_MAX_RECURSION_DEPTH`].
     pub(crate) max_recursion_depth: u16,
-    /// Whether the parser may use the experimental ARM chunked lexer.
+    /// Whether the parser may use the experimental SIMD chunked lexer.
     pub(crate) chunked_lexer: bool,
 }
 
@@ -71,7 +71,7 @@ impl ParseOptions {
         self.max_recursion_depth
     }
 
-    /// Enable or disable the experimental ARM chunked lexer.
+    /// Enable or disable the experimental SIMD chunked lexer.
     #[must_use]
     pub fn with_chunked_lexer(mut self, enabled: bool) -> Self {
         self.chunked_lexer = enabled;

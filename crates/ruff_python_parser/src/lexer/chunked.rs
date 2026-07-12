@@ -80,7 +80,7 @@ impl<'src> ChunkedLexer<'src> {
         self.finished
     }
 
-    /// Classify a batch with NEON, then carve and coalesce it into complete tokens. A final word
+    /// Classify a batch with SIMD, then carve and coalesce it into complete tokens. A final word
     /// or whitespace run is extended so that the next batch always starts at a token boundary.
     pub(crate) fn fill(&mut self) -> Option<()> {
         if self.finished {

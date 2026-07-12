@@ -64,7 +64,7 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
     group.finish();
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 fn benchmark_chunked_lexer(criterion: &mut Criterion<WallTime>) {
     let test_cases = create_test_cases();
     let mut group = criterion.benchmark_group("lexer_chunked");
@@ -86,8 +86,8 @@ fn benchmark_chunked_lexer(criterion: &mut Criterion<WallTime>) {
     group.finish();
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 criterion_group!(lexer, benchmark_lexer, benchmark_chunked_lexer);
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
 criterion_group!(lexer, benchmark_lexer);
 criterion_main!(lexer);
