@@ -116,7 +116,7 @@ impl Override {
 
         matches!(
             self.files
-                .is_file_included(path, GlobFilterCheckMode::Adhoc),
+                .is_file_included(path, GlobFilterCheckMode::Adhoc { stop_at: None }),
             IncludeResult::Included { .. }
         )
     }
