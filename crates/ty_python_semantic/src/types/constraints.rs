@@ -320,6 +320,8 @@ impl OwnedConstraintSetInner<'_> {
 pub(crate) enum ConstraintProjectionError {
     /// A projected variable occurs inside a type-level bound that cannot yet be preserved.
     NestedTypeVarRelation,
+    /// A negated projected bound depends on a type variable that remains after projection.
+    NegatedTypeVarRelation,
     /// A type alias might conceal a projected variable.
     OpaqueTypeAlias,
     /// An assumption mentions a variable that the projection removes.
@@ -3172,6 +3174,33 @@ impl NodeId {
         walk(self, builder, &mut FxHashSet::default(), f);
     }
 
+    /// Returns `true` if any matching constraint has a reachable negative branch.
+    fn has_negative_branch(
+        self,
+        builder: &ConstraintSetBuilder<'_>,
+        predicate: &mut dyn FnMut(ConstraintId) -> bool,
+    ) -> bool {
+        fn walk(
+            node: NodeId,
+            builder: &ConstraintSetBuilder<'_>,
+            seen: &mut FxHashSet<NodeId>,
+            predicate: &mut dyn FnMut(ConstraintId) -> bool,
+        ) -> bool {
+            if node.is_terminal() || !seen.insert(node) {
+                return false;
+            }
+            let interior = builder.interior_node_data(node);
+            if predicate(interior.constraint) && interior.if_false != ALWAYS_FALSE {
+                return true;
+            }
+            walk(interior.if_true, builder, seen, predicate)
+                || walk(interior.if_uncertain, builder, seen, predicate)
+                || walk(interior.if_false, builder, seen, predicate)
+        }
+
+        walk(self, builder, &mut FxHashSet::default(), predicate)
+    }
+
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
     ///
     /// TODO: [Historical note] This is now used only for display purposes, but previously was also
@@ -4218,6 +4247,33 @@ impl InteriorNode {
             })
         };
         let contains_any_typevar = |ty: Type<'db>| any_over_type(db, ty, false, Type::is_type_var);
+
+        let constraint_mentions_removed = |constraint: ConstraintId| {
+            let constraint = builder.constraint_data(constraint);
+            is_removed(constraint.typevar)
+                || constraint.bounds.lower.is_some_and(contains_removed)
+                || constraint.bounds.upper.is_some_and(contains_removed)
+        };
+        let mut relates_removed_to_surviving = false;
+        self.0
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                let subject_is_removed = is_removed(constraint.typevar);
+                relates_removed_to_surviving |= constraint
+                    .bounds
+                    .lower
+                    .into_iter()
+                    .chain(constraint.bounds.upper)
+                    .filter_map(Type::as_typevar)
+                    .any(|bound| subject_is_removed != is_removed(bound));
+            });
+        if relates_removed_to_surviving
+            && self.0.has_negative_branch(builder, &mut |constraint| {
+                constraint_mentions_removed(constraint)
+            })
+        {
+            return Err(ConstraintProjectionError::NegatedTypeVarRelation);
+        }
 
         self.try_abstract_one_inner(
             db,
@@ -7714,6 +7770,37 @@ mod tests {
                 .iff(&db, &builder, expected)
                 .is_always_satisfied(&db)
         );
+    }
+
+    #[test]
+    fn fallible_projection_rejects_negated_bare_relations() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+
+        let source_is_not_above_int =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, source, int)
+                .negate(&db, &builder);
+        let source_equals_target = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            source,
+            Type::TypeVar(target),
+            Type::TypeVar(target),
+        );
+        let relation = source_is_not_above_int.and(&db, &builder, || source_equals_target);
+
+        assert!(matches!(
+            relation.try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::NegatedTypeVarRelation)
+        ));
     }
 
     #[test]
