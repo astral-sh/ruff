@@ -1479,9 +1479,10 @@ impl<'db> Signature<'db> {
 
     /// Returns the callable-local variables supported by the initial higher-rank relation.
     ///
-    /// Every variable must be an unbounded PEP 695 type variable used only as a bare parameter or
-    /// return annotation after binding. In particular, this excludes nested occurrences.
-    fn bare_unbounded_pep695_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
+    /// Every variable must be an unbounded PEP 695 or legacy type variable bound by this method
+    /// and used only as a bare parameter or return annotation after binding. In particular, this
+    /// excludes class-scoped and nested occurrences.
+    fn bare_unbounded_method_typevars(&self, db: &'db dyn Db) -> Option<InferableTypeVars<'db>> {
         if !self.parameters.is_standard() {
             return None;
         }
@@ -1491,8 +1492,10 @@ impl<'db> Signature<'db> {
             .generic_context?
             .variables(db)
             .map(|typevar| {
-                (typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                    && typevar.binding_context(db).definition() == Some(definition)
+                (matches!(
+                    typevar.kind(db),
+                    TypeVarKind::Pep695TypeVar | TypeVarKind::LegacyTypeVar
+                ) && typevar.binding_context(db).definition() == Some(definition)
                     && typevar.typevar(db).bound_or_constraints(db).is_none())
                 .then(|| typevar.identity(db))
             })
@@ -1863,7 +1866,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let source_locals = if source.generic_context.is_some() {
-            source.bare_unbounded_pep695_typevars(db)?
+            source.bare_unbounded_method_typevars(db)?
         } else {
             if !source.parameters.is_standard()
                 || !source
@@ -1878,7 +1881,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             InferableTypeVars::None
         };
 
-        let target_locals = target.bare_unbounded_pep695_typevars(db)?;
+        let target_locals = target.bare_unbounded_method_typevars(db)?;
         // The quantifiers must bind distinct occurrences. A signature compared with itself can
         // stay on the existing relation path instead of treating one occurrence as both binders.
         if source_locals
