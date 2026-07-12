@@ -23,7 +23,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, SpecializationMaterialization};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
@@ -1732,12 +1732,16 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix_details = match self.specialization.materialization_kind(self.db) {
+            let materialization_kind = self
+                .specialization
+                .materialization(self.db)
+                .map(SpecializationMaterialization::kind);
+            let prefix_details = match materialization_kind {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
             };
-            let suffix = match self.specialization.materialization_kind(self.db) {
+            let suffix = match materialization_kind {
                 None => "",
                 Some(_) => "]",
             };

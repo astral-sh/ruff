@@ -4,8 +4,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    KnownInstanceType, SpecialFormType, StaticMroError, Type, TypeContext, TypeMapping,
+    TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -386,30 +386,23 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            let new_self = self.apply_type_mapping_impl(
+            let apply = ApplySpecialization::Specialization(specialization);
+            let type_mapping = specialization.materialization(db).map_or(
+                TypeMapping::ApplySpecialization(apply),
+                |materialization| TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: apply,
+                    materialization,
+                },
+            );
+            self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                    specialization,
-                )),
+                &type_mapping,
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
-            );
-            match specialization.materialization_kind(db) {
-                None => new_self,
-                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
-            }
+            )
         } else {
             self
         }
-    }
-
-    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
-        self.apply_type_mapping_impl(
-            db,
-            &TypeMapping::Materialize(kind),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        )
     }
 
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {

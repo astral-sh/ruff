@@ -898,9 +898,73 @@ class Mixed[T, U]:
 def preserve_unrelated_any(top: Top[Mixed[Any, int]], bottom: Bottom[Mixed[Any, int]]) -> None:
     reveal_type(top.nested)  # revealed: list[tuple[Any, int]]
     reveal_type(bottom.nested)  # revealed: list[tuple[Any, int]]
+
+class Outer[T]:
+    mapping: dict[T, Any]
+
+def preserve_fixed_attribute_specialization(top: Top[Outer[Any]]) -> None:
+    reveal_type(top.mapping)  # revealed: Top[dict[Any, Any]]
+    for key in top.mapping:
+        reveal_type(key)  # revealed: object
+    for value in top.mapping.values():
+        reveal_type(value)  # revealed: Any
 ```
 
-Alias specializations also preserve the materialization polarity in contravariant positions.
+## Fixed inherited specializations
+
+An `Any` specialization that is fixed by a base class remains gradual when a different type
+parameter is materialized.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+class Base[T, U]:
+    first: T
+    second: U
+
+class Derived[T](Base[T, Any]):
+    pass
+
+def preserve_fixed_top_specialization(top: Top[Derived[Any]]) -> None:
+    reveal_type(top.first)  # revealed: object
+    reveal_type(top.second)  # revealed: Any
+
+def preserve_materialized_bottom_specialization(bottom: Bottom[Derived[Any]]) -> None:
+    reveal_type(bottom.first)  # revealed: Never
+
+def preserve_fixed_bottom_specialization(bottom: Bottom[Derived[Any]]) -> None:
+    reveal_type(bottom.second)  # revealed: Any
+
+class Box[T]:
+    value: T
+
+    def set(self, value: T) -> None: ...
+
+class NestedBase[T, U]:
+    boxed: Box[tuple[T | None, U]]
+
+class NestedDerived[T](NestedBase[T, Any]):
+    pass
+
+def preserve_nested_fixed_top_specialization(top: Top[NestedDerived[Any]]) -> None:
+    reveal_type(top.boxed.value)  # revealed: tuple[object, Any]
+    reveal_type(top.boxed.set)  # revealed: bound method Top[Box[tuple[Any | None, Any]]].set(value: tuple[None, Any]) -> None
+```
+
+## Alias specializations
+
+Alias specializations preserve the materialization polarity in contravariant positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from ty_extensions import Top, Bottom
@@ -912,4 +976,27 @@ type AliasedCallable[T] = Callable[[Alias[T]], T]
 def _(top: Top[AliasedCallable[Any]], bottom: Bottom[AliasedCallable[Any]]) -> None:
     reveal_type(top)  # revealed: (Never, /) -> object
     reveal_type(bottom)  # revealed: (object, /) -> Never
+```
+
+## Recursive generic aliases
+
+Computing both materialization bounds for a deeply nested invariant recursive alias should not
+recompute the bounds exponentially at every level.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+Nested: TypeAlias = "list[Nested[T]]"
+
+class Wrapper(Generic[T]):
+    def __init__(self, value: Nested[T], context: T) -> None: ...
+
+value = [[[[[[[[[[[[[[[[1]], [[]]]]]]]]]]]]]]]]
+Wrapper(value, 1)
 ```
