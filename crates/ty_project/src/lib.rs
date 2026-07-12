@@ -665,7 +665,7 @@ pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// This query provides a per-file backdating boundary around the project-wide file sets. Updating
 /// either set still revalidates this query, but unchanged results are backdated before invalidation
 /// reaches semantic-index and type-inference queries.
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
     let project = db.project();
     let path = file.path(db);
