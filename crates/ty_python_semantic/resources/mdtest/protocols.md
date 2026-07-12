@@ -3061,15 +3061,26 @@ class MultipleFunctionScoped(Protocol):
     def multiple[T, U](self, first: T, second: U) -> T: ...
 
 FunctionT = TypeVar("FunctionT")
+LegacyFirst = TypeVar("LegacyFirst")
+LegacySecond = TypeVar("LegacySecond")
+LegacyReturningIntT = TypeVar("LegacyReturningIntT")
+LegacyDynamicT = TypeVar("LegacyDynamicT")
+LegacyReceiverT = TypeVar("LegacyReceiverT")
 
 class LegacyFunctionScoped(Protocol):
     def f(self, input: FunctionT) -> FunctionT: ...
+
+class LegacyMultipleFunctionScoped(Protocol):
+    def multiple(self, first: LegacyFirst, second: LegacySecond) -> LegacyFirst: ...
 
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
 class UsesPep695Receiver(Protocol):
     def compare[T](self: T, other: T) -> bool: ...
+
+class UsesLegacyReceiver(Protocol):
+    def compare(self: LegacyReceiverT, other: LegacyReceiverT) -> bool: ...
 
 class NominalNewStyle:
     def f[T](self, input: T) -> T:
@@ -3110,6 +3121,18 @@ class NominalMultipleDynamic:
 class NominalLegacy:
     def f(self, input: FunctionT) -> FunctionT:
         return input
+
+class NominalLegacyReturningInt:
+    def f(self, input: LegacyReturningIntT) -> int:
+        return 1
+
+class NominalLegacyDynamic:
+    def f(self, input: LegacyDynamicT) -> Any:
+        return input
+
+class NominalLegacyMultiple:
+    def multiple(self, first: LegacyFirst, second: LegacySecond) -> LegacyFirst:
+        return first
 
 class NominalWithSelf:
     def g(self: Self) -> Self:
@@ -3174,6 +3197,18 @@ static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
+static_assert(not is_assignable_to(NominalLegacyReturningInt, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalLegacyReturningInt, LegacyFunctionScoped))
+static_assert(not is_subtype_of(NominalLegacyReturningInt, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalLegacyReturningInt, LegacyFunctionScoped))
+static_assert(is_assignable_to(NominalLegacyDynamic, LegacyFunctionScoped))
+static_assert(not is_subtype_of(NominalLegacyDynamic, LegacyFunctionScoped))
+static_assert(is_assignable_to(NominalLegacyMultiple, LegacyMultipleFunctionScoped))
+static_assert(is_subtype_of(NominalLegacyMultiple, LegacyMultipleFunctionScoped))
+static_assert(not is_assignable_to(NominalMultipleReturningSecond, LegacyMultipleFunctionScoped))
+static_assert(not is_subtype_of(NominalMultipleReturningSecond, LegacyMultipleFunctionScoped))
+static_assert(not is_assignable_to(NominalMultipleConcrete, LegacyMultipleFunctionScoped))
+static_assert(not is_subtype_of(NominalMultipleConcrete, LegacyMultipleFunctionScoped))
 
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
@@ -3181,6 +3216,8 @@ static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 static_assert(is_assignable_to(NominalPep695Receiver, UsesPep695Receiver))
 static_assert(is_subtype_of(NominalPep695Receiver, UsesPep695Receiver))
+static_assert(is_assignable_to(NominalPep695Receiver, UsesLegacyReceiver))
+static_assert(is_subtype_of(NominalPep695Receiver, UsesLegacyReceiver))
 static_assert(is_assignable_to(NominalDynamic, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalTopBottom, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
@@ -3189,8 +3226,8 @@ static_assert(is_subtype_of(NominalTopBottom, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_subtype_of(NominalNotGeneric, NewStyleFunctionScoped))
 
-# TODO: Universally quantify legacy method-local type variables.
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
+static_assert(not is_subtype_of(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
