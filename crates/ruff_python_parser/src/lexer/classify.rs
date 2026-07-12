@@ -2,8 +2,8 @@
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{
-    uint8x16_t, vandq_u8, vceqq_u8, vcgeq_u8, vcleq_u8, vdupq_n_u8, vgetq_lane_u64, vld1q_u8,
-    vmaxvq_u8, vorrq_u8, vpaddq_u8, vreinterpretq_u64_u8, vsubq_u8,
+    uint8x16_t, vandq_u8, vdupq_n_u8, vgetq_lane_u64, vld1q_u8, vmaxvq_u8, vorrq_u8, vpaddq_u8,
+    vqtbl1q_u8, vreinterpretq_u64_u8, vshrq_n_u8, vtstq_u8,
 };
 #[cfg(target_arch = "x86")]
 use std::arch::x86::{
@@ -21,6 +21,17 @@ pub(super) struct Classified {
     pub(super) starts: Vec<u64>,
     pub(super) ascii_source: bool,
 }
+
+/// Intersecting the low- and high-nibble entries classifies a byte. Bits 0..=4 are ASCII word
+/// ranges, bits 5..=6 are horizontal whitespace, and bit 7 marks non-ASCII word bytes.
+#[cfg(target_arch = "aarch64")]
+const LOW_NIBBLE_CLASSES: [u8; 16] = [
+    213, 159, 159, 159, 159, 159, 159, 159, 159, 191, 158, 138, 170, 138, 138, 142,
+];
+#[cfg(target_arch = "aarch64")]
+const HIGH_NIBBLE_CLASSES: [u8; 16] = [
+    32, 0, 64, 1, 2, 4, 8, 16, 128, 128, 128, 128, 128, 128, 128, 128,
+];
 
 #[cfg(test)]
 pub(super) fn classify(source: &[u8]) -> Classified {
@@ -143,19 +154,20 @@ unsafe fn classify_chunk(source: *const u8) -> (u64, u64, uint8x16_t) {
         let fourth = vld1q_u8(source.add(48));
         let bits = vld1q_u8([1_u8, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128].as_ptr());
 
-        let word = mask64(
-            bits,
-            word_predicate(first),
-            word_predicate(second),
-            word_predicate(third),
-            word_predicate(fourth),
-        );
+        let low = vld1q_u8(LOW_NIBBLE_CLASSES.as_ptr());
+        let high = vld1q_u8(HIGH_NIBBLE_CLASSES.as_ptr());
+        let (word_first, whitespace_first) = classify_bytes(first, low, high);
+        let (word_second, whitespace_second) = classify_bytes(second, low, high);
+        let (word_third, whitespace_third) = classify_bytes(third, low, high);
+        let (word_fourth, whitespace_fourth) = classify_bytes(fourth, low, high);
+
+        let word = mask64(bits, word_first, word_second, word_third, word_fourth);
         let whitespace = mask64(
             bits,
-            whitespace_predicate(first),
-            whitespace_predicate(second),
-            whitespace_predicate(third),
-            whitespace_predicate(fourth),
+            whitespace_first,
+            whitespace_second,
+            whitespace_third,
+            whitespace_fourth,
         );
         let source_or = vorrq_u8(vorrq_u8(first, second), vorrq_u8(third, fourth));
         (word, whitespace, source_or)
@@ -164,27 +176,19 @@ unsafe fn classify_chunk(source: *const u8) -> (u64, u64, uint8x16_t) {
 
 #[cfg(target_arch = "aarch64")]
 #[inline]
-unsafe fn word_predicate(bytes: uint8x16_t) -> uint8x16_t {
+unsafe fn classify_bytes(
+    bytes: uint8x16_t,
+    low: uint8x16_t,
+    high: uint8x16_t,
+) -> (uint8x16_t, uint8x16_t) {
     // SAFETY: All NEON operations are valid for arbitrary byte vectors.
     unsafe {
-        let lower = vorrq_u8(bytes, vdupq_n_u8(0x20));
-        let alpha = vcleq_u8(vsubq_u8(lower, vdupq_n_u8(b'a')), vdupq_n_u8(25));
-        let digit = vcleq_u8(vsubq_u8(bytes, vdupq_n_u8(b'0')), vdupq_n_u8(9));
-        let underscore = vceqq_u8(bytes, vdupq_n_u8(b'_'));
-        let non_ascii = vcgeq_u8(bytes, vdupq_n_u8(0x80));
-        vorrq_u8(vorrq_u8(alpha, digit), vorrq_u8(underscore, non_ascii))
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[inline]
-unsafe fn whitespace_predicate(bytes: uint8x16_t) -> uint8x16_t {
-    // SAFETY: All NEON operations are valid for arbitrary byte vectors.
-    unsafe {
-        let space = vceqq_u8(bytes, vdupq_n_u8(b' '));
-        let tab = vceqq_u8(bytes, vdupq_n_u8(b'\t'));
-        let form_feed = vceqq_u8(bytes, vdupq_n_u8(b'\x0c'));
-        vorrq_u8(vorrq_u8(space, tab), form_feed)
+        let low = vqtbl1q_u8(low, vandq_u8(bytes, vdupq_n_u8(0x0f)));
+        let high = vqtbl1q_u8(high, vshrq_n_u8::<4>(bytes));
+        let classes = vandq_u8(low, high);
+        let word = vtstq_u8(classes, vdupq_n_u8(0x9f));
+        let whitespace = vtstq_u8(classes, vdupq_n_u8(0x60));
+        (word, whitespace)
     }
 }
 

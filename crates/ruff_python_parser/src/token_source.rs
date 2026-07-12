@@ -548,10 +548,10 @@ fn next_buffered_token(
     needs_legacy_reparse: &mut bool,
 ) -> (TokenKind, usize) {
     loop {
-        ensure_buffered_token(lexer, position, needs_legacy_reparse);
-        position = position.min(lexer.tokens.tokens.len() - 1);
-        if !lexer.tokens.tokens[position].kind().is_trivia() {
-            return (lexer.tokens.tokens[position].kind(), position);
+        position = ensure_buffered_token(lexer, position, needs_legacy_reparse);
+        let token = lexer.tokens.tokens[position];
+        if !token.kind().is_trivia() {
+            return (token.kind(), position);
         }
         position += 1;
     }
@@ -567,8 +567,7 @@ fn bump_buffered_token(
 ) -> Token {
     let mut next = position.wrapping_add(1);
     loop {
-        ensure_buffered_token(lexer, next, needs_legacy_reparse);
-        next = next.min(lexer.tokens.tokens.len() - 1);
+        next = ensure_buffered_token(lexer, next, needs_legacy_reparse);
         let token = lexer.tokens.tokens[next];
         match token.kind() {
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
@@ -591,12 +590,13 @@ fn ensure_buffered_token(
     lexer: &mut ChunkedLexer,
     position: usize,
     needs_legacy_reparse: &mut bool,
-) {
+) -> usize {
     if position < lexer.tokens.tokens.len() {
-        return;
+        return position;
     }
 
     refill_buffered_tokens(lexer, position, needs_legacy_reparse);
+    position.min(lexer.tokens.tokens.len() - 1)
 }
 
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]

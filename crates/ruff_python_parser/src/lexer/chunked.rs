@@ -41,7 +41,7 @@ impl ChunkedTokens {
     }
 }
 
-const CHUNK_SIZE: usize = 16 * 1024;
+const CHUNK_SIZE: usize = 32 * 1024;
 
 #[derive(Debug)]
 pub(crate) struct ChunkedLexer<'src> {
@@ -151,8 +151,10 @@ impl<'src> ChunkedLexer<'src> {
                         TokenKind::NonLogicalNewline
                     };
                     tokens.push(kind, start, end, TokenFlags::empty());
-                    structural.seek(end);
-                    next_offset = next_offset.max(end);
+                    if end > start + 1 {
+                        structural.seek(end);
+                        next_offset = next_offset.max(end);
+                    }
                     continue;
                 }
                 b'#' => {
@@ -280,8 +282,10 @@ impl<'src> ChunkedLexer<'src> {
                 _ => {}
             }
             tokens.push(kind, start, end, TokenFlags::empty());
-            structural.seek(end);
-            next_offset = next_offset.max(end);
+            if end > start + 1 {
+                structural.seek(end);
+                next_offset = next_offset.max(end);
+            }
             logical_line_has_token = true;
         }
 
