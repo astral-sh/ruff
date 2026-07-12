@@ -344,7 +344,7 @@ impl<'db> TypeVarInstance<'db> {
         };
         let identity = TypeVarIdentity::new(
             db,
-            Name::new(format!("{}'instance", self.name(db))),
+            Name::join(&[self.name(db).as_str(), "'instance"], ""),
             None, // definition
             self.kind(db),
         );

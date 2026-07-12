@@ -51,10 +51,6 @@ jobs:
       playground: ${{ steps.check_playground.outputs.changed }}
       # Flag that is set to "true" when code related to the benchmarks changes.
       benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
-      # Flag that is set to "true" when Miri should run.
-      miri: ${{ steps.check_miri.outputs.changed }}
-      # Flag that is set to "true" when Loom should run.
-      loom: ${{ steps.check_loom.outputs.changed }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -247,42 +243,6 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if Miri should run
-        id: check_miri
-        env:
-          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
-        run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
-            ':Cargo.toml' \
-            ':Cargo.lock' \
-            ':rust-toolchain.toml' \
-            ':cargo/config.toml' \
-            ':crates/char_str/**' \
-            ':.github/workflows/ci.yaml' \
-          ; then
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check if Loom should run
-        id: check_loom
-        env:
-          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
-        run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
-            ':Cargo.toml' \
-            ':Cargo.lock' \
-            ':rust-toolchain.toml' \
-            ':cargo/config.toml' \
-            ':crates/char_str/**' \
-            ':.github/workflows/ci.yaml' \
-          ; then
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
@@ -340,82 +300,6 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
-
-  loom:
-    name: "Loom (${{ matrix.name }})"
-    runs-on: ubuntu-latest
-    needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.loom == 'true' }}
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        include:
-          - name: debug
-            options: ""
-          - name: release
-            options: "--release"
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Test"
-        env:
-          RUSTFLAGS: "--cfg loom -D warnings"
-        run: >-
-          cargo test -p char_str --test loom ${{ matrix.options }}
-          --features loom --locked -- --test-threads=1
-
-  miri:
-    name: "Miri (${{ matrix.name }})"
-    runs-on: ubuntu-latest
-    needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.miri == 'true' }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: 64-bit LE
-            target: x86_64-unknown-linux-gnu
-          - name: 64-bit BE
-            target: powerpc64-unknown-linux-gnu
-          - name: 32-bit LE
-            target: i686-unknown-linux-gnu
-          - name: 32-bit BE
-            target: powerpc-unknown-linux-gnu
-    env:
-      MIRIFLAGS: "-Zmiri-strict-provenance"
-      RUSTFLAGS: "-D warnings"
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - name: "Install Miri"
-        run: |
-          rustup toolchain install nightly --profile minimal
-          rustup +nightly component add miri
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          prefix-key: rust
-          shared-key: miri-${{ matrix.target }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: "Test default features"
-        run: cargo +nightly miri test -p char_str --target ${{ matrix.target }} --locked
-      - name: "Test all features"
-        run: >-
-          cargo +nightly miri test -p char_str --target ${{ matrix.target }}
-          --all-features --locked
-      - name: "Test concurrent reference counting"
-        env:
-          MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-preemption-rate=1"
-        run: >-
-          cargo +nightly miri test -p char_str --target ${{ matrix.target }}
-          --test race_condition --locked
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
@@ -1434,8 +1318,6 @@ jobs:
       - cargo-test-linux
       - cargo-test-wasm
       - cargo-build-msrv
-      - loom
-      - miri
       - shellcheck
       - scripts
       - prek

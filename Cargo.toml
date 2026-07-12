@@ -13,7 +13,7 @@ authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 license = "MIT"
 
 [workspace.dependencies]
-char_str = { version = "0.0.4", path = "crates/char_str" }
+char_str = { version = "0.0.1", git = "https://github.com/astral-sh/char_str", rev = "27a03a07c60809860a02936ca50d87fd3a75a2d2" }
 ruff = { version = "0.15.22", path = "crates/ruff" }
 ruff_annotate_snippets = { version = "0.0.5", path = "crates/ruff_annotate_snippets" }
 ruff_cache = { version = "0.0.5", path = "crates/ruff_cache" }
@@ -130,7 +130,6 @@ js-sys = { version = "0.3.69" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
-loom = "0.7.2"
 lsp-server = { version = "0.8.0" }
 lsp-types = { package = "gen-lsp-types", version = "0.9.0", features = ["url"] }
 matchit = { version = "0.9.0" }
@@ -230,7 +229,6 @@ unreachable_pub = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = [
     "cfg(fuzzing)",
     "cfg(codspeed)",
-    "cfg(loom)",
 ] }
 
 [workspace.lints.clippy]

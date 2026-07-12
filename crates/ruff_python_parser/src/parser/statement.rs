@@ -834,8 +834,8 @@ impl<'src> Parser<'src> {
             return first;
         }
 
-        let mut components = SmallVec::<[Name; 4]>::new();
-        components.push(first.id);
+        let mut names = SmallVec::<[Name; 4]>::new();
+        names.push(first.id);
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -844,14 +844,14 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            components.push(self.parse_identifier().id);
+            names.push(self.parse_identifier().id);
         }
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: self.intern_owned_name(Name::join(&components, ".")),
+            id: self.intern_owned_name(Name::join(&names, ".")),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

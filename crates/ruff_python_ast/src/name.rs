@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use arrayvec::ArrayVec;
-use char_str::CharStr;
+use char_str::{CharStr, CharString};
 
 use crate::Expr;
 use crate::generated::ExprName;
@@ -12,6 +12,7 @@ use crate::generated::ExprName;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
     derive(schemars::JsonSchema),
@@ -38,7 +39,7 @@ impl Name {
         Self(CharStr::from_static_str(name))
     }
 
-    /// Creates a name by joining string slices with at most one heap allocation.
+    /// Creates a name by joining string slices with a separator.
     #[inline]
     pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
         Self(CharStr::join(slices, separator))
@@ -149,6 +150,13 @@ impl From<Name> for CharStr {
     }
 }
 
+impl From<CharString> for Name {
+    #[inline]
+    fn from(name: CharString) -> Self {
+        Self(name.freeze())
+    }
+}
+
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
@@ -159,40 +167,6 @@ impl FromIterator<char> for Name {
 impl ruff_cache::CacheKey for Name {
     fn cache_key(&self, state: &mut ruff_cache::CacheKeyHasher) {
         ruff_cache::CacheKey::cache_key(self.as_str(), state);
-    }
-}
-
-#[cfg(feature = "get-size")]
-impl get_size2::GetSize for Name {
-    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
-        &self,
-        mut tracker: T,
-    ) -> (usize, T) {
-        let size = if self.0.is_heap_allocated() && tracker.track(self.as_ptr()) {
-            self.0.heap_allocation_size()
-        } else {
-            0
-        };
-        (size, tracker)
-    }
-}
-
-#[cfg(feature = "salsa")]
-#[expect(
-    unsafe_code,
-    reason = "implements Salsa's unsafe update contract for an owned value"
-)]
-unsafe impl salsa::Update for Name {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        // SAFETY: `Update` guarantees that `old_pointer` is valid and uniquely available for the
-        // duration of this call. `Name` owns all of its data and has no borrowed state.
-        let old_value = unsafe { &mut *old_pointer };
-        if *old_value == new_value {
-            false
-        } else {
-            *old_value = new_value;
-            true
-        }
     }
 }
 
@@ -811,16 +785,9 @@ mod tests {
     #[cfg(feature = "salsa")]
     use std::hash::{DefaultHasher, Hash, Hasher};
 
-    use crate::Identifier;
-    use crate::name::{Name, SegmentsVec};
-
-    #[test]
-    #[cfg(target_pointer_width = "64")]
-    fn size() {
-        assert_eq!(std::mem::size_of::<Name>(), 16);
-        assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
-        assert_eq!(std::mem::size_of::<Identifier>(), 32);
-    }
+    #[cfg(feature = "salsa")]
+    use crate::name::Name;
+    use crate::name::SegmentsVec;
 
     #[cfg(feature = "salsa")]
     #[test]
@@ -836,22 +803,6 @@ mod tests {
         assert_eq!(name_hasher.finish(), lookup_hasher.finish());
         assert!(salsa::HashEqLike::<&str>::eq(&name, &lookup));
         assert_eq!(salsa::Lookup::<Name>::into_owned(lookup), name);
-    }
-
-    #[test]
-    fn join() {
-        assert_eq!(Name::join(&["foo", "bar"], "."), "foo.bar");
-    }
-
-    #[test]
-    #[cfg(feature = "get-size")]
-    fn heap_size_includes_allocation_header() {
-        use get_size2::GetSize as _;
-
-        let text = "a name longer than the inline capacity";
-        let name = Name::new(text);
-
-        assert_eq!(name.get_heap_size(), text.len() + size_of::<usize>());
     }
 
     #[test]
