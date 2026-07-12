@@ -676,24 +676,6 @@ pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
     // be quite helpful for narrowing down the issue. The messages are at TRACE because they are
     // extremely noisy.
 
-    // Avoid depending on the indexed and open file sets for files that aren't included in the
-    // project. Both sets change frequently, and a dependency on either invalidates this query when
-    // any file is added or removed. Virtual paths bypass this check because they don't have a
-    // system path.
-    // Descendants of an explicitly included directory need to fall through to the indexed file
-    // set. Explicit CLI paths override exclusions unless `--force-exclude` is set, but the ad-hoc
-    // inclusion check still applies those exclusions.
-    if path.as_system_path().is_some_and(|path| {
-        !project.is_file_included(db, path).is_included()
-            && !project
-                .included_paths_list(db)
-                .iter()
-                .any(|included| path.starts_with(included))
-    }) {
-        tracing::trace!("Not checking {path} because it is not included in the project");
-        return false;
-    }
-
     match project.check_mode(db) {
         CheckMode::OpenFiles => {
             let should_check = project.open_files(db).contains(&file);
@@ -891,11 +873,10 @@ mod tests {
     use crate::db::Db as _;
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
-    use ruff_db::Db as _;
-    use ruff_db::files::{FileRootKind, system_path_to_file};
+    use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
-    use ruff_db::testing::{assert_function_query_was_not_run, find_will_execute_event_by_name};
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ty_python_semantic::types::check_types;
 
     #[test]
@@ -959,56 +940,5 @@ mod tests {
                 literal_match: Some(true)
             }
         );
-    }
-
-    #[test]
-    fn third_party_type_inference_with_diagnostic_has_medium_durability()
-    -> ruff_db::system::Result<()> {
-        let project_root = SystemPathBuf::from("/project");
-        let third_party_root = SystemPathBuf::from("/site-packages");
-        let dependency_path = third_party_root.join("dependency.py");
-        let project = ProjectMetadata::new("test", project_root.clone());
-        let mut db = TestDb::new(project);
-        db.memory_file_system()
-            .create_directory_all(&project_root)?;
-        db.init_program().unwrap();
-        db.files()
-            .try_add_root(&db, &third_party_root, FileRootKind::SearchPath);
-
-        db.write_file(&dependency_path, "value: int = \"wrong\"")?;
-        let dependency = system_path_to_file(&db, &dependency_path).unwrap();
-        assert!(check_types(&db, dependency).is_empty());
-        db.take_salsa_events();
-
-        // Opening a project file is a LOW-durability change. It shouldn't require re-executing
-        // type inference for a third-party dependency.
-        let project_file_path = project_root.join("main.py");
-        db.write_file(&project_file_path, "")?;
-        let project_file = system_path_to_file(&db, &project_file_path).unwrap();
-        db.project().open_file(&mut db, project_file);
-        db.take_salsa_events();
-
-        check_types(&db, dependency);
-        let events = db.take_salsa_events();
-        assert!(
-            find_will_execute_event_by_name(&db, "infer_scope_types_impl", None, &events).is_none(),
-            "Third-party type inference unexpectedly ran after a LOW-durability change: \
-             {events:#?}"
-        );
-
-        // Changing the included paths has MEDIUM durability and makes the dependency eligible for
-        // checking, so its type inference must be recomputed to emit the diagnostic.
-        db.project()
-            .set_included_paths(&mut db, vec![dependency_path]);
-        db.take_salsa_events();
-
-        assert_eq!(check_types(&db, dependency).len(), 1);
-        let events = db.take_salsa_events();
-        assert!(
-            find_will_execute_event_by_name(&db, "infer_scope_types_impl", None, &events).is_some(),
-            "Third-party type inference didn't run after a MEDIUM-durability change: {events:#?}"
-        );
-
-        Ok(())
     }
 }
