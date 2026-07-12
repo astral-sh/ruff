@@ -19,17 +19,9 @@ pub(crate) struct TokenSource<'src> {
     #[cfg(target_arch = "aarch64")]
     current: Token,
 
+    /// Whether error recovery requested a logical-token re-lex that requires the streaming lexer.
     #[cfg(target_arch = "aarch64")]
-    source: &'src str,
-    #[cfg(target_arch = "aarch64")]
-    mode: Mode,
-    #[cfg(target_arch = "aarch64")]
-    start_offset: TextSize,
-
-    /// Kept when error recovery temporarily switches to the streaming lexer inside a parser
-    /// checkpoint. Rewinding that checkpoint restores the pre-lexed stream.
-    #[cfg(target_arch = "aarch64")]
-    two_pass_backup: Option<TwoPassTokens>,
+    needs_legacy_reparse: bool,
 
     /// A vector containing all the tokens emitted by the lexer. This is returned when the parser
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
@@ -50,15 +42,7 @@ enum LexerSource<'src> {
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(
-        lexer: Lexer<'src>,
-        source: &'src str,
-        mode: Mode,
-        start_offset: TextSize,
-    ) -> Self {
-        #[cfg(not(target_arch = "aarch64"))]
-        let _ = mode;
-
+    pub(crate) fn new(lexer: Lexer<'src>, source: &'src str, start_offset: TextSize) -> Self {
         TokenSource {
             lexer: LexerSource::Streaming(lexer),
             #[cfg(target_arch = "aarch64")]
@@ -68,13 +52,7 @@ impl<'src> TokenSource<'src> {
                 TokenFlags::empty(),
             ),
             #[cfg(target_arch = "aarch64")]
-            source,
-            #[cfg(target_arch = "aarch64")]
-            mode,
-            #[cfg(target_arch = "aarch64")]
-            start_offset,
-            #[cfg(target_arch = "aarch64")]
-            two_pass_backup: None,
+            needs_legacy_reparse: false,
             tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),
         }
     }
@@ -106,10 +84,7 @@ impl<'src> TokenSource<'src> {
                     TextRange::empty(start_offset),
                     TokenFlags::empty(),
                 ),
-                source,
-                mode,
-                start_offset,
-                two_pass_backup: None,
+                needs_legacy_reparse: false,
                 tokens: Vec::new(),
             };
             source.do_bump();
@@ -117,7 +92,7 @@ impl<'src> TokenSource<'src> {
         }
 
         let lexer = Lexer::new(source, mode, start_offset);
-        let mut source = TokenSource::new(lexer, source, mode, start_offset);
+        let mut source = TokenSource::new(lexer, source, start_offset);
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
@@ -180,7 +155,10 @@ impl<'src> TokenSource<'src> {
     )]
     pub(crate) fn re_lex_logical_token(&mut self) {
         #[cfg(target_arch = "aarch64")]
-        self.replay_with_streaming_lexer();
+        if matches!(self.lexer, LexerSource::TwoPass { .. }) {
+            self.needs_legacy_reparse = true;
+            return;
+        }
 
         let mut non_logical_newline = None;
 
@@ -251,13 +229,9 @@ impl<'src> TokenSource<'src> {
     ) {
         #[cfg(target_arch = "aarch64")]
         {
-            if matches!(self.lexer, LexerSource::TwoPass { .. })
-                && (self.current_kind() != TokenKind::String
-                    || !self.current_flags().intersects(TokenFlags::UNCLOSED_STRING))
-            {
+            if matches!(self.lexer, LexerSource::TwoPass { .. }) {
                 return;
             }
-            self.replay_with_streaming_lexer();
         }
 
         if let LexerSource::Streaming(lexer) = &mut self.lexer {
@@ -275,15 +249,9 @@ impl<'src> TokenSource<'src> {
     pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
         #[cfg(target_arch = "aarch64")]
         {
-            if matches!(self.lexer, LexerSource::TwoPass { .. })
-                && (self.current_kind() != TokenKind::String
-                    || !self
-                        .current_flags()
-                        .contains(TokenFlags::UNCLOSED_STRING | TokenFlags::RAW_STRING_LOWERCASE))
-            {
+            if matches!(self.lexer, LexerSource::TwoPass { .. }) {
                 return;
             }
-            self.replay_with_streaming_lexer();
         }
 
         if let LexerSource::Streaming(lexer) = &mut self.lexer {
@@ -467,13 +435,6 @@ impl<'src> TokenSource<'src> {
                     rewind_rewrites(tokens, rewrites_position);
                     *current_position = position;
                     *current_nesting = nesting;
-                } else if let Some(mut tokens) = self.two_pass_backup.take() {
-                    rewind_rewrites(&mut tokens, rewrites_position);
-                    self.lexer = LexerSource::TwoPass {
-                        tokens,
-                        position,
-                        nesting,
-                    };
                 }
             }
         }
@@ -529,31 +490,8 @@ impl<'src> TokenSource<'src> {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[cold]
-    fn replay_with_streaming_lexer(&mut self) {
-        let LexerSource::TwoPass {
-            tokens, position, ..
-        } = &self.lexer
-        else {
-            return;
-        };
-        let position = *position;
-
-        let mut lexer = Lexer::new(self.source, self.mode, self.start_offset);
-        for index in 0..=position {
-            let kind = lexer.next_token();
-            let token = tokens.tokens[index];
-            if index == position {
-                debug_assert_eq!(kind, token.kind());
-            }
-            debug_assert_eq!(lexer.current_range(), token.range());
-            debug_assert_eq!(lexer.current_flags(), token.flags());
-        }
-        let previous = std::mem::replace(&mut self.lexer, LexerSource::Streaming(lexer));
-        if let LexerSource::TwoPass { tokens, .. } = previous {
-            self.tokens.extend_from_slice(&tokens.tokens[..position]);
-            self.two_pass_backup = Some(tokens);
-        }
+    pub(crate) fn should_reparse_with_legacy_lexer(&self) -> bool {
+        self.needs_legacy_reparse
     }
 
     #[cfg(target_arch = "aarch64")]

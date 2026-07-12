@@ -141,6 +141,16 @@ impl<'src> Parser<'src> {
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
 
+        #[cfg(target_arch = "aarch64")]
+        if self.tokens.should_reparse_with_legacy_lexer() {
+            return Parser::new_starts_at(
+                self.source,
+                self.start_offset,
+                self.options.with_two_pass_lexer(false),
+            )
+            .parse();
+        }
+
         self.finish(syntax)
     }
 
