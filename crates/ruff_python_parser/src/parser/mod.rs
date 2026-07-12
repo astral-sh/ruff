@@ -82,7 +82,9 @@ impl<'src> Parser<'src> {
         start_offset: TextSize,
         options: ParseOptions,
     ) -> Self {
-        let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
+        let tokens =
+            TokenSource::from_source(source, options.mode, start_offset, max_nesting_depth);
         Self::new_with_token_source(source, start_offset, options, tokens)
     }
 

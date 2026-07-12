@@ -36,25 +36,28 @@ enum LexerSource<'src> {
     Chunked {
         lexer: ChunkedLexer<'src>,
         position: usize,
-        nesting: u32,
     },
 }
 
 impl<'src> TokenSource<'src> {
     /// Creates a token source, using chunked lexing for complete modules when the first batch is
     /// supported and the streaming lexer otherwise.
-    pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
+    pub(crate) fn from_source(
+        source: &'src str,
+        mode: Mode,
+        start_offset: TextSize,
+        max_nesting_depth: u32,
+    ) -> Self {
         #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
         if mode == Mode::Module
             && start_offset == TextSize::new(0)
-            && let Some(mut lexer) = ChunkedLexer::new(source)
+            && let Some(mut lexer) = ChunkedLexer::new(source, max_nesting_depth)
             && lexer.fill().is_some()
         {
             let mut source = TokenSource {
                 lexer: LexerSource::Chunked {
                     lexer,
                     position: usize::MAX,
-                    nesting: 0,
                 },
                 current: Token::new(
                     TokenKind::EndOfFile,
@@ -67,6 +70,9 @@ impl<'src> TokenSource<'src> {
             source.do_bump();
             return source;
         }
+
+        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
+        let _ = max_nesting_depth;
 
         Self::from_streaming_source(source, mode, start_offset)
     }
@@ -120,13 +126,14 @@ impl<'src> TokenSource<'src> {
         }
     }
 
-    /// Returns the current parenthesis, bracket, and brace nesting level.
+    /// Returns the streaming lexer's delimiter nesting level. Chunked lexing falls back once the
+    /// configured nesting limit is exceeded, so its depth is never needed by the parser.
     #[inline]
     pub(crate) fn nesting(&self) -> u32 {
         match &self.lexer {
             LexerSource::Streaming(lexer) => lexer.nesting(),
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-            LexerSource::Chunked { nesting, .. } => *nesting,
+            LexerSource::Chunked { .. } => 0,
         }
     }
 
@@ -310,11 +317,7 @@ impl<'src> TokenSource<'src> {
                 ));
             }
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-            LexerSource::Chunked {
-                lexer,
-                position,
-                nesting,
-            } => {
+            LexerSource::Chunked { lexer, position } => {
                 let current_position = *position;
                 let token = self.current;
                 if token.kind() != kind {
@@ -322,8 +325,7 @@ impl<'src> TokenSource<'src> {
                     lexer.tokens.tokens[current_position] =
                         Token::new(kind, token.range(), token.flags());
                 }
-                self.current =
-                    bump_buffered_token(lexer, position, nesting, &mut self.needs_legacy_reparse);
+                self.current = bump_buffered_token(lexer, position, &mut self.needs_legacy_reparse);
                 return;
             }
         }
@@ -359,13 +361,8 @@ impl<'src> TokenSource<'src> {
                 }
             }
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
-            LexerSource::Chunked {
-                lexer,
-                position,
-                nesting,
-            } => {
-                self.current =
-                    bump_buffered_token(lexer, position, nesting, &mut self.needs_legacy_reparse);
+            LexerSource::Chunked { lexer, position } => {
+                self.current = bump_buffered_token(lexer, position, &mut self.needs_legacy_reparse);
             }
         }
     }
@@ -379,13 +376,9 @@ impl<'src> TokenSource<'src> {
                 }
                 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
                 LexerSource::Chunked {
-                    lexer,
-                    position,
-                    nesting,
-                    ..
+                    lexer, position, ..
                 } => LexerSourceCheckpoint::Chunked {
                     position: *position,
-                    nesting: *nesting,
                     rewrites_position: lexer.tokens.rewrites.len(),
                 },
             },
@@ -413,19 +406,16 @@ impl<'src> TokenSource<'src> {
             #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
             LexerSourceCheckpoint::Chunked {
                 position,
-                nesting,
                 rewrites_position,
             } => {
                 if let LexerSource::Chunked {
                     lexer,
                     position: current_position,
-                    nesting: current_nesting,
                     ..
                 } = &mut self.lexer
                 {
                     rewind_rewrites(lexer, rewrites_position);
                     *current_position = position;
-                    *current_nesting = nesting;
                 }
             }
         }
@@ -510,7 +500,6 @@ enum LexerSourceCheckpoint {
     #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     Chunked {
         position: usize,
-        nesting: u32,
         rewrites_position: usize,
     },
 }
@@ -541,26 +530,18 @@ fn next_buffered_token(
     }
 }
 
-/// Advances to the next non-trivia buffered token and maintains delimiter nesting for the parser.
+/// Advances to the next non-trivia buffered token.
 #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 fn bump_buffered_token(
     lexer: &mut ChunkedLexer,
     position: &mut usize,
-    nesting: &mut u32,
     needs_legacy_reparse: &mut bool,
 ) -> Token {
     let mut next = position.wrapping_add(1);
     loop {
         next = ensure_buffered_token(lexer, next, needs_legacy_reparse);
         let token = lexer.tokens.tokens[next];
-        match token.kind() {
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
-            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                *nesting = nesting.saturating_sub(1);
-            }
-            _ => {}
-        }
         if !token.kind().is_trivia() {
             *position = next;
             return token;
@@ -649,6 +630,7 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 ))]
 mod tests {
+    use ruff_python_ast::token::TokenKind;
     use ruff_text_size::TextSize;
 
     use crate::Mode;
@@ -656,7 +638,34 @@ mod tests {
 
     #[test]
     fn module_uses_chunked_lexer() {
-        let source = TokenSource::from_source("value = 1\n", Mode::Module, TextSize::new(0));
+        let source =
+            TokenSource::from_source("value = 1\n", Mode::Module, TextSize::new(0), u32::MAX);
         assert!(matches!(source.lexer, LexerSource::Chunked { .. }));
+    }
+
+    #[test]
+    fn deeply_nested_module_uses_streaming_lexer() {
+        let source = TokenSource::from_source("f(f(1))\n", Mode::Module, TextSize::new(0), 1);
+        assert!(matches!(source.lexer, LexerSource::Streaming(_)));
+    }
+
+    #[test]
+    fn deeply_nested_interpolation_uses_streaming_lexer() {
+        let source =
+            TokenSource::from_source("f\"{f(f(1))}\"\n", Mode::Module, TextSize::new(0), 1);
+        assert!(matches!(source.lexer, LexerSource::Streaming(_)));
+    }
+
+    #[test]
+    fn deeply_nested_later_chunk_requests_streaming_reparse() {
+        let source = format!("{}f(f(1))\n", "value = 1\n".repeat(3_500));
+        let mut tokens = TokenSource::from_source(&source, Mode::Module, TextSize::new(0), 1);
+        assert!(matches!(tokens.lexer, LexerSource::Chunked { .. }));
+
+        while tokens.current_kind() != TokenKind::EndOfFile {
+            tokens.bump(tokens.current_kind());
+        }
+
+        assert!(tokens.should_reparse_with_legacy_lexer());
     }
 }
