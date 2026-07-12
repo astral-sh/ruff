@@ -1,6 +1,6 @@
 use crate::{Db, types::BoundTypeVarIdentity};
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
     Invariant,
     Covariant,

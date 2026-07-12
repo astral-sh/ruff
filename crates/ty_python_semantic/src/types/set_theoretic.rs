@@ -22,6 +22,7 @@ pub struct UnionType<'db> {
     pub elements: Box<[Type<'db>]>,
     /// Whether the value pointed to by this type is recursively defined.
     /// If `Yes`, union literal widening is performed early.
+    #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
 }
 
@@ -68,6 +69,7 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, *previous, cycle)
@@ -496,7 +498,7 @@ pub struct IntersectionType<'db> {
 /// and `Self::Single` would add overhead to methods like `Self::swap_remove`,
 /// and would have little value. At the point when you're calling that method, a
 /// heap allocation has already taken place.
-#[derive(Debug, Clone, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Debug, Clone, get_size2::GetSize, Default, salsa::SalsaValue)]
 pub enum NegativeIntersectionElements<'db> {
     #[default]
     Empty,
@@ -847,6 +849,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, *previous, cycle)

@@ -211,7 +211,7 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
@@ -232,6 +232,7 @@ impl Default for DataclassTransformerFlags {
 /// instance that we use as the return type for `dataclass_transform(…)` calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DataclassTransformerParams<'db> {
+    #[returns(copy)]
     pub flags: DataclassTransformerFlags,
 
     #[returns(deref)]
@@ -262,22 +263,28 @@ pub struct OverloadLiteral<'db> {
     pub name: ast::name::Name,
 
     /// Is this a function that we special-case somehow? If so, which one?
+    #[returns(copy)]
     pub(crate) known: Option<KnownFunction>,
 
     /// The scope that's created by the function, in which the function body is evaluated.
+    #[returns(copy)]
     pub(crate) body_scope: ScopeId<'db>,
 
     /// A set of special decorators that were applied to this function
+    #[returns(copy)]
     pub(crate) decorators: FunctionDecorators,
 
     /// If `Some` then contains the `@warnings.deprecated`
+    #[returns(copy)]
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
+    #[returns(copy)]
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 
     /// Whether this overload or implementation has an explicit return annotation.
+    #[returns(copy)]
     pub(crate) has_explicit_return_annotation: bool,
 }
 
@@ -717,7 +724,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Representation of a function definition in the AST, along with any previous overloads of the
 /// function. Each overload can be separately generic or not, and each generic overload uses
 /// distinct typevars.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
     overloaded: bool,
@@ -916,7 +923,7 @@ impl<'db> FunctionLiteral<'db> {
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
     fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
-        #[salsa::tracked]
+        #[salsa::tracked(returns(copy))]
         fn implementation_body_kind<'db>(
             db: &'db dyn Db,
             implementation: OverloadLiteral<'db>,
@@ -971,7 +978,7 @@ pub(super) fn same_module_uncached_raw_signature<'db>(
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum AbstractMethodKind {
     /// The method is explicitly marked as abstract using `@abstractmethod`.
     Explicit,
@@ -997,7 +1004,7 @@ impl AbstractMethodKind {
 ///
 /// This uncommon payload is boxed so that ordinary function types only retain the literal and one
 /// optional pointer.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UpdatedFunctionSignatures<'db> {
     /// Contains a potentially modified signature for this function literal, in case certain
     /// operations (like type mappings) have been applied to it.
@@ -1030,6 +1037,7 @@ impl<'db> UpdatedFunctionSignatures<'db> {
 /// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctionType<'db> {
+    #[returns(copy)]
     pub(crate) literal: FunctionLiteral<'db>,
 
     #[returns(ref)]
@@ -1396,6 +1404,7 @@ impl<'db> FunctionType<'db> {
     /// This is tracked because signatures can contain recursive `TypeOf` references back to the
     /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size,
     )]

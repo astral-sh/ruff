@@ -177,14 +177,14 @@ impl std::fmt::Display for PlaceExprRef<'_> {
 
 /// ID that uniquely identifies a place inside a [`Scope`](super::FileScopeId).
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize, salsa::Update,
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum ScopedPlaceId {
     Symbol(ScopedSymbolId),
     Member(ScopedMemberId),
 }
 
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,

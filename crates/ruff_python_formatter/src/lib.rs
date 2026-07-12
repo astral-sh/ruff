@@ -95,7 +95,7 @@ where
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 }
 
-#[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum FormatModuleError {
     #[error(transparent)]
     ParseError(#[from] ParseError),

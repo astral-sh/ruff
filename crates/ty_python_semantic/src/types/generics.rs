@@ -245,7 +245,7 @@ pub(crate) fn typing_self<'db>(
 /// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
 /// fresh generic-callable occurrence be inferable without making the surrounding source-level
 /// typevar inferable.
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
     Some(InferableTypeVarsInner<'db>),
@@ -291,7 +291,7 @@ impl<'db> BoundTypeVarInstance<'db> {
 
 #[salsa::tracked]
 impl<'db> InferableTypeVars<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
@@ -491,6 +491,7 @@ impl<'db> GenericContext<'db> {
         }
 
         #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| InferableTypeVars::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -1079,6 +1080,7 @@ impl<'db> GenericContext<'db> {
 /// the lexically containing context.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Specialization<'db> {
+    #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
@@ -1089,10 +1091,12 @@ pub struct Specialization<'db> {
     /// with `Some(MaterializationKind::Bottom)`.
     /// The `materialization_kind` field may be non-`None` only if the specialization contains
     /// dynamic types in invariant positions.
+    #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
+    #[returns(copy)]
     tuple_inner: Option<TupleType<'db>>,
 }
 
@@ -1987,6 +1991,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 /// entry means the type variable was not solved and should be projected according to the use site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
+    #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     types: Box<[Option<Type<'db>>]>,
@@ -1998,7 +2003,7 @@ impl get_size2::GetSize for TypeVarInference<'_> {}
 impl<'db> TypeVarInference<'db> {
     /// Project this inference result into a closed specialization.
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        #[salsa::tracked]
+        #[salsa::tracked(returns(copy))]
         fn specialization_inner<'db>(
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,

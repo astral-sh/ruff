@@ -13,7 +13,6 @@ use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
@@ -136,7 +135,7 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// header are only known after walking all loop-back edges. The builder reserves a [`LoopHeaderId`]
 /// before the walk, fills the corresponding header afterward, and publishes the completed headers
 /// in the scope's [`UseDefMap`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
 }
@@ -221,7 +220,7 @@ pub fn attribute_scopes<'db>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
@@ -235,7 +234,7 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionsByNode<'db> {
     single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
     non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
@@ -277,7 +276,7 @@ impl<'db> DefinitionsByNode<'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
@@ -348,7 +347,7 @@ pub struct SemanticIndex<'db> {
     narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct NarrowingAliasPredicate<'db> {
     /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
     pub expression: Expression<'db>,
@@ -1008,7 +1007,7 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum EvaluationMode {
     Sync,
     Async,
@@ -1029,7 +1028,7 @@ impl EvaluationMode {
 }
 
 /// Specifies how the boundness of a place should be determined.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BoundnessAnalysis {
     /// The place is always considered bound.
     AssumeBound,

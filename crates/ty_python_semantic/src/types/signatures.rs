@@ -101,7 +101,7 @@ fn function_signature_type_expression_flags<'db>(
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct CallableSignature<'db> {
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
@@ -478,7 +478,7 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
 }
 
 /// The signature of one of the overloads of a callable.
-#[derive(Clone, Debug, salsa::Update, get_size2::GetSize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
     pub(crate) generic_context: Option<GenericContext<'db>>,
@@ -3102,7 +3102,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// The tail of a `Concatenate[T1, T2, Tn, tail]` form.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ConcatenateTail<'db> {
     /// Represents the `Concatenate[T1, T2, Tn, ...]` form where the prefix parameters are followed
     /// by a gradual `*args: Any, **kwargs: Any`.
@@ -3118,7 +3118,9 @@ pub(crate) enum ConcatenateTail<'db> {
 /// For annotation-derived parameter lists, the kind records the form of the original annotation
 /// and must be preserved when its parameter types are transformed. In particular, specializing a
 /// standard `(*args: T, **kwargs: T)` parameter list with `T = Any` does not make it gradual.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) enum ParametersKind<'db> {
     /// A standard parameter list.
     #[default]
@@ -3174,14 +3176,14 @@ pub(crate) enum ParametersKind<'db> {
 // TODO: Given how the current structure is laid out which needs to follow certain invariants
 // between the `value` and `kind` field, it would be better to structure it such that these
 // invariants are followed at the type level instead.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ParametersData<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Parameters<'db> {
     data: Arc<ParametersData<'db>>,
 }
@@ -3982,7 +3984,7 @@ impl ParameterNamePrefix {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     annotated_type: Type<'db>,
@@ -4008,7 +4010,7 @@ pub(crate) struct Parameter<'db> {
     kind: ParameterKind<'db>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum ParameterAnnotationKind {
     Normal,
 
@@ -4408,7 +4410,7 @@ impl<'db> Parameter<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly {

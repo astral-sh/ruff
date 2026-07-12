@@ -767,7 +767,7 @@ fn synthesize_typed_dict_merge<'db>(
 /// The type of `Movie` would be `type[Movie]` where `Movie` is a `DynamicTypedDictLiteral`.
 ///
 /// The field schema is represented by a separate [`TypedDictSchema`].
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicTypedDictAnchor<'db> {
     /// The `TypedDict()` call is assigned to a variable.
     ///
@@ -828,6 +828,7 @@ pub struct DynamicTypedDictLiteral<'db> {
     #[returns(ref)]
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
 
+    #[returns(copy)]
     pub(crate) typed_dict_module: TypedDictModule,
 }
 

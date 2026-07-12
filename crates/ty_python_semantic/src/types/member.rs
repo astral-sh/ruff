@@ -8,7 +8,7 @@ use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, Default, salsa::SalsaValue)]
 pub(super) struct Member<'db> {
     /// Type, qualifiers, and boundness information of this member
     pub(super) inner: PlaceAndQualifiers<'db>,

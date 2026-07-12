@@ -1332,7 +1332,7 @@ impl ComparisonOperator {
 ///
 /// Two types with different known semantics cannot compare equal. Types with custom or otherwise
 /// unknown comparison methods are not assigned a value of this enum.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 enum KnownComparisonSemantics {
     Object,
     Int,

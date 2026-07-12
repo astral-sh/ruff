@@ -33,7 +33,7 @@ use itertools::Itertools;
 /// ```
 ///
 /// See [`ClassType::iter_mro`] for more details.
-#[derive(PartialEq, Eq, Clone, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(PartialEq, Eq, Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
@@ -692,7 +692,7 @@ impl DoubleEndedIterator for MroIterator<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct StaticMroError<'db> {
     kind: StaticMroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -721,7 +721,7 @@ impl<'db> StaticMroError<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a statically-defined class might fail.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum StaticMroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///
@@ -773,7 +773,7 @@ impl<'db> StaticMroErrorKind<'db> {
 }
 
 /// Error recording the fact that a class definition was found to have duplicate bases.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct DuplicateBaseError<'db> {
     /// The base that is duplicated in the class's bases list.
     pub(super) duplicate_base: ClassBase<'db>,
@@ -876,7 +876,7 @@ fn check_generic_reorder_fixes_mro<'db>(
 /// Error for dynamic class MRO computation with fallback MRO.
 ///
 /// Separate from [`StaticMroError`] because dynamic classes can only have a subset of MRO errors.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DynamicMroError<'db> {
     kind: DynamicMroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -897,7 +897,7 @@ impl<'db> DynamicMroError<'db> {
 /// Error kinds for dynamic class MRO computation.
 ///
 /// These mirror the relevant variants from `MroErrorKind` for static classes.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum DynamicMroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///

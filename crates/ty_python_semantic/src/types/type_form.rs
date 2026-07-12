@@ -7,6 +7,7 @@ use crate::Db;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
+    #[returns(copy)]
     pub(crate) type_argument: Type<'db>,
 }
 

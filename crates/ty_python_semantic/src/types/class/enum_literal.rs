@@ -20,6 +20,7 @@ use ty_python_core::scope::ScopeId;
 pub struct EnumSpec<'db> {
     #[returns(deref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
+    #[returns(copy)]
     pub(crate) has_known_members: bool,
 }
 
@@ -51,7 +52,7 @@ impl get_size2::GetSize for EnumSpec<'_> {}
 /// This mirrors the dynamic `TypedDict` / `NamedTuple` pattern:
 /// - assigned calls use the `Definition` as stable identity;
 /// - dangling calls use a relative offset within the enclosing scope.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicEnumAnchor<'db> {
     Definition {
         definition: Definition<'db>,
@@ -96,7 +97,9 @@ pub struct DynamicEnumLiteral<'db> {
     pub name: Name,
     #[returns(ref)]
     pub anchor: DynamicEnumAnchor<'db>,
+    #[returns(copy)]
     pub base_class: KnownClass,
+    #[returns(copy)]
     pub mixin_type: Option<Type<'db>>,
 }
 

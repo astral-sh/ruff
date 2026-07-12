@@ -97,7 +97,7 @@ impl PublicTypePolicy {
 }
 
 /// The source definition provenance for a place.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Provenance<'db> {
     /// No source definition is known.
     #[default]
@@ -136,7 +136,7 @@ impl<'db> Provenance<'db> {
 }
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
@@ -215,7 +215,7 @@ impl<'db> DefinedPlace<'db> {
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Place<'db> {
     Defined(DefinedPlace<'db>),
     #[default]
@@ -776,7 +776,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
@@ -982,6 +982,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         place.cycle_normalized(db, *previous, cycle)
@@ -1332,6 +1333,7 @@ fn symbol_impl<'db>(
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
+    returns(clone),
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
@@ -1424,7 +1426,7 @@ fn loop_header_reachability_impl<'db>(
 }
 
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable loop-back bindings that are not `del`s.
@@ -1454,7 +1456,7 @@ impl<'db> LoopHeaderReachability<'db> {
 }
 
 /// A single reachable loop-back binding with its narrowing constraint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ReachableLoopBinding<'db> {
     pub(crate) definition: Definition<'db>,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
@@ -2277,7 +2279,7 @@ impl RequiresExplicitReExport {
 ///     if flag():
 ///         x = 3
 /// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ConsideredDefinitions {
     /// Consider only the definitions that are "live" at the end of the scope, i.e. those
     /// that have not been shadowed or deleted.
