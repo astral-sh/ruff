@@ -1254,6 +1254,43 @@ def get_person_from_employee(emp: Employee) -> Person:
     return Person(**emp)
 ```
 
+Unpacking a heterogeneous `TypedDict` union preserves the requiredness and value types of declared
+keys across arms, including keys supplied by `extra_items`:
+
+```py
+from typing_extensions import NotRequired, ReadOnly, TypedDict
+
+class RequiredA(TypedDict, closed=True):
+    a: int
+    shared: int
+
+class OptionalA(TypedDict, closed=True):
+    a: NotRequired[str]
+    shared: str
+
+class Extras(TypedDict, extra_items=ReadOnly[bytes]):
+    b: float
+    shared: bytes
+
+class EmptyClosed(TypedDict, closed=True): ...
+
+class UnionTarget(TypedDict, closed=True):
+    a: int | str | bytes
+    b: NotRequired[float]
+    shared: int | str | bytes
+
+def unpacked(value: RequiredA | OptionalA | Extras | EmptyClosed) -> UnionTarget:
+    # error: [missing-typed-dict-key] "Missing required key 'a' in TypedDict `UnionTarget` constructor"
+    # error: [missing-typed-dict-key] "Missing required key 'shared' in TypedDict `UnionTarget` constructor"
+    # error: [invalid-key] "Unpacked argument may contain unknown keys for TypedDict `UnionTarget`"
+    return UnionTarget(**value)
+
+def accepts(*, a: int | str | bytes, shared: int | str | bytes, b: float = 1) -> None: ...
+def kwargs(value: RequiredA | OptionalA | Extras | EmptyClosed) -> None:
+    # error: [unknown-argument] "Unpacked argument may contain keyword arguments that do not match any known parameter of function `accepts`"
+    accepts(**value)
+```
+
 However, the positional form allows extra keys, by analogy with the fact that assignment
 `p: Person = emp` is allowed (structural subtyping). It's not consistent that `Person(emp)` is more
 lenient than `Person(**emp)`; ultimately this is because extra keys _should_ be always allowed for a

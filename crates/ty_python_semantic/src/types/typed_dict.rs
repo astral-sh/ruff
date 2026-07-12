@@ -21,12 +21,12 @@ use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
     UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
 };
-use crate::Db;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::{Db, FxOrderMap};
 use ty_python_core::definition::Definition;
 
 bitflags! {
@@ -1809,21 +1809,29 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 .map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
                 .collect::<Option<_>>()?;
 
-            let all_keys: OrderSet<Name> = unpacked_elements
-                .iter()
-                .flat_map(|unpacked| unpacked.keys.keys().cloned())
-                .collect();
+            let mut keys_by_arm: FxOrderMap<Name, Vec<(usize, &UnpackedTypedDictKey<'db>)>> =
+                FxOrderMap::default();
+            for (arm_index, unpacked) in unpacked_elements.iter().enumerate() {
+                for (key, unpacked_key) in &unpacked.keys {
+                    keys_by_arm
+                        .entry(key.clone())
+                        .or_default()
+                        .push((arm_index, unpacked_key));
+                }
+            }
+
             let mut result = BTreeMap::new();
 
-            for key in all_keys {
+            for (key, unpacked_keys) in keys_by_arm {
                 let mut value_ty = UnionBuilder::new(db);
                 let mut is_required = true;
                 let mut definition = None;
-                let mut saw_key = false;
+                let mut unpacked_keys = unpacked_keys.into_iter().peekable();
 
-                for unpacked in &unpacked_elements {
-                    if let Some(unpacked_key) = unpacked.keys.get(&key) {
-                        saw_key = true;
+                for (arm_index, unpacked) in unpacked_elements.iter().enumerate() {
+                    if let Some((_, unpacked_key)) = unpacked_keys
+                        .next_if(|(declared_arm_index, _)| *declared_arm_index == arm_index)
+                    {
                         value_ty = value_ty.add(unpacked_key.value_ty);
                         is_required &= unpacked_key.is_required;
                         definition = Some(if let Some(definition) = definition {
@@ -1832,7 +1840,6 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                             unpacked_key.definition
                         });
                     } else if let Some(extra_items) = unpacked.openness.effective_extra_items() {
-                        saw_key = true;
                         value_ty = value_ty.add(extra_items.declared_ty);
                         is_required = false;
                         definition = Some(None);
@@ -1842,16 +1849,14 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                     }
                 }
 
-                if saw_key {
-                    result.insert(
-                        key,
-                        UnpackedTypedDictKey {
-                            value_ty: value_ty.build(),
-                            is_required,
-                            definition: definition.flatten(),
-                        },
-                    );
-                }
+                result.insert(
+                    key,
+                    UnpackedTypedDictKey {
+                        value_ty: value_ty.build(),
+                        is_required,
+                        definition: definition.flatten(),
+                    },
+                );
             }
 
             let openness = union_unpacked_typed_dict_openness(
