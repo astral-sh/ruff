@@ -183,7 +183,7 @@ impl NotebookDocument {
                         self.cell_by_uri_mut(&content_change.document.text_document_identifier.uri)
                     {
                         cell.document
-                            .apply_changes(content_change.changes, version, encoding);
+                            .apply_changes(content_change.changes, version, encoding)?;
                     }
                 }
             }
