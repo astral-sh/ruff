@@ -1700,33 +1700,19 @@ impl<'db> Constraint<'db> {
                 )
             }
 
-            // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
-            (Type::TypeVar(lower), Type::TypeVar(upper))
-                if typevar.can_be_bound_for(db, builder, lower)
-                    && typevar.can_be_bound_for(db, builder, upper) =>
-            {
-                let lower = Node::new_constraint(
-                    builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        lower,
-                        None,
-                        Some(Type::TypeVar(typevar)),
-                    ),
-                    1,
-                );
-                let upper = Node::new_constraint(
-                    builder,
-                    ConstraintId::new_with_bounds(
-                        db,
-                        builder,
-                        upper,
-                        Some(Type::TypeVar(typevar)),
-                        None,
-                    ),
-                    1,
-                );
+            // Keep a type-variable relationship separate from the opposite bound. Projection can
+            // then remove the relationship without also discarding the independent bound. The
+            // recursive calls orient each relationship according to the type-variable ordering.
+            //
+            // L ≤ T ≤ U == (L ≤ T) && (T ≤ U)
+            (Type::TypeVar(_), _) if upper.is_some() => {
+                let lower = Constraint::new_node_with_bounds(db, builder, typevar, lower, None);
+                let upper = Constraint::new_node_with_bounds(db, builder, typevar, None, upper);
+                lower.and(builder, upper)
+            }
+            (_, Type::TypeVar(_)) if lower.is_some() => {
+                let lower = Constraint::new_node_with_bounds(db, builder, typevar, lower, None);
+                let upper = Constraint::new_node_with_bounds(db, builder, typevar, None, upper);
                 lower.and(builder, upper)
             }
 
@@ -7689,6 +7675,63 @@ mod tests {
                 .iff(&db, &builder, expected)
                 .is_always_satisfied(&db)
         );
+    }
+
+    #[test]
+    fn fallible_projection_preserves_surviving_mixed_range_bounds() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let int = known_instance(&db, KnownClass::Int);
+
+        for source_first in [true, false] {
+            let builder = ConstraintSetBuilder::new();
+            if source_first {
+                builder.intern_typevar(&db, source);
+                builder.intern_typevar(&db, target);
+            } else {
+                builder.intern_typevar(&db, target);
+                builder.intern_typevar(&db, source);
+            }
+
+            let lower_relation =
+                ConstraintSet::constrain_typevar(&db, &builder, target, Type::TypeVar(source), int);
+            let projected_lower = lower_relation
+                .try_exists_assuming(
+                    &db,
+                    &builder,
+                    typevar_set(&db, [source]),
+                    ConstraintSet::always(&builder),
+                )
+                .expect("the bare lower bound can be projected exactly");
+            let expected_upper =
+                ConstraintSet::constrain_typevar_upper_bound(&db, &builder, target, int);
+
+            assert!(
+                projected_lower
+                    .iff(&db, &builder, expected_upper)
+                    .is_always_satisfied(&db)
+            );
+
+            let upper_relation =
+                ConstraintSet::constrain_typevar(&db, &builder, target, int, Type::TypeVar(source));
+            let projected_upper = upper_relation
+                .try_exists_assuming(
+                    &db,
+                    &builder,
+                    typevar_set(&db, [source]),
+                    ConstraintSet::always(&builder),
+                )
+                .expect("the bare upper bound can be projected exactly");
+            let expected_lower =
+                ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, int);
+
+            assert!(
+                projected_upper
+                    .iff(&db, &builder, expected_lower)
+                    .is_always_satisfied(&db)
+            );
+        }
     }
 
     #[test]
