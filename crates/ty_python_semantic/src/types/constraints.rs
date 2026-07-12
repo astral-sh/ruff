@@ -88,6 +88,7 @@
 
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
+use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Range;
@@ -312,6 +313,15 @@ impl OwnedConstraintSetInner<'_> {
         );
         self.constraint_indices.rank(index) as usize
     }
+}
+
+/// Describes why quantified constraint projection could not be represented exactly.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ConstraintProjectionError {
+    /// A projected variable occurs inside a type-level bound that cannot yet be preserved.
+    NestedTypeVarRelation,
+    /// An assumption mentions a variable that the projection removes.
+    ProjectedTypeVarInAssumption,
 }
 
 /// A set of constraints under which a type property holds.
@@ -577,6 +587,54 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
+    }
+
+    /// Tries to existentially quantify type variables out of this constraint set.
+    ///
+    /// Unlike [`Self::reduce_inferable`], this operation returns an error rather than discarding a
+    /// type-level relationship that the constraint representation cannot preserve exactly.
+    /// `assumptions` must not mention any variable in `to_remove`; because they are independent of
+    /// those variables, they are conjoined only after projection and remain factored during the
+    /// abstraction traversal.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "used by quantified signature projection in the stacked follow-up"
+        )
+    )]
+    pub(crate) fn try_exists_assuming(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: InferableTypeVars<'db>,
+        assumptions: Self,
+    ) -> Result<Self, ConstraintProjectionError> {
+        self.verify_builder(builder);
+        assumptions.verify_builder(builder);
+
+        let type_mentions_projected = |ty: Type<'db>| {
+            any_over_type(db, ty, false, |nested| {
+                nested
+                    .as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, to_remove))
+            })
+        };
+        let mut assumption_mentions_projected = false;
+        assumptions
+            .node
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                assumption_mentions_projected |= constraint.typevar.is_inferable(db, to_remove)
+                    || constraint.bounds.lower.is_some_and(type_mentions_projected)
+                    || constraint.bounds.upper.is_some_and(type_mentions_projected);
+            });
+        if assumption_mentions_projected {
+            return Err(ConstraintProjectionError::ProjectedTypeVarInAssumption);
+        }
+
+        let projected = Self::from_node(builder, self.node.try_exists(db, builder, to_remove)?);
+        Ok(projected.and(db, builder, || assumptions))
     }
 
     /// Universally abstracts constraints involving the given type variables from this TDD.
@@ -2859,6 +2917,25 @@ impl NodeId {
         result
     }
 
+    /// Fallible existential abstraction for type-level relationships.
+    fn try_exists<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+    ) -> Result<Self, ConstraintProjectionError> {
+        if bound_typevars == InferableTypeVars::None {
+            return Ok(self);
+        }
+
+        let Node::Interior(interior) = self.node() else {
+            return Ok(self);
+        };
+
+        let mut path = interior.path_assignments(builder);
+        interior.try_exists_inner(db, builder, bound_typevars, &mut path)
+    }
+
     fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -2886,18 +2963,18 @@ impl NodeId {
         }
     }
 
-    fn abstract_one_inner<'db>(
+    fn try_abstract_one_inner<'db, E>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
+        should_remove: &mut dyn FnMut(ConstraintId) -> Result<bool, E>,
         path: &mut PathAssignments,
-    ) -> Self {
+    ) -> Result<Self, E> {
         match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::AlwaysTrue => Ok(ALWAYS_TRUE),
+            Node::AlwaysFalse => Ok(ALWAYS_FALSE),
             Node::Interior(interior) => {
-                interior.abstract_one_inner(db, builder, should_remove, path)
+                interior.try_abstract_one_inner(db, builder, should_remove, path)
             }
         }
     }
@@ -4121,6 +4198,54 @@ impl InteriorNode {
         )
     }
 
+    fn try_exists_inner<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+        path: &mut PathAssignments,
+    ) -> Result<NodeId, ConstraintProjectionError> {
+        let is_removed =
+            |typevar: BoundTypeVarInstance<'db>| typevar.is_inferable(db, bound_typevars);
+        let contains_removed = |ty: Type<'db>| {
+            any_over_type(db, ty, false, |nested| {
+                nested.as_typevar().is_some_and(is_removed)
+            })
+        };
+        let contains_any_typevar = |ty: Type<'db>| any_over_type(db, ty, false, Type::is_type_var);
+
+        self.try_abstract_one_inner(
+            db,
+            builder,
+            &mut |constraint| {
+                let constraint = builder.constraint_data(constraint);
+                let subject_is_removed = is_removed(constraint.typevar);
+                let mut remove = subject_is_removed;
+
+                for bound in constraint
+                    .bounds
+                    .lower
+                    .into_iter()
+                    .chain(constraint.bounds.upper)
+                {
+                    if subject_is_removed {
+                        if bound.as_typevar().is_none() && contains_any_typevar(bound) {
+                            return Err(ConstraintProjectionError::NestedTypeVarRelation);
+                        }
+                    } else if contains_removed(bound) {
+                        if !bound.as_typevar().is_some_and(is_removed) {
+                            return Err(ConstraintProjectionError::NestedTypeVarRelation);
+                        }
+                        remove = true;
+                    }
+                }
+
+                Ok(remove)
+            },
+            path,
+        )
+    }
+
     fn remove_noninferable<'db>(
         self,
         db: &'db dyn Db,
@@ -4167,8 +4292,62 @@ impl InteriorNode {
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
     ) -> NodeId {
+        let mut fallible = |constraint| Ok::<_, Infallible>(should_remove(constraint));
+        match self.try_abstract_one_inner(db, builder, &mut fallible, path) {
+            Ok(result) => result,
+            Err(unreachable) => match unreachable {},
+        }
+    }
+
+    fn try_abstract_edge<'db, E>(
+        child: NodeId,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        edge: (ConstraintAssignment, usize),
+        should_remove: &mut dyn FnMut(ConstraintId) -> Result<bool, E>,
+        path: &mut PathAssignments,
+        retain_derived: bool,
+    ) -> Result<NodeId, E> {
+        let (assignment, source_order) = edge;
+        let result = path.walk_edge(db, builder, assignment, source_order, |path, new_range| {
+            let branch = child.try_abstract_one_inner(db, builder, should_remove, path)?;
+            if !retain_derived {
+                return Ok(branch);
+            }
+
+            path.assignments[new_range].iter().try_fold(
+                branch,
+                |branch, (assignment, (derived_source_order, _))| {
+                    if should_remove(assignment.constraint())? {
+                        Ok(branch)
+                    } else {
+                        Ok(branch.and(
+                            builder,
+                            Node::new_satisfied_constraint(
+                                builder,
+                                *assignment,
+                                *derived_source_order,
+                            ),
+                        ))
+                    }
+                },
+            )
+        });
+        match result {
+            Some(result) => result,
+            None => Ok(ALWAYS_FALSE),
+        }
+    }
+
+    fn try_abstract_one_inner<'db, E>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        should_remove: &mut dyn FnMut(ConstraintId) -> Result<bool, E>,
+        path: &mut PathAssignments,
+    ) -> Result<NodeId, E> {
         let self_interior = builder.interior_node_data(self.node());
-        if should_remove(self_interior.constraint) {
+        if should_remove(self_interior.constraint)? {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of all of its outgoing edges. That is, the result is true if there's
             // any assignment of this node's constraint that is true.
@@ -4181,146 +4360,81 @@ impl InteriorNode {
             // TODO: This might not be stable enough, if we add more than one derived fact for this
             // constraint. If we still see inconsistent test output, we might need a more complex
             // way of tracking source order for derived facts.
-            let if_true = path
-                .walk_edge(
-                    db,
-                    builder,
+            let if_true = Self::try_abstract_edge(
+                self_interior.if_true,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_true.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
-                .walk_edge(
-                    db,
-                    builder,
+                ),
+                should_remove,
+                path,
+                true,
+            )?;
+            let if_false = Self::try_abstract_edge(
+                self_interior.if_false,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_false.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_uncertain = path
-                .walk_edge(
-                    db,
-                    builder,
+                ),
+                should_remove,
+                path,
+                true,
+            )?;
+            let if_uncertain = Self::try_abstract_edge(
+                self_interior.if_uncertain,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_unconstrained(),
                     self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_uncertain.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_uncertain).or(builder, if_false)
+                ),
+                should_remove,
+                path,
+                true,
+            )?;
+            Ok(if_true.or(builder, if_uncertain).or(builder, if_false))
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
-            let if_true = path
-                .walk_edge(
-                    db,
-                    builder,
+            let if_true = Self::try_abstract_edge(
+                self_interior.if_true,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
-                    |path, _| {
-                        self_interior
-                            .if_true
-                            .abstract_one_inner(db, builder, should_remove, path)
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_uncertain = path
-                .walk_edge(
-                    db,
-                    builder,
+                ),
+                should_remove,
+                path,
+                false,
+            )?;
+            let if_uncertain = Self::try_abstract_edge(
+                self_interior.if_uncertain,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_unconstrained(),
                     self_interior.source_order,
-                    |path, _| {
-                        self_interior.if_uncertain.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        )
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
-                .walk_edge(
-                    db,
-                    builder,
+                ),
+                should_remove,
+                path,
+                false,
+            )?;
+            let if_false = Self::try_abstract_edge(
+                self_interior.if_false,
+                db,
+                builder,
+                (
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
-                    |path, _| {
-                        self_interior
-                            .if_false
-                            .abstract_one_inner(db, builder, should_remove, path)
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
+                ),
+                should_remove,
+                path,
+                false,
+            )?;
             // Absorb the uncertain branch into both the true and false branches before
             // constructing the ITE, matching TDD semantics: when the constraint holds the result
             // is C ∨ U, and when it doesn't the result is D ∨ U.
@@ -4328,7 +4442,7 @@ impl InteriorNode {
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            Node::new_constraint(
+            Ok(Node::new_constraint(
                 builder,
                 self_interior.constraint,
                 self_interior.source_order,
@@ -4337,7 +4451,7 @@ impl InteriorNode {
                 builder,
                 if_true.or(builder, if_uncertain),
                 if_false.or(builder, if_uncertain),
-            )
+            ))
         }
     }
 
@@ -7541,6 +7655,154 @@ mod tests {
             .for_all(&db, &builder, typevar_set(&db, [target]))
             .reduce_inferable(&db, &builder, typevar_set(&db, [source]));
         assert!(exists_source_forall_target.is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn fallible_projection_preserves_bare_relations() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+
+        let relation = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, source, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar_upper_bound(
+                    &db,
+                    &builder,
+                    source,
+                    Type::TypeVar(target),
+                )
+            });
+        let projected = relation
+            .try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            )
+            .expect("bare type-variable relations are exactly projectable");
+        let expected = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, int);
+
+        assert!(
+            projected
+                .iff(&db, &builder, expected)
+                .is_always_satisfied(&db)
+        );
+    }
+
+    #[test]
+    fn fallible_projection_rejects_nested_relations() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let list_of_target =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(target)]);
+        let source_below_list =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, source, list_of_target);
+
+        assert!(matches!(
+            source_below_list.try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::NestedTypeVarRelation)
+        ));
+
+        let list_of_source =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(source)]);
+        let target_above_list =
+            ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, list_of_source);
+        assert!(matches!(
+            target_above_list.try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::NestedTypeVarRelation)
+        ));
+    }
+
+    #[test]
+    fn fallible_projection_preserves_independent_assumptions() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let outer = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+
+        let relation = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, source, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar_upper_bound(
+                    &db,
+                    &builder,
+                    source,
+                    Type::TypeVar(target),
+                )
+            });
+        let assumptions = ConstraintSet::constrain_typevar(&db, &builder, outer, str, str);
+        let projected = relation
+            .try_exists_assuming(&db, &builder, typevar_set(&db, [source]), assumptions)
+            .expect("independent assumptions do not affect projection");
+        let expected = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, target, int)
+            .and(&db, &builder, || assumptions);
+
+        assert!(
+            projected
+                .iff(&db, &builder, expected)
+                .is_always_satisfied(&db)
+        );
+        assert!(matches!(
+            relation.try_exists_assuming(
+                &db,
+                &builder,
+                typevar_set(&db, [source]),
+                ConstraintSet::constrain_typevar(&db, &builder, source, int, int),
+            ),
+            Err(ConstraintProjectionError::ProjectedTypeVarInAssumption)
+        ));
+    }
+
+    #[test]
+    fn fallible_projection_is_independent_of_variable_order() {
+        let db = setup_db();
+        let first = create_typevar(&db, "S");
+        let second = create_typevar(&db, "R");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+
+        let bounded_by_target = |typevar| {
+            ConstraintSet::constrain_typevar_upper_bound(
+                &db,
+                &builder,
+                typevar,
+                Type::TypeVar(target),
+            )
+        };
+        let relation = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, first, int)
+            .and(&db, &builder, || bounded_by_target(first))
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar_lower_bound(&db, &builder, second, str)
+            })
+            .and(&db, &builder, || bounded_by_target(second));
+
+        let project = |typevars| {
+            relation
+                .try_exists_assuming(&db, &builder, typevars, ConstraintSet::always(&builder))
+                .expect("bare relations are exactly projectable")
+        };
+        let forward = project(typevar_set(&db, [first, second]));
+        let reverse = project(typevar_set(&db, [second, first]));
+
+        assert!(forward.iff(&db, &builder, reverse).is_always_satisfied(&db));
     }
 
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the
