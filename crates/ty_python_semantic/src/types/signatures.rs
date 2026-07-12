@@ -1794,7 +1794,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             None
         };
         let target_locals = bare_target_locals.or(nested_target_local)?;
-
         // A large closed union cannot cover every specialization of an unbounded target local.
         // Reject it before invariant comparison distributes the union into a large constraint set.
         if nested_target_local.is_some()

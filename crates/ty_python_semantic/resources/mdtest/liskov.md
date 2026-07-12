@@ -888,6 +888,9 @@ class E(A):
     # `E.method` accepts every argument, but does not preserve its type in the return.
     def method[S](self, x: S) -> int: ...  # error: [invalid-method-override]
 
+class E2(A):
+    def method[S, R](self, x: S) -> int: ...  # error: [invalid-method-override]
+
 class F(A):
     def method(self, x: Any) -> Any: ...  # fine
 

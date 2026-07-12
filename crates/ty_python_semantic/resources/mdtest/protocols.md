@@ -3123,6 +3123,10 @@ class NominalTwoGenericForSingle:
     def f[S, R](self, input: S) -> R:
         raise NotImplementedError
 
+class NominalTwoGenericReturningInt:
+    def f[S, R](self, input: S) -> int:
+        return 1
+
 class NominalMultipleGeneric:
     def multiple[S, R](self, first: S, second: R) -> S:
         return first
@@ -3268,6 +3272,8 @@ static_assert(is_assignable_to(NominalGenericDynamic, NewStyleFunctionScoped))
 static_assert(not is_subtype_of(NominalGenericDynamic, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalTwoGenericForSingle, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalTwoGenericForSingle, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalTwoGenericReturningInt, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalTwoGenericReturningInt, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalMultipleGeneric, MultipleFunctionScoped))
 static_assert(is_subtype_of(NominalMultipleGeneric, MultipleFunctionScoped))
 static_assert(is_assignable_to(NominalSingleGenericForMultiple, MultipleFunctionScoped))
