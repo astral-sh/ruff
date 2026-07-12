@@ -1824,7 +1824,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         if let ([source], [target]) = (source.overloads.as_slice(), target.overloads.as_slice())
             && let Some(relation) =
-                self.try_check_nongeneric_source_with_universal_target(db, source, target)
+                self.try_check_simple_source_with_universal_target(db, source, target)
         {
             return relation;
         }
@@ -1834,9 +1834,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     /// Check the initial closed fragment of higher-rank generic callable relations.
     ///
-    /// A non-generic source must satisfy every receiver-compatible specialization of an unbounded
-    /// target-local type variable. Generic sources, overloads, declared domains, nested
-    /// occurrences, and enclosing inference variables remain on the existing relation path.
+    /// The source may have one unbounded local type variable whose specialization can depend on
+    /// each receiver-compatible specialization of the target's one unbounded local type variable.
+    /// Overloads, declared domains, nested occurrences, and enclosing inference variables remain
+    /// on the existing relation path.
     ///
     /// For example, `Concrete.f` does not satisfy `Generic.f`: the former only accepts `int`, while
     /// the latter must work for every `T`.
@@ -1848,31 +1849,50 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// class Concrete:
     ///     def f(self, value: int) -> int: ...
     /// ```
-    fn try_check_nongeneric_source_with_universal_target(
+    ///
+    /// A source `[S](S) -> S` does satisfy the target by choosing `S = T` for each target
+    /// specialization, while `[S](S) -> int` does not.
+    fn try_check_simple_source_with_universal_target(
         &self,
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.inferable != InferableTypeVars::None
-            || source.generic_context.is_some()
-            || !source.parameters.is_standard()
-            || !source
-                .parameters
-                .iter()
-                .map(Parameter::annotated_type)
-                .chain(std::iter::once(source.return_ty))
-                .all(|ty| Signature::is_supported_higher_rank_concrete_type(db, ty))
-        {
+        if self.inferable != InferableTypeVars::None {
             return None;
         }
 
+        let source_typevar = if source.generic_context.is_some() {
+            Some(source.bare_unbounded_pep695_typevar(db)?)
+        } else {
+            if !source.parameters.is_standard()
+                || !source
+                    .parameters
+                    .iter()
+                    .map(Parameter::annotated_type)
+                    .chain(std::iter::once(source.return_ty))
+                    .all(|ty| Signature::is_supported_higher_rank_concrete_type(db, ty))
+            {
+                return None;
+            }
+            None
+        };
+
         let target_typevar = target.bare_unbounded_pep695_typevar(db)?;
+        // The quantifiers must bind distinct occurrences. A signature compared with itself can
+        // stay on the existing relation path instead of treating one occurrence as both binders.
+        if source_typevar.is_some_and(|source| source.is_same_typevar_as(db, target_typevar)) {
+            return None;
+        }
+
+        let source_local = source_typevar.map_or(InferableTypeVars::None, |source| {
+            InferableTypeVars::from_typevars(db, std::iter::once(source.identity(db)).collect())
+        });
         let target_local = InferableTypeVars::from_typevars(
             db,
             std::iter::once(target_typevar.identity(db)).collect(),
         );
-        let mut checker = self.with_inferable_typevars(target_local);
+        let mut checker = self.with_inferable_typevars(source_local.merge(db, target_local));
         checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let relation = checker.with_signature_recursion_guard(source, target, || {
             target
@@ -1885,7 +1905,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         })
                 })
         });
-        Some(relation.for_all(db, self.constraints, target_local))
+
+        // The source specialization may depend on the target specialization, so eliminate the
+        // source local existentially before eliminating the target local universally.
+        Some(
+            relation
+                .reduce_inferable(db, self.constraints, source_local)
+                .for_all(db, self.constraints, target_local),
+        )
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable

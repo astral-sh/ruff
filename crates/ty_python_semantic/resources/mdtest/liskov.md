@@ -884,6 +884,10 @@ class D(A):
     # but `D.method` only accepts `int`s
     def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 
+class E(A):
+    # `E.method` accepts every argument, but does not preserve its type in the return.
+    def method[S](self, x: S) -> int: ...  # error: [invalid-method-override]
+
 class A2:
     def method(self, x: int) -> int: ...
 

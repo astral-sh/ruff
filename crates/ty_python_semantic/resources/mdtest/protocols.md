@@ -3116,6 +3116,10 @@ static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))
 And they can also have generic contexts scoped to the method:
 
 ```py
+class NominalGenericReturningInt:
+    def f[T](self, input: T) -> int:
+        return 1
+
 class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
 
@@ -3135,6 +3139,18 @@ class ReturnsPep695Receiver(Protocol):
 
 class NominalNewStyle:
     def f[T](self, input: T) -> T:
+        return input
+
+class NominalGenericTopInput:
+    def f[T](self, input: object) -> T:
+        raise NotImplementedError
+
+class NominalGenericIntInput:
+    def f[T](self, input: int) -> T:
+        raise NotImplementedError
+
+class NominalGenericDynamic:
+    def f[T](self, input: T) -> Any:
         return input
 
 class NominalLegacy:
@@ -3222,6 +3238,14 @@ static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
+static_assert(not is_assignable_to(NominalGenericReturningInt, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalGenericReturningInt, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalGenericTopInput, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalGenericTopInput, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalGenericIntInput, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalGenericIntInput, NewStyleFunctionScoped))
+static_assert(is_assignable_to(NominalGenericDynamic, NewStyleFunctionScoped))
+static_assert(not is_subtype_of(NominalGenericDynamic, NewStyleFunctionScoped))
 
 static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
