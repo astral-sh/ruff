@@ -381,11 +381,9 @@ fn transparent_callable_decorator_result<'db>(
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    let decorated_ty = match decorated_ty {
-        Type::FunctionLiteral(function) => Type::Callable(function.into_callable_type(db)),
-        Type::Callable(_) => decorated_ty,
-        _ => return None,
-    };
+    if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
+        return None;
+    }
     let decorator_callable = decorator_ty
         .try_upcast_to_callable(db)
         .and_then(CallableTypes::exactly_one)?;
@@ -401,9 +399,17 @@ fn transparent_callable_decorator_result<'db>(
         callable_paramspec_and_return_typevar(db, parameter.annotated_type())?;
     let (return_callable_paramspec, return_callable_typevar) =
         callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)?;
-    (parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
-        && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar))
-    .then_some(decorated_ty)
+    if !parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+        || !parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
+    {
+        return None;
+    }
+
+    match decorated_ty {
+        Type::FunctionLiteral(function) => Some(Type::Callable(function.into_callable_type(db))),
+        Type::Callable(_) => Some(decorated_ty),
+        _ => None,
+    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
