@@ -1,7 +1,7 @@
 use ruff_python_trivia::leading_indentation;
 use ruff_text_size::TextSize;
 
-use super::syntax::indentation as visual_indentation;
+use super::syntax::{indentation as visual_indentation, parse_rest_directive};
 
 /// Represents a fenced Markdown code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,59 +204,30 @@ impl RestLiteralBlockScanner {
 
     /// Whether or not the given line marks the start of a reST literal block.
     fn line_starts_literal_block(line: &str) -> bool {
-        let Some(marker) = Self::literal_block_marker(line) else {
-            return false;
-        };
+        if let Some(directive) = parse_rest_directive(line) {
+            // The renderer does not recognize `seealso` as prose yet, but the document scanner
+            // has historically excluded its body from preformatted content.
+            return !directive.is_named("seealso") && directive.kind().is_preformatted();
+        }
 
-        !matches!(
-            marker,
-            RestLiteralBlockMarker::Directive(
-                "attention"
-                    | "caution"
-                    | "danger"
-                    | "error"
-                    | "hint"
-                    | "important"
-                    | "note"
-                    | "tip"
-                    | "warning"
-                    | "admonition"
-                    | "seealso"
-                    | "versionadded"
-                    | "version-added"
-                    | "versionchanged"
-                    | "version-changed"
-                    | "version-deprecated"
-                    | "deprecated"
-                    | "version-removed"
-                    | "versionremoved",
-            )
-        )
+        Self::line_starts_paragraph_literal_block(line)
     }
 
-    /// Tries to identify a marker that introduces a reST literal block.
-    fn literal_block_marker(line: &str) -> Option<RestLiteralBlockMarker<'_>> {
-        let marker = if let Some(marker) = line.strip_suffix("::") {
-            marker
+    /// Returns whether a paragraph ends with a reST literal block marker.
+    fn line_starts_paragraph_literal_block(line: &str) -> bool {
+        if line.ends_with("::") {
+            true
         } else {
-            let (before_language, _language) = line.rsplit_once(' ')?;
-            before_language.trim_end().strip_suffix("::")?
-        };
-
-        if let Some(directive) = marker.strip_prefix(".. ") {
-            Some(RestLiteralBlockMarker::Directive(directive))
-        } else {
-            Some(RestLiteralBlockMarker::Paragraph)
+            line.rsplit_once(' ')
+                .is_some_and(|(before_language, _)| before_language.trim_end().ends_with("::"))
         }
     }
 
     /// Whether or not a particular literal block can contain an unindented quoted literal block.
     fn allows_quoted_literal_block(line: &str) -> bool {
         line.ends_with("::")
-            && matches!(
-                Self::literal_block_marker(line),
-                Some(RestLiteralBlockMarker::Paragraph)
-            )
+            && parse_rest_directive(line).is_none()
+            && Self::line_starts_paragraph_literal_block(line)
     }
 
     /// Returns the quote character for a quoted literal block line.
@@ -270,13 +241,6 @@ impl RestLiteralBlockScanner {
             .contains(quote)
             .then_some(quote)
     }
-}
-
-/// Identifies the syntax that introduced a potential reST literal block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RestLiteralBlockMarker<'a> {
-    Paragraph,
-    Directive(&'a str),
 }
 
 /// Tracks the state of a literal block introduced by reST syntax.

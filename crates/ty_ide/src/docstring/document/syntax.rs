@@ -30,6 +30,93 @@ pub(super) struct ParsedLine<'a> {
     pub(super) indent: TextSize,
 }
 
+/// Parses a reStructuredText directive marker and its complete argument.
+pub(in crate::docstring) fn parse_rest_directive(line: &str) -> Option<RestDirective<'_>> {
+    let directive = line.trim_start().strip_prefix(".. ")?;
+    let (name, argument) = directive.split_once("::")?;
+    if name.is_empty() || name.chars().any(char::is_whitespace) {
+        return None;
+    }
+
+    Some(RestDirective {
+        name,
+        argument: argument.trim(),
+    })
+}
+
+/// A parsed reStructuredText directive marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::docstring) struct RestDirective<'a> {
+    name: &'a str,
+    argument: &'a str,
+}
+
+impl<'a> RestDirective<'a> {
+    /// Returns the directive name without the leading `..` or trailing `::`.
+    pub(in crate::docstring) const fn name(self) -> &'a str {
+        self.name
+    }
+
+    /// Returns all text following the directive marker on the same line.
+    pub(in crate::docstring) const fn argument(self) -> &'a str {
+        self.argument
+    }
+
+    /// Returns whether this directive has the given name.
+    pub(in crate::docstring) fn is_named(self, name: &str) -> bool {
+        self.name == name
+    }
+
+    /// Returns how the directive's content should be rendered.
+    pub(in crate::docstring) fn kind(self) -> RestDirectiveKind {
+        if self.is_named("math") {
+            RestDirectiveKind::Preformatted
+        } else if matches!(
+            self.name,
+            "attention"
+                | "caution"
+                | "danger"
+                | "error"
+                | "hint"
+                | "important"
+                | "note"
+                | "tip"
+                | "warning"
+                | "admonition"
+                | "versionadded"
+                | "version-added"
+                | "versionchanged"
+                | "version-changed"
+                | "version-deprecated"
+                | "deprecated"
+                | "version-removed"
+                | "versionremoved"
+        ) {
+            RestDirectiveKind::Prose
+        } else {
+            RestDirectiveKind::Code
+        }
+    }
+}
+
+/// Describes how a reStructuredText directive's content should be rendered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::docstring) enum RestDirectiveKind {
+    /// Source code or interactive examples.
+    Code,
+    /// Whitespace-sensitive content that is not source code.
+    Preformatted,
+    /// Content parsed as ordinary reStructuredText body elements.
+    Prose,
+}
+
+impl RestDirectiveKind {
+    /// Returns whether the directive introduces content whose whitespace must be preserved.
+    pub(in crate::docstring) const fn is_preformatted(self) -> bool {
+        matches!(self, Self::Code | Self::Preformatted)
+    }
+}
+
 /// Returns whether `line` starts with a `CommonMark` list-item marker.
 ///
 /// `CommonMark` limits ordered-list markers to nine digits to avoid integer
@@ -53,7 +140,7 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
 /// Returns the end of an indented Markdown or reStructuredText container block.
 pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
     let marker = lines.get(index)?;
-    if !is_rest_directive_marker(marker.text)
+    if parse_rest_directive(marker.text).is_none()
         && !is_field_list_marker(marker.text)
         && !starts_with_markdown_list_item(marker.text.trim_start())
     {
@@ -68,17 +155,6 @@ pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Opt
             })
             .unwrap_or(lines.len()),
     )
-}
-
-fn is_rest_directive_marker(line: &str) -> bool {
-    let Some(directive) = line.trim_start().strip_prefix(".. ") else {
-        return false;
-    };
-    let Some((name, _)) = directive.split_once("::") else {
-        return false;
-    };
-
-    !name.is_empty() && !name.chars().any(char::is_whitespace)
 }
 
 /// Splits the input once at the first colon outside bracket pairs and quoted strings.
@@ -187,4 +263,37 @@ pub(super) fn indentation(line: &str) -> TextSize {
                 _ => column + 1,
             }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RestDirectiveKind, parse_rest_directive};
+
+    #[test]
+    fn parses_complete_rest_directive_arguments() {
+        let directive = parse_rest_directive("  .. math:: x^2 + y^2 = z^2").unwrap();
+
+        assert_eq!(directive.name(), "math");
+        assert_eq!(directive.argument(), "x^2 + y^2 = z^2");
+        assert_eq!(directive.kind(), RestDirectiveKind::Preformatted);
+    }
+
+    #[test]
+    fn classifies_rest_directives() {
+        for (name, expected) in [
+            ("code", RestDirectiveKind::Code),
+            ("math", RestDirectiveKind::Preformatted),
+            ("warning", RestDirectiveKind::Prose),
+        ] {
+            let marker = format!(".. {name}::");
+            assert_eq!(parse_rest_directive(&marker).unwrap().kind(), expected);
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_rest_directive_markers() {
+        assert_eq!(parse_rest_directive(".. missing-colons"), None);
+        assert_eq!(parse_rest_directive(".. two words::"), None);
+        assert_eq!(parse_rest_directive("prose .. warning::"), None);
+    }
 }

@@ -2,7 +2,10 @@ use std::borrow::Cow;
 
 use ruff_text_size::TextSize;
 
-use super::super::document::preformatted::MarkdownFence;
+use super::super::document::{
+    preformatted::MarkdownFence,
+    syntax::{RestDirectiveKind, parse_rest_directive},
+};
 
 mod inline;
 
@@ -148,6 +151,44 @@ fn render_with_indentation_mode(
             continue;
         }
 
+        // Parse directives before paragraph literal blocks so their complete arguments are
+        // available to directive-specific rendering.
+        let parsed_directive = renderer
+            .block_state
+            .is_prose()
+            .then(|| parse_rest_directive(trimmed_source_line))
+            .flatten();
+        if let Some(directive) = parsed_directive {
+            renderer.flush_pending_link();
+            match directive.kind() {
+                RestDirectiveKind::Code => {
+                    rendered_line = "";
+                    renderer.start_pending_rest_literal(
+                        directive
+                            .argument()
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("python"),
+                    );
+                }
+                RestDirectiveKind::Preformatted => {
+                    rendered_line = directive.argument();
+                    if rendered_line.is_empty() {
+                        renderer.start_pending_rest_literal("text");
+                    } else {
+                        // Use an indentation deeper than the marker so that following prose closes
+                        // the block while indented continuation lines remain part of the formula.
+                        renderer.start_rest_literal("text", line_indent + TextSize::from(1));
+                    }
+                }
+                RestDirectiveKind::Prose => {
+                    temp_owned_line =
+                        render_prose_directive("", directive.name(), directive.argument());
+                    rendered_line = temp_owned_line.as_str();
+                }
+            }
+        }
+
         // If we're not in a codeblock and we see something that signals a literal block, start one
         let parsed_literal = trimmed_source_line
             // first check for a line ending with `::`
@@ -159,7 +200,8 @@ fn render_with_indentation_mode(
                 let prefix = prefix.trim_end().strip_suffix("::")?;
                 Some((prefix, Some(lang)))
             });
-        if renderer.block_state.is_prose()
+        if parsed_directive.is_none()
+            && renderer.block_state.is_prose()
             && let Some((without_literal, lang)) = parsed_literal
         {
             let mut without_directive = without_literal;
@@ -200,37 +242,13 @@ fn render_with_indentation_mode(
                     // pending hyperlink from the previous line.
                     renderer.flush_pending_link();
 
-                    // Map version directives to human-readable phrases (matching Sphinx output)
-                    let pretty_directive = match directive.unwrap() {
-                        "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
-                        "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
-                        "deprecated" | "version-deprecated" => {
-                            Cow::Borrowed("Deprecated since version")
-                        }
-                        "versionremoved" | "version-removed" => Cow::Borrowed("Removed in version"),
-                        other => Cow::Owned(
-                            other
-                                .char_indices()
-                                .map(|(index, c)| {
-                                    if index == 0 {
-                                        c.to_ascii_uppercase()
-                                    } else {
-                                        c
-                                    }
-                                })
-                                .collect(),
-                        ),
-                    };
-
-                    // Render the argument of things like `.. version-added:: 4.0`
-                    let suffix = if let Some(lang) = lang {
-                        format!(" {lang}")
-                    } else {
-                        String::new()
-                    };
                     // We prepend without_directive here out of caution for preserving input.
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
-                    temp_owned_line = format!("**{without_directive}{pretty_directive}{suffix}:**");
+                    temp_owned_line = render_prose_directive(
+                        without_directive,
+                        directive.unwrap(),
+                        lang.unwrap_or_default(),
+                    );
 
                     rendered_line = temp_owned_line.as_str();
                 }
@@ -261,6 +279,34 @@ fn render_with_indentation_mode(
         );
     }
     renderer.finish_document();
+}
+
+fn render_prose_directive(prefix: &str, name: &str, argument: &str) -> String {
+    // Map version directives to human-readable phrases (matching Sphinx output).
+    let pretty_name = match name {
+        "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
+        "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
+        "deprecated" | "version-deprecated" => Cow::Borrowed("Deprecated since version"),
+        "versionremoved" | "version-removed" => Cow::Borrowed("Removed in version"),
+        other => Cow::Owned(
+            other
+                .char_indices()
+                .map(|(index, character)| {
+                    if index == 0 {
+                        character.to_ascii_uppercase()
+                    } else {
+                        character
+                    }
+                })
+                .collect(),
+        ),
+    };
+
+    if argument.is_empty() {
+        format!("**{prefix}{pretty_name}:**")
+    } else {
+        format!("**{prefix}{pretty_name} {argument}:**")
+    }
 }
 
 /// How to emit leading indentation outside recognized code blocks.
