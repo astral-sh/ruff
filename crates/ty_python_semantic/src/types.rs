@@ -1127,7 +1127,7 @@ impl<'db> Type<'db> {
     /// Returns `true` if this type contains a `Self` type variable.
     pub(crate) fn contains_self(self, db: &'db dyn Db) -> bool {
         if let Type::NominalInstance(instance) = self
-            && !instance.may_contain_self(db)
+            && !instance.is_definition_generic(db)
         {
             return false;
         }
