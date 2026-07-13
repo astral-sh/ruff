@@ -552,20 +552,23 @@ fn bump_buffered_token(
 ) -> Token {
     let mut next = position.wrapping_add(1);
     loop {
-        next = ensure_buffered_token(lexer, next, needs_legacy_reparse);
-        let token = lexer.tokens.tokens[next];
-        match token.kind() {
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
-            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                *nesting = nesting.saturating_sub(1);
+        if let Some(token) = lexer.tokens.tokens.get(next) {
+            match token.kind() {
+                TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => *nesting += 1,
+                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                    *nesting = nesting.saturating_sub(1);
+                }
+                _ => {}
             }
-            _ => {}
+            if !token.kind().is_trivia() {
+                *position = next;
+                return *token;
+            }
+            next += 1;
+            continue;
         }
-        if !token.kind().is_trivia() {
-            *position = next;
-            return token;
-        }
-        next += 1;
+
+        next = ensure_buffered_token(lexer, next, needs_legacy_reparse);
     }
 }
 
