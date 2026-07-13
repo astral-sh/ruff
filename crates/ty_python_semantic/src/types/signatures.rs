@@ -810,6 +810,9 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
     }
+    for ty in signature.receiver_binding_types(db) {
+        visitor.visit_type(db, ty);
+    }
     // By default we usually don't visit the type of the default value,
     // as it isn't relevant to most things
     for parameter in &signature.parameters {
