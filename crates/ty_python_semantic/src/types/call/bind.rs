@@ -2942,13 +2942,20 @@ impl<'db> CallableBinding<'db> {
     }
 
     /// Rewrites overload signatures as if an implicit bound receiver argument had already been
-    /// consumed.
+    /// consumed, preserving the corresponding source-parameter offset for diagnostics.
     pub(crate) fn bake_bound_type_into_overloads(&mut self, db: &'db dyn Db) {
         let Some(bound_self) = self.bound_type.take() else {
             return;
         };
         for overload in &mut self.overloads {
+            let removed_receiver = overload
+                .signature
+                .parameters()
+                .get(0)
+                .is_some_and(Parameter::is_positional);
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
+            overload.return_ty = overload.initial_return_type(db);
+            overload.source_parameter_index_offset += usize::from(removed_receiver);
         }
     }
 
@@ -5759,6 +5766,12 @@ pub(crate) struct Binding<'db> {
     /// and `2` here so diagnostics can point at the source declarations.
     source_overload_index: usize,
 
+    /// The number of leading source parameters consumed while constructing this binding.
+    ///
+    /// Parameter matching uses indexes into the rewritten signature, while diagnostic spans use
+    /// this offset to recover indexes into the original function definition.
+    source_parameter_index_offset: usize,
+
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
 
@@ -5801,6 +5814,7 @@ impl<'db> Binding<'db> {
         Binding {
             signature,
             source_overload_index: 0,
+            source_parameter_index_offset: 0,
             callable_type: signature_type,
             signature_type,
             return_ty,
@@ -6539,6 +6553,7 @@ impl<'db> Binding<'db> {
                 callable_description,
                 compound_diag,
                 matching_overload,
+                self.source_parameter_index_offset,
             );
         }
     }
@@ -7113,6 +7128,7 @@ impl<'db> BindingError<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn report_diagnostic(
         &self,
         context: &InferContext<'db, '_>,
@@ -7121,6 +7137,7 @@ impl<'db> BindingError<'db> {
         callable_description: Option<&CallableDescription>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
+        source_parameter_index_offset: usize,
     ) {
         let callable_kind = match callable_ty {
             Type::FunctionLiteral(_) => "Function",
@@ -7209,8 +7226,10 @@ impl<'db> BindingError<'db> {
                             SubDiagnosticSeverity::Info,
                             "Matching overload defined here",
                         );
-                        let (name_span, parameter_span) =
-                            overload_literal.parameter_span(context.db(), Some(parameter.index));
+                        let (name_span, parameter_span) = overload_literal.parameter_span(
+                            context.db(),
+                            Some(parameter.index + source_parameter_index_offset),
+                        );
                         sub.annotate(Annotation::primary(name_span));
                         sub.annotate(
                             Annotation::secondary(parameter_span)
@@ -7241,9 +7260,10 @@ impl<'db> BindingError<'db> {
                             ));
                         }
                     }
-                } else if let Some((name_span, parameter_span)) =
-                    callable_ty.parameter_span(context.db(), Some(parameter.index))
-                {
+                } else if let Some((name_span, parameter_span)) = callable_ty.parameter_span(
+                    context.db(),
+                    Some(parameter.index + source_parameter_index_offset),
+                ) {
                     let mut sub = SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         format_args!("{callable_kind} defined here"),
@@ -7342,7 +7362,8 @@ impl<'db> BindingError<'db> {
                     } else {
                         let span = callable_ty.parameter_span(
                             context.db(),
-                            (parameters.0.len() == 1).then(|| parameters.0[0].index),
+                            (parameters.0.len() == 1)
+                                .then(|| parameters.0[0].index + source_parameter_index_offset),
                         );
                         if let Some((_, parameter_span)) = span {
                             let mut sub = SubDiagnostic::new(
@@ -7541,6 +7562,7 @@ impl<'db> BindingError<'db> {
                     callable_description,
                     compound_diag,
                     matching_overload,
+                    source_parameter_index_offset,
                 );
             }
 
@@ -7552,6 +7574,7 @@ impl<'db> BindingError<'db> {
                     callable_description,
                     compound_diag,
                     matching_overload,
+                    source_parameter_index_offset,
                 );
             }
 

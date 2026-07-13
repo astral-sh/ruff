@@ -43,7 +43,7 @@ impl<'a> Benchmark<'a> {
 
         let mut metadata = ProjectMetadata::discover(&root, &system).unwrap();
 
-        metadata.apply_options(Options {
+        metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(installed_project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),

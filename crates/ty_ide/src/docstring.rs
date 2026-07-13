@@ -11,7 +11,7 @@ mod markdown;
 
 use indexmap::IndexMap;
 use regex::Regex;
-use ruff_python_trivia::{PythonWhitespace, leading_indentation};
+use ruff_python_trivia::{PythonWhitespace, expand_tabs, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::sync::LazyLock;
 
@@ -58,7 +58,8 @@ impl Docstring {
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
     pub fn parameter_documentation(&self) -> IndexMap<String, String> {
-        document::parameter_documentation(&self.0, extract_numpy_style_params(&self.0))
+        let normalized_source = documentation_trim(&self.0);
+        document::parameter_documentation(&normalized_source, extract_numpy_style_params(&self.0))
     }
 }
 
@@ -83,7 +84,7 @@ impl DocstringFragment {
 
 /// Normalizes an extracted docstring fragment without removing meaningful relative indentation.
 fn documentation_fragment_trim(docs: &str) -> String {
-    let expanded = docs.trim_end().replace('\t', "        ");
+    let expanded = expand_tabs(docs.trim_end());
     let mut output = String::with_capacity(expanded.len());
     for line in expanded.universal_newlines() {
         output.push_str(line.as_str().trim_whitespace_end());
@@ -96,13 +97,13 @@ fn documentation_fragment_trim(docs: &str) -> String {
 ///
 /// See: <https://peps.python.org/pep-0257/#handling-docstring-indentation>
 fn documentation_trim(docs: &str) -> String {
-    // First apply tab expansion as we don't want tabs in our output
-    // (python says tabs are equal to 8 spaces).
+    // First apply tab expansion as we don't want tabs in our output. Python advances tabs to the
+    // next eight-column tab stop.
     //
     // We also trim off all trailing whitespace here to eliminate trailing newlines so we
     // don't need to handle trailing blank lines later. We can't trim away leading
     // whitespace yet, because we need to identify the first line and handle it specially.
-    let expanded = docs.trim_end().replace('\t', "        ");
+    let expanded = expand_tabs(docs.trim_end());
 
     // Compute the minimum indention of all non-empty non-first lines
     // and statistics about leading blank lines to help trim them later.
@@ -346,6 +347,23 @@ mod tests {
         // so tests are stable and the expected output stays readable.
         settings.add_filter("  \n", "<HB>\n");
         settings.bind_to_scope()
+    }
+
+    #[test]
+    fn expands_tabs_to_tab_stops_when_trimming_documentation() {
+        assert_snapshot!(
+            documentation_trim(
+                "\
+Summary.
+    baseline
+  \tindented",
+            ),
+            @"
+        Summary.
+        baseline
+            indented
+        "
+        );
     }
 
     // A nice doctest that is surrounded by prose

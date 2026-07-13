@@ -625,6 +625,43 @@ Person3(age=20)
 Person3(age="20")  # error: [invalid-argument-type]
 ```
 
+Pydantic's strict aliases and `Strict()` metadata also enable strict validation for individual
+fields:
+
+```py
+from typing import Annotated
+from pydantic import Field, Strict, StrictInt
+
+class StrictFields(BaseModel):
+    strict_int: StrictInt
+    strict_str: Annotated[str, Strict()]
+
+StrictFields(strict_int=1, strict_str="foo")
+StrictFields(strict_int="1", strict_str="foo")  # error: [invalid-argument-type]
+StrictFields(strict_int=1, strict_str=b"foo")  # error: [invalid-argument-type]
+
+class StrictMetadataOrder(BaseModel):
+    field_then_lax: Annotated[int, Field(strict=True), Strict(False)]
+    lax_then_field: Annotated[int, Strict(False), Field(strict=True)]
+
+StrictMetadataOrder(field_then_lax="1", lax_then_field=1)
+StrictMetadataOrder(field_then_lax=1, lax_then_field="1")  # error: [invalid-argument-type]
+```
+
+A field with `Strict(False)` can opt out of strict validation, even in a model with `strict=True`:
+
+```py
+class LaxFieldInStrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    strict_int: int
+    lax_int: Annotated[int, Strict(False)]
+
+LaxFieldInStrictModel(strict_int=1, lax_int=1)
+LaxFieldInStrictModel(strict_int=1, lax_int="1")
+LaxFieldInStrictModel(strict_int="1", lax_int=1)  # error: [invalid-argument-type]
+```
+
 ## `validate_by_name`, `validate_by_alias`
 
 By default, Pydantic only allows a field to be initialized by its alias name, not by its field name:
@@ -651,6 +688,20 @@ class AliasAndName(BaseModel):
 AliasAndName(alias=1)
 AliasAndName(name=1)
 AliasAndName(name=None)  # error: [invalid-argument-type]
+```
+
+The older `populate_by_name=True` setting has the same behavior:
+
+```py
+class PopulatedByName(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: int = Field(alias="alias")
+
+PopulatedByName(alias=1)
+PopulatedByName(name=1)
+PopulatedByName(alias=None)  # error: [invalid-argument-type]
+PopulatedByName(name=None)  # error: [invalid-argument-type]
 ```
 
 Passing none of these should be an error:
@@ -740,6 +791,44 @@ class PersonAllowingExtras(BaseModel):
 PersonAllowingExtras(name="Alice", something_else=7)
 ```
 
+## Custom initializers and extra fields
+
+A custom initializer that accepts arbitrary keyword arguments does not prevent a subclass from
+accepting extra data:
+
+```py
+from typing import Any
+
+from pydantic import BaseModel
+
+class FrameworkBase(BaseModel):
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+
+class User(FrameworkBase):
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, **extra: Any) -> None
+User(name="Alice", city="Berlin")
+```
+
+A fixed custom initializer continues to control the accepted arguments:
+
+```py
+class RestrictiveBase(BaseModel):
+    def __init__(self, name: str) -> None:
+        super().__init__(name=name)
+
+RestrictiveBase(name="Alice")
+RestrictiveBase(name="Alice", city="Berlin")  # error: [unknown-argument]
+
+class RestrictiveUser(RestrictiveBase):
+    name: str
+
+RestrictiveUser(name="Alice")
+RestrictiveUser(name="Alice", city="Berlin")  # error: [unknown-argument]
+```
+
 ## Field named `extra`
 
 The variadic keyword parameter uses a collision-free name when the model already has a field named
@@ -794,15 +883,48 @@ class Person(BaseModel):
     id: Annotated[int, Field(default=0)]
 
 Person(name="Alice", id=1)
-# TODO: This should not be an error
-# error: [invalid-argument-type]
 Person(name=b"Alice", id=1)
-# TODO: This should not be an error
-# error: [missing-argument]
 Person(name="Alice")
 
 Person(name=None, id=1)  # error: [invalid-argument-type]
 Person(id=1)  # error: [missing-argument]
+```
+
+Multiple `Field(...)` calls in `Annotated[...]` are merged:
+
+```py
+class MultipleAnnotatedFields(BaseModel):
+    strict_then_default: Annotated[int, Field(strict=True), Field(default=0)]
+    default_then_strict: Annotated[int, Field(default=0), Field(strict=True)]
+
+MultipleAnnotatedFields()
+MultipleAnnotatedFields(strict_then_default=1, default_then_strict=1)
+MultipleAnnotatedFields(strict_then_default="1")  # error: [invalid-argument-type]
+MultipleAnnotatedFields(default_then_strict="1")  # error: [invalid-argument-type]
+```
+
+Field metadata in the annotation and on the right hand side is also merged:
+
+```py
+class AnnotatedAndAssignedFields(BaseModel):
+    strict_then_default: Annotated[int, Field(strict=True)] = Field(default=0)
+    default_then_strict: Annotated[int, Field(default=0)] = Field(strict=True)
+
+AnnotatedAndAssignedFields()
+AnnotatedAndAssignedFields(strict_then_default=1, default_then_strict=1)
+AnnotatedAndAssignedFields(strict_then_default="1")  # error: [invalid-argument-type]
+AnnotatedAndAssignedFields(default_then_strict="1")  # error: [invalid-argument-type]
+```
+
+Field metadata is also collected through aliases:
+
+```py
+AliasField = Annotated[int, Field(default=0)]
+
+class ModelWithAliasField(BaseModel):
+    value: AliasField
+
+ModelWithAliasField()
 ```
 
 ## Frozen models and fields

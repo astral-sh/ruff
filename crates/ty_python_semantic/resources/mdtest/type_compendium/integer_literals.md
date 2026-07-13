@@ -65,15 +65,14 @@ static_assert(is_single_valued(Literal[1]))
 static_assert(is_single_valued(Literal[54165]))
 ```
 
-And this can be used for type-narrowing using not-equal comparisons:
+And this can be used for type-narrowing using equality comparisons:
 
 ```py
 def f(x: int):
     if x == 54165:
-        # The reason that no narrowing occurs here is that there might be subclasses of `int`
-        # that override `__eq__`. This is not specific to integer literals though, and generally
-        # applies to `==` comparisons.
-        reveal_type(x)  # revealed: int
+        # By default, ty assumes that a broad `int` uses builtin equality. The
+        # Enabling `strict-literal-narrowing` disables this narrowing.
+        reveal_type(x)  # revealed: Literal[54165]
 
     if x != 54165:
         reveal_type(x)  # revealed: int & ~Literal[54165]

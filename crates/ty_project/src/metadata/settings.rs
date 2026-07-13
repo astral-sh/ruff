@@ -179,7 +179,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();
@@ -188,12 +188,14 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
         merged.combine_with((*option).clone());
     }
 
-    let global_options = db.project().metadata(db).options();
+    let metadata = db.project().metadata(db);
 
-    merged.rules.combine_with(global_options.rules.clone());
-    merged
-        .analysis
-        .combine_with(global_options.analysis.clone());
+    // Merge with the project level options by replaying the individual options
+    // in the correct precedence order.
+    for options in metadata.options_in_precedence_order(metadata.options()) {
+        merged.rules.combine_with(options.rules.clone());
+        merged.analysis.combine_with(options.analysis.clone());
+    }
 
     if merged.rules.is_none() && merged.analysis.is_none() {
         return FileSettings::Global;

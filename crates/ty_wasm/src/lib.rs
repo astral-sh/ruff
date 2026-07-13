@@ -165,12 +165,13 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let (program_settings, program_settings_diagnostics) = project
+        let merged_options = project.to_merged_options();
+        let (program_settings, program_settings_diagnostics) = merged_options
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
-        let (settings, settings_diagnostics) = project
+        let (settings, settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
 
@@ -194,13 +195,10 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            &[ChangeEvent::Created {
-                path: path.clone(),
-                kind: CreatedKind::File,
-            }],
-            None,
-        );
+        self.db.apply_changes(&[ChangeEvent::Created {
+            path: path.clone(),
+            kind: CreatedKind::File,
+        }]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
@@ -227,19 +225,16 @@ impl Workspace {
             .write_file(system_path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            &[
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileContent,
-                },
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileMetadata,
-                },
-            ],
-            None,
-        );
+        self.db.apply_changes(&[
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileContent,
+            },
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileMetadata,
+            },
+        ]);
 
         Ok(())
     }
@@ -261,13 +256,10 @@ impl Workspace {
                 .remove_file(system_path)
                 .map_err(into_error)?;
 
-            self.db.apply_changes(
-                &[ChangeEvent::Deleted {
-                    path: system_path.to_path_buf(),
-                    kind: DeletedKind::File,
-                }],
-                None,
-            );
+            self.db.apply_changes(&[ChangeEvent::Deleted {
+                path: system_path.to_path_buf(),
+                kind: DeletedKind::File,
+            }]);
         }
 
         Ok(())

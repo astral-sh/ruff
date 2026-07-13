@@ -365,6 +365,7 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 reveal_type(C.attribute)  # revealed: Any
+C.attribute = "could be accepted by the dynamic descriptor"
 
 class UnionMeta(type):
     attribute: Any | DataDescriptor = DataDescriptor()
@@ -545,6 +546,10 @@ reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
 reveal_type(C3.meta_non_data_descriptor1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_non_data_descriptor2)  # revealed: Literal["class level data descriptor"]
+
+C3.meta_non_data_descriptor1 = "value on class"
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `meta_non_data_descriptor1` of type `Literal["value on class"]`"
+C3.meta_non_data_descriptor1 = "invalid"
 ```
 
 Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are

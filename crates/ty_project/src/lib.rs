@@ -110,13 +110,16 @@ pub struct Project {
     /// This changes the behavior of `check` to either check only the open files or all files in
     /// the project including the virtual files that might exists in the editor.
     #[default]
+    #[returns(copy)]
     check_mode: CheckMode,
 
     #[default]
+    #[returns(copy)]
     verbose_flag: bool,
 
     /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
     #[default]
+    #[returns(copy)]
     force_exclude_flag: bool,
 }
 
@@ -423,16 +426,6 @@ impl Project {
         );
     }
 
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
-        if !self.should_check_file(db, file) {
-            return Vec::new();
-        }
-
-        check_file_impl(db, file)
-            .map(<[Diagnostic]>::to_vec)
-            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
-    }
-
     /// Opens a file in the project.
     pub fn open_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!("Opening file `{}`", file.path(db));
@@ -517,78 +510,6 @@ impl Project {
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
         self.set_open_fileset(db).to(FxHashSet::default())
-    }
-
-    /// Returns `true` if the file should be checked.
-    ///
-    /// This depends on the project's check mode:
-    /// * For [`OpenFiles`], it checks if the file is either explicitly set as an open file using
-    ///   [`open_file`] or a system virtual path
-    /// * For [`AllFiles`], it checks if the file is either a system virtual path or a part of the
-    ///   indexed files in the project
-    ///
-    /// [`open_file`]: Self::open_file
-    /// [`OpenFiles`]: CheckMode::OpenFiles
-    /// [`AllFiles`]: CheckMode::AllFiles
-    pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
-        let path = file.path(db);
-
-        // NOTE: The tracing messages below were added because
-        // whether a file should be checked or not can sometimes
-        // be at the root of confusing UX like "diagnostics all
-        // of a sudden stopped working." Having a trace message
-        // indicating *why* a particular file isn't being checked
-        // can be quite helpful for narrowing down the issue.
-        //
-        // The problem is that it's incredibly noisy. Which is why
-        // we set them to the TRACE level.
-
-        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
-        // both have a durability of `LOW`.
-        if path.is_vendored_path() {
-            tracing::trace!("Not checking {path} because it is a vendored path");
-            return false;
-        }
-
-        match self.check_mode(db) {
-            CheckMode::OpenFiles => {
-                let should_check = self.open_files(db).contains(&file);
-                if !should_check {
-                    tracing::trace!(
-                        "Not checking {path} because check mode is `OpenFiles` \
-                         and it is not in the open file set"
-                    );
-                }
-                should_check
-            }
-            CheckMode::AllFiles => {
-                // Virtual files are always checked.
-                //
-                // We also check the open file set. In theory, we
-                // shouldn't need to do this since it is accounted for
-                // by the virtual file check (for the case when a file
-                // wants to be checked but isn't saved to disk yet).
-                // However, not all clients follow the LSP convention
-                // that URIs for documents not on disk yet use the
-                // `untitled://...` scheme. That is, we assume that a
-                // `file://...` scheme corresponds to a saved file on
-                // disk, and anything else is "virtual." For example,
-                // neovim uses `file://...` even for an open buffer
-                // that does not correspond to a file saved to disk
-                // yet.
-                let should_check = path.is_system_virtual_path()
-                    || self.files(db).contains(&file)
-                    || self.open_files(db).contains(&file);
-                if !should_check {
-                    tracing::trace!(
-                        "Not checking {path} because check mode is `AllFiles` \
-                         and it is not a virtual path, in the project files \
-                         or in the open file set"
-                    );
-                }
-                should_check
-            }
-        }
     }
 
     #[tracing::instrument(level = "debug", skip(self, db))]
@@ -724,6 +645,81 @@ impl Project {
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .collect()
+    }
+}
+
+pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    if !db.should_check_file(file) {
+        return Vec::new();
+    }
+
+    check_file_impl(db, file)
+        .map(<[Diagnostic]>::to_vec)
+        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+}
+
+/// Returns `true` if the file should be checked.
+///
+/// This depends on the project's check mode:
+/// * For [`CheckMode::OpenFiles`], it checks if the file is explicitly in the open file set.
+/// * For [`CheckMode::AllFiles`], it checks if the file is virtual, indexed in the project, or in
+///   the open file set.
+///
+/// This query provides a per-file backdating boundary around the project-wide file sets. Updating
+/// either set still revalidates this query, but unchanged results are backdated before invalidation
+/// reaches semantic-index and type-inference queries.
+#[salsa::tracked(returns(copy))]
+pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
+    let project = db.project();
+    let path = file.path(db);
+
+    // NOTE: The tracing messages below were added because whether a file should be checked or not
+    // can sometimes be at the root of confusing UX like "diagnostics all of a sudden stopped
+    // working." Having a trace message indicating why a particular file isn't being checked can
+    // be quite helpful for narrowing down the issue. The messages are at TRACE because they are
+    // extremely noisy.
+
+    if path.is_vendored_path() {
+        tracing::trace!("Not checking {path} because it is a vendored path");
+        return false;
+    }
+
+    match project.check_mode(db) {
+        CheckMode::OpenFiles => {
+            let should_check = project.open_files(db).contains(&file);
+            if !should_check {
+                tracing::trace!(
+                    "Not checking {path} because check mode is `OpenFiles` \
+                     and it is not in the open file set"
+                );
+            }
+            should_check
+        }
+        CheckMode::AllFiles => {
+            // Virtual files are always checked.
+            //
+            // We also check the open file set. In theory, we shouldn't need to do this since it is
+            // accounted for by the virtual file check (for the case when a file wants to be checked
+            // but isn't saved to disk yet). However, not all clients follow the LSP convention that
+            // URIs for documents not on disk yet use the `untitled://...` scheme. That is, we assume
+            // that a `file://...` scheme corresponds to a saved file on disk, and anything else is
+            // "virtual." For example, neovim uses `file://...` even for an open buffer that does not
+            // correspond to a file saved to disk yet.
+            if path.is_system_virtual_path() {
+                return true;
+            }
+
+            let should_check =
+                project.files(db).contains(&file) || project.open_files(db).contains(&file);
+            if !should_check {
+                tracing::trace!(
+                    "Not checking {path} because check mode is `AllFiles` \
+                     and it is not a virtual path, in the project files \
+                     or in the open file set"
+                );
+            }
+            should_check
+        }
     }
 }
 

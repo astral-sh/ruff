@@ -11,7 +11,6 @@ use crate::types::attribute_write::{
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -50,7 +49,7 @@ impl<'db> ClassType<'db> {
 }
 
 /// Representation of a single `Protocol` class definition.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
@@ -452,7 +451,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
 /// Property accessors remain as callables until a relation needs their read or write type. Once
 /// resolved, `Value` retains the accessor's binding context so that only its own `Self` type is
 /// rebound during protocol checks.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMemberType<'db> {
     Value {
         ty: Type<'db>,
@@ -575,7 +574,7 @@ impl<'db> ProtocolMemberType<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 /// The types supported by one way of accessing a protocol member.
 ///
 /// `read` is covariant and `write` is contravariant. Either operation can be absent: for example,
@@ -643,7 +642,7 @@ fn cycle_normalized_optional_type<'db>(
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
@@ -826,7 +825,7 @@ impl<'db> ProtocolMemberData<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMemberKind<'db> {
     Method(ProtocolMemberType<'db>),
     Property {
@@ -1021,6 +1020,109 @@ fn property_set_member_type<'db>(
         UnionType::from_elements(db, set_types),
         definition,
     ))
+}
+
+/// Derive the observable instance capabilities of a descriptor-decorated protocol member.
+fn descriptor_decorated_protocol_member<'db>(
+    db: &'db dyn Db,
+    descriptor_ty: Type<'db>,
+    protocol: ClassType<'db>,
+    definition: Option<Definition<'db>>,
+) -> Option<ProtocolMemberData<'db>> {
+    // Applying a generic descriptor decorator to a method that refers to an enclosing type
+    // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
+    // its `__get__` result would then erase the remaining descriptor structure and weaken the
+    // protocol member to a bare `Unknown`.
+    if super::visitor::any_over_type(db, descriptor_ty, false, |ty| ty.is_unknown()) {
+        return None;
+    }
+
+    let Place::Defined(DefinedPlace {
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .class_member_with_policy(db, "__get__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+    else {
+        return None;
+    };
+
+    let receiver_ty = Type::instance(db, protocol);
+    let (read_ty, _) =
+        descriptor_ty.try_call_dunder_get(db, Some(receiver_ty), receiver_ty.to_meta_type(db))?;
+    let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
+
+    let write = if let Place::Defined(DefinedPlace {
+        ty: setter_ty,
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+    {
+        Some(ProtocolMemberType::with_definition(
+            descriptor_setter_write_type(db, setter_ty, descriptor_ty, receiver_ty)
+                .unwrap_or_else(Type::unknown),
+            definition,
+        ))
+    } else {
+        None
+    };
+
+    Some(ProtocolMemberData::property(read, write, definition))
+}
+
+/// Derive a write type from a single ordinary setter signature.
+fn descriptor_setter_write_type<'db>(
+    db: &'db dyn Db,
+    setter_ty: Type<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let callable = setter_ty.try_upcast_to_callable(db)?.exactly_one()?;
+    let signatures = callable.signatures(db);
+    let [signature] = signatures.overloads.as_ref() else {
+        return None;
+    };
+
+    // A method type variable cannot be used as the write type directly: it is inferred separately
+    // for each call. Deriving its accepted values requires generic call analysis.
+    if signature.generic_context.is_some_and(|generic_context| {
+        generic_context.variables(db).any(|typevar| {
+            !typevar.typevar(db).is_self(db)
+                && typevar
+                    .binding_context(db)
+                    .definition()
+                    .is_some_and(|definition| definition.kind(db).is_function_def())
+        })
+    }) {
+        return None;
+    }
+
+    let parameters = signature.parameters();
+    if parameters.len() != 3 {
+        return None;
+    }
+    let descriptor_parameter = parameters
+        .get_positional(0)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    let receiver_parameter = parameters
+        .get_positional(1)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    if !descriptor_ty.is_assignable_to(db, descriptor_parameter)
+        || !receiver_ty.is_assignable_to(db, receiver_parameter)
+    {
+        return None;
+    }
+
+    Some(
+        parameters
+            .get_positional(2)?
+            .annotated_type()
+            .bind_self_typevars(db, descriptor_ty),
+    )
 }
 
 fn property_set_type<'db>(
@@ -1877,6 +1979,7 @@ impl BoundOnClass {
 
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
+    returns(copy),
     cycle_initial=|db, _, _| ProtocolInterface::empty(db),
     cycle_fn=proto_interface_cycle_recover,
     heap_size=ruff_memory_usage::heap_size,
@@ -1983,6 +2086,18 @@ fn cached_protocol_interface<'db>(
                 Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
                     ProtocolMemberData::method(function.into_callable_type(db), definition)
                 }
+                _ if bound_on_class.is_yes()
+                    && definition
+                        .is_some_and(|definition| definition.kind(db).is_function_def()) =>
+                {
+                    if let Some(descriptor) =
+                        descriptor_decorated_protocol_member(db, ty, class, definition)
+                    {
+                        descriptor
+                    } else {
+                        ProtocolMemberData::attribute(ty, qualifiers, definition)
+                    }
+                }
                 _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
             };
 
@@ -2004,7 +2119,8 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, *previous, cycle)
 }
 
-/// Bind `self`, and *also* discard the functionlike-ness of the callable.
+/// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
+/// of the callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
@@ -2014,12 +2130,7 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    CallableType::new(
-        db,
-        callable.signatures(db).bind_self(db, self_type),
-        CallableTypeKind::Regular,
-        callable.provenance(db),
-    )
+    callable.bind_self(db, self_type).into_regular(db)
 }
 
 /// Return the possible output type of a callable unless any overload returns `Never`.

@@ -71,7 +71,7 @@ bitflags::bitflags! {
     ///
     /// This combines properties derived from the MRO into the existing class-classification
     /// query, avoiding a separate cached query for each property.
-    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash, salsa::Update)]
+    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
     pub(super) struct ClassInstanceFlags: u8 {
         /// The class is, or inherits from, a `TypedDict` specification.
         const TYPED_DICT = 1 << 0;
@@ -83,7 +83,7 @@ bitflags::bitflags! {
 impl get_size2::GetSize for ClassInstanceFlags {}
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
@@ -120,7 +120,9 @@ impl<'db> CodeGeneratorKind<'db> {
             return None;
         }
 
-        #[salsa::tracked(cycle_initial=|_, _, _| None,
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -197,7 +199,9 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(cycle_initial=|_, _, _| None,
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_dynamic_class<'db>(
@@ -309,7 +313,9 @@ impl<'db> CodeGeneratorKind<'db> {
 /// A specialization of a generic class with a particular assignment of types to typevars.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericAlias<'db> {
+    #[returns(copy)]
     pub(crate) origin: StaticClassLiteral<'db>,
+    #[returns(copy)]
     pub(crate) specialization: Specialization<'db>,
 }
 
@@ -409,6 +415,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -450,7 +457,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 /// A class literal, either defined via a `class` statement or a `type` function call.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum ClassLiteral<'db> {
     /// A class defined via a `class` statement.
@@ -993,7 +1000,7 @@ impl<'db> From<DynamicEnumLiteral<'db>> for ClassLiteral<'db> {
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum ClassType<'db> {
     // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
@@ -1392,6 +1399,7 @@ impl<'db> ClassType<'db> {
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -2372,7 +2380,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct AbstractMethod<'db> {
     pub(super) defining_class: ClassType<'db>,
     pub(super) definition: Definition<'db>,
@@ -2413,7 +2421,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -2456,7 +2464,7 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
@@ -2838,7 +2846,7 @@ impl std::fmt::Display for QualifiedClassName<'_> {
 /// `TypeError`s resulting from class definitions.
 ///
 /// [PEP 800]: https://peps.python.org/pep-0800/
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct DisjointBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: DisjointBaseKind,
@@ -2879,7 +2887,7 @@ impl<'db> DisjointBase<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum DisjointBaseKind {
     /// We know the class is a disjoint base because it's either hardcoded in ty
     /// or has the `@disjoint_base` decorator.
@@ -2888,7 +2896,7 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
 }
@@ -2900,7 +2908,7 @@ impl<'db> MetaclassError<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum MetaclassErrorKind<'db> {
     /// The class has incompatible metaclasses in its inheritance hierarchy.
     ///

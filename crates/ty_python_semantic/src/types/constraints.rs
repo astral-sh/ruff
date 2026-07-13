@@ -239,13 +239,13 @@ where
 /// Note that you cannot interrogate an owned constraint set directly. Instead, use
 /// [`query`][OwnedConstraintSet::query] to query it in a builder with matching arenas, or
 /// [`load`][ConstraintSetBuilder::load] to remap it into an existing builder.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnedConstraintSetInner<'db> {
     constraints: Box<[Constraint<'db>]>,
     constraint_indices: RankBitBox,
@@ -1125,17 +1125,17 @@ impl IntersectionResult<'_> {
 
 /// The index of a bound typevar within a [`ConstraintSetStorage`].
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct TypeVarId;
 
 /// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(get_size2::GetSize)]
 pub struct ConstraintId;
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Constraint<'db> {
     pub(crate) typevar: BoundTypeVarInstance<'db>,
     pub(crate) bounds: ConstraintBounds<'db>,
@@ -1146,7 +1146,7 @@ pub(crate) struct Constraint<'db> {
 /// Missing bounds are represented as `None`; callers can materialize them to the logical defaults
 /// (`Never` for lower bounds, `object` for upper bounds) when they need to reason about
 /// satisfiability.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ConstraintBounds<'db> {
     pub(crate) lower: Option<Type<'db>>,
     pub(crate) upper: Option<Type<'db>>,
@@ -1191,7 +1191,7 @@ impl<'db> ConstraintBounds<'db> {
 /// As an optimization, we will remove redundant clauses as we build up an `UpperBound`. This
 /// reduces the amount of work `IntersectionBuilder` needs to do when producing the solution for
 /// this upper bound.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
     clauses: FxOrderSet<Type<'db>>,
 }
@@ -1797,7 +1797,7 @@ impl ConstraintId {
 /// cannot use this ordering as our BDD variable ordering, since we calculate it from already
 /// constructed BDDs, and we need the BDD variable ordering to be fixed and available before
 /// construction starts.)
-#[derive(Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize)]
 struct NodeId(u32);
 
 /// A special ID that is used for an "always true" / "always visible" constraint.
@@ -3254,7 +3254,7 @@ impl Idx for NodeId {
 struct InteriorNode(NodeId);
 
 /// An interior node of a BDD
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 struct InteriorNodeData {
     constraint: ConstraintId,
     if_true: NodeId,
@@ -3333,7 +3333,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
 }
 
 /// The explicit lower and upper bounds inferred for one typevar on one BDD path.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) lower: Option<Type<'db>>,
@@ -3403,6 +3403,7 @@ impl<'db> Type<'db> {
 }
 
 #[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]
@@ -3417,7 +3418,7 @@ fn is_possibly_constraint_set_assignable<'db>(
 }
 
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,

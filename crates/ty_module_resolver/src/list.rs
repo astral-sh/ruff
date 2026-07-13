@@ -98,7 +98,9 @@ fn list_modules_in<'db>(
 /// A module paired with whether it came from a stub package.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ListedModule<'db> {
+    #[returns(copy)]
     module: Module<'db>,
+    #[returns(copy)]
     is_stub_package: bool,
 }
 

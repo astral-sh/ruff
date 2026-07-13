@@ -413,18 +413,9 @@ impl Session {
         path: &AnySystemPath,
         changes: &[ChangeEvent],
     ) -> ChangeResult {
-        let overrides = path.as_system().and_then(|root| {
-            self.workspaces()
-                .for_path(root)?
-                .settings()
-                .project_options_overrides()
-                .cloned()
-        });
-
         self.bump_revision();
 
-        self.project_db_mut(path)
-            .apply_changes(changes, overrides.as_ref())
+        self.project_db_mut(path).apply_changes(changes)
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -594,10 +585,7 @@ impl Session {
             self.native_system.clone(),
         );
 
-        let configuration_file = workspace
-            .settings
-            .project_options_overrides()
-            .and_then(|settings| settings.config_file_override.as_ref());
+        let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
             ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
@@ -608,12 +596,16 @@ impl Session {
         let project = metadata
             .context("Failed to discover project configuration")
             .and_then(|mut metadata| {
+                if let Some(fallback_options) = workspace.settings.fallback_options() {
+                    metadata.apply_fallback_options(fallback_options.clone());
+                }
+
                 metadata
                     .apply_configuration_files(&system)
                     .context("Failed to apply configuration files")?;
 
-                if let Some(overrides) = workspace.settings.project_options_overrides() {
-                    metadata.apply_overrides(overrides);
+                if let Some(override_options) = workspace.settings.override_options() {
+                    metadata.apply_override_options(override_options.clone());
                 }
 
                 ProjectDatabase::fallible(metadata, system.clone())

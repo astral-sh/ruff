@@ -191,6 +191,39 @@ def f(a_or_b: A | B, any_or_a: Any | A):
     reveal_type(any_or_a.f())  # revealed: Any | int
 ```
 
+## Stored protocol-bound methods
+
+A protocol-bound method stored alongside another callable must not re-check its already-bound
+receiver when the callable union is invoked.
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+class PeekIterator(Iterator[Any]):
+    def __init__(self, iterator: Iterator[Any]) -> None:
+        self._next = iterator.__next__
+
+    def __next__(self) -> Any:
+        return self._next()
+
+    def use_fallback(self) -> None:
+        self._next = lambda: None
+```
+
+Only a genuine implicit positional receiver can be consumed before call inference. Other parameter
+shapes must continue through the ordinary bound-method call path.
+
+```py
+from typing import Protocol
+
+class Variadic(Protocol):
+    def method(*args: int) -> int: ...
+
+def check_variadic(value: Variadic) -> None:
+    value.method()  # error: [invalid-argument-type]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml

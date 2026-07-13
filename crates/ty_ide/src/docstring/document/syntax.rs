@@ -8,33 +8,15 @@ use super::rst::is_field_list_marker;
 /// source ranges.
 ///
 /// For example, `first\r\nsecond` yields `first` at offset 0 and `second` at offset 7.
-pub(super) fn parsed_lines(raw: &str) -> Vec<ParsedLine<'_>> {
-    let mut lines = raw
+pub(super) fn parsed_lines(source: &str) -> Vec<ParsedLine<'_>> {
+    source
         .universal_newlines()
         .map(|line| ParsedLine {
             text: line.as_str(),
             range: line.range(),
-            raw_indent: indentation(line.as_str()),
-            structural_indent: TextSize::new(0),
+            indent: indentation(line.as_str()),
         })
-        .collect::<Vec<_>>();
-
-    // PEP 257 ignores indentation on the first physical line and removes the common margin from
-    // all later lines. Keep the raw indentation as well because item and block indentation can
-    // still disambiguate content within a section.
-    let continuation_margin = lines
-        .iter()
-        .skip(1)
-        .filter(|line| !line.text.trim().is_empty())
-        .map(|line| line.raw_indent)
-        .min()
-        .unwrap_or(TextSize::new(0));
-
-    for line in lines.iter_mut().skip(1) {
-        line.structural_indent = line.raw_indent.saturating_sub(continuation_margin);
-    }
-
-    lines
+        .collect()
 }
 
 /// A docstring line and its source range, excluding the newline terminator.
@@ -44,10 +26,8 @@ pub(super) struct ParsedLine<'a> {
     pub(super) text: &'a str,
     /// The byte range of `text` within the source document.
     pub(super) range: TextRange,
-    /// The indentation in the raw docstring text.
-    pub(super) raw_indent: TextSize,
-    /// The indentation after removing the PEP 257 continuation margin.
-    pub(super) structural_indent: TextSize,
+    /// The indentation in the source document.
+    pub(super) indent: TextSize,
 }
 
 /// Returns whether `line` starts with a `CommonMark` list-item marker.
@@ -70,6 +50,55 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
         && matches!(bytes.get(digits + 1), Some(b' ' | b'\t'))
 }
 
+/// Returns whether `text` consists of a complete Markdown code span.
+///
+/// For example, this returns `true` for ``"`value`"`` and `false` for
+/// ``"`value` trailing"``.
+pub(in crate::docstring) fn is_markdown_code_span(text: &str) -> bool {
+    markdown_code_span_len(text) == Some(TextSize::of(text))
+}
+
+/// Returns the length of a complete Markdown code span at the start of `text`.
+///
+/// For example, given `text` equal to ``"`value` trailing"``, the returned length covers only
+/// ``"`value`"``.
+///
+/// Lengths are measured in UTF-8 bytes. A closing backtick run must be the same length as the
+/// opening run.
+pub(in crate::docstring) fn markdown_code_span_len(text: &str) -> Option<TextSize> {
+    let opening = find_backtick_run(text, TextSize::ZERO)?;
+    if opening.start() != TextSize::ZERO {
+        return None;
+    }
+
+    let mut search_from = opening.end();
+    while let Some(closing) = find_backtick_run(text, search_from) {
+        if closing.len() == opening.len() {
+            return Some(closing.end());
+        }
+        search_from = closing.end();
+    }
+
+    None
+}
+
+/// Returns the byte range of the first consecutive backtick run at or after `from`.
+///
+/// For example, searching ``"value `code`"`` from the start returns the range covering the
+/// opening ``"`"``.
+pub(in crate::docstring) fn find_backtick_run(text: &str, from: TextSize) -> Option<TextRange> {
+    let from = from.to_usize();
+    let start = from + text.get(from..)?.find('`')?;
+    let len = text[start..]
+        .bytes()
+        .take_while(|byte| *byte == b'`')
+        .count();
+    Some(TextRange::new(
+        TextSize::of(&text[..start]),
+        TextSize::of(&text[..start + len]),
+    ))
+}
+
 /// Returns the end of an indented Markdown or reStructuredText container block.
 pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
     let marker = lines.get(index)?;
@@ -80,13 +109,11 @@ pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Opt
         return None;
     }
 
-    // Container membership is determined before PEP 257 normalization. This keeps raw-indented
-    // section-like text inside lists, directives, and field-list entries.
     Some(
         (index + 1..lines.len())
             .find(|&end| {
                 let line = lines[end];
-                !line.text.trim().is_empty() && line.raw_indent <= marker.raw_indent
+                !line.text.trim().is_empty() && line.indent <= marker.indent
             })
             .unwrap_or(lines.len()),
     )
@@ -209,4 +236,30 @@ pub(super) fn indentation(line: &str) -> TextSize {
                 _ => column + 1,
             }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextSize;
+
+    use super::markdown_code_span_len;
+
+    #[test]
+    fn finds_markdown_code_span_len() {
+        assert_eq!(
+            markdown_code_span_len("`value` trailing"),
+            Some(TextSize::of("`value`"))
+        );
+        assert_eq!(
+            markdown_code_span_len("``value`with:ticks``"),
+            Some(TextSize::of("``value`with:ticks``"))
+        );
+        assert_eq!(
+            markdown_code_span_len("`first` second`"),
+            Some(TextSize::of("`first`"))
+        );
+        assert_eq!(markdown_code_span_len("``value```"), None);
+        assert_eq!(markdown_code_span_len("``"), None);
+        assert_eq!(markdown_code_span_len("value"), None);
+    }
 }

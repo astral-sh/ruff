@@ -12,8 +12,10 @@ use crate::{
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
+    #[returns(copy)]
     pub file: File,
 
+    #[returns(copy)]
     pub file_scope_id: FileScopeId,
 }
 
@@ -82,7 +84,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -109,7 +111,7 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize)]
 pub struct Scope {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
@@ -365,7 +367,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),

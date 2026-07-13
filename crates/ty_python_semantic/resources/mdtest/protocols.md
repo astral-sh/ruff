@@ -1834,7 +1834,7 @@ the non-callable attribute must be readable with the same type through both an i
 `classvars.py`:
 
 ```py
-from typing import ClassVar, Protocol
+from typing import Any, ClassVar, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_assignable_to
 
@@ -1866,6 +1866,36 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
+
+class XMeta(type):
+    def x(cls) -> str:
+        return ""
+
+class ClassVarXWithConflictingMetaclass(metaclass=XMeta):
+    x: ClassVar[int] = 42
+
+static_assert(is_assignable_to(ClassVarXWithConflictingMetaclass, ClassVarXProto))
+static_assert(is_subtype_of(ClassVarXWithConflictingMetaclass, ClassVarXProto))
+
+class GenericMeta(type):
+    x: list[Any] = []
+
+class ClassVarXWithGenericMetaclass(metaclass=GenericMeta):
+    x: ClassVar[int] = 42
+
+static_assert(is_assignable_to(ClassVarXWithGenericMetaclass, ClassVarXProto))
+static_assert(is_subtype_of(ClassVarXWithGenericMetaclass, ClassVarXProto))
+
+# A class-level attribute shadows a non-data descriptor on the metaclass. In particular,
+# `NotHashable.__hash__` takes precedence over the non-data `type.__hash__` descriptor.
+class NotHashableProto(Protocol):
+    __hash__: ClassVar[None]
+
+class NotHashable:
+    __hash__: ClassVar[None] = None
+
+static_assert(is_assignable_to(NotHashable, NotHashableProto))
+static_assert(is_subtype_of(NotHashable, NotHashableProto))
 ```
 
 This is mentioned by the
@@ -2440,6 +2470,245 @@ class HasConcretePropertySetter(Protocol):
 
 static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
+```
+
+## Protocol members defined using descriptor decorators
+
+### Descriptor reads and writes
+
+On an instance, a protocol member defined using a descriptor decorator has the type returned by
+`__get__`, not the type of the descriptor stored on the protocol class. If the descriptor defines
+`__set__`, its value parameter determines which assignments are valid:
+
+```py
+from typing import Protocol
+
+class StringDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "example"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class HasName(Protocol):
+    @StringDescriptor
+    def name(self) -> object: ...
+
+class WithName:
+    name: str = "example"
+
+has_name: HasName = WithName()
+reveal_type(has_name.name)  # revealed: str
+has_name.name = "updated"
+has_name.name = 1  # error: [invalid-assignment]
+```
+
+### `cached_property`
+
+The standard-library `cached_property` descriptor uses the same behavior:
+
+```py
+from functools import cached_property
+from typing import Protocol
+
+class HasCachedName(Protocol):
+    @cached_property
+    def name(self) -> str: ...
+
+class WithCachedName:
+    @cached_property
+    def name(self) -> str:
+        return "example"
+
+has_name: HasCachedName = WithCachedName()
+```
+
+### Generic descriptor result types
+
+Applying a generic descriptor decorator to a generic protocol method currently loses the protocol's
+type variable and produces `cached_property[Unknown]`. The protocol must preserve that descriptor
+type instead of reducing it to a bare `Unknown`, which would allow an incompatible implementation.
+
+```py
+from functools import cached_property
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, reveal_protocol_interface
+
+T = TypeVar("T")
+
+class HasValue(Protocol[T]):
+    @cached_property
+    def value(self) -> T: ...
+
+class StrValue:
+    @cached_property
+    def value(self) -> str:
+        return "value"
+
+static_assert(not is_assignable_to(StrValue, HasValue[int]))
+
+# TODO: This should be a property with an `int` read type once decorator calls preserve enclosing
+# type variables.
+# revealed: {"value": AttributeMember(`cached_property[Unknown]`)}
+reveal_protocol_interface(HasValue[int])
+```
+
+### Descriptor values in annotations
+
+Only a descriptor produced by decorating a protocol method changes how that member is read and
+written through an instance. An annotation whose type implements the descriptor protocol still
+declares an ordinary attribute whose protocol member type is the descriptor object. We reveal the
+protocol interface here because ordinary instance access would invoke `cached_property.__get__` and
+reveal `str` in both cases:
+
+```py
+from functools import cached_property
+from typing import Protocol
+from ty_extensions._internal import reveal_protocol_interface
+
+class StoresDescriptor(Protocol):
+    name: cached_property[str]
+
+# revealed: {"name": AttributeMember(`cached_property[str]`)}
+reveal_protocol_interface(StoresDescriptor)
+```
+
+### Overloaded setters selected by receiver type
+
+An overloaded `__set__` method can accept different values for different receiver types. For
+`HasValue`, the overloads with an `object` receiver accept `int` and `bytes`; the overload for
+`Other` does not apply. Until these overloads can be analyzed, `Unknown` is used as the write type.
+This preserves the writable requirement without rejecting assignments.
+
+```py
+from typing import Protocol, final, overload
+
+@final
+class Other: ...
+
+class ReceiverSensitiveDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    @overload
+    def __set__(self, instance: object, value: int) -> None: ...
+    @overload
+    def __set__(self, instance: object, value: bytes) -> None: ...
+    @overload
+    def __set__(self, instance: Other, value: str) -> None: ...
+    def __set__(self, instance: object, value: int | bytes | str) -> None: ...
+
+class HasValue(Protocol):
+    @ReceiverSensitiveDescriptor
+    def value(self) -> int: ...
+
+class ReadOnlyValue:
+    @property
+    def value(self) -> int:
+        return 1
+
+read_only: HasValue = ReadOnlyValue()  # error: [invalid-assignment]
+
+def update_value(value: HasValue) -> None:
+    value.value = 1
+    value.value = b"valid"
+    # TODO: This assignment should be rejected.
+    value.value = "bad"
+```
+
+### Union descriptor types
+
+If a decorator can return either of two descriptors, an assignment must be accepted by both possible
+descriptors. Here, only `str` is accepted by both.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def either_descriptor(getter: object) -> Descriptor[int | str] | Descriptor[str | bytes]:
+    raise NotImplementedError
+
+class HasEitherValue(Protocol):
+    @either_descriptor
+    def either_value(self) -> object: ...
+
+def update_either_value(value: HasEitherValue) -> None:
+    value.either_value = "valid"
+    # TODO: This assignment should be rejected.
+    value.either_value = 1
+```
+
+### Overloaded setters selected by descriptor type
+
+An overload can also restrict the type of the descriptor itself. The decorator below returns
+`SelfSensitiveDescriptor[int]`, so only the overload accepting an `int` value applies.
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+
+class SelfSensitiveDescriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    @overload
+    def __set__(self: SelfSensitiveDescriptor[int], instance: object, value: int) -> None: ...
+    @overload
+    def __set__(self: SelfSensitiveDescriptor[str], instance: object, value: str) -> None: ...
+    def __set__(self, instance: object, value: int | str) -> None: ...
+
+def int_descriptor(getter: object) -> SelfSensitiveDescriptor[int]:
+    raise NotImplementedError
+
+class HasIntValue(Protocol):
+    @int_descriptor
+    def int_value(self) -> int: ...
+
+def update_int_value(value: HasIntValue) -> None:
+    value.int_value = 1
+    # TODO: This assignment should be rejected.
+    value.int_value = "bad"
+```
+
+### Generic setter value types
+
+A setter that uses a method type variable directly as its value parameter accepts every value
+allowed by that type variable's upper bound.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class BoundedDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def bounded_descriptor(getter: object) -> BoundedDescriptor:
+    raise NotImplementedError
+
+class HasBoundedValue(Protocol):
+    @bounded_descriptor
+    def bounded_value(self) -> int: ...
+
+def update_bounded_value(value: HasBoundedValue) -> None:
+    value.bounded_value = 1
+    # TODO: This assignment should be rejected.
+    value.bounded_value = "bad"
 ```
 
 ## Variance of generic protocols with `Final` members

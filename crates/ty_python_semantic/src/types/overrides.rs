@@ -669,7 +669,7 @@ fn check_class_declaration<'db>(
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
@@ -733,7 +733,7 @@ fn superclass_variable_kind<'db>(
 ///     x: ClassVar[int] = 2
 /// ```
 #[allow(clippy::needless_pass_by_value)]
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn effective_superclass_variable_kind<'db>(
     db: &'db dyn Db,
     superclass: ClassType<'db>,
@@ -815,7 +815,7 @@ fn effective_superclass_variable_kind<'db>(
 /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
 /// which might be in a different Python module. If this weren't a tracked query, we could
 /// introduce cross-module dependencies and over-invalidation.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_function_definition<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,

@@ -2765,8 +2765,49 @@ match capture_from_later_global():
 
 ## Value patterns
 
-Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
-one can only give us information where we know how the subject type implements equality.
+Value patterns are evaluated by equality, which is overridable. Apart from the optimistic treatment
+of broad builtin types described below, successfully matching one only gives us information where we
+know how the subject type implements equality.
+
+Broad builtin types are treated as if they use the builtin equality implementation, so literal
+patterns narrow `str`, `int`, and `bytes`:
+
+```py
+def string_pattern(value: str):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: Literal["a"]
+
+def integer_pattern(value: int):
+    match value:
+        case 1:
+            reveal_type(value)  # revealed: Literal[1, True]
+
+def bytes_pattern(value: bytes):
+    match value:
+        case b"a":
+            reveal_type(value)  # revealed: Literal[b"a"]
+```
+
+Explicit subclass and custom comparison arms are still preserved:
+
+```py
+class StringSubclass(str): ...
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def subclass_pattern(value: StringSubclass):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: StringSubclass
+
+def custom_comparison_pattern(value: str | AlwaysEqual):
+    match value:
+        case "a":
+            reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
+```
 
 Consider the following example.
 
@@ -2776,19 +2817,16 @@ from typing import Literal
 def _(x: Literal["foo"] | int):
     match x:
         case "foo":
-            reveal_type(x)  # revealed: Literal["foo"] | int
+            reveal_type(x)  # revealed: Literal["foo"]
 
     match x:
         case "bar":
-            reveal_type(x)  # revealed: int
+            reveal_type(x)  # revealed: Never
 ```
 
-In the first `match`'s `case "foo"` all we know is `x == "foo"`. `x` could be an instance of an
-arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow to
-`Literal["foo"]`.
-
-In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
-rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
+In the first `match`, the broad `int` arm is assumed to use builtin equality and cannot compare
+equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabling
+`strict-literal-narrowing` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
 disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
@@ -2883,15 +2921,15 @@ class C:
 def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
     match x:
         case "foo":
-            reveal_type(x)  # revealed: Literal["foo"] | int | float | complex
+            reveal_type(x)  # revealed: Literal["foo"] | float | complex
         case 42:
-            reveal_type(x)  # revealed: int | float | complex
+            reveal_type(x)  # revealed: Literal[42] | float | complex
         case 6.0:
             reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
         case 1j:
             reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
         case b"foo":
-            reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
+            reveal_type(x)  # revealed: Literal[b"foo"] | float | complex
         case _:
             reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
 ```
@@ -3132,11 +3170,11 @@ class C:
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" if reveal_type(x):  # revealed: Literal["foo"] | int
+        case "foo" if reveal_type(x):  # revealed: Literal["foo"]
             pass
-        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
-        case 42 if reveal_type(x):  # revealed: int
+        case 42 if reveal_type(x):  # revealed: Literal[42]
             pass
 ```
 
@@ -3232,9 +3270,9 @@ from typing import Literal
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
-        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo"] | int
+        case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo", 42]
             pass
-        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
+        case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
             pass

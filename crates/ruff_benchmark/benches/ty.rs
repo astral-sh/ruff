@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -163,13 +163,10 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn incremental(case: &mut Case) {
         let Case { db, .. } = case;
 
-        db.apply_changes(
-            &[ChangeEvent::Changed {
-                path: case.file_path.clone(),
-                kind: ChangedKind::FileContent,
-            }],
-            None,
-        );
+        db.apply_changes(&[ChangeEvent::Changed {
+            path: case.file_path.clone(),
+            kind: ChangedKind::FileContent,
+        }]);
 
         let result = db.check();
 
@@ -267,7 +264,7 @@ fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python,
@@ -1725,7 +1722,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_options(Options {
+        metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),

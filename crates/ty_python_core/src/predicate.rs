@@ -72,13 +72,13 @@ impl<'db> PredicatesBuilder<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct Predicate<'db> {
     pub node: PredicateNode<'db>,
     pub is_positive: bool,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum PredicateOrLiteral<'db> {
     Literal(bool),
     Predicate(Predicate<'db>),
@@ -98,7 +98,7 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct CallableAndCallExpr<'db> {
     pub callable: Expression<'db>,
     pub call_expr: Expression<'db>,
@@ -108,7 +108,7 @@ pub struct CallableAndCallExpr<'db> {
     pub is_await: bool,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
@@ -143,14 +143,14 @@ pub enum PredicateNode<'db> {
 ///
 /// The full pattern determines the predicate's truth value, while `target` selects the subject
 /// occurrence whose aligned pattern constraint should be applied to a binding.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SubjectElementPatternPredicate<'db> {
     pub pattern: PatternPredicate<'db>,
     pub target: ExpressionNodeKey,
 }
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SequencePatternPredicateKind<'db> {
     pub patterns: Box<[PatternPredicateKind<'db>]>,
 }
@@ -176,7 +176,7 @@ impl<'db> SequencePatternPredicateKind<'db> {
 }
 
 /// Structural details for a class pattern.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ClassPatternPredicateKind<'db> {
     pub class: Expression<'db>,
     pub positional: Box<[PatternPredicateKind<'db>]>,
@@ -189,14 +189,14 @@ impl ClassPatternPredicateKind<'_> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ClassPatternKeywordPredicateKind<'db> {
     pub attr: Name,
     pub pattern: PatternPredicateKind<'db>,
 }
 
 /// Structural details for a mapping pattern.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingPatternPredicateKind<'db> {
     pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
     pub rest: Option<Name>,
@@ -208,7 +208,7 @@ impl MappingPatternPredicateKind<'_> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingPatternEntryPredicateKind<'db> {
     pub key: Expression<'db>,
     pub pattern: PatternPredicateKind<'db>,
@@ -216,7 +216,7 @@ pub struct MappingPatternEntryPredicateKind<'db> {
 
 /// Pattern structure used for type narrowing, static reachability, and inferring the types of
 /// names bound by a successful match.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
@@ -230,15 +230,19 @@ pub enum PatternPredicateKind<'db> {
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
+    #[returns(copy)]
     pub file: File,
 
+    #[returns(copy)]
     pub file_scope: FileScopeId,
 
+    #[returns(copy)]
     pub subject: Expression<'db>,
 
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,
 
+    #[returns(copy)]
     pub guard: Option<Expression<'db>>,
 
     /// A reference to the pattern of the previous match case
@@ -297,6 +301,7 @@ impl<'db> PatternPredicate<'db> {
 /// [Truthiness]: [crate::types::Truthiness]
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
+    #[returns(copy)]
     pub importing_file: File,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
@@ -308,8 +313,10 @@ pub struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
+    #[returns(copy)]
     pub symbol_id: ScopedSymbolId,
 
+    #[returns(copy)]
     pub referenced_file: File,
 }
 

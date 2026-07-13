@@ -40,7 +40,7 @@ use crate::place::{
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::attribute_write::assignment_attribute_members;
+use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -2857,7 +2857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }),
                     ..
                 }) = assignment_attribute_members(db, object_ty, attribute)
-                    .map(|(meta_attr, _)| meta_attr)
+                    .and_then(AssignmentAttributeMembers::type_member)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(
@@ -3853,10 +3853,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotation = assignment.annotation(self.module());
+        // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
+        self.setup_dataclass_field_specifiers();
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+        self.dataclass_field_specifiers.clear();
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
@@ -6319,6 +6322,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -6404,13 +6408,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // The SequentMap's transitivity reasoning can inject
                                 // cross-typevar references into the solution bounds.
                                 // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
-                                // which adds `_KT` to `_VT`'s lower bound. Filter out any
-                                // inferable typevars from the solution, since they represent
+                                // which adds `_KT` to `_VT`'s lower bound. Remove inferable
+                                // typevars from the same generic context, since they represent
                                 // cross-typevar relationships that are resolved independently.
-                                let inferred_ty = binding.solution.filter_union(db, |ty| {
-                                    !ty.as_typevar()
-                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
-                                });
+                                let inferred_ty = builder
+                                    .remove_inferable_typevar_artifacts_from_solution(
+                                        binding.bound_typevar,
+                                        binding.solution,
+                                    );
 
                                 // Avoid inferring a preferred type based on partially specialized
                                 // type context from an outer generic call. If the type context is
@@ -6523,8 +6528,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
-
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
 
         for elt_ty in elt_tys.clone() {

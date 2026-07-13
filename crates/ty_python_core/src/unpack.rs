@@ -29,10 +29,13 @@ use crate::scope::{FileScopeId, ScopeId};
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Unpack<'db> {
+    #[returns(copy)]
     pub file: File,
 
+    #[returns(copy)]
     pub(crate) value_file_scope: FileScopeId,
 
+    #[returns(copy)]
     pub(crate) target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
@@ -44,6 +47,7 @@ pub struct Unpack<'db> {
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
+    #[returns(copy)]
     pub value: UnpackValue<'db>,
 }
 
@@ -67,7 +71,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UnpackValue<'db> {
     /// The kind of unpack expression
     kind: UnpackKind,
@@ -99,7 +103,7 @@ impl<'db> UnpackValue<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable { mode: EvaluationMode },
@@ -110,7 +114,7 @@ pub enum UnpackKind {
 }
 
 /// The position of the target element in an unpacking.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum UnpackPosition {
     /// The target element is in the first position of the unpacking.
     First,

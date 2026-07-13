@@ -31,6 +31,7 @@ pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
 
+    #[returns(copy)]
     pub(super) detailed_display: bool,
 }
 
@@ -50,7 +51,9 @@ impl<'db> InternedConstraintSet<'db> {
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctoolsPartialInstance<'db> {
+    #[returns(copy)]
     pub wrapped: InternedType<'db>,
+    #[returns(copy)]
     pub partial: CallableType<'db>,
 }
 
@@ -68,7 +71,7 @@ impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 /// are generally created by operations at runtime in some way, such as a type alias
 /// statement, a typevar definition, or an instance of `Generic[T]` in a class's
 /// bases list.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
@@ -462,6 +465,7 @@ impl<'db> KnownInstanceType<'db> {
 pub struct SentinelInstance<'db> {
     #[returns(ref)]
     pub name: Name,
+    #[returns(copy)]
     pub definition: Definition<'db>,
 }
 
@@ -479,7 +483,7 @@ impl<'db> SentinelInstance<'db> {
 }
 
 /// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
     pub(crate) message: Option<StringLiteralType<'db>>,
@@ -491,12 +495,15 @@ pub struct DeprecatedInstance<'db> {
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
+    #[returns(copy)]
     pub default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
+    #[returns(copy)]
     pub init: bool,
 
     /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+    #[returns(copy)]
     pub kw_only: Option<bool>,
 
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
@@ -506,9 +513,11 @@ pub struct FieldInstance<'db> {
     /// The converter types for this field, if a `converter` argument was provided.
     /// The first element is the input type (first positional parameter), the second is the
     /// output type (return type of the converter callable).
+    #[returns(copy)]
     pub converter: Option<(Type<'db>, Type<'db>)>,
 
     /// The mode selected by Pydantic's `strict` argument.
+    #[returns(copy)]
     pub strict: ConfigBoolean,
 }
 
@@ -760,6 +769,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
 /// A salsa-interned `Type`
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedType<'db> {
+    #[returns(copy)]
     pub(super) inner: Type<'db>,
 }
 

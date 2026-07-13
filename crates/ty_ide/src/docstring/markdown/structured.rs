@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
-use crate::docstring::document::syntax::starts_with_markdown_list_item;
+use crate::docstring::document::syntax::{is_markdown_code_span, starts_with_markdown_list_item};
 
 mod rst;
 
@@ -320,6 +320,12 @@ fn description_block_start(description: &str) -> Option<usize> {
 
 fn render_type_code_span_into(output: &mut String, ty: &str) {
     let normalized = normalize_type_for_code_span(ty);
+
+    if is_markdown_code_span(&normalized) {
+        output.push_str(&normalized);
+        return;
+    }
+
     render_code_span_into(output, normalized.as_ref());
 }
 
@@ -409,6 +415,7 @@ mod tests {
 
     #[test]
     fn sections_render_in_canonical_order() {
+        let _snap = bind_markdown_snapshot_filters();
         let section = section_block(vec![
             SectionItem::new(
                 SectionKind::Raises,
@@ -456,31 +463,31 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **value**: `str`  
+        **value**: `str`<HB>
         The value.
 
         ## Keyword Arguments
-        **limit**: `int`  
+        **limit**: `int`<HB>
         Maximum result count.
 
         ## Other Parameters
-        **kw\_only**: `str`  
+        **kw\_only**: `str`<HB>
         Less common option.
 
         ## Attributes
-        **cache**: `dict[str, object]`  
+        **cache**: `dict[str, object]`<HB>
         Cached data.
 
         ## Returns
-        `bool`  
+        `bool`<HB>
         Whether validation passed.
 
         ## Yields
-        **item**: `Iterator[int]`  
+        **item**: `Iterator[int]`<HB>
         Generated values.
 
         ## Raises
-        `ValueError`  
+        `ValueError`<HB>
         Invalid value.
         ");
     }
@@ -510,6 +517,7 @@ mod tests {
 
     #[test]
     fn section_items_escape_bold_names() {
+        let _snap = bind_markdown_snapshot_filters();
         let section = section_block(vec![
             SectionItem::new(
                 SectionKind::Parameters,
@@ -533,13 +541,13 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **\*args**  
+        **\*args**<HB>
         Escaped name.
 
-        **\_\_value\_\_**  
+        **\_\_value\_\_**<HB>
         Escaped name.
 
-        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**  
+        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**<HB>
         Escaped name.
         ");
     }
@@ -647,11 +655,12 @@ Rendered as code:
 
     #[test]
     fn following_prose_does_not_continue_a_rendered_parameter_paragraph() {
+        let _snap = bind_markdown_snapshot_filters();
         let rendered = render_parameter_docstring("Value.", "After.");
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**  
+        **value**<HB>
         Value.
 
         After.
@@ -724,6 +733,7 @@ Rendered as code:
 
     #[test]
     fn adjacent_sections_are_separated() {
+        let _snap = bind_markdown_snapshot_filters();
         let raw = "ab";
         let rendered = render_sections(
             raw,
@@ -751,11 +761,11 @@ Rendered as code:
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**  
+        **value**<HB>
         The value.
 
         ## Returns
-        `bool`  
+        `bool`<HB>
         The result.
         ");
     }

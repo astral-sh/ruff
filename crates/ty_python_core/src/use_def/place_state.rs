@@ -52,7 +52,7 @@ use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
@@ -70,14 +70,14 @@ impl ScopedDefinitionId {
 
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -98,7 +98,7 @@ pub(crate) enum PreviousDefinitions {
 /// `ShadowThisOne` is how normal assignments behave, and it's also how some "synthetic" bindings
 /// behave (loop headers), but there are other synthetic bindings (nested `nonlocal` writes) that
 /// cannot be shadowed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum FutureDefinitions {
     ShadowThisOne,
     DontShadowThisOne,
@@ -212,7 +212,7 @@ impl Declarations {
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
@@ -220,7 +220,7 @@ pub(super) enum EnclosingSnapshot {
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
@@ -262,14 +262,14 @@ impl Bindings {
 }
 
 /// One of the live bindings for a single place at some point in control flow.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct LiveBinding {
     binding: PackedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct PackedDefinitionId(u32);
 
 impl PackedDefinitionId {

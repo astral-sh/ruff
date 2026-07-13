@@ -158,6 +158,7 @@ pub enum KnownClass {
     PydanticBaseSettings,
     PydanticConfigDict,
     PydanticRootModel,
+    PydanticStrict,
 }
 
 impl KnownClass {
@@ -288,7 +289,8 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
-            | Self::PydanticRootModel => Some(Truthiness::Ambiguous),
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -400,7 +402,8 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
-            | KnownClass::PydanticRootModel => false,
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
         }
     }
 
@@ -508,7 +511,8 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
-            | KnownClass::PydanticRootModel => false,
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
 
             KnownClass::PydanticConfigDict => true,
         }
@@ -618,7 +622,8 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
-            | KnownClass::PydanticRootModel => false,
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
         }
     }
 
@@ -739,7 +744,8 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
-            | Self::PydanticRootModel => false,
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => false,
         }
     }
 
@@ -849,7 +855,8 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
-            | KnownClass::PydanticRootModel => false,
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,
@@ -973,6 +980,7 @@ impl KnownClass {
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
             Self::PydanticRootModel => "RootModel",
+            Self::PydanticStrict => "Strict",
         }
     }
 
@@ -1012,10 +1020,21 @@ impl KnownClass {
             KnownClass::Tuple,
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
-        self.to_class_literal(db)
-            .to_class_type(db)
-            .map(|class| Type::instance(db, class))
-            .unwrap_or_else(Type::unknown)
+
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_instance<'db>(
+            db: &'db dyn Db,
+            class: KnownClassArgument<'db>,
+        ) -> Type<'db> {
+            class
+                .class(db)
+                .to_class_literal(db)
+                .to_class_type(db)
+                .map(|class| Type::instance(db, class))
+                .unwrap_or_else(Type::unknown)
+        }
+
+        known_class_to_instance(db, KnownClassArgument::new(db, self))
     }
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
@@ -1117,12 +1136,7 @@ impl KnownClass {
         self,
         db: &dyn Db,
     ) -> Result<Option<StaticClassLiteral<'_>>, KnownClassLookupError<'_>> {
-        #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-        struct KnownClassArgument {
-            class: KnownClass,
-        }
-
-        #[salsa::tracked(cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             class: KnownClassArgument<'db>,
@@ -1359,6 +1373,7 @@ impl KnownClass {
             Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
+            Self::PydanticStrict => KnownModule::PydanticTypes,
         }
     }
 
@@ -1469,7 +1484,8 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
-            | Self::PydanticRootModel => Some(false),
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => Some(false),
 
             Self::Tuple => None,
         }
@@ -1583,7 +1599,8 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
-            | Self::PydanticRootModel => false,
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => false,
         }
     }
 
@@ -1697,6 +1714,7 @@ impl KnownClass {
             "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
             "RootModel" => &[Self::PydanticRootModel],
+            "Strict" => &[Self::PydanticStrict],
             _ => return None,
         };
 
@@ -1796,7 +1814,8 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
-            | Self::PydanticRootModel => module == self.canonical_module(db),
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType
@@ -1960,8 +1979,14 @@ impl KnownClass {
     }
 }
 
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct KnownClassArgument {
+    #[returns(copy)]
+    class: KnownClass,
+}
+
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum KnownClassLookupError<'db> {
     /// There is no symbol by that name in the expected module.
     ClassNotFound { third_party: bool },

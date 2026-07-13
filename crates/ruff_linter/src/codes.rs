@@ -1089,6 +1089,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
         (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
         (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
+        (Ruff, "105") => rules::ruff::rules::NoqaComments,
+        (Ruff, "106") => rules::ruff::rules::RuleCodesInSuppressionComments,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]

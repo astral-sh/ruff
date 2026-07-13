@@ -565,9 +565,10 @@ async def ruff_check(
     if proc.returncode != 0:
         raise ToolError(err.decode("utf8"))
 
-    # Strip summary lines so the diff is only diagnostic lines
-    return [
+    # Strip summary lines so the diff is only diagnostic lines. Also sort the lines so that
+    # reordering isn't presented as an addition/deletion pair.
+    return sorted(
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
-    ]
+    )

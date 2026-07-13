@@ -50,7 +50,7 @@ impl<'db> Type<'db> {
     ///
     /// A bare typevar has depth zero. Returns `None` if this type does not contain any typevars.
     pub(crate) fn max_typevar_depth(self, db: &'db dyn Db) -> Option<u32> {
-        #[salsa::tracked(cycle_initial=|_, _, _, ()| None)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| None)]
         fn max_typevar_depth_impl<'db>(db: &'db dyn Db, ty: Type<'db>, _dummy: ()) -> Option<u32> {
             struct MaxTypevarDepthVisitor<'db> {
                 active: RefCell<FxHashSet<Type<'db>>>,
@@ -175,18 +175,22 @@ impl<'db> Type<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeVarInstance<'db> {
     /// The identity of this typevar
+    #[returns(copy)]
     pub(crate) identity: TypeVarIdentity<'db>,
 
     /// The upper bound or constraint on the type of this TypeVar, if any. Don't use this field
     /// directly; use the `bound_or_constraints` (or `upper_bound` and `constraints`) methods
     /// instead (to evaluate any lazy bound or constraints).
+    #[returns(copy)]
     _bound_or_constraints: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
 
     /// The explicitly specified variance of the TypeVar
+    #[returns(copy)]
     pub(super) explicit_variance: Option<TypeVarVariance>,
 
     /// The default type for this TypeVar, if any. Don't use this field directly, use the
     /// `default_type` method instead (to evaluate any lazy default).
+    #[returns(copy)]
     _default: Option<TypeVarDefaultEvaluation<'db>>,
 }
 
@@ -522,6 +526,7 @@ impl<'db> TypeVarInstance<'db> {
     /// Returns the "unchecked" upper bound of a type variable instance.
     /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
     #[salsa::tracked(
+        returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
@@ -560,6 +565,7 @@ impl<'db> TypeVarInstance<'db> {
     /// Returns the "unchecked" constraints of a type variable instance.
     /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
     #[salsa::tracked(
+        returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
@@ -618,7 +624,7 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -742,7 +748,7 @@ impl<'db> TypeVarInstance<'db> {
 ///
 /// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
 /// occurrences.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeVarNonce(u32);
 
 // This type does not have any heap storage.
@@ -907,10 +913,12 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     heap_size = ruff_memory_usage::heap_size
 )]
 pub struct BoundTypeVarInstance<'db> {
+    #[returns(copy)]
     pub typevar: TypeVarInstance<'db>,
     // This duplicates the source-level identity accessible through `typevar`, but keeps
     // `identity()` to a single interned-field read. Storing only the occurrence-specific fields
     // and reconstructing the full identity regresses hot-path project benchmarks.
+    #[returns(copy)]
     identity_inner: BoundTypeVarIdentity<'db>,
 }
 
@@ -1379,9 +1387,11 @@ pub struct TypeVarIdentity<'db> {
     pub(crate) name: Name,
 
     /// The type var's definition (None if synthesized)
+    #[returns(copy)]
     pub(crate) definition: Option<Definition<'db>>,
 
     /// The kind of typevar (PEP 695, Legacy, or TypingSelf)
+    #[returns(copy)]
     pub(crate) kind: TypeVarKind,
 }
 
@@ -1444,7 +1454,7 @@ fn lazy_default_cycle_recover<'db>(
 }
 
 /// Where a type variable is bound and usable.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum BindingContext<'db> {
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
@@ -1494,7 +1504,7 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// bounds or constraints. Two bound typevars have the same identity if they represent the same
 /// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
 /// the same source-level typevar have different bound identities.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
@@ -1527,6 +1537,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
@@ -1561,7 +1572,7 @@ fn bound_typevar_default_type_cycle_recover<'db>(
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeVarDefaultEvaluation<'db> {
     /// The default type is lazily evaluated.
     Lazy,
@@ -1576,7 +1587,7 @@ impl<'db> From<Type<'db>> for TypeVarDefaultEvaluation<'db> {
 }
 
 /// Whether a typevar bound/constraints is eagerly specified or lazily evaluated.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeVarBoundOrConstraintsEvaluation<'db> {
     /// There is a lazily-evaluated upper bound.
     LazyUpperBound,
@@ -1751,7 +1762,7 @@ impl<'db> TypeVarConstraints<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(TypeVarConstraints<'db>),
