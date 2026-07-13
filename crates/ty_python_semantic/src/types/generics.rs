@@ -1457,51 +1457,6 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    /// Merge two specializations that occur as positive elements of an intersection.
-    ///
-    /// Returns `None` if the specializations cannot be represented by a single merged type-argument
-    /// vector.
-    pub(super) fn merge_intersection(self, db: &'db dyn Db, other: Self) -> Option<Self> {
-        let generic_context = self.generic_context(db);
-        if other.generic_context(db) != generic_context {
-            return None;
-        }
-
-        // TODO: Merge materialization kinds and tuple specializations instead of discarding them.
-        if self.materialization_kind(db).is_some()
-            || other.materialization_kind(db).is_some()
-            || self.tuple_inner(db).is_some()
-            || other.tuple_inner(db).is_some()
-        {
-            return None;
-        }
-
-        let types: Option<Box<[Option<Type<'db>>]>> = itertools::izip!(
-            generic_context.variables(db),
-            self.types(db),
-            other.types(db)
-        )
-        .map(
-            |(typevar, left, right)| match specialization_variance(db, typevar) {
-                TypeVarVariance::Covariant => {
-                    Some(Some(IntersectionType::from_two_elements(db, *left, *right)))
-                }
-                TypeVarVariance::Contravariant => {
-                    Some(Some(UnionType::from_two_elements(db, *left, *right)))
-                }
-                TypeVarVariance::Invariant if left == right => Some(Some(*left)),
-                // Distinct invariant arguments have no single sound merged argument.
-                TypeVarVariance::Invariant => None,
-                // Bivariant parameters carry no information, so leave them unmapped instead of
-                // preventing independent parameters from being merged.
-                TypeVarVariance::Bivariant => Some(None),
-            },
-        )
-        .collect();
-
-        Some(generic_context.specialize_partial(db, types?))
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -2090,9 +2045,20 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
-    /// Whether argument validation should use the original constraint-set relation instead of
-    /// rechecking against the resulting specialization.
-    requires_constraint_set_validation: bool,
+    /// Whether `pending` contains a relation from an actual intersection whose solution paths can
+    /// refine a call return type.
+    has_actual_intersection_constraint: bool,
+    /// Whether every constraint-set inference path in `pending` preserves the meaning needed for
+    /// path-wise return refinement.
+    ///
+    /// Some hybrid inference paths still flatten their own solutions into `types` before adding
+    /// their constraint set to `pending`. Until those paths retain provenance too, combining them
+    /// with actual-intersection paths would conflate alternative overloads with simultaneous
+    /// specializations of one call.
+    ///
+    /// TODO: Replace this call-wide gate with per-path provenance once all constraint-set inference
+    /// paths preserve their solutions.
+    supports_path_return_inference: bool,
 }
 
 /// The result of type variable inference before choosing how to handle unsolved type variables.
@@ -2143,6 +2109,35 @@ impl<'db> TypeVarInference<'db> {
 
         self.generic_context(db).specialize_recursive(db, types)
     }
+
+    /// Returns `true` if inference solved every type variable from this context that appears in
+    /// `ty`.
+    pub(crate) fn is_complete_for(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let unsolved: FxHashSet<_> = self
+            .generic_context(db)
+            .variables_inner(db)
+            .keys()
+            .zip(self.types(db))
+            .filter_map(|(identity, inferred)| inferred.is_none().then_some(*identity))
+            .collect();
+        let mut complete = true;
+        ty.visit_specialization(db, |nested, _| {
+            if let Type::TypeVar(typevar) = nested
+                && unsolved.contains(&typevar.identity(db))
+            {
+                complete = false;
+            }
+        });
+        complete
+    }
+
+    /// Returns `true` if every inferred mapping is fully static.
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.types(db)
+            .iter()
+            .flatten()
+            .all(|ty| ty.bottom_materialization(db) == ty.top_materialization(db))
+    }
 }
 
 /// A failure to project a constraint set into the legacy type-mapping representation.
@@ -2168,7 +2163,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
-            requires_constraint_set_validation: false,
+            has_actual_intersection_constraint: false,
+            supports_path_return_inference: true,
         }
     }
 
@@ -2248,6 +2244,77 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .collect();
 
         TypeVarInference::new(self.db, generic_context, inferred)
+    }
+
+    /// Build one inference result for each satisfiable path through the pending call-wide
+    /// constraint set.
+    ///
+    /// Unlike [`Self::build_inference_with`], this preserves correlations between bindings on one
+    /// path instead of unioning each type variable's solutions across independent paths. Returns
+    /// `None` for unsupported or unconstrained inference shapes so callers can retain the merged
+    /// fallback.
+    pub(crate) fn build_inference_paths_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
+    ) -> Option<Box<[TypeVarInference<'db>]>> {
+        if !self.has_actual_intersection_constraint
+            || !self.supports_path_return_inference
+            || generic_context
+                .variables_inner(self.db)
+                .values()
+                .any(|typevar| typevar.is_paramspec(self.db))
+        {
+            return None;
+        }
+
+        let Solutions::Constrained(solutions) = self.pending.solutions_with(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |_variance, path_bound| {
+                let typevar = path_bound.bound_typevar;
+                if let Some(ty) = choose(typevar, Some(path_bound)) {
+                    return Ok(Some(ty));
+                }
+
+                PathBounds::default_solve(self.db, self.constraints, path_bound)
+            },
+        ) else {
+            return None;
+        };
+
+        let fallback = self.solve_hash_map_with(generic_context, &mut choose);
+        let mut inferences = Vec::with_capacity(solutions.len());
+        for solution in solutions {
+            let mut types = fallback.clone();
+            for binding in solution {
+                let identity = binding.bound_typevar.identity(self.db);
+                let solution = self.remove_inferable_typevar_artifacts_from_solution(
+                    binding.bound_typevar,
+                    binding.solution,
+                );
+                types.insert(identity, solution);
+            }
+
+            if types.iter().any(|(identity, ty)| {
+                self.has_expanding_cycle(generic_context, &types, *identity, *ty)
+            }) {
+                return None;
+            }
+
+            let inferred: Box<[_]> = generic_context
+                .variables_inner(self.db)
+                .keys()
+                .map(|identity| types.get(identity).copied())
+                .collect();
+            let inference = TypeVarInference::new(self.db, generic_context, inferred);
+            if !inferences.contains(&inference) {
+                inferences.push(inference);
+            }
+        }
+
+        (!inferences.is_empty()).then(|| inferences.into_boxed_slice())
     }
 
     fn solve_pending_with(
@@ -2620,6 +2687,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ConstraintSetInferenceError<'db>> {
+        self.supports_path_return_inference = false;
         let mut first_error = None;
         let solutions = match set.solutions_with(
             self.db,
@@ -2844,74 +2912,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
-    ///
-    /// Returns whether validation should use the original constraint-set relation instead of the
-    /// resulting specialization.
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
         actual: Type<'db>,
-    ) -> Result<bool, SpecializationError<'db>> {
-        self.requires_constraint_set_validation = false;
+    ) -> Result<(), SpecializationError<'db>> {
         self.infer_map_impl(
             formal,
             actual,
             TypeVarVariance::Covariant,
             &mut FxHashSet::default(),
-        )?;
-        Ok(std::mem::take(
-            &mut self.requires_constraint_set_validation,
-        ))
-    }
-
-    /// Project immediate positive elements of an actual intersection to one merged generic view.
-    ///
-    /// This projection only generates inference constraints. It does not establish that the
-    /// original intersection is assignable to the projected type.
-    fn project_intersection_for_constraint_inference(
-        db: &'db dyn Db,
-        intersection: IntersectionType<'db>,
-        target: Type<'db>,
-    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let target_origin = target
-            .as_nominal_instance()?
-            .class(db)
-            .into_generic_alias()?
-            .origin(db);
-        let mut merged: Option<Specialization<'db>> = None;
-        let mut unmatched = Vec::new();
-
-        for positive in intersection.iter_positive(db) {
-            let positive_class = match positive {
-                Type::NominalInstance(instance) => Some(instance.class(db)),
-                Type::ProtocolInstance(protocol) => protocol
-                    .to_nominal_instance()
-                    .map(|instance| instance.class(db)),
-                _ => None,
-            };
-            let Some(positive_class) = positive_class else {
-                unmatched.push(positive);
-                continue;
-            };
-            let specialization = positive_class
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .filter_map(ClassType::into_generic_alias)
-                .find(|alias| alias.origin(db) == target_origin)
-                .map(|alias| alias.specialization(db));
-            let Some(specialization) = specialization else {
-                unmatched.push(positive);
-                continue;
-            };
-            merged = Some(match merged {
-                Some(existing) => existing.merge_intersection(db, specialization)?,
-                None => specialization,
-            });
-        }
-
-        let merged = merged?;
-        let projected = target_origin.apply_specialization(db, |_| merged);
-        Some((Type::instance(db, projected), unmatched))
+        )
     }
 
     fn when_assignable_with_polarity(
@@ -2926,34 +2937,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &source.when_constraint_set_assignable_to_owned(self.db, target),
             )
         };
-        let when_covariantly_assignable = |formal: Type<'db>, actual: Type<'db>| {
-            if let Type::Intersection(intersection) = actual
-                && let Some((projected, unmatched)) =
-                    Self::project_intersection_for_constraint_inference(
-                        self.db,
-                        intersection,
-                        formal,
-                    )
-            {
-                // Matching generic views of the same intersected value contribute one merged
-                // bound, e.g. `Sequence[A] & Sequence[B]` contributes `A & B <= T` when compared
-                // to `Sequence[T]`. Separate arguments still contribute independent bounds.
-                let projected = when_assignable(projected, formal);
-                return projected.or(self.db, self.constraints, || {
-                    unmatched
-                        .into_iter()
-                        .when_any(self.db, self.constraints, |positive| {
-                            when_assignable(positive, formal)
-                        })
-                });
-            }
-            when_assignable(actual, formal)
-        };
         match polarity {
-            TypeVarVariance::Covariant => when_covariantly_assignable(formal, actual),
+            TypeVarVariance::Covariant => when_assignable(actual, formal),
             TypeVarVariance::Contravariant => when_assignable(formal, actual),
             TypeVarVariance::Invariant => {
-                let covariant = when_covariantly_assignable(formal, actual);
+                let covariant = when_assignable(actual, formal);
                 let contravariant = when_assignable(formal, actual);
                 covariant.and(self.db, self.constraints, || contravariant)
             }
@@ -3311,7 +3299,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
-                self.requires_constraint_set_validation = true;
+                self.has_actual_intersection_constraint = true;
                 self.infer_from_constraint_set(when)?;
                 return Ok(());
             }

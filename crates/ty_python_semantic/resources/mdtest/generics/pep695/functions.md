@@ -217,8 +217,8 @@ f(Bad(), B())
 
 ## Inferring typevars in intersections (actual type position, multiple positive types)
 
-When an actual intersection has multiple specializations of the same covariant generic class, we
-combine the type arguments before inferring a bounded typevar:
+When an actual intersection provides multiple valid specializations of a generic call, inference
+keeps those paths separate and intersects the instantiated return types:
 
 ```py
 from typing import Sequence
@@ -237,21 +237,20 @@ def first[T: Base](x: Sequence[T]) -> T:
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
     reveal_type(first(x))  # revealed: Sub1 & Sub2
 
-# An intersection is a subtype of the bound if one of its positive elements is a subtype of the
-# bound.
+# Invalid specialization paths do not contribute to the inferred return type.
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
-    reveal_type(first(x))  # revealed: Sub1 & Unrelated1
+    reveal_type(first(x))  # revealed: Sub1
 
-# Additional positive elements are preserved in the inferred type.
+# Every valid path contributes to the inferred return type.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
-    reveal_type(first(x))  # revealed: Sub1 & Sub2 & Unrelated1
+    reveal_type(first(x))  # revealed: Sub1 & Sub2
 
 # An intersection with two positive elements, neither of which produces a valid specialization.
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 
-# Constrained typevars use the same merged intersection evidence. A lower bound that rules out every
+# Constrained typevars use the same path-based inference. A lower bound that rules out every
 # declared constraint should produce the usual constraint violation.
 
 def first_constrained[Constrained: (Sub1, Sub2)](
@@ -314,6 +313,45 @@ def f(x: ASource) -> None:
     if isinstance(x, BSource):
         reveal_type(x)  # revealed: ASource & BSource
         reveal_type(element(x))  # revealed: A & B
+```
+
+The return-type intersection comes from multiple valid call specializations, not from treating an
+arbitrary covariant generic as preserving intersections:
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+
+class F[T]:
+    def use(self, callback: Callable[[T], int]) -> int:
+        raise NotImplementedError
+
+def f_element[T](x: F[T]) -> T:
+    raise NotImplementedError
+
+def takes_f_intersection(x: F[Intersection[A, B]]) -> None: ...
+def _(x: Intersection[F[A], F[B]]) -> None:
+    # error: [invalid-argument-type]
+    takes_f_intersection(x)
+    reveal_type(f_element(x))  # revealed: A & B
+```
+
+Constraints from every argument are solved together before each valid call specialization is
+instantiated:
+
+```py
+from ty_extensions import Intersection
+
+class D: ...
+
+def correlated[T](x: Source[T], y: Source[T]) -> T:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Source[A], Source[B]],
+    y: Intersection[Source[B], Source[D]],
+) -> None:
+    reveal_type(correlated(x, y))  # revealed: (A & B) | (D & B)
 ```
 
 PEP 695 can infer a bivariant class parameter when it is unused. Such a parameter should remain
@@ -381,7 +419,7 @@ def sink_type[T](x: Sink[T]) -> T:
 
 def _(x: ASink) -> None:
     if isinstance(x, BSink):
-        reveal_type(sink_type(x))  # revealed: A | B
+        reveal_type(sink_type(x))  # revealed: A & B
 
 class C(A, B): ...
 
@@ -395,7 +433,8 @@ def _(
     reveal_type(choose(x, sink))  # revealed: C
 ```
 
-Protocol inference should preserve gradual types in narrowed intersections:
+Gradual actual intersections still use constraint-set inference, but fall back from path-wise return
+refinement until gradual path provenance is tracked:
 
 ```py
 def _(x):

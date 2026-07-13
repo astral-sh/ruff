@@ -5061,20 +5061,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
     ///
-    /// TODO: Remove this once `check_argument_type` builds the specialization directly from its
-    /// assignability constraint set.
+    /// TODO: Once specialization inference fully owns generic argument validation, this field can
+    /// be removed.
     constraint_set_errors: Vec<bool>,
-
-    /// Temporary exemptions from the assignability check in `check_argument_type`.
-    ///
-    /// Constraint-set inference has already proved the original unspecialized argument relation
-    /// satisfiable for these parameters. The inferred specialization can be more precise than any
-    /// specialization that individually validates the argument, so rechecking against it would
-    /// reject a valid call.
-    ///
-    /// TODO: Remove this once `check_argument_type` builds the specialization directly from its
-    /// assignability constraint set instead of consuming one from the earlier separate step.
-    constraint_set_validations: Vec<FxHashSet<usize>>,
 }
 
 /// Result of checking only the key type of a keyword-unpack argument.
@@ -5146,9 +5135,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: InferableTypeVars::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
-            constraint_set_validations: (0..arguments.len())
-                .map(|_| FxHashSet::default())
-                .collect(),
         }
     }
 
@@ -5206,6 +5192,37 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn specialization(&self) -> Option<Specialization<'db>> {
         self.inference
             .map(|inference| inference.specialization(self.db))
+    }
+
+    /// Returns `true` if every argument relation that contributes to specialization inference is
+    /// fully static.
+    ///
+    /// Constraint-set assignability for gradual types is existential over materializations. Until
+    /// path solutions retain that provenance, only static relations can safely contribute
+    /// intersected return types.
+    ///
+    /// TODO: Replace this call-wide check with path-level gradual-evidence tracking.
+    fn argument_relations_are_fully_static(&self) -> bool {
+        let parameters = self.signature.parameters();
+        self.enumerate_argument_types()
+            .all(|(argument_index, _, _, argument_types)| {
+                self.argument_matches[argument_index]
+                    .iter()
+                    .all(|matched_parameter| {
+                        let parameter_index = matched_parameter.index;
+                        if self.is_gradual_variadic_parameter(parameter_index) {
+                            return true;
+                        }
+
+                        let declared_type = parameters[parameter_index].annotated_type();
+                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        let argument_type =
+                            matched_parameter.argument_type.unwrap_or(argument_type);
+                        argument_type.bottom_materialization(self.db)
+                            == argument_type.top_materialization(self.db)
+                            && !declared_type.has_dynamic(self.db)
+                    })
+            })
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -5358,7 +5375,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
-            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -5376,7 +5392,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.constraint_set_errors.fill(false);
 
             self.infer_argument_constraints(
-                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -5445,7 +5460,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             maybe_promote(typevar, bounds)
         };
-        let inference = match builder.build_inference_with(generic_context, &mut choose) {
+        let merged_inference = match builder.build_inference_with(generic_context, &mut choose) {
             Ok(inference) => inference,
             Err(()) => {
                 let parameters = self.signature.parameters();
@@ -5465,18 +5480,53 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     }
                 }
 
-                builder.build_diagnostic_inference_with(generic_context, argument_relations, choose)
+                builder.build_diagnostic_inference_with(
+                    generic_context,
+                    argument_relations,
+                    &mut choose,
+                )
             }
         };
-        let specialization = inference.specialization(self.db);
 
-        self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
+        let original_return_ty = self.return_ty;
+        let path_inferences = self
+            .argument_relations_are_fully_static()
+            .then(|| builder.build_inference_paths_with(generic_context, &mut choose))
+            .flatten();
+        let specialization = merged_inference.specialization(self.db);
+        let merged_return_ty = original_return_ty.apply_specialization(self.db, specialization);
+        let path_return_ty = path_inferences.as_deref().and_then(|paths| {
+            let returns: Vec<_> = paths
+                .iter()
+                .copied()
+                .filter(|inference| {
+                    inference.is_complete_for(self.db, original_return_ty)
+                        && inference.is_fully_static(self.db)
+                })
+                .map(|inference| {
+                    original_return_ty
+                        .apply_specialization(self.db, inference.specialization(self.db))
+                })
+                .filter(|ty| ty.bottom_materialization(self.db) == ty.top_materialization(self.db))
+                .collect();
+            (!returns.is_empty()).then(|| IntersectionType::from_elements(self.db, returns))
+        });
+
+        let inference = if path_return_ty.is_some() {
+            path_inferences
+                .as_deref()
+                .and_then(|paths| paths.first())
+                .copied()
+                .unwrap_or(merged_inference)
+        } else {
+            merged_inference
+        };
+        self.return_ty = path_return_ty.unwrap_or(merged_return_ty);
         self.inference = Some(inference);
     }
 
     fn infer_argument_constraints<'c>(
         &mut self,
-        constraints: &'c ConstraintSetBuilder<'db>,
         builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
@@ -5513,24 +5563,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let argument_type = argument_types.get_for_declared_type(declared_type);
                 let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
-                let specialization_result = builder.infer(
-                    declared_type,
-                    argument_type,
-                );
-
-                match specialization_result {
-                    Ok(true)
-                        if !argument_type
-                            .when_constraint_set_assignable_to(
-                                self.db,
-                                declared_type,
-                                constraints,
-                            )
-                            .is_never_satisfied(self.db) =>
-                    {
-                        self.constraint_set_validations[argument_index].insert(parameter_index);
-                    }
-                    Ok(_) => {}
+                match builder.infer(declared_type, argument_type) {
+                    Ok(()) => {}
                     Err(error) => {
                         self.constraint_set_errors[argument_index] = true;
                         specialization_errors.push(BindingError::SpecializationError {
@@ -5599,12 +5633,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
-        // building them in an earlier separate step. This will also remove the
-        // `constraint_set_validations` suppression markers.
+        // building them in an earlier separate step.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
-            && !self.constraint_set_validations[argument_index].contains(&parameter_index)
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
             && argument_type

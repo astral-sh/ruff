@@ -24,8 +24,7 @@ use crate::types::{
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, TypePair,
-        constraints::ConstraintSet,
+        ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         generics::InferableTypeVars,
     },
 };
