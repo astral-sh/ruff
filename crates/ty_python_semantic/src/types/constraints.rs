@@ -327,6 +327,8 @@ impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
                     .insert(old_interior.constraint, condition);
                 condition
             };
+        let condition = condition
+            .with_adjusted_source_order(self.builder, old_interior.source_order.saturating_sub(1));
         let if_true = self.rebuild_node(old_interior.if_true);
         let if_uncertain = self.rebuild_node(old_interior.if_uncertain);
         let if_false = self.rebuild_node(old_interior.if_false);
@@ -8034,6 +8036,39 @@ mod tests {
                 └─₀ never
             "#},
         );
+    }
+
+    #[test]
+    fn mapped_owned_constraint_set_preserves_source_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            create_constraint(&db, builder, t, KnownClass::Int).and(&db, builder, || {
+                create_constraint(&db, builder, u, KnownClass::Str)
+            })
+        });
+        let generic_context =
+            crate::types::generics::GenericContext::from_typevar_instances(&db, [t, u]);
+        let mapped = owned.apply_type_mapping(
+            &db,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta: 1,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        mapped.query(|builder, set| {
+            let mut source_orders = Vec::new();
+            set.node
+                .for_each_unique_constraint(builder, &mut |_, source_order| {
+                    source_orders.push(source_order);
+                });
+            source_orders.sort_unstable();
+            assert_eq!(source_orders, [1, 2]);
+        });
     }
 
     #[test]
