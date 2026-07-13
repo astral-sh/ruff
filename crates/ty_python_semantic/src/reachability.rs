@@ -228,6 +228,7 @@ use ty_python_core::{
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -547,46 +548,73 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// chain. Inferring the expressions in source order turns that chain into cache lookups while
 /// preserving normal reachability and narrowing during every inference.
 ///
-/// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
+/// Because the prefix is based on source order rather than graph reachability, branch-heavy
 /// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
 /// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
 ///
-/// Reentrant analysis of the same predicate graph skips the prefix pass: because the outer pass is
+/// Reentrant analysis of the same scope skips the prefix pass: because the outer pass is
 /// proceeding in source order, any preceding call needed by the current expression has already
-/// been inferred. A different predicate graph performs its own pass, which is necessary when
+/// been inferred. A different scope performs its own pass, which is necessary when
 /// inferring a call crosses into another large scope.
 fn analyze_non_terminal_call_prefix<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) {
-    let range = 0..=root_predicate.index();
-    if !range.clone().any(|index| {
-        matches!(
-            predicates[ScopedPredicateId::new(index)].node,
-            PredicateNode::IsNonTerminalCall(_)
-        )
-    }) {
+    let scope = predicate_scope(db, &predicates[root_predicate]);
+    let use_def = use_def_map(db, scope);
+    let call_count = use_def
+        .non_terminal_call_predicate_ids()
+        .partition_point(|predicate| predicate.index() <= root_predicate.index());
+
+    if call_count == 0 {
         return;
     }
 
-    let key = predicate_scope(db, &predicates[root_predicate]).as_id();
     ACTIVE_NON_TERMINAL_CALL_PREFIXES.with(|active| {
         active.visit(
-            &key,
+            &scope.as_id(),
             || {},
             || {
-                for index in range {
-                    let predicate = &predicates[ScopedPredicateId::new(index)];
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                        analyze_single(db, predicate);
-                    }
+                let mut start = 0;
+                let mut remaining = call_count;
+
+                while remaining > 0 {
+                    let level = remaining.ilog2();
+                    let length = 1 << level;
+                    analyze_non_terminal_call_range(db, scope, level, start >> level);
+                    start += length;
+                    remaining -= length;
                 }
             },
         );
     });
+}
+
+/// Analyzes a power-of-two range of statement-level call predicates in source order.
+///
+/// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
+/// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
+/// requested prefix contains thousands of calls.
+#[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
+fn analyze_non_terminal_call_range<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    level: u32,
+    index: usize,
+) {
+    if level == 0 {
+        let use_def = use_def_map(db, scope);
+        let predicate_id = use_def.non_terminal_call_predicate_ids()[index];
+        analyze_single(db, &use_def.predicates()[predicate_id]);
+        return;
+    }
+
+    let child_index = index * 2;
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index);
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -1605,6 +1633,126 @@ mod tests {
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
+
+    #[test]
+    fn non_terminal_call_prefix_reuses_ranges() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/test.py",
+            r#"
+            def noop() -> None: ...
+
+            def f(flag: bool) -> None:
+                if flag:
+                    noop()
+                noop()
+                noop()
+                if flag:
+                    noop()
+                noop()
+                noop()
+                noop()
+            "#,
+        )?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        {
+            let index = semantic_index(&db, file);
+            let function_scope = index
+                .child_scopes(FileScopeId::global())
+                .nth(1)
+                .unwrap()
+                .0
+                .to_scope_id(&db, file);
+            let use_def = use_def_map(&db, function_scope);
+            let predicates = use_def.predicates();
+            let call_predicates = use_def.non_terminal_call_predicate_ids();
+
+            assert_eq!(call_predicates.len(), 7);
+            assert!(call_predicates.windows(2).all(|ids| ids[0] < ids[1]));
+            assert!(
+                call_predicates.iter().all(|id| {
+                    matches!(predicates[*id].node, PredicateNode::IsNonTerminalCall(_))
+                })
+            );
+            assert!(
+                predicates
+                    .iter()
+                    .any(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
+            );
+
+            analyze_non_terminal_call_prefix(&db, predicates, call_predicates[3]);
+            analyze_non_terminal_call_prefix(&db, predicates, call_predicates[6]);
+        }
+
+        let events = db.take_salsa_events();
+        let range_executions = salsa::attach(&db, || {
+            events
+                .into_iter()
+                .filter(|event| {
+                    matches!(
+                        &event.kind,
+                        salsa::EventKind::WillExecute { database_key }
+                            if format!("{database_key:?}")
+                                .contains("analyze_non_terminal_call_range")
+                    )
+                })
+                .count()
+        });
+
+        // The first prefix executes the seven nodes for calls 0..4. The second prefix reuses that
+        // range and executes only the three nodes for calls 4..6 plus the final leaf.
+        assert_eq!(range_executions, 11);
+
+        Ok(())
+    }
+
+    #[test]
+    fn non_terminal_call_ranges_invalidate_when_callable_changes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_files([
+            ("/src/dependency.py", "def callback() -> None: ..."),
+            (
+                "/src/test.py",
+                r#"from dependency import callback
+
+def f() -> None:
+    callback()
+    callback()
+    callback()
+    callback()
+"#,
+            ),
+        ])?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        {
+            let index = semantic_index(&db, file);
+            let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+            let use_def = index.use_def_map(function_scope);
+            assert!(is_reachable(
+                &db,
+                use_def,
+                use_def.end_of_scope_reachability()
+            ));
+        }
+
+        db.write_file(
+            "/src/dependency.py",
+            "from typing import NoReturn\ndef callback() -> NoReturn: ...",
+        )?;
+
+        let index = semantic_index(&db, file);
+        let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+        let use_def = index.use_def_map(function_scope);
+        assert!(!is_reachable(
+            &db,
+            use_def,
+            use_def.end_of_scope_reachability()
+        ));
+
+        Ok(())
+    }
 
     #[test]
     fn deep_constraint_projection_does_not_overflow() -> anyhow::Result<()> {

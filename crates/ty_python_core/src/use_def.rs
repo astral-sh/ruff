@@ -258,7 +258,9 @@ use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
 };
 use crate::place::{PlaceExprRef, ScopedPlaceId};
-use crate::predicate::{PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId};
+use crate::predicate::{
+    PredicateNode, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
+};
 use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
@@ -589,6 +591,7 @@ enum InternedEnclosingSnapshotId {
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ConstraintTables<'db> {
     predicates: Predicates<'db>,
+    non_terminal_call_predicate_ids: Box<[ScopedPredicateId]>,
     reachability_constraints: ReachabilityConstraints,
     narrowing_constraints: NarrowingConstraints,
 }
@@ -621,6 +624,7 @@ struct UseDefMapExtra {
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
     LazyLock::new(|| ConstraintTables {
         predicates: IndexVec::new().into(),
+        non_terminal_call_predicate_ids: Box::default(),
         reachability_constraints: ReachabilityConstraintsBuilder::default().build(),
         narrowing_constraints: NarrowingConstraintsBuilder::default().build(),
     });
@@ -864,6 +868,11 @@ impl<'db> UseDefMap<'db> {
 
     pub fn predicates(&self) -> &Predicates<'db> {
         &self.constraint_tables().predicates
+    }
+
+    /// Returns the IDs of all statement-level call predicates in source order.
+    pub fn non_terminal_call_predicate_ids(&self) -> &[ScopedPredicateId] {
+        &self.constraint_tables().non_terminal_call_predicate_ids
     }
 
     pub fn range_reachability(
@@ -2639,6 +2648,12 @@ impl<'db> UseDefMapBuilder<'db> {
             })
         });
         let predicates = self.predicates.build();
+        let non_terminal_call_predicate_ids = predicates
+            .iter_enumerated()
+            .filter_map(|(id, predicate)| {
+                matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)).then_some(id)
+            })
+            .collect();
         let reachability_constraints = self.reachability_constraints.build();
         let narrowing_constraints = self.narrowing_constraints.build();
         let constraint_tables = (!reachability_constraints.used_interiors().is_empty()
@@ -2646,6 +2661,7 @@ impl<'db> UseDefMapBuilder<'db> {
         .then(|| {
             Box::new(ConstraintTables {
                 predicates,
+                non_terminal_call_predicate_ids,
                 reachability_constraints,
                 narrowing_constraints,
             })
