@@ -494,6 +494,37 @@ impl<'db> Type<'db> {
         ))
     }
 
+    pub(super) fn when_constraint_set_subtype_of_owned(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> &'db OwnedConstraintSet<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn when_constraint_set_subtype_of_owned_impl<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let constraints = ConstraintSetBuilder::new();
+            constraints.into_owned(|constraints| {
+                source.has_relation_to_with_typevar_evaluation(
+                    db,
+                    target,
+                    constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::Subtyping,
+                    TypeVarEvaluation::Lazy,
+                )
+            })
+        }
+
+        when_constraint_set_subtype_of_owned_impl(db, self, target)
+    }
+
     pub(super) fn when_constraint_set_assignable_to<'c>(
         self,
         db: &'db dyn Db,
@@ -851,24 +882,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             ..self.clone()
         }
-    }
-
-    /// Check constraint-set assignability while sharing this checker's recursion state.
-    pub(super) fn check_constraint_set_assignability_pair(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let checker = Self {
-            inferable: InferableTypeVars::None,
-            relation: TypeRelation::Assignability,
-            typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: None,
-            given: ConstraintSet::from_bool(self.constraints, false),
-            ..self.clone()
-        };
-        checker.check_type_pair(db, source, target)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
