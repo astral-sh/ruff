@@ -1415,9 +1415,8 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3986>.
 ///
-/// Non-terminal-call predicates must gate later narrowing, but do not need to be attached to an
-/// unchanged binding at every use. Deferring those gates until the binding changes prevents each
-/// call from rebuilding the growing constraint chain.
+/// Non-terminal-call predicates must gate later narrowing. Keeping these scope-wide constraints in
+/// an append-only tree avoids eagerly rewriting every live place state after each call.
 fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     setup_rayon();
 

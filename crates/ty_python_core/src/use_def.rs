@@ -1384,13 +1384,7 @@ struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     constraint: ScopedReachabilityConstraintId,
     narrowing_constraint: ScopedNarrowingConstraint,
-    use_generation: usize,
-    deferred_use_count: usize,
 }
-
-/// Force every statement-level call through the regular materialization path so `CodSpeed` can
-/// measure the cost of the optimization independently.
-const MIN_DEFERRED_USE_CONSTRAINTS: usize = usize::MAX;
 
 /// An append-only tree of scope-wide reachability constraints and call narrowing gates.
 ///
@@ -1410,8 +1404,6 @@ impl Default for PendingReachability {
             parent: root,
             constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
-            use_generation: 0,
-            deferred_use_count: 0,
         });
         Self {
             constraints,
@@ -1425,18 +1417,11 @@ impl PendingReachability {
         &mut self,
         constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
-        materialize_at_use: bool,
     ) {
-        let use_generation =
-            self.constraints[self.current].use_generation + usize::from(materialize_at_use);
-        let deferred_use_count =
-            self.constraints[self.current].deferred_use_count + usize::from(!materialize_at_use);
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             constraint,
             narrowing_constraint,
-            use_generation,
-            deferred_use_count,
         });
     }
 
@@ -1535,22 +1520,14 @@ impl PendingReachability {
     /// Returns the place state needed to resolve a use.
     ///
     /// A call's narrowing gate is only needed if the place is later changed or merged, so it is
-    /// never materialized here. Call reachability also does not change which bindings are visible,
-    /// so skip materializing a long suffix that consists solely of call constraints. This prevents
-    /// repeated calls from accumulating ever-growing constraint chains on the same binding.
+    /// not materialized here.
     fn materialize_ref_at_use<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
-        let pending_constraint = &self.constraints[pending.reachability];
-        let target_constraint = &self.constraints[target];
-        if pending_constraint.use_generation != target_constraint.use_generation
-            || target_constraint.deferred_use_count < MIN_DEFERRED_USE_CONSTRAINTS
-        {
-            self.materialize_reachability(pending, target, reachability_constraints);
-        }
+        self.materialize_reachability(pending, target, reachability_constraints);
         &pending.state
     }
 
@@ -2233,7 +2210,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_reachability_constraint_impl(
             constraint,
             ScopedNarrowingConstraint::ALWAYS_TRUE,
-            true,
         );
     }
 
@@ -2242,24 +2218,19 @@ impl<'db> UseDefMapBuilder<'db> {
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
-        self.record_reachability_constraint_impl(
-            reachability_constraint,
-            narrowing_constraint,
-            false,
-        );
+        self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 
     fn record_reachability_constraint_impl(
         &mut self,
         constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
-        materialize_at_use: bool,
     ) {
         self.reachability = self
             .reachability_constraints
             .add_and_constraint(self.reachability, constraint);
         self.pending_reachability
-            .push(constraint, narrowing_constraint, materialize_at_use);
+            .push(constraint, narrowing_constraint);
     }
 
     pub(super) fn record_declaration(
