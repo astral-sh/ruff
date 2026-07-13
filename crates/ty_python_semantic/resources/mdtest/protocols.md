@@ -2830,6 +2830,14 @@ from ty_extensions._internal import is_subtype_of, is_assignable_to
 class P(Protocol):
     def m(self, x: int, /) -> None: ...
 
+class PWithClassMethod(Protocol):
+    @classmethod
+    def m(cls, x: int, /) -> None: ...
+
+class PWithStaticMethod(Protocol):
+    @staticmethod
+    def m(x: int, /) -> None: ...
+
 class NominalSubtype:
     def m(self, y: int) -> None: ...
 
@@ -2870,6 +2878,8 @@ static_assert(is_assignable_to(NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalWithStaticMethodGood, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithStaticMethodGood, P))
+static_assert(is_subtype_of(PWithClassMethod, P))
+static_assert(is_subtype_of(PWithStaticMethod, P))
 
 # This staticmethod has an extra parameter when accessed on an instance.
 static_assert(not is_assignable_to(NominalWithStaticMethod, P))
@@ -3210,6 +3220,90 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## Module objects with static-method protocol members
+
+Module objects implement protocols through their public interface. A module-level function can
+therefore satisfy an ordinary or static method member with the same signature.
+
+`factory.py`:
+
+```py
+size: int = 1
+
+def make(value: int) -> str:
+    return str(value)
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+import factory
+
+class FactoryObject(Protocol):
+    size: int
+    def make(self, value: int) -> str: ...
+
+class FactoryModule(Protocol):
+    size: int
+
+    @staticmethod
+    def make(value: int) -> str: ...
+
+factory_object: FactoryObject = factory
+factory_module: FactoryModule = factory
+```
+
+## Class objects with class-method protocol members
+
+A class object implements a protocol when its directly accessible members have compatible types. The
+corresponding member does not also need to exist on the class object's metaclass:
+
+```py
+from typing import Protocol
+
+class Parser(Protocol):
+    @classmethod
+    def parse(cls, value: str) -> int: ...
+
+class IntParser:
+    @classmethod
+    def parse(cls, value: str) -> int:
+        return int(value)
+
+parser: Parser = IntParser
+```
+
+## Class objects and `Self`-returning class-method protocol members
+
+When a class object is checked against a class-method protocol member, `Self` in the protocol
+signature is bound to instances of the class object rather than to the class object itself:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class FactoryProtocol(Protocol):
+    @classmethod
+    def make(cls) -> Self: ...
+
+class Factory:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class BadFactory:
+    @classmethod
+    def make(cls) -> int:
+        return 1
+
+static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
+static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
@@ -3224,7 +3318,9 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 `P.x` after the descriptor protocol has been invoked on `P.x`:
 
 ```py
-from typing import Protocol
+from collections.abc import Callable
+from typing import Protocol, overload
+from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
 
@@ -3263,23 +3359,70 @@ class NStaticMethodBad:
     def x(cls, val: int) -> str:
         return "foo"
 
+class NMaybeCallable:
+    x: Callable[[int], str] | None
+
+class F:
+    def __call__(self, val: int) -> str:
+        return "foo"
+
+class NObject:
+    x: object = F()
+
+class NStaticMethodShadowed(NStaticMethodGood):
+    def __init__(self) -> None:
+        self.x: int = 1
+
+class PFactory(Protocol):
+    @classmethod
+    def create(cls) -> Self: ...
+
+class Factory:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class BadFactory:
+    @classmethod
+    def create(cls) -> int:
+        return 42
+
+class POverloadedFactory(Protocol):
+    @overload
+    @classmethod
+    def create(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def create(cls, value: str) -> Self: ...
+
+class OverloadedFactory:
+    @overload
+    @classmethod
+    def create(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def create(cls, value: str) -> Self: ...
+    @classmethod
+    def create(cls, value: int | str) -> Self:
+        return cls()
+
 # `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
 # whether you access them on the protocol class or instances of the protocol.
 # That means that they are equivalent protocols!
 static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
 
-# TODO: these should all pass
-static_assert(not is_assignable_to(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NNotCallable, PStaticMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PClassMethod))  # error: [static-assert-error]
-static_assert(is_disjoint_from(NNotCallable, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NNotCallable, PClassMethod))
+static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NNotCallable, PClassMethod))
+static_assert(not is_disjoint_from(NNotCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NMaybeCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NObject, PStaticMethod))
 
 # `NInstanceMethod.x` has the correct type when accessed on an instance of
 # `NInstanceMethod`, but not when accessed on the class object itself
 #
-# TODO: these should pass
-static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))
 
 # A nominal type with a `@staticmethod` can satisfy a protocol with a `@classmethod`
 # if the staticmethod duck-types the same as the classmethod member
@@ -3288,26 +3431,33 @@ static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))  # error: [s
 # with a `@staticmethod` member
 static_assert(is_assignable_to(NClassMethodGood, PClassMethod))
 static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NClassMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NClassMethodGood, PClassMethod))
+static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))
 
 static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
 static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
-# TODO: these should all pass:
-static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))  # error: [static-assert-error]
-static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))  # error: [static-assert-error]
+static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))
+static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+
+# An instance attribute can override an inherited static method.
+static_assert(not is_subtype_of(NStaticMethodShadowed, PStaticMethod))
+
+# `Self` in the classmethod signature is bound to the implementation type.
+static_assert(is_subtype_of(Factory, PFactory))
+static_assert(not is_assignable_to(BadFactory, PFactory))
+
+# Each overload keeps its own `Self` binding.
+static_assert(is_subtype_of(OverloadedFactory, POverloadedFactory))
 ```
 
-Until classmethod protocol members are fully supported, their placeholder representation should not
-incorrectly require a mutable instance attribute. In particular, a frozen dataclass can satisfy a
-protocol bound through a classmethod:
+A classmethod protocol member does not require a mutable instance attribute. In particular, a frozen
+dataclass can satisfy a protocol bound through a classmethod:
 
 ```py
 from dataclasses import dataclass
@@ -3364,6 +3514,45 @@ class MissingDecorator:
 static_assert(is_assignable_to(CorrectImpl, ContextManagerProtocol))
 static_assert(is_assignable_to(AlsoCorrect, ContextManagerProtocol))
 static_assert(not is_assignable_to(MissingDecorator, ContextManagerProtocol))
+```
+
+A decorator with a precise callable return type preserves the signatures of class and static
+protocol methods:
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def preserve_signature(function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class StaticProtocol(Protocol):
+    @staticmethod
+    @preserve_signature
+    def method(value: int) -> str: ...
+
+class StaticImplementation:
+    @staticmethod
+    def method(value: int) -> str:
+        return str(value)
+
+class ClassProtocol(Protocol):
+    @classmethod
+    @preserve_signature
+    def method(cls, value: int) -> str: ...
+
+class ClassImplementation:
+    @classmethod
+    def method(cls, value: int) -> str:
+        return str(value)
+
+static_assert(is_subtype_of(StaticImplementation, StaticProtocol))
+static_assert(is_subtype_of(ClassImplementation, ClassProtocol))
 ```
 
 ## Equivalence of protocols with method or property members
@@ -3832,6 +4021,34 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Type-variable inference also uses static and class `__call__` members:
+
+```py
+from typing import Protocol, TypeVar
+
+CallbackT = TypeVar("CallbackT")
+
+class StaticCallback(Protocol[CallbackT]):
+    @staticmethod
+    def __call__(value: CallbackT) -> CallbackT: ...
+
+class ClassCallback(Protocol[CallbackT]):
+    @classmethod
+    def __call__(cls, value: CallbackT) -> CallbackT: ...
+
+def use_static(callback: StaticCallback[CallbackT]) -> CallbackT:
+    raise NotImplementedError
+
+def use_class(callback: ClassCallback[CallbackT]) -> CallbackT:
+    raise NotImplementedError
+
+def identity(value: int) -> int:
+    return value
+
+reveal_type(use_static(identity))  # revealed: int
+reveal_type(use_class(identity))  # revealed: int
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py
@@ -3868,6 +4085,29 @@ class NoArgs(Protocol):
 
 def _(source: NoArgs):
     target: Variadic[Any] = source  # error: [invalid-assignment]
+```
+
+## Class constructors and static callback protocols
+
+A class object's call signature comes from its constructor. An unrelated `__call__` method on the
+class's instances does not replace that constructor signature when matching a static callback
+protocol:
+
+```py
+from typing import Protocol
+
+class Product:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def __call__(self, text: str) -> str:
+        return text
+
+class Constructor(Protocol):
+    @staticmethod
+    def __call__(value: int) -> Product: ...
+
+constructor: Constructor = Product
 ```
 
 ## Generic protocols and union arguments

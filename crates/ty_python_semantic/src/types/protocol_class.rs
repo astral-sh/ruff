@@ -28,7 +28,6 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
-        todo_type,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -234,7 +233,12 @@ impl<'db> ProtocolInterface<'db> {
     {
         let members: BTreeMap<_, _> = members
             .into_iter()
-            .map(|(name, callable)| (Name::new(name), ProtocolMemberData::method(callable, None)))
+            .map(|(name, callable)| {
+                (
+                    Name::new(name),
+                    ProtocolMemberData::method(db, callable, None),
+                )
+            })
             .collect();
         Self::new(db, members)
     }
@@ -316,7 +320,10 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
+    /// Returns the callable signature exposed by instance access to a protocol's `__call__`
+    /// method.
+    ///
+    /// The callable is already in its instance-bound form, so callers must not bind it again.
     pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
         self.member_by_name(db, "__call__").and_then(|member| {
             if !member.is_method() {
@@ -324,7 +331,7 @@ impl<'db> ProtocolInterface<'db> {
             }
             match member
                 .capabilities(db)
-                .class
+                .instance
                 .read
                 .and_then(|read| read.resolve(db))
                 .map(ProtocolMemberType::ty)
@@ -650,9 +657,27 @@ pub(super) struct ProtocolMemberData<'db> {
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn method(callable: CallableType<'db>, definition: Option<Definition<'db>>) -> Self {
+    fn method(
+        db: &'db dyn Db,
+        callable: CallableType<'db>,
+        definition: Option<Definition<'db>>,
+    ) -> Self {
+        let (method_kind, callable) = if callable.is_classmethod_like(db) {
+            (
+                ProtocolMethodKind::Class,
+                protocol_bind_self(db, callable, None),
+            )
+        } else if callable.is_staticmethod_like(db) {
+            (ProtocolMethodKind::Static, callable.into_regular(db))
+        } else {
+            (ProtocolMethodKind::Instance, callable)
+        };
+
         Self {
-            kind: ProtocolMemberKind::Method(ProtocolMemberType::new(Type::Callable(callable))),
+            kind: ProtocolMemberKind::Method(
+                ProtocolMemberType::with_definition(Type::Callable(callable), definition),
+                method_kind,
+            ),
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -690,16 +715,16 @@ impl<'db> ProtocolMemberData<'db> {
     /// keeping them derived prevents the stored member kind and its capabilities from diverging.
     fn capabilities(&self, db: &'db dyn Db) -> ProtocolMemberCapabilities<'db> {
         match self.kind {
-            ProtocolMemberKind::Method(method) => {
-                let instance_method = match method.ty() {
-                    Type::Callable(callable) => {
-                        method.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
+            ProtocolMemberKind::Method(member, kind) => {
+                let instance_method = match (member.ty(), kind) {
+                    (Type::Callable(callable), ProtocolMethodKind::Instance) => {
+                        member.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
                     }
-                    _ => method,
+                    _ => member,
                 };
                 ProtocolMemberCapabilities {
                     instance: ProtocolMemberAccess::new(Some(instance_method), None),
-                    class: ProtocolMemberAccess::new(Some(method), None),
+                    class: ProtocolMemberAccess::new(Some(member), None),
                 }
             }
             ProtocolMemberKind::Property { read, write } => ProtocolMemberCapabilities {
@@ -709,9 +734,8 @@ impl<'db> ProtocolMemberData<'db> {
             ProtocolMemberKind::Attribute(member_ty) => {
                 let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
                 let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
-                // A `Todo` records a protocol member form that is not modeled yet. In particular,
-                // classmethod and staticmethod members currently use the attribute representation;
-                // do not infer a write requirement from that temporary representation.
+                // A `Todo` records a protocol member form that is not modeled yet; do not infer a
+                // write requirement from that temporary representation.
                 let is_todo = member_ty.ty().is_todo();
                 ProtocolMemberCapabilities {
                     instance: ProtocolMemberAccess::new(
@@ -792,8 +816,8 @@ impl<'db> ProtocolMemberData<'db> {
         impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.kind {
-                    ProtocolMemberKind::Method(method) => {
-                        write!(f, "MethodMember(`{}`)", method.ty().display(self.db))
+                    ProtocolMemberKind::Method(member, _) => {
+                        write!(f, "MethodMember(`{}`)", member.ty().display(self.db))
                     }
                     ProtocolMemberKind::Property { read, write } => {
                         let mut d = f.debug_struct("PropertyMember");
@@ -827,7 +851,7 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMemberKind<'db> {
-    Method(ProtocolMemberType<'db>),
+    Method(ProtocolMemberType<'db>, ProtocolMethodKind),
     Property {
         read: Option<ProtocolMemberType<'db>>,
         write: Option<ProtocolMemberType<'db>>,
@@ -835,10 +859,17 @@ enum ProtocolMemberKind<'db> {
     Attribute(ProtocolMemberType<'db>),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ProtocolMethodKind {
+    Instance,
+    Class,
+    Static,
+}
+
 impl<'db> ProtocolMemberKind<'db> {
     fn member_types(self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
         match self {
-            Self::Method(method) => [Some(method), None],
+            Self::Method(member, _) => [Some(member), None],
             Self::Property { read, write } => [read, write],
             Self::Attribute(attribute) => [Some(attribute), None],
         }
@@ -848,11 +879,11 @@ impl<'db> ProtocolMemberKind<'db> {
 
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         match (self, previous) {
-            (Self::Method(current), Self::Method(previous)) => {
+            (Self::Method(current, kind), Self::Method(previous, _)) => {
                 let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
                     (current.ty(), previous.ty())
                 else {
-                    return Self::Method(current.cycle_normalized(db, previous, cycle));
+                    return Self::Method(current.cycle_normalized(db, previous, cycle), kind);
                 };
                 debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
                 let signatures = current_callable.signatures(db).cycle_normalized(
@@ -860,12 +891,15 @@ impl<'db> ProtocolMemberKind<'db> {
                     previous_callable.signatures(db),
                     cycle,
                 );
-                Self::Method(current.with_ty(Type::Callable(CallableType::new(
-                    db,
-                    signatures,
-                    current_callable.kind(db),
-                    current_callable.provenance(db),
-                ))))
+                Self::Method(
+                    current.with_ty(Type::Callable(CallableType::new(
+                        db,
+                        signatures,
+                        current_callable.kind(db),
+                        current_callable.provenance(db),
+                    ))),
+                    kind,
+                )
             }
             (
                 Self::Property {
@@ -894,9 +928,10 @@ impl<'db> ProtocolMemberKind<'db> {
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
-            Self::Method(method) => {
-                Self::Method(method.recursive_type_normalized_impl(db, div, nested)?)
-            }
+            Self::Method(member, kind) => Self::Method(
+                member.recursive_type_normalized_impl(db, div, nested)?,
+                kind,
+            ),
             Self::Property { read, write } => Self::Property {
                 read: match read {
                     Some(read) => Some(read.recursive_type_normalized_impl(db, div, nested)?),
@@ -921,9 +956,10 @@ impl<'db> ProtocolMemberKind<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
-            Self::Method(method) => {
-                Self::Method(method.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Self::Method(member, kind) => Self::Method(
+                member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                kind,
+            ),
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
@@ -963,7 +999,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 
     pub(super) fn is_method(&self) -> bool {
-        matches!(self.data.kind, ProtocolMemberKind::Method(_))
+        matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    fn is_instance_method(&self) -> bool {
+        matches!(
+            self.data.kind,
+            ProtocolMemberKind::Method(_, ProtocolMethodKind::Instance)
+        )
     }
 
     fn is_property(&self) -> bool {
@@ -976,6 +1019,42 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     fn capabilities(&self, db: &'db dyn Db) -> ProtocolMemberCapabilities<'db> {
         self.data.capabilities(db)
+    }
+
+    /// Returns the accesses that a candidate value must provide for this member.
+    ///
+    /// A module-level callable can satisfy an ordinary or static method through direct member
+    /// access. A class object can likewise satisfy a class or static method. The member does not
+    /// also need to exist on the value's meta-type.
+    fn implementation_capabilities(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> ProtocolMemberCapabilities<'db> {
+        let capabilities = self.capabilities(db);
+        if matches!(
+            (ty, self.data.kind),
+            (
+                Type::ModuleLiteral(_),
+                ProtocolMemberKind::Method(
+                    _,
+                    ProtocolMethodKind::Instance | ProtocolMethodKind::Static
+                )
+            ) | (
+                Type::ClassLiteral(_),
+                ProtocolMemberKind::Method(
+                    _,
+                    ProtocolMethodKind::Class | ProtocolMethodKind::Static
+                )
+            )
+        ) {
+            ProtocolMemberCapabilities {
+                class: ProtocolMemberAccess::NONE,
+                ..capabilities
+            }
+        } else {
+            capabilities
+        }
     }
 
     fn has_todo_type(&self) -> bool {
@@ -1140,6 +1219,8 @@ fn protocol_member_read_type<'db>(
     member: &ProtocolMember<'_, 'db>,
     access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
+    // A callback protocol describes call syntax. Use the candidate's callable type instead of an
+    // explicitly resolved `__call__` attribute, which can differ for class objects.
     if access == ProtocolMemberAccessMode::Instance
         && member.is_method()
         && member.name == "__call__"
@@ -1147,7 +1228,11 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
-    let place = if access == ProtocolMemberAccessMode::Instance && member.is_method() {
+    // PEP 544 matches module-level functions directly, without descriptor binding on `ModuleType`.
+    let place = if access == ProtocolMemberAccessMode::Instance
+        && member.is_instance_method()
+        && !matches!(ty, Type::ModuleLiteral(_))
+    {
         ty.invoke_descriptor_protocol(
             db,
             ty,
@@ -1484,11 +1569,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required_ty: ProtocolMemberType<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
         let Some(attribute_type) = protocol_member_read_type(db, ty, receiver_ty, member, access)
         else {
             return self.never();
         };
+
+        // For a method on a class object, `Self` names instances of that class: a
+        // `@classmethod` returning `Self` returns `Factory`, not `type[Factory]`. For a
+        // non-method member, `Self` names the object whose attribute is being checked, so a
+        // class object must stay a class object.
+        let non_method_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
+        let method_self_binding_ty = ty
+            .to_instance(db)
+            .or_else(|| ty.literal_fallback_instance(db))
+            .unwrap_or(ty);
 
         // Checking a class object against a protocol's instance capabilities can expose the
         // property descriptor itself rather than the value returned by its getter. Compatibility
@@ -1511,11 +1605,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
-                        &callables.map(|callable| callable.apply_self(db, fallback_ty)),
-                        required_callable.apply_self(db, fallback_ty),
+                        &callables.map(|callable| callable.apply_self(db, method_self_binding_ty)),
+                        required_callable.apply_self(db, method_self_binding_ty),
                     )
                 })
-        } else if member.is_method() {
+        } else if member.is_instance_method() {
             let Some(required_ty) = required_ty.resolve(db) else {
                 return self.never();
             };
@@ -1529,19 +1623,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if callable.is_function_like(db) {
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, Some(fallback_ty)),
-                                protocol_bind_self(db, required_callable, Some(fallback_ty)),
+                                callable.bind_self(db, Some(method_self_binding_ty)),
+                                protocol_bind_self(
+                                    db,
+                                    required_callable,
+                                    Some(method_self_binding_ty),
+                                ),
                             )
                         } else {
                             self.check_callable_pair(db, *callable, required_callable)
                         }
                     })
                 })
-        } else {
-            required_ty.bind_self(db, fallback_ty).when_some_and(
+        } else if member.is_method() {
+            let Some(required_ty) = required_ty.resolve(db) else {
+                return self.never();
+            };
+            let Type::Callable(required_callable) = required_ty.ty() else {
+                return self.never();
+            };
+            self.check_type_pair(
                 db,
-                self.constraints,
-                |required_ty| {
+                attribute_type,
+                Type::Callable(required_callable.apply_self(db, method_self_binding_ty)),
+            )
+        } else {
+            required_ty
+                .bind_self(db, non_method_self_binding_ty)
+                .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
                         && result.is_never_satisfied(db)
@@ -1552,8 +1661,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
                     }
                     result
-                },
-            )
+                })
         }
     }
 
@@ -1570,7 +1678,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        if access == ProtocolMemberAccessMode::Class && member.is_method() {
+        if access == ProtocolMemberAccessMode::Class
+            && member.is_instance_method()
+            && required.read.is_some()
+        {
             // The instance-side check is authoritative for the signature of a method
             // implementation. Class access only establishes that the member is present. Callable
             // types and several callable literal forms do not expose a useful `__call__` member
@@ -1636,7 +1747,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let capabilities = member.capabilities(db);
+        let capabilities = member.implementation_capabilities(db, ty);
         if let Some(context) = self.report_context() {
             let instance_read_missing = capabilities.instance.read.is_some()
                 && protocol_member_read_type(
@@ -1648,7 +1759,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
                 .is_none();
             let class_read_missing = capabilities.class.read.is_some()
-                && !(member.is_method() && member.name == "__call__")
+                && !(member.is_instance_method() && member.name == "__call__")
                 && protocol_member_read_type(
                     db,
                     ty,
@@ -1709,16 +1820,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let source_capabilities = source_member.capabilities(db);
         let target_capabilities = target_member.capabilities(db);
+
+        if access == ProtocolMemberAccessMode::Class
+            && source_member.is_method()
+            && target_member.is_instance_method()
+        {
+            // The instance-side check is authoritative for an ordinary method's signature. Class
+            // access only establishes that the source member is also present on the class.
+            return ConstraintSet::from_bool(
+                self.constraints,
+                source_capabilities.class.read.is_some(),
+            );
+        }
+
         let (source, target) = match access {
             ProtocolMemberAccessMode::Instance => {
-                (source_capabilities.instance, target_capabilities.instance)
-            }
-            ProtocolMemberAccessMode::Class
-                if source_member.is_method() && target_member.is_method() =>
-            {
-                // The receiver type of an unbound method is specific to the class that
-                // defines it. Compare the corresponding bound access types after separately
-                // establishing that both methods are available through their classes.
                 (source_capabilities.instance, target_capabilities.instance)
             }
             ProtocolMemberAccessMode::Class => {
@@ -1912,35 +2028,36 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 return self.never();
             }
 
-            ty.try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
-                .when_some_and(db, self.constraints, |callables| {
-                    callables.iter().when_all(db, self.constraints, |callable| {
-                        if !callable_has_only_non_never_returns(db, *callable) {
-                            return self.never();
-                        }
+            let Some(callables) = ty.try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
+            else {
+                return self.never();
+            };
 
-                        // Disjointness distributes over unions. Compare the overload return arms
-                        // directly so that recursive return types do not require canonicalizing an
-                        // intermediate union merely to distribute it again.
-                        method.signatures(db).iter().when_all(
+            callables.iter().when_all(db, self.constraints, |callable| {
+                if !callable_has_only_non_never_returns(db, *callable) {
+                    return self.never();
+                }
+
+                // Disjointness distributes over unions. Compare the overload return arms
+                // directly so that recursive return types do not require canonicalizing an
+                // intermediate union merely to distribute it again.
+                method
+                    .signatures(db)
+                    .iter()
+                    .when_all(db, self.constraints, |method_signature| {
+                        callable.signatures(db).iter().when_all(
                             db,
                             self.constraints,
-                            |method_signature| {
-                                callable.signatures(db).iter().when_all(
+                            |callable_signature| {
+                                self.check_type_pair(
                                     db,
-                                    self.constraints,
-                                    |callable_signature| {
-                                        self.check_type_pair(
-                                            db,
-                                            method_signature.return_ty,
-                                            callable_signature.return_ty,
-                                        )
-                                    },
+                                    method_signature.return_ty,
+                                    callable_signature.return_ty,
                                 )
                             },
                         )
                     })
-                })
+            })
         }
     }
 }
@@ -2089,21 +2206,16 @@ fn cached_protocol_interface<'db>(
                     definition,
                 ),
                 Type::Callable(callable)
-                    if bound_on_class.is_yes() && callable.is_function_like(db) =>
+                    if bound_on_class.is_yes() && callable.is_method_like(db) =>
                 {
-                    ProtocolMemberData::method(callable, definition)
+                    ProtocolMemberData::method(db, callable, definition)
                 }
                 Type::FunctionLiteral(function)
-                    if function.is_staticmethod(db) || function.is_classmethod(db) =>
+                    if bound_on_class.is_yes()
+                        || function.is_staticmethod(db)
+                        || function.is_classmethod(db) =>
                 {
-                    ProtocolMemberData::attribute(
-                        todo_type!("classmethod and staticmethod protocol members"),
-                        qualifiers,
-                        definition,
-                    )
-                }
-                Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
-                    ProtocolMemberData::method(function.into_callable_type(db), definition)
+                    ProtocolMemberData::method(db, function.into_callable_type(db), definition)
                 }
                 _ if bound_on_class.is_yes()
                     && definition
