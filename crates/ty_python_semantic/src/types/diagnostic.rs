@@ -142,6 +142,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
@@ -1051,6 +1052,15 @@ declare_lint! {
         summary: "detects unknown keyword arguments in calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pydantic-discarded-extra-argument.md")]
+    pub(crate) static PYDANTIC_DISCARDED_EXTRA_ARGUMENT = {
+        summary: "detects extra constructor arguments that Pydantic silently discards",
+        status: LintStatus::stable("0.0.60"),
+        default_level: Level::Warn,
     }
 }
 
