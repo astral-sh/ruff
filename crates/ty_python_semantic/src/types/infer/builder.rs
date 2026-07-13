@@ -362,35 +362,54 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 /// An expression cache shared across builders during multi-inference.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
 
-fn callable_paramspec_and_return_typevar<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
-    let callable = ty.resolve_type_alias(db).as_callable()?;
-    if callable.kind(db) != CallableTypeKind::Regular {
-        return None;
-    }
-    let [signature] = callable.signatures(db).overloads.as_slice() else {
-        return None;
-    };
-    let paramspec = signature.parameters().as_paramspec()?;
-    let return_typevar = signature.return_ty.as_typevar().or_else(|| {
-        let specialization = signature
-            .return_ty
-            .known_specialization(db, KnownClass::Awaitable)?;
-        let [inner] = specialization.types(db) else {
-            return None;
-        };
-        inner.as_typevar()
-    })?;
-    Some((paramspec, return_typevar))
-}
-
 fn transparent_callable_decorator_result<'db>(
     db: &'db dyn Db,
     bindings: &Bindings<'db>,
     decorated_ty: Type<'db>,
 ) -> Option<Type<'db>> {
+    enum TransparentCallableReturn<'db> {
+        TypeVar(BoundTypeVarInstance<'db>),
+        Awaitable(BoundTypeVarInstance<'db>),
+    }
+
+    impl<'db> TransparentCallableReturn<'db> {
+        fn matches(self, db: &'db dyn Db, other: Self) -> bool {
+            match (self, other) {
+                (Self::TypeVar(left), Self::TypeVar(right))
+                | (Self::Awaitable(left), Self::Awaitable(right)) => {
+                    left.is_same_typevar_as(db, right)
+                }
+                _ => false,
+            }
+        }
+    }
+
+    fn callable_paramspec_and_return<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(BoundTypeVarInstance<'db>, TransparentCallableReturn<'db>)> {
+        let callable = ty.resolve_type_alias(db).as_callable()?;
+        if callable.kind(db) != CallableTypeKind::Regular {
+            return None;
+        }
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let paramspec = signature.parameters().as_paramspec()?;
+        let return_typevar = if let Some(typevar) = signature.return_ty.as_typevar() {
+            TransparentCallableReturn::TypeVar(typevar)
+        } else {
+            let specialization = signature
+                .return_ty
+                .known_specialization(db, KnownClass::Awaitable)?;
+            let [inner] = specialization.types(db) else {
+                return None;
+            };
+            TransparentCallableReturn::Awaitable(inner.as_typevar()?)
+        };
+        Some((paramspec, return_typevar))
+    }
+
     if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
         return None;
     }
@@ -405,12 +424,12 @@ fn transparent_callable_decorator_result<'db>(
         return None;
     };
 
-    let (parameter_callable_paramspec, parameter_callable_return_typevar) =
-        callable_paramspec_and_return_typevar(db, parameter.annotated_type())?;
-    let (return_callable_paramspec, return_callable_typevar) =
-        callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)?;
+    let (parameter_callable_paramspec, parameter_callable_return) =
+        callable_paramspec_and_return(db, parameter.annotated_type())?;
+    let (return_callable_paramspec, return_callable_return) =
+        callable_paramspec_and_return(db, decorator_signature.return_ty)?;
     if !parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
-        || !parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
+        || !parameter_callable_return.matches(db, return_callable_return)
     {
         return None;
     }
@@ -4881,11 +4900,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: Remove this special case once the new constraint solver can preserve
         // per-overload ParamSpec/return correlations for transparent callable decorators.
         if let Some(decorator_bindings) = decorator_bindings.as_ref()
-            && let Some(result) = transparent_callable_decorator_result(
-                self.db(),
-                decorator_bindings,
-                decorated_ty,
-            )
+            && let Some(result) =
+                transparent_callable_decorator_result(self.db(), decorator_bindings, decorated_ty)
         {
             return result;
         }

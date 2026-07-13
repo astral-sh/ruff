@@ -1088,6 +1088,19 @@ reveal_type(
 async def check_awaitable() -> None:
     reveal_type(await awaitable(1))  # revealed: int
     reveal_type(await awaitable("one"))  # revealed: str
+
+def unwrap_awaitable(function: Callable[P, Awaitable[R]], /) -> Callable[P, R]:
+    raise NotImplementedError
+
+@overload
+async def unwrapped(value: int) -> int: ...
+@overload
+async def unwrapped(value: str) -> str: ...
+@unwrap_awaitable
+async def unwrapped(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(unwrapped(1))  # revealed: int | str
 ```
 
 The selected decorator overload can use an `Awaitable` return type.
