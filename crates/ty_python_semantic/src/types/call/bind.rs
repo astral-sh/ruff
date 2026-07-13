@@ -32,7 +32,7 @@ use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBound, Solutions,
 };
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
@@ -5021,10 +5021,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            let inferred = PathBounds::default_solve(self.db, constraints, bounds)
-                .ok()
-                .flatten()?;
-            let promoted = inferred.promote(self.db);
+            let lower = bounds.lower?;
+            let promoted = lower.promote(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
