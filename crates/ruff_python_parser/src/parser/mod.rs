@@ -137,7 +137,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Creates a parser that bypasses chunked lexing, for a single fallback reparse.
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
     fn new_starts_at_with_legacy_lexer(
         source: &'src str,
         start_offset: TextSize,
@@ -219,7 +219,7 @@ impl<'src> Parser<'src> {
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
         if self.tokens.should_reparse_with_legacy_lexer() {
             return Parser::new_starts_at_with_legacy_lexer(
                 self.source,
