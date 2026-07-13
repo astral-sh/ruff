@@ -1785,6 +1785,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
+        // Aggregation summarizes visible parameters and return types, but receiver bindings are
+        // additional per-signature obligations. Leave those signatures to the ordinary relation,
+        // which checks each receiver binding before comparing the visible signature.
+        if target_signature.receiver_bindings.is_some()
+            || source_signatures
+                .iter()
+                .any(|signature| signature.receiver_bindings.is_some())
+        {
+            return None;
+        }
+
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
                 return None;
