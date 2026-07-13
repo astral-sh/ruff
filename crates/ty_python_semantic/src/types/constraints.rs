@@ -89,6 +89,7 @@
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
+use std::iter;
 use std::marker::PhantomData;
 use std::ops::Range;
 use std::sync::Arc;
@@ -3490,7 +3491,7 @@ impl<'db> PathBounds<'db> {
         inferable: InferableTypeVars<'db>,
     ) -> Self {
         if let Some(path_bounds) =
-            Self::compute_simple_lower_bound_conjunction(db, builder, node, inferable)
+            Self::compute_simple_bound_conjunction(db, builder, node, inferable)
         {
             return path_bounds;
         }
@@ -3559,14 +3560,13 @@ impl<'db> PathBounds<'db> {
         PathBounds::Constrained(result.into_boxed_slice())
     }
 
-    /// Accumulates a conjunction of concrete lower-bound constraints without constructing a
+    /// Accumulates a conjunction of concrete bound constraints without constructing a
     /// [`PathAssignments`] or its sequent map.
     ///
-    /// There are no relationships to derive between these constraints: each lower bound contains
-    /// no typevars, and an unconstrained upper bound cannot make the path unsatisfiable. The normal
-    /// solution-selection logic still validates each accumulated bound against the typevar's
-    /// declared bound or constraints.
-    fn compute_simple_lower_bound_conjunction(
+    /// There are no relationships to derive between these constraints, as the upper and lower
+    /// bounds do not contain typevars. The normal solution-selection logic still validates each
+    /// accumulated bound against the typevar's declared bound or constraints.
+    fn compute_simple_bound_conjunction(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
@@ -3595,16 +3595,18 @@ impl<'db> PathBounds<'db> {
                         return None;
                     }
 
-                    let lower = constraint.bounds.lower?;
-                    if constraint.bounds.upper.is_some()
-                        || lower.has_typevar(db)
-                        || lower.has_unspecialized_type_var(db)
+                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
+                        .any(|bound| bound.has_typevar(db) || bound.has_unspecialized_type_var(db))
                     {
                         return None;
                     }
 
                     current = interior.if_true;
-                    constraints.push((constraint.typevar, lower, interior.source_order));
+                    constraints.push((
+                        constraint.typevar,
+                        constraint.bounds,
+                        interior.source_order,
+                    ));
                 }
             }
         }
@@ -3612,8 +3614,14 @@ impl<'db> PathBounds<'db> {
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxHashMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
-        for (typevar, lower, _) in constraints {
-            mappings.entry(typevar).or_default().add_lower(db, lower);
+        for (typevar, constraint, _) in constraints {
+            let bounds = mappings.entry(typevar).or_default();
+            if let Some(lower) = constraint.lower {
+                bounds.add_lower(db, lower);
+            }
+            if let Some(upper) = constraint.upper {
+                bounds.add_upper(db, upper);
+            }
         }
 
         let path = mappings
@@ -6468,13 +6476,13 @@ impl PathAssignments {
         // assignments on this path. Assignments will typically have a single history, so it
         // should™ be fine that we're scanning and filtering that entire list.
         let (index, _, (_, history)) = self.assignments.get_full(&assignment)?;
-        let first = std::iter::once(history);
+        let first = iter::once(history);
         let rest = self
             .additional_substitution_histories
             .iter()
             .filter(move |(history_index, _)| *history_index == index)
             .map(|(_, history)| history);
-        Some(std::iter::chain(first, rest))
+        Some(iter::chain(first, rest))
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -7105,6 +7113,79 @@ mod tests {
                 bound_typevar: t,
                 solution: UnionType::from_elements(&db, [int, str]),
             }]])
+        );
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn simple_exact_bound_conjunction_skips_sequent_analysis() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let set =
+            ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(&db, &builder, u, int, int)
+            });
+        let inferable = InferableTypeVars::from_typevars(
+            &db,
+            [t.identity(&db), u.identity(&db)].into_iter().collect(),
+        );
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        let Solutions::Constrained(solutions) = set.solutions(&db, &builder, inferable) else {
+            panic!("expected constrained solutions");
+        };
+        assert_eq!(solutions.len(), 1);
+        assert_eq!(solutions[0].len(), 2);
+        assert!(solutions[0].contains(&TypeVarSolution {
+            bound_typevar: t,
+            solution: int,
+        }));
+        assert!(solutions[0].contains(&TypeVarSolution {
+            bound_typevar: u,
+            solution: int,
+        }));
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn simple_unsatisfiable_exact_bound_conjunction_skips_sequent_analysis() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let set =
+            ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(&db, &builder, t, str, str)
+            });
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        assert_eq!(
+            set.solutions(&db, &builder, inferable),
+            Solutions::Unsatisfiable
         );
 
         let storage = builder.storage.borrow();
