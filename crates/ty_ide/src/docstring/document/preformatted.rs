@@ -205,9 +205,7 @@ impl RestLiteralBlockScanner {
     /// Whether or not the given line marks the start of a reST literal block.
     fn line_starts_literal_block(line: &str) -> bool {
         if let Some(directive) = parse_rest_directive(line) {
-            // The renderer does not recognize `seealso` as prose yet, but the document scanner
-            // has historically excluded its body from preformatted content.
-            return !directive.is_named("seealso") && directive.kind().is_preformatted();
+            return directive.kind().is_preformatted();
         }
 
         Self::line_starts_paragraph_literal_block(line)

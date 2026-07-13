@@ -1,10 +1,8 @@
-use std::borrow::Cow;
-
 use ruff_text_size::TextSize;
 
 use super::super::document::{
     preformatted::MarkdownFence,
-    syntax::{RestDirectiveKind, parse_rest_directive},
+    syntax::{RestDirective, RestDirectiveKind, parse_rest_directive},
 };
 
 mod inline;
@@ -97,6 +95,14 @@ fn render_with_indentation_mode(
         renderer.prepare_line(first_line);
         first_line = false;
 
+        if let Some(marker_indent) = renderer.block_state.rest_control_marker_indent() {
+            if rendered_line.is_empty() || line_indent > marker_indent {
+                renderer.discard_pending_line();
+                continue;
+            }
+            renderer.finish_rest_control();
+        }
+
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
         // (Just pop all trailing `\n` from `output`?)
@@ -107,12 +113,30 @@ fn render_with_indentation_mode(
             renderer.finish_rest_literal();
         }
 
+        if let Some(marker_indent) = renderer.block_state.rest_directive_literal_marker_indent()
+            && !rendered_line.is_empty()
+            && line_indent <= marker_indent
+        {
+            renderer.finish_rest_literal();
+        }
+
         // We previously entered a literal block and we just found our first non-blank line
         // So now we're actually in the literal block
         if let Some(language) = renderer.block_state.pending_rst_literal_language()
             && !rendered_line.is_empty()
         {
             renderer.start_rest_literal(language, line_indent);
+        }
+
+        if let Some((language, marker_indent)) =
+            renderer.block_state.pending_rest_directive_literal()
+            && !rendered_line.is_empty()
+        {
+            if line_indent > marker_indent {
+                renderer.start_rest_directive_literal(language, marker_indent);
+            } else {
+                renderer.cancel_pending_rest_directive_literal();
+            }
         }
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
@@ -151,110 +175,59 @@ fn render_with_indentation_mode(
             continue;
         }
 
-        // Parse directives before paragraph literal blocks so their complete arguments are
-        // available to directive-specific rendering.
-        let parsed_directive = renderer
-            .block_state
-            .is_prose()
-            .then(|| parse_rest_directive(trimmed_source_line))
-            .flatten();
-        if let Some(directive) = parsed_directive {
+        // Directives classify their content independently from paragraph literal blocks.
+        if renderer.block_state.is_prose()
+            && let Some((prefix, directive)) = find_rest_directive(trimmed_source_line)
+        {
             renderer.flush_pending_link();
+
             match directive.kind() {
                 RestDirectiveKind::Code => {
-                    rendered_line = "";
-                    renderer.start_pending_rest_literal(
-                        directive
-                            .argument()
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("python"),
+                    rendered_line = prefix.trim_end();
+                    renderer.start_pending_rest_directive_literal(
+                        code_directive_language(directive),
+                        line_indent,
                     );
                 }
                 RestDirectiveKind::Preformatted => {
-                    rendered_line = directive.argument();
-                    if rendered_line.is_empty() {
-                        renderer.start_pending_rest_literal("text");
+                    let language = preformatted_directive_language(directive);
+                    if prefix.trim().is_empty()
+                        && let Some(content) = preformatted_directive_inline_content(directive)
+                    {
+                        renderer.start_rest_directive_literal(language, line_indent);
+                        rendered_line = content;
                     } else {
-                        // Use an indentation deeper than the marker so that following prose closes
-                        // the block while indented continuation lines remain part of the formula.
-                        renderer.start_rest_literal("text", line_indent + TextSize::from(1));
+                        temp_owned_line = preformatted_directive_title(prefix, directive);
+                        rendered_line = temp_owned_line.as_str();
+                        renderer.start_pending_rest_directive_literal(language, line_indent);
                     }
                 }
                 RestDirectiveKind::Prose => {
-                    temp_owned_line =
-                        render_prose_directive("", directive.name(), directive.argument());
+                    temp_owned_line = render_prose_directive(prefix, directive);
                     rendered_line = temp_owned_line.as_str();
                 }
+                RestDirectiveKind::Control => {
+                    rendered_line = prefix.trim_end();
+                    if rendered_line.is_empty() {
+                        renderer.start_rest_control(line_indent);
+                    }
+                }
             }
-        }
-
-        // If we're not in a codeblock and we see something that signals a literal block, start one
-        let parsed_literal = trimmed_source_line
-            // first check for a line ending with `::`
-            .strip_suffix("::")
-            .map(|prefix| (prefix, None))
-            // if that fails, look for a line ending with `:: lang`
-            .or_else(|| {
-                let (prefix, lang) = trimmed_source_line.rsplit_once(' ')?;
-                let prefix = prefix.trim_end().strip_suffix("::")?;
-                Some((prefix, Some(lang)))
-            });
-        if parsed_directive.is_none()
-            && renderer.block_state.is_prose()
-            && let Some((without_literal, lang)) = parsed_literal
+        // If we're not in a codeblock and we see a paragraph literal marker, start a block.
+        } else if renderer.block_state.is_prose()
+            && let Some((without_literal, language)) = parse_paragraph_literal(trimmed_source_line)
         {
-            let mut without_directive = without_literal;
-            let mut directive = None;
-            // Parse out a directive like `.. warning::`
-            if let Some((prefix, directive_str)) = without_literal.rsplit_once(' ')
-                && let Some(without_directive_str) = prefix.strip_suffix("..")
-            {
-                directive = Some(directive_str);
-                without_directive = without_directive_str;
-            }
-
-            // Whether the `::` should become `:` or be erased
-            let include_colon = if let Some(character) = without_directive.chars().next_back() {
-                // If lang is set then we're either deleting the whole line or
-                // the special rendering below will add it itself
-                lang.is_none() && !character.is_whitespace()
+            let include_colon = language.is_none()
+                && without_literal
+                    .chars()
+                    .next_back()
+                    .is_some_and(|character| !character.is_whitespace());
+            rendered_line = if include_colon {
+                rendered_line.strip_suffix(':').unwrap_or(rendered_line)
             } else {
-                // Delete whole line
-                false
+                without_literal.trim_end()
             };
-
-            if include_colon {
-                rendered_line = rendered_line.strip_suffix(":").unwrap();
-            } else {
-                rendered_line = without_directive.trim_end();
-            }
-
-            match directive {
-                // Special directives that should be plaintext
-                Some(
-                    "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
-                    | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
-                    | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
-                    | "version-removed" | "versionremoved",
-                ) => {
-                    // A directive starts a new block and cannot continue a
-                    // pending hyperlink from the previous line.
-                    renderer.flush_pending_link();
-
-                    // We prepend without_directive here out of caution for preserving input.
-                    // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
-                    temp_owned_line = render_prose_directive(
-                        without_directive,
-                        directive.unwrap(),
-                        lang.unwrap_or_default(),
-                    );
-
-                    rendered_line = temp_owned_line.as_str();
-                }
-                // All other directives are code and default to Python.
-                _ => renderer.start_pending_rest_literal(lang.unwrap_or("python")),
-            }
+            renderer.start_pending_rest_literal(language.unwrap_or("python"));
         }
 
         // Add this line's indentation.
@@ -281,32 +254,147 @@ fn render_with_indentation_mode(
     renderer.finish_document();
 }
 
-fn render_prose_directive(prefix: &str, name: &str, argument: &str) -> String {
-    // Map version directives to human-readable phrases (matching Sphinx output).
-    let pretty_name = match name {
-        "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
-        "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
-        "deprecated" | "version-deprecated" => Cow::Borrowed("Deprecated since version"),
-        "versionremoved" | "version-removed" => Cow::Borrowed("Removed in version"),
-        other => Cow::Owned(
-            other
-                .char_indices()
-                .map(|(index, character)| {
-                    if index == 0 {
-                        character.to_ascii_uppercase()
-                    } else {
-                        character
-                    }
-                })
-                .collect(),
-        ),
-    };
-
-    if argument.is_empty() {
-        format!("**{prefix}{pretty_name}:**")
-    } else {
-        format!("**{prefix}{pretty_name} {argument}:**")
+fn find_rest_directive(line: &str) -> Option<(&str, RestDirective<'_>)> {
+    if let Some(directive) = parse_rest_directive(line) {
+        return Some(("", directive));
     }
+
+    // Preserve the renderer's historical best-effort handling of invalid markers that have
+    // prose before the directive.
+    let marker_start = line.rfind(".. ")?;
+    let directive = parse_rest_directive(&line[marker_start..])?;
+    Some((&line[..marker_start], directive))
+}
+
+fn parse_paragraph_literal(line: &str) -> Option<(&str, Option<&str>)> {
+    line.strip_suffix("::")
+        .map(|prefix| (prefix, None))
+        .or_else(|| {
+            let (prefix, language) = line.rsplit_once(' ')?;
+            let prefix = prefix.trim_end().strip_suffix("::")?;
+            Some((prefix, Some(language)))
+        })
+}
+
+fn code_directive_language(directive: RestDirective<'_>) -> &str {
+    if directive.is_named("code")
+        || directive.is_named("code-block")
+        || directive.is_named("sourcecode")
+    {
+        first_argument_word(directive.argument()).unwrap_or("python")
+    } else if directive.is_named("testoutput") {
+        "text"
+    } else {
+        "python"
+    }
+}
+
+fn preformatted_directive_language(directive: RestDirective<'_>) -> &str {
+    if directive.is_named("raw") {
+        first_argument_word(directive.argument()).unwrap_or("text")
+    } else if directive.is_named("csv-table") {
+        "csv"
+    } else if directive.is_named("graphviz") {
+        "dot"
+    } else {
+        "text"
+    }
+}
+
+fn preformatted_directive_inline_content(directive: RestDirective<'_>) -> Option<&str> {
+    directive
+        .is_named("math")
+        .then_some(directive.argument())
+        .filter(|argument| !argument.is_empty())
+}
+
+fn preformatted_directive_title(prefix: &str, directive: RestDirective<'_>) -> String {
+    if directive.is_named("csv-table") && !directive.argument().is_empty() {
+        format!("{prefix}**{}**", directive.argument())
+    } else {
+        prefix.trim_end().to_owned()
+    }
+}
+
+fn render_prose_directive(prefix: &str, directive: RestDirective<'_>) -> String {
+    let name = directive.name();
+    let argument = directive.argument();
+
+    let label = [
+        ("attention", "Attention"),
+        ("caution", "Caution"),
+        ("danger", "Danger"),
+        ("error", "Error"),
+        ("hint", "Hint"),
+        ("important", "Important"),
+        ("note", "Note"),
+        ("tip", "Tip"),
+        ("warning", "Warning"),
+        ("seealso", "See also"),
+    ]
+    .into_iter()
+    .find_map(|(name, label)| directive.is_named(name).then_some(label));
+    if let Some(label) = label {
+        return render_labeled_directive(prefix, label, argument);
+    }
+
+    if directive.is_named("admonition") {
+        let label = if argument.is_empty() {
+            "Admonition"
+        } else {
+            argument
+        };
+        return render_labeled_directive(prefix, label, "");
+    }
+
+    let version_label = [
+        ("versionadded", "Added in version"),
+        ("version-added", "Added in version"),
+        ("versionchanged", "Changed in version"),
+        ("version-changed", "Changed in version"),
+        ("deprecated", "Deprecated since version"),
+        ("version-deprecated", "Deprecated since version"),
+        ("versionremoved", "Removed in version"),
+        ("version-removed", "Removed in version"),
+    ]
+    .into_iter()
+    .find_map(|(name, label)| directive.is_named(name).then_some(label));
+    if let Some(label) = version_label {
+        let (version, explanation) = split_first_word(argument);
+        let label = if version.is_empty() {
+            label.to_owned()
+        } else {
+            format!("{label} {version}")
+        };
+        return render_labeled_directive(prefix, &label, explanation);
+    }
+
+    let mut rendered = format!("{prefix}*{name}*");
+    if !argument.is_empty() {
+        rendered.push(' ');
+        rendered.push_str(argument);
+    }
+    rendered
+}
+
+fn render_labeled_directive(prefix: &str, label: &str, content: &str) -> String {
+    let mut rendered = format!("**{prefix}{label}:**");
+    if !content.is_empty() {
+        rendered.push(' ');
+        rendered.push_str(content);
+    }
+    rendered
+}
+
+fn split_first_word(argument: &str) -> (&str, &str) {
+    let Some(split) = argument.find(char::is_whitespace) else {
+        return (argument, "");
+    };
+    (&argument[..split], argument[split..].trim_start())
+}
+
+fn first_argument_word(argument: &str) -> Option<&str> {
+    argument.split_whitespace().next()
 }
 
 /// How to emit leading indentation outside recognized code blocks.
@@ -354,13 +442,20 @@ impl<'source, 'output> Renderer<'source, 'output> {
         self.line_prefix.emit(self.output);
     }
 
+    fn discard_pending_line(&mut self) {
+        self.line_prefix.rendered.clear();
+    }
+
     /// Flushes a wrapped hyperlink candidate.
     fn flush_pending_link(&mut self) {
         self.inline.flush_pending_link(self.output);
     }
 
     fn finish_rest_literal(&mut self) {
-        debug_assert!(matches!(self.block_state, BlockState::RestLiteral { .. }));
+        debug_assert!(matches!(
+            self.block_state,
+            BlockState::RestLiteral { .. } | BlockState::RestDirectiveLiteral { .. }
+        ));
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(FENCE);
@@ -371,6 +466,17 @@ impl<'source, 'output> Renderer<'source, 'output> {
         self.block_state = BlockState::PendingRestLiteral { language };
     }
 
+    fn start_pending_rest_directive_literal(
+        &mut self,
+        language: &'source str,
+        marker_indent: TextSize,
+    ) {
+        self.block_state = BlockState::PendingRestDirectiveLiteral {
+            language,
+            marker_indent,
+        };
+    }
+
     fn start_rest_literal(&mut self, language: &str, indent: TextSize) {
         self.flush_pending_line();
         self.block_state = BlockState::RestLiteral { indent };
@@ -378,6 +484,32 @@ impl<'source, 'output> Renderer<'source, 'output> {
         self.output.push_str(FENCE);
         self.output.push_str(language);
         self.output.push('\n');
+    }
+
+    fn start_rest_directive_literal(&mut self, language: &str, marker_indent: TextSize) {
+        self.flush_pending_line();
+        self.block_state = BlockState::RestDirectiveLiteral { marker_indent };
+        self.output.push('\n');
+        self.output.push_str(FENCE);
+        self.output.push_str(language);
+        self.output.push('\n');
+    }
+
+    fn cancel_pending_rest_directive_literal(&mut self) {
+        debug_assert!(matches!(
+            self.block_state,
+            BlockState::PendingRestDirectiveLiteral { .. }
+        ));
+        self.block_state = BlockState::Prose;
+    }
+
+    fn start_rest_control(&mut self, marker_indent: TextSize) {
+        self.block_state = BlockState::RestControl { marker_indent };
+    }
+
+    fn finish_rest_control(&mut self) {
+        debug_assert!(matches!(self.block_state, BlockState::RestControl { .. }));
+        self.block_state = BlockState::Prose;
     }
 
     fn start_doctest(&mut self) {
@@ -420,8 +552,13 @@ impl<'source, 'output> Renderer<'source, 'output> {
     fn finish_document(mut self) {
         self.flush_pending_line();
         match self.block_state {
-            BlockState::Prose | BlockState::PendingRestLiteral { .. } => {}
-            BlockState::RestLiteral { .. } | BlockState::Doctest => {
+            BlockState::Prose
+            | BlockState::PendingRestLiteral { .. }
+            | BlockState::PendingRestDirectiveLiteral { .. }
+            | BlockState::RestControl { .. } => {}
+            BlockState::RestLiteral { .. }
+            | BlockState::RestDirectiveLiteral { .. }
+            | BlockState::Doctest => {
                 self.output.push('\n');
                 self.output.push_str(FENCE);
             }
@@ -474,7 +611,7 @@ impl LinePrefix {
         // Suppress source line boundaries after a reST literal marker while we
         // wait for its content. This allows us to collapse any intervening
         // newlines that are purely structural.
-        if !block_state.is_pending_rst_literal() {
+        if !block_state.suppresses_source_line_boundary() {
             self.rendered.push('\n');
         }
     }
@@ -513,8 +650,18 @@ enum BlockState<'a> {
     PendingRestLiteral {
         language: &'a str,
     },
+    PendingRestDirectiveLiteral {
+        language: &'a str,
+        marker_indent: TextSize,
+    },
     RestLiteral {
         indent: TextSize,
+    },
+    RestDirectiveLiteral {
+        marker_indent: TextSize,
+    },
+    RestControl {
+        marker_indent: TextSize,
     },
     Doctest,
     MarkdownFence(MarkdownFence<'a>),
@@ -528,12 +675,18 @@ impl<'docstring> BlockState<'docstring> {
     const fn is_code(&self) -> bool {
         matches!(
             self,
-            Self::RestLiteral { .. } | Self::Doctest | Self::MarkdownFence(_)
+            Self::RestLiteral { .. }
+                | Self::RestDirectiveLiteral { .. }
+                | Self::Doctest
+                | Self::MarkdownFence(_)
         )
     }
 
-    const fn is_pending_rst_literal(&self) -> bool {
-        matches!(self, Self::PendingRestLiteral { .. })
+    const fn suppresses_source_line_boundary(&self) -> bool {
+        matches!(
+            self,
+            Self::PendingRestLiteral { .. } | Self::PendingRestDirectiveLiteral { .. }
+        )
     }
 
     const fn is_doctest(&self) -> bool {
@@ -550,6 +703,31 @@ impl<'docstring> BlockState<'docstring> {
     const fn pending_rst_literal_language(&self) -> Option<&'docstring str> {
         match self {
             Self::PendingRestLiteral { language } => Some(*language),
+            _ => None,
+        }
+    }
+
+    const fn rest_directive_literal_marker_indent(&self) -> Option<TextSize> {
+        match self {
+            Self::RestDirectiveLiteral { marker_indent } => Some(*marker_indent),
+            _ => None,
+        }
+    }
+
+    const fn pending_rest_directive_literal(&self) -> Option<(&'docstring str, TextSize)> {
+        match self {
+            Self::PendingRestDirectiveLiteral {
+                language,
+                marker_indent,
+                ..
+            } => Some((*language, *marker_indent)),
+            _ => None,
+        }
+    }
+
+    const fn rest_control_marker_indent(&self) -> Option<TextSize> {
+        match self {
+            Self::RestControl { marker_indent } => Some(*marker_indent),
             _ => None,
         }
     }

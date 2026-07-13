@@ -62,40 +62,62 @@ impl<'a> RestDirective<'a> {
         self.argument
     }
 
-    /// Returns whether this directive has the given name.
+    /// Returns whether this directive has the given case-insensitive name.
     pub(in crate::docstring) fn is_named(self, name: &str) -> bool {
-        self.name == name
+        self.name.eq_ignore_ascii_case(name)
     }
 
     /// Returns how the directive's content should be rendered.
     pub(in crate::docstring) fn kind(self) -> RestDirectiveKind {
-        if self.is_named("math") {
-            RestDirectiveKind::Preformatted
-        } else if matches!(
-            self.name,
-            "attention"
-                | "caution"
-                | "danger"
-                | "error"
-                | "hint"
-                | "important"
-                | "note"
-                | "tip"
-                | "warning"
-                | "admonition"
-                | "versionadded"
-                | "version-added"
-                | "versionchanged"
-                | "version-changed"
-                | "version-deprecated"
-                | "deprecated"
-                | "version-removed"
-                | "versionremoved"
-        ) {
-            RestDirectiveKind::Prose
-        } else {
+        if self.has_name_in(&[
+            "code",
+            "code-block",
+            "sourcecode",
+            "doctest",
+            "testcode",
+            "testsetup",
+            "testcleanup",
+            "testoutput",
+        ]) {
             RestDirectiveKind::Code
+        } else if self.has_name_in(&[
+            "math",
+            "parsed-literal",
+            "raw",
+            "csv-table",
+            "productionlist",
+            "graphviz",
+        ]) {
+            RestDirectiveKind::Preformatted
+        } else if self.has_name_in(&[
+            "image",
+            "contents",
+            "sectnum",
+            "section-numbering",
+            "target-notes",
+            "include",
+            "unicode",
+            "default-role",
+            "title",
+            "highlight",
+            "literalinclude",
+            "sectionauthor",
+            "moduleauthor",
+            "codeauthor",
+            "tabularcolumns",
+            "default-domain",
+            "currentmodule",
+            "program",
+            "index",
+        ]) {
+            RestDirectiveKind::Control
+        } else {
+            RestDirectiveKind::Prose
         }
+    }
+
+    fn has_name_in(self, names: &[&str]) -> bool {
+        names.iter().any(|name| self.is_named(name))
     }
 }
 
@@ -104,10 +126,12 @@ impl<'a> RestDirective<'a> {
 pub(in crate::docstring) enum RestDirectiveKind {
     /// Source code or interactive examples.
     Code,
-    /// Whitespace-sensitive content that is not source code.
+    /// Whitespace-sensitive content that is not necessarily source code.
     Preformatted,
     /// Content parsed as ordinary reStructuredText body elements.
     Prose,
+    /// A directive that configures the document without introducing a content block.
+    Control,
 }
 
 impl RestDirectiveKind {
@@ -281,9 +305,16 @@ mod tests {
     #[test]
     fn classifies_rest_directives() {
         for (name, expected) in [
-            ("code", RestDirectiveKind::Code),
-            ("math", RestDirectiveKind::Preformatted),
+            ("code-block", RestDirectiveKind::Code),
+            ("doctest", RestDirectiveKind::Code),
+            ("parsed-literal", RestDirectiveKind::Preformatted),
+            ("MATH", RestDirectiveKind::Preformatted),
+            ("productionlist", RestDirectiveKind::Preformatted),
             ("warning", RestDirectiveKind::Prose),
+            ("seealso", RestDirectiveKind::Prose),
+            ("custom-directive", RestDirectiveKind::Prose),
+            ("highlight", RestDirectiveKind::Control),
+            ("literalinclude", RestDirectiveKind::Control),
         ] {
             let marker = format!(".. {name}::");
             assert_eq!(parse_rest_directive(&marker).unwrap().kind(), expected);
