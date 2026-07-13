@@ -174,27 +174,34 @@ class C3:
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
 
-Note that we currently only apply this heuristic when calling a function such as `memoize` via the
-decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
-but here we emit errors:
+Transparent decorators are also treated consistently when spelled as an equivalent assignment:
 
 ```py
-def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
-    raise NotImplementedError
-
 class C4:
     def method(self, x: int) -> str:
         return str(x)
-    method_decorated = memoize3(method)
+    method_decorated = memoize(method)
 
-# error: [missing-argument]
-# error: [invalid-argument-type]
 C4().method_decorated(1)
 ```
 
-The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
-return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
-applied as a decorator, it is reasonable to assume so.
+For non-transparent decorators, avoid resolving the decorated function's signature before the
+decorator itself has been rejected. Doing so can introduce a cycle when the signature refers back to
+the decorated name:
+
+```py
+decorated = lambda: decorated
+try:
+    pass
+except* Exception:
+    pass
+
+unknown_decorator: Any
+
+@unknown_decorator  # error: [unresolved-reference]
+def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
+    pass
+```
 
 In general, a function call might however return a `Callable` that is unrelated to the argument
 passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
