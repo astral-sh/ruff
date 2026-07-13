@@ -3055,7 +3055,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3167,6 +3167,17 @@ class ExplicitReceiverProtocol(Protocol):
 class StructuralExplicitReceiver:
     def method(self: ExplicitReceiverProtocol) -> None: ...
 
+class OverloadedExplicitReceiverProtocol(Protocol):
+    def overloaded(self: str, value: int | str) -> int: ...
+
+class OverloadedExplicitReceiverImplementation:
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> int: ...
+    def overloaded(self, value: int | str) -> int:
+        return 1
+
 class ReceiverOnly(Protocol):
     def method(self) -> None: ...
 
@@ -3216,6 +3227,11 @@ static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 # progress. The recursive check should terminate and establish the structural relation.
 static_assert(is_assignable_to(StructuralExplicitReceiver, ExplicitReceiverProtocol))
 static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol))
+
+# Aggregating the implementation's overloads covers the visible `int | str` parameter, but the
+# implementation's concrete receiver does not satisfy the protocol's explicit `str` receiver.
+static_assert(not is_assignable_to(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
+static_assert(not is_subtype_of(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 
 # TODO: These relations should be rejected because the concrete receiver is outside the
 # receiver TypeVar's declared domain. Bound callable comparison does not enforce that domain yet.
