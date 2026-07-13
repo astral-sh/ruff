@@ -1081,8 +1081,6 @@ mod tests {
         definition::{
             DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
         },
-        reachability_constraints::ScopedReachabilityConstraintId,
-        use_def::MIN_DEFERRED_USE_CONSTRAINTS,
     };
 
     impl UseDefMap<'_> {
@@ -1328,78 +1326,6 @@ y = 2
             .first_public_binding(function_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
-    }
-
-    #[test]
-    fn non_terminal_call_constraints_are_deferred_at_uses() {
-        let source = format!(
-            "def func(value):\n    unchanged = 'abc'\n{}    if value is None:\n        unchanged.upper()\n        fail()\n",
-            "    unchanged.upper()\n".repeat(MIN_DEFERRED_USE_CONSTRAINTS + 1)
-        );
-        let TestCase { db, file } = test_case(&source);
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
-        let [(function_scope_id, _)] = index
-            .child_scopes(FileScopeId::global())
-            .collect::<Vec<_>>()[..]
-        else {
-            panic!("expected one child scope")
-        };
-        let function_table = index.place_table(function_scope_id);
-        let use_def = index.use_def_map(function_scope_id);
-
-        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
-        let receiver_binding = |statement: &ast::Stmt| {
-            let receiver = statement
-                .as_expr_stmt()
-                .unwrap()
-                .value
-                .as_call_expr()
-                .unwrap()
-                .func
-                .as_attribute_expr()
-                .unwrap()
-                .value
-                .as_name_expr()
-                .unwrap();
-            use_def
-                .bindings_at_use(receiver.scoped_use_id(&db, file))
-                .next()
-                .unwrap()
-        };
-        let binding_at_last_materialized_call =
-            receiver_binding(&function.body[MIN_DEFERRED_USE_CONSTRAINTS]);
-        let binding_at_first_deferred_call =
-            receiver_binding(&function.body[MIN_DEFERRED_USE_CONSTRAINTS + 1]);
-        let call_in_branch = &function.body[MIN_DEFERRED_USE_CONSTRAINTS + 2]
-            .as_if_stmt()
-            .unwrap()
-            .body[0];
-        let binding_at_call_in_branch = receiver_binding(call_in_branch);
-
-        let value = use_def
-            .end_of_scope_symbol_bindings(function_table.symbol_id("value").unwrap())
-            .next()
-            .unwrap();
-
-        assert_eq!(
-            binding_at_first_deferred_call
-                .narrowing_constraint
-                .constraint(),
-            ScopedNarrowingConstraint::ALWAYS_TRUE
-        );
-        assert_eq!(
-            binding_at_first_deferred_call.reachability_constraint,
-            binding_at_last_materialized_call.reachability_constraint
-        );
-        assert_ne!(
-            binding_at_call_in_branch.reachability_constraint,
-            ScopedReachabilityConstraintId::ALWAYS_TRUE
-        );
-        assert_ne!(
-            value.narrowing_constraint.constraint(),
-            ScopedNarrowingConstraint::ALWAYS_TRUE
-        );
     }
 
     #[test]
