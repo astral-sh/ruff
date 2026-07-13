@@ -20,20 +20,23 @@ impl Default for InferenceSettings {
 }
 
 /// A physical file interpreted as part of one program.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor = new_internal, heap_size = ruff_memory_usage::heap_size)]
 pub struct ProgramFile<'db> {
     #[returns(copy)]
     pub program: Program,
     #[returns(copy)]
     pub file: File,
+    #[returns(copy)]
+    pub versioned_file: VersionedFile<'db>,
 }
 
 // The Salsa allocation is tracked separately.
 impl get_size2::GetSize for ProgramFile<'_> {}
 
 impl<'db> ProgramFile<'db> {
-    pub fn versioned_file(self, db: &'db dyn Db) -> VersionedFile<'db> {
-        VersionedFile::new(db, self.file(db), self.program(db).python_version(db))
+    pub fn new(db: &'db dyn Db, program: Program, file: File) -> Self {
+        let versioned_file = VersionedFile::new(db, file, program.python_version(db));
+        Self::new_internal(db, program, file, versioned_file)
     }
 
     pub fn resolver_file(self, db: &'db dyn Db) -> ResolverFile<'db> {

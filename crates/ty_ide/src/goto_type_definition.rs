@@ -16,13 +16,14 @@ pub fn goto_type_definition(
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;
+    let program = program_file.program(db);
 
     tracing::debug!(
         "Inferred type of covering node is {}",
-        ty.display(db, program_file.program(db))
+        ty.display(db, program)
     );
 
-    let navigation_targets = ty.navigation_targets(db, program_file.program(db));
+    let navigation_targets = ty.navigation_targets(db, program);
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),

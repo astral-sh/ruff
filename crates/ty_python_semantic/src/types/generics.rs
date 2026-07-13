@@ -594,11 +594,11 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
+        program: Program,
         definition: Definition<'db>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
     ) -> Option<Self> {
-        let program = definition.program_file(db).program(db);
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
@@ -663,6 +663,7 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn remove_callable_only_typevars(
         db: &'db dyn Db,
+        program: Program,
         generic_context: Option<Self>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
@@ -689,12 +690,12 @@ impl<'db> GenericContext<'db> {
             fn finalize(
                 self,
                 db: &'db dyn Db,
+                program: Program,
                 function_definition: Definition<'db>,
             ) -> (
                 FxHashSet<BoundTypeVarInstance<'db>>,
                 FxHashMap<CallableType<'db>, CallableType<'db>>,
             ) {
-                let program = function_definition.program_file(db).program(db);
                 let mut found_only_inside_callable_return = FxHashSet::default();
                 let replacements = self
                     .found_inside_callable_return
@@ -845,7 +846,6 @@ impl<'db> GenericContext<'db> {
         let Some(generic_context) = generic_context else {
             return (None, return_type);
         };
-        let program = function_definition.program_file(db).program(db);
 
         // Find whether each typevar appears inside and/or outside a return type Callable.
         let mut find_typevar_locations = FindTypeVarLocations::default();
@@ -860,7 +860,7 @@ impl<'db> GenericContext<'db> {
         let (found_only_inside_callable_return, replacements) = find_typevar_locations
             .locations
             .into_inner()
-            .finalize(db, function_definition);
+            .finalize(db, program, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
         let return_type =
             return_type.apply_type_mapping(db, program, &type_mapping, TypeContext::default());
@@ -1586,11 +1586,12 @@ impl<'db> Specialization<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
+        program: Program,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let program = self.program(db);
+        debug_assert_eq!(program, self.program(db));
         if let Some(tuple) = self.tuple_inner(db) {
             tuple.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
         } else {

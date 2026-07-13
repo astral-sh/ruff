@@ -207,7 +207,7 @@ impl<'db> SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => {}
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                class.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
             }
             SubclassOfInner::TypeVar(typevar) => {
                 Type::TypeVar(typevar).find_legacy_typevars_impl(

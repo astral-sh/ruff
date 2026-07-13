@@ -516,9 +516,13 @@ impl<'db> NominalInstanceType<'db> {
             }
             NominalInstanceInner::SysVersionInfo(_) | NominalInstanceInner::Object => {}
             NominalInstanceInner::NonTuple(class) => {
-                class
-                    .class(db)
-                    .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                class.class(db).find_legacy_typevars_impl(
+                    db,
+                    program,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
             }
         }
     }
@@ -976,7 +980,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
-                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                class.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
             }
             Protocol::Synthesized(synthesized) => {
                 synthesized.find_legacy_typevars_impl(

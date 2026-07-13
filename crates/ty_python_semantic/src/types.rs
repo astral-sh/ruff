@@ -7221,7 +7221,7 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) => {
-                alias.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                alias.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
             }
 
             Type::NominalInstance(instance) => {

@@ -403,12 +403,18 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
+        program: Program,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        self.specialization(db)
-            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        self.specialization(db).find_legacy_typevars_impl(
+            db,
+            program,
+            binding_context,
+            typevars,
+            visitor,
+        );
     }
 
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -1269,6 +1275,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
+        program: Program,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
@@ -1276,7 +1283,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => {}
             Self::Generic(generic) => {
-                generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                generic.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
             }
         }
     }

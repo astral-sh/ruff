@@ -523,8 +523,8 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn lazy_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let program = self.definition(db)?.program_file(db).program(db);
         let bound = self.lazy_bound_unchecked(db)?;
+        let program = self.definition(db)?.program_file(db).program(db);
 
         if bound.has_typevar_or_typevar_instance(db, program) {
             return None;
@@ -582,8 +582,8 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
-        let program = self.definition(db)?.program_file(db).program(db);
         let constraints = self.lazy_constraints_unchecked(db)?;
+        let program = self.definition(db)?.program_file(db).program(db);
 
         if constraints
             .elements(db)

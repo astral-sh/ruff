@@ -138,7 +138,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let parsed = parsed_module(db, scope.program_file(db).versioned_file(db)).load(db);
+        let program_file = scope.program_file(db);
+        let parsed = parsed_module(db, program_file.versioned_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -146,7 +147,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.program_file(db));
+                let index = semantic_index(db, program_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })

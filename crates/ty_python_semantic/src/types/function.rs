@@ -608,6 +608,7 @@ impl<'db> OverloadLiteral<'db> {
 
         let mut raw_signature = Signature::from_function(
             db,
+            program,
             pep695_ctx,
             definition,
             function_stmt_node,

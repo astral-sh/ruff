@@ -1390,16 +1390,16 @@ fn symbol_impl<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
-    let program_file = scope.program_file(db);
-    let program = program_file.program(db);
 
     let is_known_module = |known_module| {
+        let program_file = scope.program_file(db);
         ty_module_resolver::file_to_module(db, program_file.resolver_file(db))
             .is_some_and(|module| module.is_known(db, known_module))
     };
 
     // Check the symbol name first to avoid a module-resolution query for every symbol lookup.
     if matches!(name, "version_info" | "platform") && is_known_module(KnownModule::Sys) {
+        let program = scope.program(db);
         match name {
             "version_info" => {
                 return Place::bound(Type::sys_version_info(program.python_version(db))).into();
@@ -1417,6 +1417,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
+        let program = scope.program(db);
         match program.python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
@@ -1727,7 +1728,8 @@ fn place_from_bindings_impl<'db>(
             // We need to "look through" loop header definitions to do boundness analysis. The
             // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
             // like all other bindings, so that it can participate in fixpoint iteration.
-            if binding.kind(db).is_loop_header() {
+            let binding_kind = binding.kind(db);
+            if binding_kind.is_loop_header() {
                 let loop_header = loop_header_reachability(db, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
@@ -1737,7 +1739,7 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
-            } else if matches!(binding.kind(db), DefinitionKind::NestedBindings(_)) {
+            } else if matches!(binding_kind, DefinitionKind::NestedBindings(_)) {
                 // Nested bindings definitions similar to loop header definitions, synthetic
                 // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {

@@ -696,6 +696,7 @@ impl<'db> Signature<'db> {
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,
+        program: crate::Program,
         pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
@@ -704,6 +705,7 @@ impl<'db> Signature<'db> {
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
+            program,
             definition,
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
@@ -714,7 +716,7 @@ impl<'db> Signature<'db> {
             .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
-            GenericContext::from_function_params(db, definition, &parameters, return_ty);
+            GenericContext::from_function_params(db, program, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
             db,
             pep695_generic_context,
@@ -729,6 +731,7 @@ impl<'db> Signature<'db> {
                 // because we need to apply this heuristic to PEP-695 typevars as well.)
                 GenericContext::remove_callable_only_typevars(
                     db,
+                    program,
                     full_generic_context,
                     &parameters,
                     return_ty,
@@ -3821,11 +3824,11 @@ impl<'db> Parameters<'db> {
 
     fn from_parameters(
         db: &'db dyn Db,
+        program: crate::Program,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let program = definition.program_file(db).program(db);
         let ast::Parameters {
             posonlyargs,
             args,
