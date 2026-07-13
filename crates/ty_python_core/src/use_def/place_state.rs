@@ -232,6 +232,12 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn is_narrowed(&self) -> bool {
+        self.live_bindings
+            .iter()
+            .any(|binding| binding.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE)
+    }
+
     pub(super) fn is_always_unbound(&self) -> bool {
         let [binding] = self.live_bindings.as_slice() else {
             return false;
@@ -397,6 +403,20 @@ impl Bindings {
         }
     }
 
+    /// Gate any existing narrowing on the live bindings by the given constraint.
+    pub(super) fn gate_existing_narrowing(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        for binding in &mut self.live_bindings {
+            if binding.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                binding.narrowing_constraint = narrowing_constraints
+                    .add_and_constraint(binding.narrowing_constraint, constraint);
+            }
+        }
+    }
+
     /// Add given reachability constraint to all live bindings.
     pub(super) fn record_reachability_constraint(
         &mut self,
@@ -475,6 +495,10 @@ pub(crate) struct PlaceState {
 }
 
 impl PlaceState {
+    pub(super) fn is_narrowed(&self) -> bool {
+        self.bindings.is_narrowed()
+    }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
@@ -512,6 +536,16 @@ impl PlaceState {
     ) {
         self.bindings
             .record_narrowing_constraint(narrowing_constraints, constraint);
+    }
+
+    /// Gate any existing narrowing on the live bindings by the given constraint.
+    pub(super) fn gate_existing_narrowing(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        self.bindings
+            .gate_existing_narrowing(narrowing_constraints, constraint);
     }
 
     /// Add the given constraint to live bindings that were also present at an earlier use.

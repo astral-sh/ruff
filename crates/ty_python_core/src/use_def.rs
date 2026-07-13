@@ -1383,7 +1383,14 @@ struct PendingReachabilityId;
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     constraint: ScopedReachabilityConstraintId,
+    use_generation: usize,
+    deferred_use_count: usize,
 }
+
+/// Keep short call sequences on the regular path to avoid changing dependency graphs in the
+/// overwhelmingly common case. Longer sequences are where repeated materialization becomes
+/// expensive enough to matter.
+pub(crate) const MIN_DEFERRED_USE_CONSTRAINTS: usize = 16;
 
 /// An append-only tree of scope-wide reachability constraints.
 ///
@@ -1403,6 +1410,8 @@ impl Default for PendingReachability {
         constraints.push(PendingReachabilityConstraint {
             parent: root,
             constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            use_generation: 0,
+            deferred_use_count: 0,
         });
         Self {
             constraints,
@@ -1412,10 +1421,16 @@ impl Default for PendingReachability {
 }
 
 impl PendingReachability {
-    fn push(&mut self, constraint: ScopedReachabilityConstraintId) {
+    fn push(&mut self, constraint: ScopedReachabilityConstraintId, materialize_at_use: bool) {
+        let use_generation =
+            self.constraints[self.current].use_generation + usize::from(materialize_at_use);
+        let deferred_use_count =
+            self.constraints[self.current].deferred_use_count + usize::from(!materialize_at_use);
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             constraint,
+            use_generation,
+            deferred_use_count,
         });
     }
 
@@ -1464,6 +1479,28 @@ impl PendingReachability {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
         if pending.reachability != target {
+            self.materialize(pending, target, reachability_constraints);
+        }
+        &pending.state
+    }
+
+    /// Returns the place state needed to resolve a use.
+    ///
+    /// Statement-level call reachability does not change which bindings are visible at a use, and
+    /// is only needed when control-flow states are later merged. Skip materializing a suffix that
+    /// consists solely of those constraints so repeated calls do not accumulate an ever-growing
+    /// reachability chain on the same binding.
+    fn materialize_ref_at_use<'a>(
+        &self,
+        pending: &'a mut PendingPlaceState,
+        target: PendingReachabilityId,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) -> &'a PlaceState {
+        let pending_constraint = &self.constraints[pending.reachability];
+        let target_constraint = &self.constraints[target];
+        if pending_constraint.use_generation != target_constraint.use_generation
+            || target_constraint.deferred_use_count < MIN_DEFERRED_USE_CONSTRAINTS
+        {
             self.materialize(pending, target, reachability_constraints);
         }
         &pending.state
@@ -2109,14 +2146,57 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// Gates existing narrowing for all places in the current scope.
+    ///
+    /// A non-terminal-call constraint only needs to gate existing narrowing. Adding it to an
+    /// unchanged binding cannot affect that binding's type, but makes every later lookup project
+    /// the growing chain of preceding calls.
+    pub(super) fn gate_existing_narrowing_for_all_places(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        let pending = self.pending_reachability.current;
+        for state in self
+            .symbol_states
+            .iter_mut()
+            .chain(self.member_states.iter_mut())
+        {
+            if !state.state.is_narrowed() {
+                continue;
+            }
+            let state = self.pending_reachability.materialize(
+                state,
+                pending,
+                &mut self.reachability_constraints,
+            );
+            state.gate_existing_narrowing(&mut self.narrowing_constraints, constraint);
+        }
+    }
+
     pub(super) fn record_reachability_constraint(
         &mut self,
         constraint: ScopedReachabilityConstraintId,
     ) {
+        self.record_reachability_constraint_impl(constraint, true);
+    }
+
+    pub(super) fn record_non_terminal_call_reachability_constraint(
+        &mut self,
+        constraint: ScopedReachabilityConstraintId,
+    ) {
+        self.record_reachability_constraint_impl(constraint, false);
+    }
+
+    fn record_reachability_constraint_impl(
+        &mut self,
+        constraint: ScopedReachabilityConstraintId,
+        materialize_at_use: bool,
+    ) {
         self.reachability = self
             .reachability_constraints
             .add_and_constraint(self.reachability, constraint);
-        self.pending_reachability.push(constraint);
+        self.pending_reachability
+            .push(constraint, materialize_at_use);
     }
 
     pub(super) fn record_declaration(
@@ -2226,11 +2306,12 @@ impl<'db> UseDefMapBuilder<'db> {
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
-        let bindings = self
-            .pending_reachability
-            .materialize_ref(place_state, pending, &mut self.reachability_constraints)
-            .bindings()
-            .clone();
+        let place_state = self.pending_reachability.materialize_ref_at_use(
+            place_state,
+            pending,
+            &mut self.reachability_constraints,
+        );
+        let bindings = place_state.bindings().clone();
 
         self.record_use_bindings(bindings, use_id);
     }
@@ -2244,11 +2325,12 @@ impl<'db> UseDefMapBuilder<'db> {
         for place in places {
             let place_state =
                 pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
-            let bindings = self
-                .pending_reachability
-                .materialize_ref(place_state, pending, &mut self.reachability_constraints)
-                .bindings()
-                .clone();
+            let place_state = self.pending_reachability.materialize_ref_at_use(
+                place_state,
+                pending,
+                &mut self.reachability_constraints,
+            );
+            let bindings = place_state.bindings().clone();
 
             let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
             self.mark_definition_ids_used(binding_definition_ids);
