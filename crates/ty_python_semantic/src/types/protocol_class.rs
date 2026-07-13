@@ -859,7 +859,7 @@ enum ProtocolMemberKind<'db> {
     Attribute(ProtocolMemberType<'db>),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMethodKind {
     Instance,
     Class,
@@ -1569,11 +1569,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required_ty: ProtocolMemberType<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
         let Some(attribute_type) = protocol_member_read_type(db, ty, receiver_ty, member, access)
         else {
             return self.never();
         };
+
+        // For a method on a class object, `Self` names instances of that class: a
+        // `@classmethod` returning `Self` returns `Factory`, not `type[Factory]`. For a
+        // non-method member, `Self` names the object whose attribute is being checked, so a
+        // class object must stay a class object.
+        let non_method_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
+        let method_self_binding_ty = ty
+            .to_instance(db)
+            .or_else(|| ty.literal_fallback_instance(db))
+            .unwrap_or(ty);
 
         // Checking a class object against a protocol's instance capabilities can expose the
         // property descriptor itself rather than the value returned by its getter. Compatibility
@@ -1596,8 +1605,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
-                        &callables.map(|callable| callable.apply_self(db, fallback_ty)),
-                        required_callable.apply_self(db, fallback_ty),
+                        &callables.map(|callable| callable.apply_self(db, method_self_binding_ty)),
+                        required_callable.apply_self(db, method_self_binding_ty),
                     )
                 })
         } else if member.is_instance_method() {
@@ -1614,8 +1623,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if callable.is_function_like(db) {
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, Some(fallback_ty)),
-                                protocol_bind_self(db, required_callable, Some(fallback_ty)),
+                                callable.bind_self(db, Some(method_self_binding_ty)),
+                                protocol_bind_self(
+                                    db,
+                                    required_callable,
+                                    Some(method_self_binding_ty),
+                                ),
                             )
                         } else {
                             self.check_callable_pair(db, *callable, required_callable)
@@ -1632,13 +1645,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(required_callable.apply_self(db, fallback_ty)),
+                Type::Callable(required_callable.apply_self(db, method_self_binding_ty)),
             )
         } else {
-            required_ty.bind_self(db, fallback_ty).when_some_and(
-                db,
-                self.constraints,
-                |required_ty| {
+            required_ty
+                .bind_self(db, non_method_self_binding_ty)
+                .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
                         && result.is_never_satisfied(db)
@@ -1649,8 +1661,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
                     }
                     result
-                },
-            )
+                })
         }
     }
 
@@ -2030,10 +2041,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 // Disjointness distributes over unions. Compare the overload return arms
                 // directly so that recursive return types do not require canonicalizing an
                 // intermediate union merely to distribute it again.
-                method.signatures(db).iter().when_all(
-                    db,
-                    self.constraints,
-                    |method_signature| {
+                method
+                    .signatures(db)
+                    .iter()
+                    .when_all(db, self.constraints, |method_signature| {
                         callable.signatures(db).iter().when_all(
                             db,
                             self.constraints,
@@ -2045,8 +2056,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                 )
                             },
                         )
-                    },
-                )
+                    })
             })
         }
     }

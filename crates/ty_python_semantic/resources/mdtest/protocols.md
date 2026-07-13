@@ -3275,6 +3275,35 @@ class IntParser:
 parser: Parser = IntParser
 ```
 
+## Class objects and `Self`-returning class-method protocol members
+
+When a class object is checked against a class-method protocol member, `Self` in the protocol
+signature is bound to instances of the class object rather than to the class object itself:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class FactoryProtocol(Protocol):
+    @classmethod
+    def make(cls) -> Self: ...
+
+class Factory:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class BadFactory:
+    @classmethod
+    def make(cls) -> int:
+        return 1
+
+static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
+static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
