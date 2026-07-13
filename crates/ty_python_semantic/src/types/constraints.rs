@@ -86,7 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
-use std::cell::{Ref, RefCell};
+use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -105,7 +105,8 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
@@ -1342,22 +1343,101 @@ impl ConstraintId {
     }
 }
 
+/// Returns the maximum constructor depth of `ty` and the maximum nesting depth of any typevar that
+/// it contains.
+///
+/// Atomic types and bare typevars have constructor depth zero. The typevar depth is `0` if `ty`
+/// does not contain any typevars.
+fn max_constructor_and_typevar_depth<'db>(db: &'db dyn Db, ty: Type<'db>) -> (u16, u16) {
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| (0, 0))]
+    fn max_constructor_and_typevar_depth_impl<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        _dummy: (),
+    ) -> (u16, u16) {
+        struct TypeDepthVisitor<'db> {
+            active: RefCell<FxHashSet<Type<'db>>>,
+            current_depth: Cell<u16>,
+            max_constructor_depth: Cell<u16>,
+            max_typevar_depth: Cell<u16>,
+        }
+
+        impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if ty.is_type_var() {
+                    self.max_typevar_depth
+                        .set(self.max_typevar_depth.get().max(self.current_depth.get()));
+                    return;
+                }
+
+                let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
+                    return;
+                };
+                if !self.active.borrow_mut().insert(ty) {
+                    return;
+                }
+
+                let current_depth = self.current_depth.get();
+                let nested_depth = current_depth.saturating_add(1);
+                self.current_depth.set(nested_depth);
+                self.max_constructor_depth
+                    .set(self.max_constructor_depth.get().max(nested_depth));
+                walk_non_atomic_type(db, non_atomic, self);
+                self.current_depth.set(current_depth);
+                self.active.borrow_mut().remove(&ty);
+            }
+        }
+
+        let visitor = TypeDepthVisitor {
+            active: RefCell::default(),
+            current_depth: Cell::default(),
+            max_constructor_depth: Cell::default(),
+            max_typevar_depth: Cell::default(),
+        };
+        visitor.visit_type(db, ty);
+        (
+            visitor.max_constructor_depth.get(),
+            visitor.max_typevar_depth.get(),
+        )
+    }
+
+    max_constructor_and_typevar_depth_impl(db, ty, ())
+}
+
 impl<'db> Constraint<'db> {
+    fn bound_depth(self, db: &'db dyn Db) -> (u16, u16) {
+        let both_bounds = std::iter::chain(self.bounds.lower, self.bounds.upper);
+        both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
+            let (bound_constructor_depth, bound_typevar_depth) =
+                max_constructor_and_typevar_depth(db, bound);
+            (
+                constructor_depth.max(bound_constructor_depth),
+                typevar_depth.max(bound_typevar_depth),
+            )
+        })
+    }
+
     /// Returns how much sequent fuel is needed to derive this constraint.
     ///
-    /// Nested types containing typevars can produce increasingly complex families of derived
-    /// constraints. Charge more fuel for those constraints so that each additional level of
-    /// nesting shortens the remaining derivation chain.
-    fn sequent_fuel_cost(self, db: &'db dyn Db) -> u16 {
-        let max_typevar_depth = self
-            .bounds
-            .lower
-            .into_iter()
-            .chain(self.bounds.upper)
-            .filter_map(|bound| bound.max_typevar_depth(db))
-            .max()
-            .unwrap_or_default();
-        u16::try_from(max_typevar_depth.saturating_add(1)).unwrap_or(u16::MAX)
+    /// This cost is driven by two factors.
+    ///
+    /// First, nested types containing typevars can produce increasingly complex families of
+    /// derived constraints. Charge more fuel for those constraints so that each additional level
+    /// of typevar depth shortens the remaining derivation chain.
+    ///
+    /// Second, even without considering typevars, the lower and upper bounds can become more
+    /// structurally complex. We consider a type to be more complex if it has deeper nesting of
+    /// type constructors. Each sequent is charged the _increase_ in that complexity between its
+    /// antecedents and its consequent. (Measuring growth rather than absolute depth avoids
+    /// penalizing a complex concrete bound that is merely propagated unchanged.)
+    fn sequent_fuel_cost(self, db: &'db dyn Db, antecedent_constructor_depth: u16) -> u16 {
+        let (constructor_depth, typevar_depth) = self.bound_depth(db);
+        let constructor_growth = constructor_depth.saturating_sub(antecedent_constructor_depth);
+        typevar_depth.max(constructor_growth).saturating_add(1)
     }
 
     /// Returns whether this constraint is produced by dropping exactly one bound from
@@ -6226,7 +6306,7 @@ impl SequentMap {
 /// BDD, since constraints are not independent. In particular, there can be "implications", which
 /// record e.g. when two constraints both being true imply another:
 /// `A ≤ list[B] ∧ B ≤ int → A ≤ list[int]`. If we see `A ≤ list[B]` and `B ≤ int` in a BDD path,
-/// we can _assume_ that `A ≤ lint[int]` also holds, even if it doesn't actually appear in the BDD.
+/// we can _assume_ that `A ≤ list[int]` also holds, even if it doesn't actually appear in the BDD.
 ///
 /// Unfortunately, there are certain implications that are technically true, but not helpful;
 /// for instance, because they cause us to endlessly expand a constraint by substituting a bound
@@ -6234,9 +6314,11 @@ impl SequentMap {
 ///
 /// We use a "fuel" mechanism to prevent these kinds of situations, without having to play
 /// whack-a-mole to implement detection patterns for all of the pathological patterns. Each
-/// constraint costs a certain amount of fuel, based on the complexity of its lower and upper
-/// bounds. This cost is based on how many typevars the constraint bound contains, and how "deep"
-/// those typevars are. (So `int` has cost 0, `T` has cost 1, `list[T]` has cost 2, and so on.)
+/// derived constraint costs at least one unit of fuel. Nested typevars increase that cost according
+/// to their depth, as does any constructor depth introduced relative to the antecedents. Measuring
+/// structural growth instead of absolute depth ensures that propagating an existing complex
+/// concrete bound remains cheap, while repeatedly wrapping that bound continues to consume path
+/// fuel after no nested typevars remain.
 ///
 /// We track this fuel in two ways: First, there is a global limit on the total amount of work we
 /// are willing to do for a particular BDD path traversal. Second, there is a more focused
@@ -6600,12 +6682,17 @@ impl PathAssignments {
         let mut new_constraints: FxIndexMap<ConstraintId, (u16, u16)> = FxIndexMap::default();
         let mut add_new_constraint = |constraint, available_fuel: u16, fuel_cost: u16| {
             if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+                let new_fuel = (post_fuel, fuel_cost);
                 new_constraints
                     .entry(constraint)
-                    .and_modify(|(existing_fuel, _)| {
-                        *existing_fuel = (*existing_fuel).max(post_fuel);
+                    .and_modify(|existing_fuel| {
+                        *existing_fuel = std::cmp::max_by_key(
+                            *existing_fuel,
+                            new_fuel,
+                            |&(post_fuel, fuel_cost)| (post_fuel, std::cmp::Reverse(fuel_cost)),
+                        );
                     })
-                    .or_insert((post_fuel, fuel_cost));
+                    .or_insert(new_fuel);
             }
         };
 
@@ -6617,8 +6704,13 @@ impl PathAssignments {
                 continue;
             };
             let available_fuel = ante1_fuel.min(ante2_fuel);
+            let (ante1_constructor_depth, _) = builder.constraint_data(*ante1).bound_depth(db);
+            let (ante2_constructor_depth, _) = builder.constraint_data(*ante2).bound_depth(db);
+            let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
             for post in posts {
-                let fuel_cost = builder.constraint_data(*post).sequent_fuel_cost(db);
+                let fuel_cost = builder
+                    .constraint_data(*post)
+                    .sequent_fuel_cost(db, antecedent_constructor_depth);
                 add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
@@ -6628,12 +6720,13 @@ impl PathAssignments {
                 continue;
             };
             let ante_data = builder.constraint_data(*ante);
+            let (antecedent_constructor_depth, _) = ante_data.bound_depth(db);
             for post in posts {
                 let post_data = builder.constraint_data(*post);
                 let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
                     1
                 } else {
-                    post_data.sequent_fuel_cost(db)
+                    post_data.sequent_fuel_cost(db, antecedent_constructor_depth)
                 };
                 add_new_constraint(*post, available_fuel, fuel_cost);
             }

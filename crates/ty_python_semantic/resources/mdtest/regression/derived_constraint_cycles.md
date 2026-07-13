@@ -110,4 +110,43 @@ def f[T](sentinel):
         items[0] = wrap(sentinel)
 ```
 
+## Recursive structural growth without nested typevars
+
+A substitution can remove the last nested typevar from a derived constraint while still producing an
+increasingly deep family of concrete bounds. Structural growth must continue to consume fuel after
+that substitution.
+
+```py
+from typing import Iterable, Protocol, TypeAlias, TypeVar
+
+V_co = TypeVar("V_co", covariant=True)
+
+class Compatible(Protocol):
+    def convert(self) -> object: ...
+
+OptionSequence: TypeAlias = Iterable[V_co] | Compatible
+
+def convert(obj: OptionSequence[V_co]) -> list[V_co]:
+    if isinstance(obj, float):
+        return [obj]  # ty: ignore[invalid-return-type]
+    return []
+```
+
+## Propagating an existing deep concrete bound
+
+Structural fuel is charged only for depth introduced by a derivation. Propagating a deeply nested
+concrete bound through a typevar therefore remains cheap.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+type Deep = tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[int]]]]]]]]]]
+
+def check_deep_bound[T, U]():
+    constraints = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, Deep)
+    static_assert(constraints.implies_subtype_of(T, Deep))
+```
+
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660

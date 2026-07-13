@@ -19,10 +19,7 @@ use crate::{
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{
-            self, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
-            walk_type_with_recursion_guard,
-        },
+        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -44,61 +41,6 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
-    }
-
-    /// Returns the maximum nesting depth of any typevar in this type.
-    ///
-    /// A bare typevar has depth zero. Returns `None` if this type does not contain any typevars.
-    pub(crate) fn max_typevar_depth(self, db: &'db dyn Db) -> Option<u32> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| None)]
-        fn max_typevar_depth_impl<'db>(db: &'db dyn Db, ty: Type<'db>, _dummy: ()) -> Option<u32> {
-            struct MaxTypevarDepthVisitor<'db> {
-                active: RefCell<FxHashSet<Type<'db>>>,
-                current_depth: Cell<u32>,
-                max_depth: Cell<Option<u32>>,
-            }
-
-            impl<'db> TypeVisitor<'db> for MaxTypevarDepthVisitor<'db> {
-                fn should_visit_lazy_type_attributes(&self) -> bool {
-                    false
-                }
-
-                fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                    if ty.is_type_var() {
-                        self.max_depth.set(Some(
-                            self.max_depth
-                                .get()
-                                .unwrap_or_default()
-                                .max(self.current_depth.get()),
-                        ));
-                        return;
-                    }
-
-                    let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
-                        return;
-                    };
-                    if !self.active.borrow_mut().insert(ty) {
-                        return;
-                    }
-
-                    let current_depth = self.current_depth.get();
-                    self.current_depth.set(current_depth.saturating_add(1));
-                    walk_non_atomic_type(db, non_atomic, self);
-                    self.current_depth.set(current_depth);
-                    self.active.borrow_mut().remove(&ty);
-                }
-            }
-
-            let visitor = MaxTypevarDepthVisitor {
-                active: RefCell::default(),
-                current_depth: Cell::default(),
-                max_depth: Cell::default(),
-            };
-            visitor.visit_type(db, ty);
-            visitor.max_depth.get()
-        }
-
-        max_typevar_depth_impl(db, self, ())
     }
 
     pub(crate) fn references_typevar(
