@@ -329,7 +329,7 @@ class MetaBase(type):
         return self
 
 class Meta(MetaBase):
-    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:  # error: [invalid-method-override]
+    def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
         return super().__call__(*args, **kwargs)
@@ -356,7 +356,7 @@ super(Meta, OtherBase)  # error: [invalid-super-argument]
 T = TypeVar("T", bound=int)
 
 class BoundIntMeta(type):
-    def __call__(cls: type[T]) -> T:  # error: [invalid-method-override]
+    def __call__(cls: type[T]) -> T:
         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 
