@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.20")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct MethodReceiverDefault {
     receiver_kind: ReceiverKind,
 }
