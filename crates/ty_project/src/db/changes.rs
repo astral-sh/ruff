@@ -3,11 +3,10 @@ use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
-use super::ignore::IgnoreFiles;
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{IgnoreFiles, SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use ty_python_core::program::{FallibleStrategy, Program};
 

@@ -21,12 +21,13 @@
 //! case where a file or directory is already ignored by an ignore file at the
 //! project walk root.
 
-use ignore::gitignore;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ::ignore::gitignore;
 use rustc_hash::FxHashMap;
 
+use crate::system::{System, SystemPath, SystemPathBuf};
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) enum Ignored {
+pub enum Ignored {
     /// A root ignore file proves that the project walker would skip this path.
     Yes,
 
@@ -35,19 +36,19 @@ pub(super) enum Ignored {
 }
 
 impl Ignored {
-    pub(super) const fn is_uncertain(self) -> bool {
+    pub const fn is_uncertain(self) -> bool {
         matches!(self, Self::Uncertain)
     }
 }
 
-pub(super) struct IgnoreFiles<'a> {
+pub struct IgnoreFiles<'a> {
     walk_roots: &'a [SystemPathBuf],
     system: Box<dyn System>,
     roots: FxHashMap<SystemPathBuf, RootIgnoreFiles>,
 }
 
 impl<'a> IgnoreFiles<'a> {
-    pub(super) fn new(system: Box<dyn System>, walk_roots: &'a [SystemPathBuf]) -> Self {
+    pub fn new(system: Box<dyn System>, walk_roots: &'a [SystemPathBuf]) -> Self {
         Self {
             walk_roots,
             system,
@@ -57,7 +58,7 @@ impl<'a> IgnoreFiles<'a> {
 
     /// Returns `Yes` only when the matching walk root can prune `path`
     /// from its own ignore files. In all other cases, return uncertain.
-    pub(super) fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
+    pub fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
         // A nested explicit walk root gets its own depth-0 walk, so an ancestor
         // root cannot prove that the nested root's descendants are ignored.
         let Some(root) = self
@@ -176,9 +177,9 @@ impl IgnoreFile {
         };
 
         Ok(match matcher.matched(path.as_std_path(), is_directory) {
-            ignore::Match::None => None,
-            ignore::Match::Ignore(_) => Some(true),
-            ignore::Match::Whitelist(_) => Some(false),
+            ::ignore::Match::None => None,
+            ::ignore::Match::Ignore(_) => Some(true),
+            ::ignore::Match::Whitelist(_) => Some(false),
         })
     }
 }
@@ -219,7 +220,7 @@ fn has_parent_ignore_file(system: &dyn System, canonical_root: &SystemPath) -> b
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{InMemorySystem, System, SystemPath, SystemPathBuf};
+    use crate::system::{InMemorySystem, System, SystemPath, SystemPathBuf};
 
     use super::{IgnoreFiles, Ignored};
 

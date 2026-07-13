@@ -4,7 +4,7 @@ pub use memory_fs::MemoryFileSystem;
 pub use os::testing::UserConfigDirectoryOverrideGuard;
 
 #[cfg(feature = "os")]
-pub use os::OsSystem;
+pub use os::{IgnoreFiles, Ignored, OsSystem};
 
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};

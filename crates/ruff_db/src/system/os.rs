@@ -1,5 +1,9 @@
 #![allow(clippy::disallowed_methods)]
 
+mod ignore;
+
+pub use ignore::{IgnoreFiles, Ignored};
+
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
@@ -173,7 +177,7 @@ impl System for OsSystem {
 
     /// Creates a builder to recursively walk `path`.
     ///
-    /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
+    /// The walker ignores files according to [`::ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         WalkDirectoryBuilder::new(
@@ -268,7 +272,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             return;
         };
 
-        let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        let mut builder = ::ignore::WalkBuilder::new(first.as_std_path());
         builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
@@ -315,7 +319,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                                 }));
 
                                 // Skip the entire directory because all the paths won't be UTF-8 paths.
-                                ignore::WalkState::Skip
+                                ::ignore::WalkState::Skip
                             }
                         }
                     }
@@ -326,7 +330,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                             // (which, should not be reported here but the `ignore` crate doesn't distinguish between ignore and IO errors).
                             // Let's log the error to at least make it visible.
                             tracing::warn!("Failed to traverse directory: {error}.");
-                            ignore::WalkState::Continue
+                            ::ignore::WalkState::Continue
                         }
                     },
                 }
@@ -337,11 +341,11 @@ impl DirectoryWalker for OsDirectoryWalker {
 
 #[cold]
 fn ignore_to_walk_directory_error(
-    error: ignore::Error,
+    error: ::ignore::Error,
     path: Option<PathBuf>,
     depth: Option<usize>,
-) -> std::result::Result<walk_directory::Error, ignore::Error> {
-    use ignore::Error;
+) -> std::result::Result<walk_directory::Error, ::ignore::Error> {
+    use ::ignore::Error;
 
     match error {
         Error::WithPath { path, err } => ignore_to_walk_directory_error(*err, Some(path), depth),
@@ -399,12 +403,12 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-impl From<WalkState> for ignore::WalkState {
+impl From<WalkState> for ::ignore::WalkState {
     fn from(value: WalkState) -> Self {
         match value {
-            WalkState::Continue => ignore::WalkState::Continue,
-            WalkState::Skip => ignore::WalkState::Skip,
-            WalkState::Quit => ignore::WalkState::Quit,
+            WalkState::Continue => ::ignore::WalkState::Continue,
+            WalkState::Skip => ::ignore::WalkState::Skip,
+            WalkState::Quit => ::ignore::WalkState::Quit,
         }
     }
 }
