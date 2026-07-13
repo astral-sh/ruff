@@ -690,6 +690,20 @@ AliasAndName(name=1)
 AliasAndName(name=None)  # error: [invalid-argument-type]
 ```
 
+The older `populate_by_name=True` setting has the same behavior:
+
+```py
+class PopulatedByName(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: int = Field(alias="alias")
+
+PopulatedByName(alias=1)
+PopulatedByName(name=1)
+PopulatedByName(alias=None)  # error: [invalid-argument-type]
+PopulatedByName(name=None)  # error: [invalid-argument-type]
+```
+
 Passing none of these should be an error:
 
 ```py
@@ -804,6 +818,9 @@ A fixed custom initializer continues to control the accepted arguments:
 class RestrictiveBase(BaseModel):
     def __init__(self, name: str) -> None:
         super().__init__(name=name)
+
+RestrictiveBase(name="Alice")
+RestrictiveBase(name="Alice", city="Berlin")  # error: [unknown-argument]
 
 class RestrictiveUser(RestrictiveBase):
     name: str
