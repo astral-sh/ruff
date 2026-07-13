@@ -8,6 +8,13 @@ lint.preview = true
 ## Basic errors
 
 ```py
+from typing import override
+
+
+def decorator(func):
+    return func
+
+
 class InstanceReceiverDefault:
     def method(self=None): ...  # TODO: error: [method-receiver-default]
 
@@ -34,6 +41,13 @@ class CustomDecoratorReceiverDefault:
 ## No errors
 
 ```py
+from typing import override
+
+
+def decorator(func):
+    return func
+
+
 class StaticMethodWithDefault:
     @staticmethod
     def helper(arg=None): ...
