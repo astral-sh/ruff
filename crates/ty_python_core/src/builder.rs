@@ -4196,14 +4196,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             // narrowing to be preserved after if-statements where one branch
                             // calls a `NoReturn` function like `sys.exit()`.
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
+                                .gate_existing_narrowing_for_all_places(narrowing_constraint);
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
                             // (not a reachability constraint). Recording reachability for
                             // calls in module scope is simply too expensive, and it's not
                             // too important of a use case.
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
+                                .gate_existing_narrowing_for_all_places(narrowing_constraint);
                         }
                     }
                 }

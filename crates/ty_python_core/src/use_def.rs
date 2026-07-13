@@ -2085,12 +2085,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Records a narrowing constraint for all places in the current scope.
+    /// Gates existing narrowing for all places in the current scope.
     ///
     /// This is used to gate narrowing by `IsNonTerminalCall` constraints: when a branch contains
     /// a call to a `NoReturn` function, all narrowing in that branch should be conditional
     /// on the call actually returning `Never`.
-    pub(super) fn record_narrowing_constraint_for_all_places(
+    pub(super) fn gate_existing_narrowing_for_all_places(
         &mut self,
         constraint: ScopedNarrowingConstraint,
     ) {
@@ -2105,7 +2105,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 pending,
                 &mut self.reachability_constraints,
             );
-            state.record_narrowing_constraint(&mut self.narrowing_constraints, constraint);
+            state.gate_existing_narrowing(&mut self.narrowing_constraints, constraint);
         }
     }
 
