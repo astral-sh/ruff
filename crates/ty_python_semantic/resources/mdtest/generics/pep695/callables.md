@@ -66,6 +66,30 @@ accepts_object: Callable[[object], object] = receiver.method
 accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
 ```
 
+The receiver must also satisfy a method type variable's declared bound or constraints:
+
+```py
+from typing import Callable
+
+class InvalidBoundedReceiver:
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
+    def method[T: int](self: T) -> None: ...
+
+class InvalidConstrainedReceiver:
+    def method[T: (int, str)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
+invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
+valid_bound: Callable[[], None] = ValidBoundedReceiver().method
+
+invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method  # error: [invalid-assignment]
+valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
+```
+
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py

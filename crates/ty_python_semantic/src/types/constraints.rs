@@ -408,6 +408,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::constrain_typevar_with_bounds(db, builder, typevar, None, Some(upper))
     }
 
+    /// Returns the declared specialization domains of `typevars` as a constraint set.
+    pub(crate) fn valid_typevar_specializations(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        typevars.into_iter().when_all(db, builder, |typevar| {
+            Self::from_node(builder, typevar.valid_specializations(db, builder))
+        })
+    }
+
     /// Verifies that this constraint set was created by `builder`
     #[track_caller]
     fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {

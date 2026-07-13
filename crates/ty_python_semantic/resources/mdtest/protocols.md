@@ -3167,6 +3167,21 @@ class ExplicitReceiverProtocol(Protocol):
 class StructuralExplicitReceiver:
     def method(self: ExplicitReceiverProtocol) -> None: ...
 
+class ReceiverOnly(Protocol):
+    def method(self) -> None: ...
+
+class InvalidBoundedReceiver:
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
+    def method[T: int](self: T) -> None: ...
+
+class InvalidConstrainedReceiver:
+    def method[T: (int, str)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
@@ -3207,6 +3222,16 @@ static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 # progress. The recursive check should terminate and establish the structural relation.
 static_assert(is_assignable_to(StructuralExplicitReceiver, ExplicitReceiverProtocol))
 static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol))
+
+# A bound receiver must choose a specialization within its declared domain.
+static_assert(not is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidBoundedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidBoundedReceiver, ReceiverOnly))
+static_assert(not is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidConstrainedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidConstrainedReceiver, ReceiverOnly))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
