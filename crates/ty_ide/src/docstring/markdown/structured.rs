@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
-use crate::docstring::document::syntax::starts_with_markdown_list_item;
+use crate::docstring::document::syntax::{is_markdown_code_span, starts_with_markdown_list_item};
 
 mod rst;
 
@@ -320,6 +320,12 @@ fn description_block_start(description: &str) -> Option<usize> {
 
 fn render_type_code_span_into(output: &mut String, ty: &str) {
     let normalized = normalize_type_for_code_span(ty);
+
+    if is_markdown_code_span(&normalized) {
+        output.push_str(&normalized);
+        return;
+    }
+
     render_code_span_into(output, normalized.as_ref());
 }
 
