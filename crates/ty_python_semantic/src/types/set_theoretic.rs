@@ -7,7 +7,7 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
@@ -68,16 +68,23 @@ impl<'db> UnionType<'db> {
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        UnionBuilder::new(db).add(a).add(b).build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            UnionBuilder::new(db)
+                .add(types.first(db))
+                .add(types.second(db))
+                .build()
+        }
+
+        union_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -848,18 +855,22 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub(crate) fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .positive_elements([a, b])
-            .build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            IntersectionBuilder::new(db)
+                .positive_elements([types.first(db), types.second(db)])
+                .build()
+        }
+
+        intersection_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     pub(crate) fn recursive_type_normalized_impl(

@@ -23,7 +23,7 @@ use crate::types::{
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
+        ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         generics::InferableTypeVars,
     },
 };
@@ -463,14 +463,15 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(
             db: &'db dyn Db,
-            source: Type<'db>,
-            target: Type<'db>,
+            types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
+            let source = types.first(db);
+            let target = types.second(db);
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 source.has_relation_to_with_typevar_evaluation(
@@ -489,7 +490,8 @@ impl<'db> Type<'db> {
         }
 
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
-            db, self, target,
+            db,
+            TypePair::new(db, self, target),
         ))
     }
 
@@ -529,16 +531,13 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
     pub(super) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
-        fn is_redundant_with_impl<'db>(
-            db: &'db dyn Db,
-            self_ty: Type<'db>,
-            other: Type<'db>,
-        ) -> bool {
-            self_ty
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+            types
+                .first(db)
                 .has_relation_to(
                     db,
-                    other,
+                    types.second(db),
                     &ConstraintSetBuilder::new(),
                     InferableTypeVars::None,
                     TypeRelation::Redundancy { pure: false },
@@ -550,7 +549,7 @@ impl<'db> Type<'db> {
             return true;
         }
 
-        is_redundant_with_impl(db, self, other)
+        is_redundant_with_impl(db, TypePair::new(db, self, other))
     }
 
     pub(super) fn has_relation_to<'c>(

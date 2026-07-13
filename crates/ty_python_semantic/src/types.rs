@@ -1019,6 +1019,18 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// An ordered pair of types shared by type-relation and set-theoretic queries.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct TypePair<'db> {
+    #[returns(copy)]
+    first: Type<'db>,
+    #[returns(copy)]
+    second: Type<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypePair<'_> {}
+
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,

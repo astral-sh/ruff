@@ -111,7 +111,7 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -3694,16 +3694,13 @@ impl<'db> Type<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| true,
+    cycle_initial = |_, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn is_possibly_constraint_set_assignable<'db>(
-    db: &'db dyn Db,
-    source: Type<'db>,
-    target: Type<'db>,
-) -> bool {
-    source
-        .when_constraint_set_assignable_to_owned(db, target)
+fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+    types
+        .first(db)
+        .when_constraint_set_assignable_to_owned(db, types.second(db))
         .query(|_builder, when| !when.is_never_satisfied(db))
 }
 
@@ -3954,7 +3951,10 @@ impl<'db> PathBounds<'db> {
                         }
                     }
 
-                    if !is_possibly_constraint_set_assignable(db, lower, declared_upper) {
+                    if !is_possibly_constraint_set_assignable(
+                        db,
+                        TypePair::new(db, lower, declared_upper),
+                    ) {
                         // This path does not satisfy the typevar's declared upper bound, and is
                         // therefore not a valid specialization.
                         return Err(());
