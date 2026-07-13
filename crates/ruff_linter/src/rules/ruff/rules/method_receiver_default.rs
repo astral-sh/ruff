@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -69,47 +70,21 @@ fn classify_receiver_kind(
     function: &ast::StmtFunctionDef,
     checker: &Checker,
 ) -> Option<ReceiverKind> {
-    // Check if it's a static method
-    if is_staticmethod(function, checker) {
-        return None;
-    }
+    let function_kind = function_type::classify(
+        function.name.as_str(),
+        &function.decorator_list,
+        checker.semantic().current_scope(),
+        checker.semantic(),
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
+    );
 
-    // Check if it's a classmethod
-    if is_classmethod(function, checker) {
-        return Some(ReceiverKind::Class);
-    }
-
-    // Check if it's __new__ (class receiver)
-    if function.name.as_str() == "__new__" {
-        return Some(ReceiverKind::Class);
-    }
-
-    // Default: instance receiver
-    Some(ReceiverKind::Instance)
-}
-
-/// Check if a function is decorated with @staticmethod
-fn is_staticmethod(function: &ast::StmtFunctionDef, checker: &Checker) -> bool {
-    function
-        .decorator_list
-        .iter()
-        .any(|decorator| is_name_or_attr(&decorator.expression, "staticmethod", checker))
-}
-
-/// Check if a function is decorated with @classmethod
-fn is_classmethod(function: &ast::StmtFunctionDef, checker: &Checker) -> bool {
-    function
-        .decorator_list
-        .iter()
-        .any(|decorator| is_name_or_attr(&decorator.expression, "classmethod", checker))
-}
-
-/// Check if an expression is a name or attribute matching the given string
-fn is_name_or_attr(expr: &Expr, name: &str, _checker: &Checker) -> bool {
-    match expr {
-        Expr::Name(ast::ExprName { id, .. }) => id == name,
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == name,
-        _ => false,
+    match function_kind {
+        FunctionType::StaticMethod => None,
+        FunctionType::ClassMethod => Some(ReceiverKind::Class),
+        FunctionType::NewMethod => Some(ReceiverKind::Class),
+        FunctionType::Method => Some(ReceiverKind::Instance),
+        _ => None,
     }
 }
 
@@ -119,6 +94,40 @@ pub(crate) fn method_receiver_default(checker: &Checker, function: &ast::StmtFun
     let Some(Stmt::ClassDef(_)) = checker.semantic().current_statement_parent() else {
         return;
     };
+
+    // Conservatively bail out if there are decorators beyond the standard ones we handle
+    // This includes @override and other custom decorators that may indicate inherited signatures
+    let classmethod_decorators = &checker.settings().pep8_naming.classmethod_decorators;
+    let staticmethod_decorators = &checker.settings().pep8_naming.staticmethod_decorators;
+
+    for decorator in &function.decorator_list {
+        let decorator_name = match decorator {
+            ast::Decorator {
+                expression: ast::Expr::Name(name),
+                ..
+            } => Some(name.id.as_str()),
+            ast::Decorator {
+                expression: ast::Expr::Attribute(attr),
+                ..
+            } => Some(attr.attr.as_str()),
+            _ => None,
+        };
+
+        if let Some(name) = decorator_name {
+            // Skip standard decorators we handle
+            if name == "classmethod"
+                || name == "staticmethod"
+                || classmethod_decorators.contains(&name.to_string())
+                || staticmethod_decorators.contains(&name.to_string())
+                || name == "property"
+                || name == "override"
+            {
+                continue;
+            }
+            // If we encounter any other decorator, bail out conservatively
+            return;
+        }
+    }
 
     // Determine receiver kind
     let Some(receiver_kind) = classify_receiver_kind(function, checker) else {
