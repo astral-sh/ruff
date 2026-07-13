@@ -4192,17 +4192,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 .current_reachability_constraints_mut()
                                 .add_atom(predicate_id);
                             self.current_use_def_map_mut()
-                                .record_non_terminal_call_reachability_constraint(
+                                .record_non_terminal_call_constraints(
                                     reachability_constraint,
+                                    narrowing_constraint,
                                 );
-
-                            // Also gate narrowing by this constraint: if the call returns
-                            // `Never`, any narrowing in the current branch should be
-                            // invalidated (since this path is unreachable). This enables
-                            // narrowing to be preserved after if-statements where one branch
-                            // calls a `NoReturn` function like `sys.exit()`.
-                            self.current_use_def_map_mut()
-                                .gate_existing_narrowing_for_all_places(narrowing_constraint);
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
                             // (not a reachability constraint). Recording reachability for

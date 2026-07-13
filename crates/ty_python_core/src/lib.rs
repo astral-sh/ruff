@@ -1331,7 +1331,7 @@ y = 2
     }
 
     #[test]
-    fn non_terminal_calls_only_gate_narrowed_bindings() {
+    fn non_terminal_call_constraints_are_deferred_at_uses() {
         let source = format!(
             "def func(value):\n    unchanged = 'abc'\n{}    if value is None:\n        unchanged.upper()\n        fail()\n",
             "    unchanged.upper()\n".repeat(MIN_DEFERRED_USE_CONSTRAINTS + 1)
