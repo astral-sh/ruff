@@ -178,6 +178,7 @@ help: Remove the unused suppression comment
 9  +   + 2)  # fmt: skip
 10 | a = (3
    |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```py
@@ -263,6 +264,18 @@ including module docstrings.
 
 a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
+```
+
+Unlike `ty: ignore`, an own-line `type: ignore` after executable code does not suppress the next
+line. This preserves the standardized semantics of `type: ignore` comments.
+
+```py
+seen_code = True
+
+# error: [unused-type-ignore-comment]
+# type: ignore
+# error: [unresolved-reference]
+value = missing
 ```
 
 ## `respect-type-ignore-comments=false`

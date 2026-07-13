@@ -211,7 +211,8 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
-        return Fix::safe_edit(Edit::range_deletion(suppression.comment_range));
+        // and don't promote a following suppression to an own-line suppression.
+        return Fix::unsafe_edit(Edit::range_deletion(suppression.comment_range));
     }
 
     // Remove any leading whitespace before the comment

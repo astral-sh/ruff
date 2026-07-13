@@ -9,7 +9,8 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
@@ -96,7 +97,11 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                             if comment.kind().is_type_ignore() && !respect_type_ignore {
                                 continue;
                             }
-                            builder.add_comment(comment, TextRange::new(line_start, token.end()));
+                            builder.add_comment(
+                                comment,
+                                TextRange::new(line_start, token.end()),
+                                parsed.tokens(),
+                            );
                         }
                         Err(error) => match error.kind {
                             ParseErrorKind::NotASuppression
@@ -310,8 +315,16 @@ pub(crate) struct Suppressions {
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
-    /// The suppressions are sorted by [`Suppression::range`] (which implies [`Suppression::comment_range`]).
+    /// The suppressions are sorted by [`Suppression::range`] (which implies
+    /// [`Suppression::comment_range`]) and [`Suppression::suppressed_range`] start.
     line: Vec<Suppression>,
+
+    /// The maximum [`Suppression::suppressed_range`] end up to and including each suppression in
+    /// [`Self::line`].
+    ///
+    /// This supports efficiently searching nested own-line suppression ranges while preserving
+    /// source order for unused-suppression diagnostics.
+    line_max_end: Box<[TextSize]>,
 
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
@@ -339,32 +352,30 @@ impl Suppressions {
 
     /// Returns the line-level suppressions that apply for `range`.
     ///
-    /// A suppression applies for the given range if it contains the range's
-    /// start or end offset. This means the suppression is on the same line
-    /// as the diagnostic's start or end.
+    /// A suppression applies for the given range if it contains the range's start or end offset.
+    /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
+    /// suppressions cover the following logical line.
     fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        // First find the index of the suppression comment that ends right before the range
-        // starts. This allows us to skip suppressions that are not relevant for the range.
-        let end_offset = self
-            .line
-            .binary_search_by_key(&range.start(), |suppression| {
-                suppression.suppressed_range.end()
-            })
-            .unwrap_or_else(|index| index);
+        // First find the earliest suppression that may end at or after the range starts. Using
+        // prefix maximums is necessary because own-line suppression ranges can be nested.
+        let start = self
+            .line_max_end
+            .partition_point(|&max_end| max_end < range.start());
 
-        // From here, search the remaining suppression comments for one that
-        // contains the range's start or end offset. Stop the search
-        // as soon as the suppression's range and the range no longer overlap.
-        self.line[end_offset..]
-            .iter()
-            // Stop searching if the suppression starts after the range we're looking for.
-            .take_while(move |suppression| range.end() >= suppression.suppressed_range.start())
-            .filter(move |suppression| {
-                // Don't use intersect to avoid that suppressions on inner-expression
-                // ignore errors for outer expressions
-                suppression.suppressed_range.contains(range.start())
-                    || suppression.suppressed_range.contains_inclusive(range.end())
-            })
+        // Suppression ranges are ordered by their start, so suppressions after this index cannot
+        // contain either boundary of the diagnostic range.
+        let end = self
+            .line
+            .partition_point(|suppression| suppression.suppressed_range.start() <= range.end());
+
+        // Search the potentially overlapping suppression comments for one that contains the
+        // range's start or end offset.
+        self.line[start..end].iter().filter(move |suppression| {
+            // Don't use intersect to avoid that suppressions on inner-expression
+            // ignore errors for outer expressions
+            suppression.suppressed_range.contains(range.start())
+                || suppression.suppressed_range.contains_inclusive(range.end())
+        })
     }
 
     fn iter(&self) -> SuppressionsIter<'_> {
@@ -413,7 +424,8 @@ pub(crate) struct Suppression {
     comment_range: TextRange,
 
     /// The range for which this suppression applies.
-    /// Most of the time, this is the range of the comment's line.
+    /// Most of the time, this is the range of the comment's line. An own-line `ty: ignore`
+    /// suppression also covers the following logical line.
     /// However, there are few cases where the range gets expanded to
     /// cover multiple lines:
     /// * multiline strings: `expr + """multiline\nstring"""  # type: ignore`
@@ -527,16 +539,27 @@ impl<'a> SuppressionsBuilder<'a> {
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
 
+        let mut max_end = TextSize::default();
+        let line_max_end = self
+            .line
+            .iter()
+            .map(|suppression| {
+                max_end = max_end.max(suppression.suppressed_range.end());
+                max_end
+            })
+            .collect();
+
         Suppressions {
             file: self.file,
             line: self.line,
+            line_max_end,
             unknown: self.unknown,
             invalid: self.invalid,
         }
     }
 
     #[expect(clippy::needless_pass_by_value)]
-    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
+    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange, tokens: &Tokens) {
         // ignore comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
         // > imports, or other executable code, silences all errors in the file.
@@ -547,6 +570,11 @@ impl<'a> SuppressionsBuilder<'a> {
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
+        } else if !comment.kind().is_type_ignore()
+            && indentation_at_offset(comment.range().start(), self.source).is_some()
+        {
+            let (before, after) = tokens.split_at(comment.range().start());
+            own_line_suppression_range(comment.range(), before, after)
         } else {
             line_range
         };
@@ -622,6 +650,48 @@ impl<'a> SuppressionsBuilder<'a> {
     fn add_invalid_comment(&mut self, kind: SuppressionKind, error: ParseError) {
         self.invalid.push(InvalidSuppression { kind, error });
     }
+}
+
+/// Returns the range covered by an own-line suppression comment.
+///
+/// A suppression before a logical line covers the entire logical line. A suppression inside a
+/// multiline logical line covers the next non-comment physical line instead. This matches Ruff's
+/// own-line suppression behavior.
+fn own_line_suppression_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
+    let mut end = range.end();
+    let is_inner_comment = before.iter().rev().find_map(|token| match token.kind() {
+        TokenKind::Newline => Some(false),
+        TokenKind::NonLogicalNewline | TokenKind::Comment => None,
+        _ => Some(true),
+    });
+
+    let is_inner_comment = is_inner_comment.unwrap_or(false);
+    let mut is_blank_or_comment_only = true;
+    let mut seen_nonlogical_newline = false;
+
+    for token in after {
+        match token.kind() {
+            TokenKind::Newline => {
+                end = token.start();
+                break;
+            }
+            TokenKind::Comment => {}
+            TokenKind::NonLogicalNewline if is_inner_comment => {
+                end = token.start();
+                if seen_nonlogical_newline && !is_blank_or_comment_only {
+                    break;
+                }
+                seen_nonlogical_newline = true;
+                is_blank_or_comment_only = true;
+            }
+            _ => {
+                is_blank_or_comment_only = false;
+                end = token.end();
+            }
+        }
+    }
+
+    TextRange::new(range.start(), end)
 }
 
 /// Suppression for an unknown lint rule.
