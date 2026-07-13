@@ -183,8 +183,13 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
-                self.counter_stack.push(Vec::with_capacity(cases.len()));
+                // The subject is evaluated once, unconditionally, before any
+                // case is tried, so its usage is counted in the enclosing
+                // context rather than in a per-case branch counter. Visiting it
+                // before pushing the branch stack also avoids incrementing into
+                // an empty counter (which previously panicked, see #26624).
                 self.visit_expr(subject);
+                self.counter_stack.push(Vec::with_capacity(cases.len()));
                 for match_case in cases {
                     self.counter_stack.last_mut().unwrap().push(0);
                     self.visit_match_case(match_case);

@@ -244,5 +244,16 @@ B031 Using the generator returned from `itertools.groupby()` more than once will
 226 |         collect_shop_items(shopper, section_items)  # B031
     |                                     ^^^^^^^^^^^^^
 227 |
-228 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
+228 | # Regression test for https://github.com/astral-sh/ruff/issues/26624
+    |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:242:33
+    |
+240 |         case _:
+241 |             pass
+242 |     collect_shop_items(shopper, section_items)  # B031
+    |                                 ^^^^^^^^^^^^^
+243 |
+244 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
     |

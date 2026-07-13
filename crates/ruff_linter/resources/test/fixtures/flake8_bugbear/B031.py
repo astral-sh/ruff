@@ -225,6 +225,22 @@ def foo():
             collect_shop_items(shopper, section_items)
         collect_shop_items(shopper, section_items)  # B031
 
+# Regression test for https://github.com/astral-sh/ruff/issues/26624
+# Using the group in a `match` subject must not panic. Here it is consumed
+# exactly once, so it should not be flagged.
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    match list(section_items):
+        case _:
+            pass
+
+# The group is consumed by the `match` subject and then reused afterwards,
+# which should be flagged.
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    match list(section_items):
+        case _:
+            pass
+    collect_shop_items(shopper, section_items)  # B031
+
 # Let's redefine the `groupby` function to make sure we pick up the correct one.
 # NOTE: This should always be at the end of the file.
 def groupby(data, key=None):
