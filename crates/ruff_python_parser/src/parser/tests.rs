@@ -2,12 +2,36 @@ use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, St
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
+#[cfg(target_arch = "aarch64")]
+use super::Parser;
+
 #[test]
 fn test_modes() {
     let source = "a[0][1][2][3][4]";
 
     assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
     assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
+}
+
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn chunked_lexer_reparses_after_late_error() {
+    let prefix = "value = 1\n".repeat(2_000);
+    let options = ParseOptions::from(Mode::Module);
+
+    for suffix in [
+        "value = 01\n",
+        "value = 'unterminated\n",
+        "(value\n",
+        "value = 1\\\n",
+        "values = [\n    first,\n    second\nif condition:\n    pass\n",
+    ] {
+        let source = format!("{prefix}{suffix}");
+        let streaming =
+            Parser::new_starts_at_with_legacy_lexer(&source, 0.into(), options.clone()).parse();
+        let chunked = crate::parse_unchecked(&source, options.clone());
+        assert_eq!(streaming, chunked, "{suffix:?}");
+    }
 }
 
 #[test]

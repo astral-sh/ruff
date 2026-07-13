@@ -44,6 +44,12 @@ impl Token {
         self.kind
     }
 
+    /// Returns the flags associated with this token.
+    #[inline]
+    pub const fn flags(&self) -> TokenFlags {
+        self.flags
+    }
+
     /// Returns the token as a tuple of (kind, range).
     #[inline]
     pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
