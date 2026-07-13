@@ -9,16 +9,16 @@ use ruff_python_ast::TomlSourceType;
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_db::diagnostic::Diagnostic;
-use ruff_source_file::{SourceFile, SourceFileBuilder};
 
+use crate::IOError;
 use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::{FixTable, MAX_ITERATIONS, report_failed_to_converge_error};
 use crate::registry::Rule;
 use crate::rules::ruff::rules::{InvalidPyprojectToml, rule_codes_in_selectors};
 use crate::settings::LinterSettings;
 use crate::settings::types::UnsafeFixes;
-use crate::{IOError, Violation};
 
 pub struct TomlFixerResult<'a> {
     pub diagnostics: Vec<Diagnostic>,
@@ -28,15 +28,17 @@ pub struct TomlFixerResult<'a> {
 
 /// RUF200
 pub fn lint_toml(
-    source_file: &SourceFile,
+    path: &Path,
+    source: &str,
     settings: &LinterSettings,
     source_type: TomlSourceType,
 ) -> Vec<Diagnostic> {
-    let mut messages = rule_codes_in_selectors(source_file, settings, source_type);
+    let context = LintContext::new(path, source, settings);
+    rule_codes_in_selectors(&context, source_type);
 
-    if settings.rules.enabled(Rule::InvalidPyprojectToml) && source_type.is_pyproject() {
-        let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
-            return messages;
+    if context.is_rule_enabled(Rule::InvalidPyprojectToml) && source_type.is_pyproject() {
+        let Some(err) = toml::from_str::<PyProjectToml>(source).err() else {
+            return context.into_parts().0;
         };
 
         let range = match err.span() {
@@ -44,33 +46,31 @@ pub fn lint_toml(
             // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
             None => TextRange::default(),
             Some(range) => {
-                let Some(range) = text_range_from_std(range, source_file, settings, &mut messages)
-                else {
-                    return messages;
+                let Some(range) = text_range_from_std(range, &context) else {
+                    return context.into_parts().0;
                 };
                 range
             }
         };
 
         let toml_err = err.message().to_string();
-        let diagnostic =
-            InvalidPyprojectToml { message: toml_err }.into_diagnostic(range, source_file);
-        messages.push(diagnostic);
+        context.report_diagnostic(InvalidPyprojectToml { message: toml_err }, range);
     }
 
-    messages
+    context.into_parts().0
 }
 
 /// Generate diagnostics for a TOML configuration file, iteratively applying fixes until the source
 /// stabilizes.
 pub fn lint_fix_toml<'a>(
-    source_file: &'a SourceFile,
+    path: &Path,
+    source: &'a str,
     settings: &LinterSettings,
     source_type: TomlSourceType,
     unsafe_fixes: UnsafeFixes,
 ) -> TomlFixerResult<'a> {
-    let mut diagnostics = lint_toml(source_file, settings, source_type);
-    let mut transformed = Cow::Borrowed(source_file.source_text());
+    let mut diagnostics = lint_toml(path, source, settings, source_type);
+    let mut transformed = Cow::Borrowed(source);
     let mut fixed = FixTable::default();
     let mut iterations = 0;
 
@@ -86,11 +86,7 @@ pub fn lint_fix_toml<'a>(
         };
 
         if iterations >= MAX_ITERATIONS {
-            report_failed_to_converge_error(
-                Path::new(source_file.name()),
-                transformed.as_ref(),
-                &diagnostics,
-            );
+            report_failed_to_converge_error(path, transformed.as_ref(), &diagnostics);
             return TomlFixerResult {
                 diagnostics,
                 transformed,
@@ -105,28 +101,21 @@ pub fn lint_fix_toml<'a>(
         transformed = Cow::Owned(code);
         iterations += 1;
 
-        let transformed_source =
-            SourceFileBuilder::new(source_file.name(), transformed.as_ref()).finish();
-        diagnostics = lint_toml(&transformed_source, settings, source_type);
+        diagnostics = lint_toml(path, transformed.as_ref(), settings, source_type);
     }
 }
 
 /// Try to convert a `range` into a `TextRange`, emitting an `IOError` diagnostic if the file is too
 /// large or a warning if the `IOError` lint rule is disabled.
-pub(crate) fn text_range_from_std(
-    range: Range<usize>,
-    source_file: &SourceFile,
-    settings: &LinterSettings,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<TextRange> {
+pub(crate) fn text_range_from_std(range: Range<usize>, context: &LintContext) -> Option<TextRange> {
     let Ok(end) = TextSize::try_from(range.end) else {
+        let source_file = context.source_file();
         let message = format!(
             "{} is larger than 4GB, but ruff assumes all files to be smaller",
             source_file.name(),
         );
-        if settings.rules.enabled(Rule::IOError) {
-            let diagnostic = IOError { message }.into_diagnostic(TextRange::default(), source_file);
-            diagnostics.push(diagnostic);
+        if context.is_rule_enabled(Rule::IOError) {
+            context.report_diagnostic(IOError { message }, TextRange::default());
         } else {
             warn!(
                 "{}{}{} {message}",
@@ -146,11 +135,12 @@ pub(crate) fn text_range_from_std(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use insta::assert_snapshot;
 
     use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics, DummyFileResolver};
     use ruff_python_ast::TomlSourceType;
-    use ruff_source_file::SourceFileBuilder;
 
     use crate::codes::Rule;
     use crate::settings::LinterSettings;
@@ -160,11 +150,12 @@ mod tests {
 
     #[test]
     fn fixes_toml() {
-        let source_file = SourceFileBuilder::new("ruff.toml", r#"lint.select = ["F401"]"#).finish();
+        let source = r#"lint.select = ["F401"]"#;
         let settings = LinterSettings::for_rule(Rule::RuleCodesInSelectors).with_preview_mode();
 
         let result = lint_fix_toml(
-            &source_file,
+            Path::new("ruff.toml"),
+            source,
             &settings,
             TomlSourceType::Ruff,
             UnsafeFixes::Disabled,

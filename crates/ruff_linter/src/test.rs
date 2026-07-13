@@ -144,9 +144,9 @@ pub(crate) fn test_toml_path(
     let path = test_resource_path("fixtures").join(path);
     let filename = path.file_name().unwrap_or_else(|| path.as_os_str());
     let contents = std::fs::read_to_string(&path)?;
-    let source_file = SourceFileBuilder::new(filename.to_string_lossy(), contents).finish();
     Ok(crate::pyproject_toml::lint_toml(
-        &source_file,
+        Path::new(filename),
+        &contents,
         settings,
         source_type,
     ))

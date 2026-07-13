@@ -5,16 +5,14 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use toml::Spanned;
 
-use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::TomlSourceType;
-use ruff_source_file::SourceFile;
 
 use crate::{
-    FixAvailability, Violation, codes::Rule, preview::is_human_readable_names_enabled,
-    pyproject_toml::text_range_from_std, rule_redirects::get_redirect_target,
-    settings::LinterSettings,
+    FixAvailability, Violation, checkers::ast::LintContext, codes::Rule,
+    preview::is_human_readable_names_enabled, pyproject_toml::text_range_from_std,
+    rule_redirects::get_redirect_target,
 };
 
 /// ## What it does
@@ -60,21 +58,16 @@ impl Violation for RuleCodesInSelectors {
 }
 
 /// RUF201
-pub(crate) fn rule_codes_in_selectors(
-    source_file: &SourceFile,
-    settings: &LinterSettings,
-    source_type: TomlSourceType,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    if !settings.rules.enabled(Rule::RuleCodesInSelectors)
-        || !is_human_readable_names_enabled(settings.preview)
+pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSourceType) {
+    if !context.is_rule_enabled(Rule::RuleCodesInSelectors)
+        || !is_human_readable_names_enabled(context.settings().preview)
     {
-        return diagnostics;
+        return;
     }
 
+    let source_file = context.source_file();
     let Ok(Some(document)) = Document::from_toml_str(source_file.source_text(), source_type) else {
-        return diagnostics;
+        return;
     };
 
     for (spanned, selector) in document.selectors() {
@@ -93,22 +86,16 @@ pub(crate) fn rule_codes_in_selectors(
 
         // This can only fail if the file is larger than 4GB, so abort analysis of the entire file
         // rather than continuing to the next selector.
-        let Some(range) =
-            text_range_from_std(content_range, source_file, settings, &mut diagnostics)
-        else {
-            return diagnostics;
+        let Some(range) = text_range_from_std(content_range, context) else {
+            return;
         };
 
-        let mut diagnostic = RuleCodesInSelectors { selector }.into_diagnostic(range, source_file);
+        let mut diagnostic = context.report_diagnostic(RuleCodesInSelectors { selector }, range);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             rule.name().to_string(),
             range,
         )));
-
-        diagnostics.push(diagnostic);
     }
-
-    diagnostics
 }
 
 enum Document {

@@ -225,13 +225,12 @@ pub(crate) fn lint_path(
                         return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
                     }
                 };
-                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
                 if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
                     let TomlFixerResult {
                         diagnostics,
                         transformed,
                         fixed,
-                    } = lint_fix_toml(&source_file, settings, source_type, unsafe_fixes);
+                    } = lint_fix_toml(path, &contents, settings, source_type, unsafe_fixes);
 
                     if !fixed.is_empty() {
                         match fix_mode {
@@ -243,7 +242,7 @@ pub(crate) fn lint_path(
                                     &mut io::stdout().lock(),
                                     "{}",
                                     SourceKindDiff::from_text(
-                                        source_file.source_text(),
+                                        &contents,
                                         transformed.as_ref(),
                                         Some(path),
                                     )
@@ -256,7 +255,7 @@ pub(crate) fn lint_path(
                     (diagnostics, fixed)
                 } else {
                     (
-                        lint_toml(&source_file, settings, source_type),
+                        lint_toml(path, &contents, settings, source_type),
                         FixTable::default(),
                     )
                 }
@@ -404,7 +403,6 @@ pub(crate) fn lint_stdin(
             }
 
             let path = path.unwrap();
-            let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
 
             let (diagnostics, fixed) =
                 if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
@@ -413,7 +411,8 @@ pub(crate) fn lint_stdin(
                         transformed,
                         fixed,
                     } = lint_fix_toml(
-                        &source_file,
+                        path,
+                        &contents,
                         &settings.linter,
                         source_type,
                         settings.unsafe_fixes,
@@ -429,7 +428,7 @@ pub(crate) fn lint_stdin(
                                     &mut io::stdout().lock(),
                                     "{}",
                                     SourceKindDiff::from_text(
-                                        source_file.source_text(),
+                                        &contents,
                                         transformed.as_ref(),
                                         Some(path),
                                     )
@@ -442,7 +441,7 @@ pub(crate) fn lint_stdin(
                     (diagnostics, fixed)
                 } else {
                     (
-                        lint_toml(&source_file, &settings.linter, source_type),
+                        lint_toml(path, &contents, &settings.linter, source_type),
                         FixTable::default(),
                     )
                 };
