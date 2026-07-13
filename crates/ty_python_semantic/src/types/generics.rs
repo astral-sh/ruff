@@ -2143,9 +2143,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 (Some(inferred), _) => Some(inferred),
                 (None, declared) => declared,
             }
-            .filter(|candidate| {
-                !candidate.has_typevar(db) && !candidate.has_unspecialized_type_var(db)
-            });
+            .filter(|candidate| !candidate.has_unspecialized_type_var(db));
 
             if let (Some(candidate), Some(bounds)) = (candidate, bounds) {
                 let candidate_bound = PathBound::exact(typevar, candidate);

@@ -479,6 +479,26 @@ def f[A, B, C](x: tuple[A, B] | tuple[A, B, C]) -> list[A | B | C]:
     return f(x)
 ```
 
+An outer constrained type variable is also a valid declared candidate for an inner generic call:
+
+```py
+import tempfile
+from typing import IO, Literal
+
+class AsyncFile[T: (str, bytes)]:
+    def __init__(self, file: IO[T]) -> None:
+        self.file = file
+
+class TemporaryFile[T: (str, bytes)]:
+    _async_file: AsyncFile[T]
+    mode: Literal["w", "wb"]
+
+    def enter(self) -> AsyncFile[T]:
+        file = tempfile.TemporaryFile(self.mode)
+        self._async_file = AsyncFile(file)
+        return self._async_file
+```
+
 ## Generic constructors
 
 The same applies to constructors of generic classes:
