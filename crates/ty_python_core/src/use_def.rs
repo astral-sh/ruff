@@ -1388,10 +1388,9 @@ struct PendingReachabilityConstraint {
     deferred_use_count: usize,
 }
 
-/// Keep short call sequences on the regular path to avoid changing dependency graphs in the
-/// overwhelmingly common case. Longer sequences are where repeated materialization becomes
-/// expensive enough to matter.
-pub(crate) const MIN_DEFERRED_USE_CONSTRAINTS: usize = 16;
+/// Force every statement-level call through the regular materialization path so `CodSpeed` can
+/// measure the cost of the optimization independently.
+const MIN_DEFERRED_USE_CONSTRAINTS: usize = usize::MAX;
 
 /// An append-only tree of scope-wide reachability constraints and call narrowing gates.
 ///
