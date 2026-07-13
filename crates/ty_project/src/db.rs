@@ -97,6 +97,12 @@ impl ProjectDatabase {
         self.files.freeze();
     }
 
+    /// See [`Project::freeze_open_files`].
+    pub fn freeze_open_files(&mut self) {
+        let project = self.project();
+        project.freeze_open_files(self);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,

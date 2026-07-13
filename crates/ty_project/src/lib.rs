@@ -125,22 +125,27 @@ pub struct Project {
 
 /// The set of files that are open in the editor.
 ///
-/// Defaults to [`AlwaysEmpty`] with a `HIGH` durability so that batch runs, which never open
-/// files, don't take a low-durability dependency in every type-inference query that asks
-/// whether a file is open. The language server switches to [`Files`] (with `LOW` durability)
-/// immediately after creating the database, before running any inference, so that later
-/// open/close events never invalidate high-durability memos.
+/// Defaults to [`Files`] with a `LOW` durability so that the language server can update the
+/// set on open/close events without any setup after creating the database. CLI runs, which
+/// never open files, call [`Project::freeze_open_files`] to switch to [`AlwaysEmpty`] with a
+/// `NEVER_CHANGE` durability, so that their type-inference queries don't record any
+/// dependency on the open-file set.
 ///
 /// [`AlwaysEmpty`]: OpenFileSet::AlwaysEmpty
 /// [`Files`]: OpenFileSet::Files
-#[derive(Debug, Clone, PartialEq, Eq, Default, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum OpenFileSet {
     /// No files are open and the set never changes.
-    #[default]
     AlwaysEmpty,
 
     /// The files currently open in the editor.
     Files(FxHashSet<File>),
+}
+
+impl Default for OpenFileSet {
+    fn default() -> Self {
+        OpenFileSet::Files(FxHashSet::default())
+    }
 }
 
 impl OpenFileSet {
@@ -266,7 +271,7 @@ impl Project {
 
         Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::HIGH)
+            .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
             .new(db)
     }
@@ -279,7 +284,6 @@ impl Project {
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
         let included_paths = self.included_paths_list(db).to_vec();
-        let open_files = self.open_fileset(db).clone();
         let check_mode = self.check_mode(db);
         let verbose = self.verbose_flag(db);
         let force_exclude = self.force_exclude_flag(db);
@@ -293,9 +297,6 @@ impl Project {
         self.set_included_paths_list(db)
             .with_durability(durability)
             .to(included_paths);
-        self.set_open_fileset(db)
-            .with_durability(durability)
-            .to(open_files);
         self.set_check_mode(db)
             .with_durability(durability)
             .to(check_mode);
@@ -581,6 +582,14 @@ impl Project {
         self.set_open_fileset(db)
             .with_durability(Durability::LOW)
             .to(OpenFileSet::Files(open_files));
+    }
+
+    /// Permanently marks the project as never having open files, so reads of the
+    /// open-file state record no salsa dependency. Any later write panics.
+    pub fn freeze_open_files(self, db: &mut dyn Db) {
+        self.set_open_fileset(db)
+            .with_durability(Durability::NEVER_CHANGE)
+            .to(OpenFileSet::AlwaysEmpty);
     }
 
     /// This takes the open files from the project and returns them.
