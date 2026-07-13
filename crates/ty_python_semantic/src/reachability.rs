@@ -527,6 +527,9 @@ std::thread_local! {
     static ACTIVE_NON_TERMINAL_CALL_PREFIXES: ActiveRecursionDetector<salsa::Id> = ActiveRecursionDetector::default();
 }
 
+const MIN_CACHED_NON_TERMINAL_CALLS: usize = 128;
+const NON_TERMINAL_CALL_RANGE_LEAF_SIZE: usize = 64;
+
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -565,9 +568,9 @@ fn analyze_non_terminal_call_prefix<'db>(
 ) {
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let use_def = use_def_map(db, scope);
-    let call_count = use_def
-        .non_terminal_call_predicate_ids()
-        .partition_point(|predicate| predicate.index() <= root_predicate.index());
+    let call_predicate_ids = use_def.non_terminal_call_predicate_ids();
+    let call_count =
+        call_predicate_ids.partition_point(|predicate| predicate.index() <= root_predicate.index());
 
     if call_count == 0 {
         return;
@@ -578,8 +581,13 @@ fn analyze_non_terminal_call_prefix<'db>(
             &scope.as_id(),
             || {},
             || {
+                if call_predicate_ids.len() <= MIN_CACHED_NON_TERMINAL_CALLS {
+                    analyze_non_terminal_calls(db, use_def, &call_predicate_ids[..call_count]);
+                    return;
+                }
+
                 let mut start = 0;
-                let mut remaining = call_count;
+                let mut remaining = call_count / NON_TERMINAL_CALL_RANGE_LEAF_SIZE;
 
                 while remaining > 0 {
                     let level = remaining.ilog2();
@@ -588,16 +596,35 @@ fn analyze_non_terminal_call_prefix<'db>(
                     start += length;
                     remaining -= length;
                 }
+
+                let tail_start = call_count / NON_TERMINAL_CALL_RANGE_LEAF_SIZE
+                    * NON_TERMINAL_CALL_RANGE_LEAF_SIZE;
+                analyze_non_terminal_calls(
+                    db,
+                    use_def,
+                    &call_predicate_ids[tail_start..call_count],
+                );
             },
         );
     });
 }
 
-/// Analyzes a power-of-two range of statement-level call predicates in source order.
+fn analyze_non_terminal_calls<'db>(
+    db: &'db dyn Db,
+    use_def: &UseDefMap<'db>,
+    predicate_ids: &[ScopedPredicateId],
+) {
+    for predicate_id in predicate_ids {
+        analyze_single(db, &use_def.predicates()[*predicate_id]);
+    }
+}
+
+/// Analyzes a power-of-two range of statement-level call-predicate blocks in source order.
 ///
 /// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
 /// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
-/// requested prefix contains thousands of calls.
+/// requested prefix contains thousands of calls. Each leaf handles multiple calls iteratively to
+/// avoid retaining a Salsa argument and query result for every individual call.
 #[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
 fn analyze_non_terminal_call_range<'db>(
     db: &'db dyn Db,
@@ -607,8 +634,13 @@ fn analyze_non_terminal_call_range<'db>(
 ) {
     if level == 0 {
         let use_def = use_def_map(db, scope);
-        let predicate_id = use_def.non_terminal_call_predicate_ids()[index];
-        analyze_single(db, &use_def.predicates()[predicate_id]);
+        let start = index * NON_TERMINAL_CALL_RANGE_LEAF_SIZE;
+        let end = start + NON_TERMINAL_CALL_RANGE_LEAF_SIZE;
+        analyze_non_terminal_calls(
+            db,
+            use_def,
+            &use_def.non_terminal_call_predicate_ids()[start..end],
+        );
         return;
     }
 
@@ -1635,7 +1667,7 @@ mod tests {
     use ty_python_core::semantic_index;
 
     #[test]
-    fn non_terminal_call_prefix_reuses_ranges() -> anyhow::Result<()> {
+    fn non_terminal_call_prefix_bypasses_ranges_for_small_scope() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
             "/src/test.py",
@@ -1700,9 +1732,63 @@ mod tests {
                 .count()
         });
 
-        // The first prefix executes the seven nodes for calls 0..4. The second prefix reuses that
-        // range and executes only the three nodes for calls 4..6 plus the final leaf.
-        assert_eq!(range_executions, 11);
+        assert_eq!(range_executions, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn non_terminal_call_prefix_reuses_ranges() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let source = format!(
+            "def noop() -> None: ...\n\ndef f(flag: bool) -> None:\n    if flag:\n        noop()\n{}",
+            "    noop()\n".repeat(MIN_CACHED_NON_TERMINAL_CALLS)
+        );
+        db.write_file("/src/test.py", &source)?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        {
+            let index = semantic_index(&db, file);
+            let function_scope = index
+                .child_scopes(FileScopeId::global())
+                .nth(1)
+                .unwrap()
+                .0
+                .to_scope_id(&db, file);
+            let use_def = use_def_map(&db, function_scope);
+            let predicates = use_def.predicates();
+            let call_predicates = use_def.non_terminal_call_predicate_ids();
+
+            assert_eq!(call_predicates.len(), MIN_CACHED_NON_TERMINAL_CALLS + 1);
+            assert!(call_predicates.windows(2).all(|ids| ids[0] < ids[1]));
+            assert!(
+                call_predicates.iter().all(|id| {
+                    matches!(predicates[*id].node, PredicateNode::IsNonTerminalCall(_))
+                })
+            );
+
+            analyze_non_terminal_call_prefix(&db, predicates, call_predicates[95]);
+            analyze_non_terminal_call_prefix(&db, predicates, call_predicates[128]);
+        }
+
+        let events = db.take_salsa_events();
+        let range_executions = salsa::attach(&db, || {
+            events
+                .into_iter()
+                .filter(|event| {
+                    matches!(
+                        &event.kind,
+                        salsa::EventKind::WillExecute { database_key }
+                            if format!("{database_key:?}")
+                                .contains("analyze_non_terminal_call_range")
+                    )
+                })
+                .count()
+        });
+
+        // The first prefix executes one leaf for calls 0..64. The second prefix reuses that leaf
+        // and executes only the parent range and the leaf for calls 64..128.
+        assert_eq!(range_executions, 3);
 
         Ok(())
     }
@@ -1710,19 +1796,13 @@ mod tests {
     #[test]
     fn non_terminal_call_ranges_invalidate_when_callable_changes() -> anyhow::Result<()> {
         let mut db = setup_db();
+        let source = format!(
+            "from dependency import callback\n\ndef f() -> None:\n{}",
+            "    callback()\n".repeat(MIN_CACHED_NON_TERMINAL_CALLS + 1)
+        );
         db.write_files([
             ("/src/dependency.py", "def callback() -> None: ..."),
-            (
-                "/src/test.py",
-                r#"from dependency import callback
-
-def f() -> None:
-    callback()
-    callback()
-    callback()
-    callback()
-"#,
-            ),
+            ("/src/test.py", source.as_str()),
         ])?;
 
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
