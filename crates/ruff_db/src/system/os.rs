@@ -2,10 +2,9 @@
 
 mod ignore;
 
-pub use ignore::{IgnoreFiles, Ignored};
-
+use self::ignore::IgnoreFiles;
 use super::walk_directory::{
-    self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    self, DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
 use crate::max_parallelism;
@@ -336,6 +335,17 @@ impl DirectoryWalker for OsDirectoryWalker {
                 }
             })
         });
+    }
+
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental> {
+        // N.B. The current work-around `IgnoreFiles` implementation doesn't
+        // support any configuration right now. This will be fixed once we
+        // switch to the `ignore` crate's implementation. --AG
+        let WalkDirectoryConfiguration { paths, .. } = configuration;
+        Box::new(IgnoreFiles::new(paths))
     }
 }
 
