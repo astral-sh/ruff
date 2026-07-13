@@ -319,13 +319,6 @@ pub(crate) struct Suppressions {
     /// [`Suppression::comment_range`]) and [`Suppression::suppressed_range`] start.
     line: Vec<Suppression>,
 
-    /// The maximum [`Suppression::suppressed_range`] end up to and including each suppression in
-    /// [`Self::line`].
-    ///
-    /// This supports efficiently searching nested own-line suppression ranges while preserving
-    /// source order for unused-suppression diagnostics.
-    line_max_end: Box<[TextSize]>,
-
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
 
@@ -356,12 +349,6 @@ impl Suppressions {
     /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
     /// suppressions cover the following logical line.
     fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        // First find the earliest suppression that may end at or after the range starts. Using
-        // prefix maximums is necessary because own-line suppression ranges can be nested.
-        let start = self
-            .line_max_end
-            .partition_point(|&max_end| max_end < range.start());
-
         // Suppression ranges are ordered by their start, so suppressions after this index cannot
         // contain either boundary of the diagnostic range.
         let end = self
@@ -370,7 +357,7 @@ impl Suppressions {
 
         // Search the potentially overlapping suppression comments for one that contains the
         // range's start or end offset.
-        self.line[start..end].iter().filter(move |suppression| {
+        self.line[..end].iter().filter(move |suppression| {
             // Don't use intersect to avoid that suppressions on inner-expression
             // ignore errors for outer expressions
             suppression.suppressed_range.contains(range.start())
@@ -539,20 +526,9 @@ impl<'a> SuppressionsBuilder<'a> {
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
 
-        let mut max_end = TextSize::default();
-        let line_max_end = self
-            .line
-            .iter()
-            .map(|suppression| {
-                max_end = max_end.max(suppression.suppressed_range.end());
-                max_end
-            })
-            .collect();
-
         Suppressions {
             file: self.file,
             line: self.line,
-            line_max_end,
             unknown: self.unknown,
             invalid: self.invalid,
         }
