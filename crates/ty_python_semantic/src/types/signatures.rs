@@ -2133,7 +2133,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self
             .with_inferable_typevars(inferable)
-            .with_callable_local_typevars(db, signature_inferable);
+            .with_quantified_typevars(db, signature_inferable);
         if source
             .receiver_bindings
             .is_some_and(|bindings| bindings.contains_typevar(db))
