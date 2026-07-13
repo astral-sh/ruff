@@ -641,7 +641,7 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:25
           |
-        1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+        1 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
           |                         ^
           |
         "#);
@@ -666,7 +666,7 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:2
           |
-        1 | ␈␛
+        1 | ␈␚␛
           |  ^
           |
         "#);

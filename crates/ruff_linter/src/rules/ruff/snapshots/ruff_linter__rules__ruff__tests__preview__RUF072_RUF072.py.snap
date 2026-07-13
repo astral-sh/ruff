@@ -314,7 +314,7 @@ help: Remove the `finally` clause
 RUF072 [*] Empty `finally` clause
    --> RUF072.py:178:1
     |
-176 |       1
+176 |   ␌    1
 177 |       2
 178 | / finally:
 179 | |     pass
@@ -336,7 +336,7 @@ help: Remove the `finally` clause
 RUF072 [*] Empty `finally` clause
    --> RUF072.py:186:1
     |
-184 |   try:
+184 |   ␌try:
 185 |       1
 186 | / finally:
 187 | |     pass
