@@ -1383,9 +1383,10 @@ struct PendingReachabilityId;
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     constraint: ScopedReachabilityConstraintId,
+    narrowing_gate: ScopedNarrowingConstraint,
 }
 
-/// An append-only tree of scope-wide reachability constraints.
+/// An append-only tree of scope-wide reachability constraints and terminal-call gates.
 ///
 /// Each [`PendingPlaceState`] remembers the last node applied to its place state, so snapshots can
 /// share place states and defer applying subsequent constraints until the place is observed or
@@ -1403,6 +1404,7 @@ impl Default for PendingReachability {
         constraints.push(PendingReachabilityConstraint {
             parent: root,
             constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            narrowing_gate: ScopedNarrowingConstraint::ALWAYS_TRUE,
         });
         Self {
             constraints,
@@ -1416,7 +1418,24 @@ impl PendingReachability {
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             constraint,
+            narrowing_gate: ScopedNarrowingConstraint::ALWAYS_TRUE,
         });
+    }
+
+    fn record_narrowing_gate(
+        &mut self,
+        narrowing_gate: ScopedNarrowingConstraint,
+        has_reachability_constraint: bool,
+    ) {
+        if has_reachability_constraint {
+            self.constraints[self.current].narrowing_gate = narrowing_gate;
+        } else {
+            self.current = self.constraints.push(PendingReachabilityConstraint {
+                parent: self.current,
+                constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                narrowing_gate,
+            });
+        }
     }
 
     /// Applies the constraints between the place's last materialized node and `target`.
@@ -1491,6 +1510,49 @@ impl PendingReachability {
         }
         constraint
     }
+
+    /// Takes the terminal-call gates introduced by each path after their common ancestor.
+    ///
+    /// Gates are consumed when their paths are merged: reusing a branch-local gate in a later
+    /// `elif` merge would incorrectly apply it to the already-merged paths. The gates are combined
+    /// in source order to keep their decision diagrams compact.
+    fn take_narrowing_gates_between_paths(
+        &mut self,
+        mut current: PendingReachabilityId,
+        mut branch: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) -> (ScopedNarrowingConstraint, ScopedNarrowingConstraint) {
+        let mut current_gates = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+        let mut branch_gates = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+
+        while current != branch {
+            if current.index() > branch.index() {
+                let event = &mut self.constraints[current];
+                current_gates.push(std::mem::replace(
+                    &mut event.narrowing_gate,
+                    ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ));
+                current = event.parent;
+            } else {
+                let event = &mut self.constraints[branch];
+                branch_gates.push(std::mem::replace(
+                    &mut event.narrowing_gate,
+                    ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ));
+                branch = event.parent;
+            }
+        }
+
+        let mut current_gate = ScopedNarrowingConstraint::ALWAYS_TRUE;
+        for gate in current_gates.into_iter().rev() {
+            current_gate = narrowing_constraints.add_and_constraint(current_gate, gate);
+        }
+        let mut branch_gate = ScopedNarrowingConstraint::ALWAYS_TRUE;
+        for gate in branch_gates.into_iter().rev() {
+            branch_gate = narrowing_constraints.add_and_constraint(branch_gate, gate);
+        }
+        (current_gate, branch_gate)
+    }
 }
 
 /// A copy-on-write place state and the last reachability node materialized into it.
@@ -1532,6 +1594,7 @@ impl PendingReachability {
         branch_states: IndexVec<I, PendingPlaceState>,
         branch: PendingReachabilityId,
         branch_reachability: ScopedReachabilityConstraintId,
+        narrowing_gates: (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
@@ -1582,8 +1645,9 @@ impl PendingReachability {
             self.materialize(&mut branch_state, branch, reachability_constraints);
             let branch_state = Rc::unwrap_or_clone(branch_state.state);
             let current = self.materialize(current, self.current, reachability_constraints);
-            current.merge(
+            current.merge_with_narrowing_gates(
                 branch_state,
+                narrowing_gates,
                 narrowing_constraints,
                 reachability_constraints,
             );
@@ -2085,14 +2149,15 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Records a narrowing constraint for all places in the current scope.
+    /// Gates existing narrowing for all places in the current scope.
     ///
     /// This is used to gate narrowing by `IsNonTerminalCall` constraints: when a branch contains
     /// a call to a `NoReturn` function, all narrowing in that branch should be conditional
-    /// on the call actually returning `Never`.
-    pub(super) fn record_narrowing_constraint_for_all_places(
+    /// on the call returning normally.
+    pub(super) fn gate_existing_narrowing_for_all_places(
         &mut self,
         constraint: ScopedNarrowingConstraint,
+        has_reachability_constraint: bool,
     ) {
         let pending = self.pending_reachability.current;
         for state in self
@@ -2105,8 +2170,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 pending,
                 &mut self.reachability_constraints,
             );
-            state.record_narrowing_constraint(&mut self.narrowing_constraints, constraint);
+            state.gate_existing_narrowing(&mut self.narrowing_constraints, constraint);
         }
+        self.pending_reachability
+            .record_narrowing_gate(constraint, has_reachability_constraint);
     }
 
     pub(super) fn record_reachability_constraint(
@@ -2489,12 +2556,17 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
+        let current = self.pending_reachability.current;
         let branch = snapshot.pending_reachability;
+        let narrowing_gates = self
+            .pending_reachability
+            .take_narrowing_gates_between_paths(current, branch, &mut self.narrowing_constraints);
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
             branch,
             snapshot.reachability,
+            narrowing_gates,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
@@ -2503,6 +2575,7 @@ impl<'db> UseDefMapBuilder<'db> {
             snapshot.member_states,
             branch,
             snapshot.reachability,
+            narrowing_gates,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );

@@ -728,6 +728,74 @@ def g(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+Narrowing in a non-terminal branch must also be preserved when the other branch contains a
+`NoReturn` call, even if the terminal branch did not narrow the binding itself. This includes
+exception handlers and module scope.
+
+```py
+import sys
+from typing import cast
+
+def terminal_except(value: str | int) -> int:
+    try:
+        if not isinstance(value, int):
+            value = 0
+    except Exception:
+        sys.exit()
+    return value
+
+def terminal_sibling(value: str | int, flag: bool) -> int:
+    if flag:
+        sys.exit()
+    elif not isinstance(value, int):
+        value = 0
+    return value
+
+value = cast(str | int, 1)
+flag = cast(bool, True)
+if flag:
+    sys.exit()
+elif not isinstance(value, int):
+    value = 0
+
+reveal_type(value)  # revealed: int
+```
+
+Branch-local terminal-call gates must be consumed when their paths are merged. Reusing one in a
+later `elif` merge would incorrectly gate the already-merged paths, narrowing the discriminator to
+`Never` when the final branch terminates.
+
+```py
+import sys
+
+platform = sys.argv[0]
+version = sys.argv[1]
+
+if platform == "debian" and version == "12":
+    postgres_version = "15"
+elif platform == "debian" and version == "13":
+    postgres_version = "17"
+elif platform == "ubuntu" and version == "22.04":
+    postgres_version = "14"
+elif platform == "ubuntu" and version == "24.04":
+    postgres_version = "16"
+elif platform == "ubuntu" and version == "26.04":
+    postgres_version = "18"
+elif platform == "rhel" and version.startswith("7."):
+    postgres_version = "10"
+elif platform == "centos" and version == "7":
+    postgres_version = "10"
+else:
+    sys.exit(1)
+
+if (platform == "debian" and version == "13") or (platform == "ubuntu" and version == "26.04"):
+    # error: [possibly-unresolved-reference]
+    reveal_type(postgres_version)  # revealed: Literal["15", "17", "14", "16", "18", "10"]
+else:
+    # error: [possibly-unresolved-reference]
+    reveal_type(postgres_version)  # revealed: Literal["15", "17", "14", "16", "18", "10"]
+```
+
 ### Possibly unresolved diagnostics
 
 If the codepath on which a variable is not defined eventually returns `Never`, use of the variable

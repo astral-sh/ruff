@@ -397,6 +397,20 @@ impl Bindings {
         }
     }
 
+    /// Gate any existing narrowing on the live bindings by the given constraint.
+    pub(super) fn gate_existing_narrowing(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        for binding in &mut self.live_bindings {
+            if binding.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                binding.narrowing_constraint = narrowing_constraints
+                    .add_and_constraint(binding.narrowing_constraint, constraint);
+            }
+        }
+    }
+
     /// Add given reachability constraint to all live bindings.
     pub(super) fn record_reachability_constraint(
         &mut self,
@@ -424,13 +438,36 @@ impl Bindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        self.merge_with_narrowing_gates(
+            b,
+            (
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+            ),
+            narrowing_constraints,
+            reachability_constraints,
+        );
+    }
+
+    fn merge_with_narrowing_gates(
+        &mut self,
+        b: Self,
+        narrowing_gates: (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
         let a = std::mem::take(self);
 
         if let Some((a, b)) = a
             .unbound_narrowing_constraint
             .zip(b.unbound_narrowing_constraint)
         {
-            self.unbound_narrowing_constraint = Some(narrowing_constraints.add_or_constraint(a, b));
+            self.unbound_narrowing_constraint = Some(merge_narrowing_constraints(
+                narrowing_constraints,
+                a,
+                b,
+                narrowing_gates,
+            ));
         }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -444,8 +481,12 @@ impl Bindings {
                 EitherOrBoth::Both(a, b) => {
                     // If the same definition is visible through both paths, we OR the narrowing
                     // constraints: the type should be narrowed by whichever path was taken.
-                    let narrowing_constraint = narrowing_constraints
-                        .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
+                    let narrowing_constraint = merge_narrowing_constraints(
+                        narrowing_constraints,
+                        a.narrowing_constraint,
+                        b.narrowing_constraint,
+                        narrowing_gates,
+                    );
 
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
@@ -464,6 +505,24 @@ impl Bindings {
                     self.live_bindings.push(binding);
                 }
             }
+        }
+    }
+}
+
+fn merge_narrowing_constraints(
+    narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    current: ScopedNarrowingConstraint,
+    branch: ScopedNarrowingConstraint,
+    (current_gate, branch_gate): (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
+) -> ScopedNarrowingConstraint {
+    match (current, branch) {
+        (ScopedNarrowingConstraint::ALWAYS_TRUE, ScopedNarrowingConstraint::ALWAYS_TRUE) => {
+            ScopedNarrowingConstraint::ALWAYS_TRUE
+        }
+        (current, branch) => {
+            let current = narrowing_constraints.add_and_constraint(current, current_gate);
+            let branch = narrowing_constraints.add_and_constraint(branch, branch_gate);
+            narrowing_constraints.add_or_constraint(current, branch)
         }
     }
 }
@@ -512,6 +571,16 @@ impl PlaceState {
     ) {
         self.bindings
             .record_narrowing_constraint(narrowing_constraints, constraint);
+    }
+
+    /// Gate any existing narrowing on the live bindings by the given constraint.
+    pub(super) fn gate_existing_narrowing(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        self.bindings
+            .gate_existing_narrowing(narrowing_constraints, constraint);
     }
 
     /// Add the given constraint to live bindings that were also present at an earlier use.
@@ -579,8 +648,30 @@ impl PlaceState {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        self.bindings
-            .merge(b.bindings, narrowing_constraints, reachability_constraints);
+        self.merge_with_narrowing_gates(
+            b,
+            (
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+            ),
+            narrowing_constraints,
+            reachability_constraints,
+        );
+    }
+
+    pub(super) fn merge_with_narrowing_gates(
+        &mut self,
+        b: PlaceState,
+        narrowing_gates: (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        self.bindings.merge_with_narrowing_gates(
+            b.bindings,
+            narrowing_gates,
+            narrowing_constraints,
+            reachability_constraints,
+        );
         self.declarations
             .merge(b.declarations, reachability_constraints);
     }
@@ -852,6 +943,53 @@ mod tests {
         assert_eq!(bindings[1].1, atom0);
         assert_eq!(bindings[2].0, 3);
         assert_eq!(bindings[2].1, atom3);
+    }
+
+    #[test]
+    fn merge_terminal_narrowing_gate() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
+        let narrowed = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
+        let terminal_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
+        let other_narrowed = narrowing_constraints.add_atom(ScopedPredicateId::new(2));
+        let other_terminal_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(3));
+        let mut current = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut branch = current.clone();
+        current.record_narrowing_constraint(&mut narrowing_constraints, narrowed);
+
+        current.merge_with_narrowing_gates(
+            branch.clone(),
+            (ScopedNarrowingConstraint::ALWAYS_TRUE, terminal_gate),
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+
+        let expected = narrowing_constraints.add_or_constraint(narrowed, terminal_gate);
+        assert_bindings(&current, &[(0, expected)]);
+
+        let mut narrowed_branch =
+            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        narrowed_branch.record_narrowing_constraint(&mut narrowing_constraints, other_narrowed);
+        current.merge_with_narrowing_gates(
+            narrowed_branch,
+            (terminal_gate, other_terminal_gate),
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+
+        let expected_current = narrowing_constraints.add_and_constraint(expected, terminal_gate);
+        let expected_branch =
+            narrowing_constraints.add_and_constraint(other_narrowed, other_terminal_gate);
+        let expected = narrowing_constraints.add_or_constraint(expected_current, expected_branch);
+        assert_bindings(&current, &[(0, expected)]);
+
+        branch.merge_with_narrowing_gates(
+            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE),
+            (terminal_gate, terminal_gate),
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+        assert_bindings(&branch, &[(0, ScopedNarrowingConstraint::ALWAYS_TRUE)]);
     }
 
     #[test]
