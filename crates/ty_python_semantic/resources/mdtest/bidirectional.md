@@ -936,6 +936,22 @@ reveal_type(x20)  # revealed: dict[Hashable, list[(...) -> Any]]
 
 x21: Mapping[Hashable, list[Callable[..., Any]]] = dict(x=[variadic])
 reveal_type(x21)  # revealed: dict[Hashable, list[(...) -> Any]]
+
+x22: Mapping[str, Literal["+", "-"]] = {
+    "plus": "+",
+    "minus": "-",
+}
+reveal_type(x22)  # revealed: dict[str, Literal["+", "-"]]
+
+class DataFrame: ...
+
+type Aggregate = Callable[[DataFrame], object] | str
+type AggregateSpec = Aggregate | list[Aggregate]
+
+def mean(data: DataFrame) -> float:
+    return 0.0
+
+x23: Mapping[Hashable, AggregateSpec] = {"col1": ["sum", mean], "col2": mean}
 ```
 
 ## Implicit generic class specialization

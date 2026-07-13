@@ -2280,35 +2280,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(target, ty);
-        self.remove_inferable_typevar_artifacts_from_upper_bound(target, ty)
-    }
-
-    fn remove_inferable_typevar_artifacts_from_lower_bound(
-        &self,
-        target: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        match ty {
-            Type::Union(union)
-                if union
-                    .elements(self.db)
-                    .iter()
-                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
-            {
-                union.filter(self.db, |element| {
-                    !self.is_inferable_typevar_artifact(target, *element)
-                })
-            }
-            _ => ty,
-        }
-    }
-
-    fn remove_inferable_typevar_artifacts_from_upper_bound(
-        &self,
-        target: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
         match ty {
             Type::Intersection(intersection)
                 if intersection
@@ -2320,6 +2291,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         Type::object()
                     } else {
                         *element
+                    }
+                })
+            }
+            Type::Union(union)
+                if union
+                    .elements(self.db)
+                    .iter()
+                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
+            {
+                union.map(self.db, |element| {
+                    if self.is_inferable_typevar_artifact(target, *element) {
+                        Type::Never
+                    } else {
+                        self.remove_inferable_typevar_artifacts_from_solution(target, *element)
                     }
                 })
             }
