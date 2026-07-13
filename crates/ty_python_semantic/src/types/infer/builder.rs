@@ -374,24 +374,33 @@ fn callable_paramspec_and_return_typevar<'db>(
         return None;
     };
     let paramspec = signature.parameters().as_paramspec()?;
-    Some((paramspec, signature.return_ty.as_typevar()?))
+    let return_typevar = signature.return_ty.as_typevar().or_else(|| {
+        let specialization = signature
+            .return_ty
+            .known_specialization(db, KnownClass::Awaitable)?;
+        let [inner] = specialization.types(db) else {
+            return None;
+        };
+        inner.as_typevar()
+    })?;
+    Some((paramspec, return_typevar))
 }
 
 fn transparent_callable_decorator_result<'db>(
     db: &'db dyn Db,
-    decorator_ty: Type<'db>,
+    bindings: &Bindings<'db>,
     decorated_ty: Type<'db>,
 ) -> Option<Type<'db>> {
     if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
         return None;
     }
-    let decorator_callable = decorator_ty
-        .try_upcast_to_callable(db)
-        .and_then(CallableTypes::exactly_one)?;
-    let decorator_signatures = decorator_callable.signatures(db);
-    let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
-        return None;
-    };
+    let binding = bindings.single_element()?;
+    let (_, overload) = binding.matching_overloads().exactly_one().ok()?;
+    let decorator_signature = &overload.signature;
+    let bound_signature = binding
+        .bound_type
+        .map(|bound_type| decorator_signature.bind_self(db, Some(bound_type)));
+    let decorator_signature = bound_signature.as_ref().unwrap_or(decorator_signature);
     let [parameter] = decorator_signature.parameters().as_slice() else {
         return None;
     };
@@ -4763,11 +4772,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let decorated_ty =
             self.get_or_infer_expression(decorated_expression, TypeContext::default());
         let call_arguments = CallArguments::positional([decorated_ty]);
-        if decorator_ty.try_call(self.db(), &call_arguments).is_err() {
+        let Ok(bindings) = decorator_ty.try_call(self.db(), &call_arguments) else {
             return return_ty;
-        }
+        };
 
-        transparent_callable_decorator_result(self.db(), decorator_ty, decorated_ty)
+        transparent_callable_decorator_result(self.db(), &bindings, decorated_ty)
             .unwrap_or(return_ty)
     }
 
@@ -4860,21 +4869,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let call_arguments = CallArguments::positional([decorated_ty]);
-        let mut decorator_call_succeeded = true;
-        let return_ty = decorator_ty
-            .try_call(self.db(), &call_arguments)
-            .map(|bindings| bindings.return_type(self.db()))
-            .unwrap_or_else(|CallError(_, bindings)| {
-                decorator_call_succeeded = false;
-                bindings.report_diagnostics(&self.context, decorator_node.into());
-                bindings.return_type(self.db())
-            });
+        let (return_ty, decorator_bindings) =
+            match decorator_ty.try_call(self.db(), &call_arguments) {
+                Ok(bindings) => (bindings.return_type(self.db()), Some(bindings)),
+                Err(CallError(_, bindings)) => {
+                    bindings.report_diagnostics(&self.context, decorator_node.into());
+                    (bindings.return_type(self.db()), None)
+                }
+            };
 
         // TODO: Remove this special case once the new constraint solver can preserve
-        // per-overload ParamSpec/return correlations for `Callable[P, R] -> Callable[P, R]`.
-        if decorator_call_succeeded
-            && let Some(result) =
-                transparent_callable_decorator_result(self.db(), decorator_ty, decorated_ty)
+        // per-overload ParamSpec/return correlations for transparent callable decorators.
+        if let Some(decorator_bindings) = decorator_bindings.as_ref()
+            && let Some(result) = transparent_callable_decorator_result(
+                self.db(),
+                decorator_bindings,
+                decorated_ty,
+            )
         {
             return result;
         }
