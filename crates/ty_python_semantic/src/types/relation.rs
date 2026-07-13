@@ -853,6 +853,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    /// Check constraint-set assignability while sharing this checker's recursion state.
+    pub(super) fn check_constraint_set_assignability_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let checker = Self {
+            inferable: InferableTypeVars::None,
+            relation: TypeRelation::Assignability,
+            typevar_evaluation: TypeVarEvaluation::Lazy,
+            context_tree: None,
+            given: ConstraintSet::from_bool(self.constraints, false),
+            ..self.clone()
+        };
+        checker.check_type_pair(db, source, target)
+    }
+
     pub(super) const fn is_eager_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)

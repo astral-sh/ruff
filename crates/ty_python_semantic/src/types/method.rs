@@ -87,6 +87,7 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function_signature = self.function(db).signature(db);
         let typing_self_type = self.typing_self_type(db);
+        let receiver_type = self.self_instance(db);
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -94,25 +95,37 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .any(Signature::has_explicit_positional_receiver_annotation)
             {
-                return CallableSignature::from_overloads(
-                    function_signature
-                        .overloads
-                        .iter()
-                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
-                );
+                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
+                    |signature| {
+                        signature.bind_self_with_receiver(
+                            db,
+                            Some(receiver_type),
+                            Some(typing_self_type),
+                        )
+                    },
+                ));
             }
 
-            let self_instance = self.self_instance(db);
             return CallableSignature::from_overloads(
                 function_signature
                     .overloads
                     .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
-                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
+                    .map(|signature| {
+                        signature.bind_self_with_receiver(
+                            db,
+                            Some(receiver_type),
+                            Some(typing_self_type),
+                        )
+                    }),
             );
         };
 
-        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+        CallableSignature::single(signature.bind_self_with_receiver(
+            db,
+            Some(receiver_type),
+            Some(typing_self_type),
+        ))
     }
 
     pub(super) fn recursive_type_normalized_impl(
