@@ -5683,11 +5683,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
     ) {
-        if !self.collects_expected_types() {
+        // Cheaper check first so most queries never depend on the open-file state
+        if !self.has_string_literal_completion_candidates(ty) {
             return;
         }
 
-        if !self.has_string_literal_completion_candidates(ty) {
+        if !self.collects_expected_types() {
             return;
         }
 
