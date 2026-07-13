@@ -721,7 +721,7 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>, VariableSegment<'db>>;
 /// For example, `tuple[str, *tuple[int, ...], bytes]` has a homogeneous `int` segment, while
 /// `tuple[str, *Ts, bytes]` has a `TypeVarTuple` segment for `Ts`. The fixed `str` prefix and
 /// `bytes` suffix are stored separately by [`VariableLengthTuple`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum VariableSegment<'db> {
     /// A segment whose elements all have the same type, such as `int` in `tuple[int, ...]`.
     Homogeneous(Type<'db>),
