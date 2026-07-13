@@ -1382,7 +1382,7 @@ struct PendingReachabilityId;
 #[derive(Debug)]
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
-    constraint: ScopedReachabilityConstraintId,
+    reachability_constraint: ScopedReachabilityConstraintId,
     narrowing_constraint: ScopedNarrowingConstraint,
 }
 
@@ -1402,7 +1402,7 @@ impl Default for PendingReachability {
         let root = constraints.next_index();
         constraints.push(PendingReachabilityConstraint {
             parent: root,
-            constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
         });
         Self {
@@ -1415,12 +1415,12 @@ impl Default for PendingReachability {
 impl PendingReachability {
     fn push(
         &mut self,
-        constraint: ScopedReachabilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
-            constraint,
+            reachability_constraint,
             narrowing_constraint,
         });
     }
@@ -1476,7 +1476,7 @@ impl PendingReachability {
             let mut current = target;
             while current != pending.reachability {
                 let event = &self.constraints[current];
-                unapplied.push(event.constraint);
+                unapplied.push(event.reachability_constraint);
                 assert_ne!(
                     current, event.parent,
                     "pending reachability must be an ancestor"
@@ -1544,7 +1544,8 @@ impl PendingReachability {
         let mut current = target;
         while current != ancestor {
             let event = &self.constraints[current];
-            constraint = reachability_constraints.add_and_constraint(constraint, event.constraint);
+            constraint = reachability_constraints
+                .add_and_constraint(constraint, event.reachability_constraint);
             assert_ne!(
                 current, event.parent,
                 "pending reachability must be an ancestor"
@@ -2223,14 +2224,14 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn record_reachability_constraint_impl(
         &mut self,
-        constraint: ScopedReachabilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
         self.reachability = self
             .reachability_constraints
-            .add_and_constraint(self.reachability, constraint);
+            .add_and_constraint(self.reachability, reachability_constraint);
         self.pending_reachability
-            .push(constraint, narrowing_constraint);
+            .push(reachability_constraint, narrowing_constraint);
     }
 
     pub(super) fn record_declaration(
