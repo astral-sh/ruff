@@ -1726,7 +1726,7 @@ f(a)
 ### Classes with `__call__` as attribute
 
 An instance type can be a subtype of a compatible callable type if the instance type's class has a
-callable `__call__` attribute.
+callable `__call__` attribute. An explicitly annotated non-`ClassVar` callable remains regular.
 
 ```py
 from __future__ import annotations
@@ -1741,9 +1741,9 @@ def call_impl(a: A, x: int) -> str:
 class A:
     __call__: Callable[[A, int], str] = call_impl
 
-static_assert(is_subtype_of(A, Callable[[int], str]))
-static_assert(not is_subtype_of(A, Callable[[int], int]))
-reveal_type(A()(1))  # revealed: str
+static_assert(is_subtype_of(A, Callable[[A, int], str]))
+static_assert(not is_subtype_of(A, Callable[[A, int], int]))
+reveal_type(A()(A(), 1))  # revealed: str
 ```
 
 ### Class literals

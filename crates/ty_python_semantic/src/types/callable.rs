@@ -318,12 +318,6 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
-    /// Represents a `Callable[P, R]`-typed dunder attribute.
-    ///
-    /// This is distinct from [`Self::Regular`] so that the dunder descriptor heuristic does not
-    /// turn the callable into a function-like object after `P` is specialized.
-    DunderParamSpec,
-
     /// A callable type that represents a staticmethod. These callables do not bind `self`
     /// when accessed as attributes on instances - they return the underlying function as-is.
     StaticMethodLike,
@@ -488,10 +482,6 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
-    }
-
     pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::Regular)
     }
@@ -558,10 +548,6 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
-        if self.is_dunder_paramspec(db) {
-            return self.into_regular(db);
-        }
-
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
@@ -575,15 +561,6 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db),
             CallableTypeKind::FunctionLike,
-            self.provenance(db),
-        )
-    }
-
-    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db),
-            CallableTypeKind::DunderParamSpec,
             self.provenance(db),
         )
     }

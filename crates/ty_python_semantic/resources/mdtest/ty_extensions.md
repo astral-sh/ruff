@@ -760,8 +760,8 @@ def _(
     reveal_type(c8)  # revealed: (x: int) -> str
 ```
 
-A callable instance upcast to a callable type is still a regular callable when stored as a class
-attribute, even if its `__call__` method is function-like. Explicit descriptor behavior is still
+A callable instance upcast to a callable type is treated as a descriptor when inferred as a class
+attribute, even if the runtime value is not a descriptor. Explicit descriptor behavior is still
 respected:
 
 ```py
@@ -778,8 +778,8 @@ instance = CallableInstance()
 class Owner:
     callback = into_callable(instance)
 
-Owner().callback(1)
-Owner().callback()  # error: [missing-argument]
+Owner().callback(1)  # error: [too-many-positional-arguments]
+Owner().callback()
 
 class DescriptorCallableInstance:
     def __call__(self, value: int, /) -> str:

@@ -1139,7 +1139,10 @@ impl<'db> StaticClassLiteral<'db> {
             match ty {
                 Type::Callable(callable_ty)
                     if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
+                        && callable_ty.signatures(db).has_parameters()
+                        // A wholly gradual signature has no receiver to bind. Keeping it regular
+                        // also preserves its gradual assignability for method overrides.
+                        && !callable_ty.signatures(db).is_gradual() =>
                 {
                     Type::Callable(callable_ty.into_function_like(db))
                 }
@@ -1148,6 +1151,22 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 Type::Intersection(intersection) => intersection
                     .map_positive(db, |element| into_function_like_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
+        fn into_regular_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) => Type::Callable(callable_ty.into_regular(db)),
+                // A TypeVar annotation can specialize to a function literal. Erase that runtime
+                // provenance so the explicit annotation still behaves as a regular callable.
+                Type::FunctionLiteral(function) => {
+                    Type::Callable(function.into_callable_type(db).into_regular(db))
+                }
+                Type::Union(union) => union.map(db, |element| into_regular_callable(db, *element)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, |element| into_regular_callable(db, *element))
+                }
                 _ => ty,
             }
         }
@@ -1166,11 +1185,31 @@ impl<'db> StaticClassLiteral<'db> {
             }
         };
 
-        // We generally treat dunder attributes with `Callable` types as function-like callables.
-        // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, ty));
-        }
+        // Callable values inferred from class-body assignments are generally functions at runtime,
+        // so we treat concrete signatures as function-like descriptors. `ClassVar` annotations
+        // make the same assertion explicitly. Other annotated callable attributes remain regular
+        // callables: their annotation does not tell us whether the runtime value implements the
+        // descriptor protocol.
+        let is_annotated_assignment = match member.place {
+            Place::Defined(place) => place.provenance.definition().is_some_and(|definition| {
+                matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+            }),
+            Place::Undefined => false,
+        };
+        member = match member.place {
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Inferred,
+                ..
+            }) => member.map_type(|ty| into_function_like_callable(db, ty)),
+            Place::Defined(_) if member.is_class_var() => {
+                member.map_type(|ty| into_function_like_callable(db, ty))
+            }
+            Place::Defined(_) if is_annotated_assignment => {
+                member.map_type(|ty| into_regular_callable(db, ty))
+            }
+            Place::Defined(_) => member,
+            Place::Undefined => member,
+        };
 
         member
     }
@@ -1188,23 +1227,6 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        fn into_dunder_paramspec_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
-                {
-                    Type::Callable(callable_ty.into_dunder_paramspec(db))
-                }
-                Type::Union(union) => {
-                    union.map(db, |element| into_dunder_paramspec_callable(db, *element))
-                }
-                Type::Intersection(intersection) => intersection
-                    .map_positive(db, |element| into_dunder_paramspec_callable(db, *element)),
-                _ => ty,
-            }
-        }
-
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
         if CodeGeneratorKind::from_class(db, self.into())
             .is_some_and(CodeGeneratorKind::is_dataclass_like)
@@ -1248,12 +1270,6 @@ impl<'db> StaticClassLiteral<'db> {
 
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
-            let ty = if name.starts_with("__") && name.ends_with("__") {
-                into_dunder_paramspec_callable(db, ty)
-            } else {
-                ty
-            };
-
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of

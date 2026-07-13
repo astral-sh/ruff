@@ -404,6 +404,12 @@ impl<'db> CallableSignature<'db> {
             .any(|signature| !signature.parameters().as_slice().is_empty())
     }
 
+    pub(crate) fn is_gradual(&self) -> bool {
+        self.overloads
+            .iter()
+            .all(|signature| signature.parameters().is_gradual())
+    }
+
     /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
     /// given type. (Does not bind the `self` parameter; to do that, use
     /// [`bind_self`][Self::bind_self].)

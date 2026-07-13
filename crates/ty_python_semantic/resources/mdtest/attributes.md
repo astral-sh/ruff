@@ -1469,8 +1469,8 @@ class StoresInstanceIter(metaclass=IteratingMeta):
 reveal_type(iter(StoresInstanceIter()))  # revealed: Iterator[int]
 ```
 
-Splitting the class MRO around a generated attribute preserves the usual treatment of dunder
-`Callable` attributes as bound-method descriptors:
+Splitting the class MRO around a generated attribute preserves an explicitly annotated dunder
+`Callable` as a regular callable:
 
 ```py
 def pow_impl(value: object, exponent: int) -> object:
@@ -1482,7 +1482,8 @@ class PowMeta(type):
 class Tensor(metaclass=PowMeta):
     __pow__: Callable[[object, int], object] = pow_impl
 
-reveal_type(Tensor() ** 2)  # revealed: object
+# error: [unsupported-operator]
+reveal_type(Tensor() ** 2)  # revealed: Unknown
 ```
 
 An annotation-only `ClassVar` on the constructed class is a class-namespace contract and takes

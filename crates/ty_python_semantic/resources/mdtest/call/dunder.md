@@ -143,7 +143,7 @@ after the `ParamSpec` is specialized:
 
 ```py
 from collections.abc import Callable
-from typing import Generic, ParamSpec, Protocol
+from typing import Generic, ParamSpec, Protocol, TypeVar
 from typing_extensions import Self
 
 P = ParamSpec("P")
@@ -154,6 +154,21 @@ class C(Protocol[P]):
 def check(value: C[[str]]) -> None:
     reveal_type(value.__call__)  # revealed: (str, /) -> int
     reveal_type(value("value"))  # revealed: int
+
+Call = TypeVar("Call", bound=Callable[..., object])
+
+class CallableWrapper(Protocol[Call]):
+    __call__: Call
+
+def decorate(function: Call) -> CallableWrapper[Call]:
+    raise NotImplementedError
+
+def view(request: object, kind: str) -> object:
+    return request, kind
+
+decorated = decorate(view)
+reveal_type(decorated.__call__)  # revealed: (request: object, kind: str) -> object
+reveal_type(decorated(object(), kind="task"))  # revealed: object
 
 class Base(Generic[P]):
     __getitem__: Callable[P, Self]
