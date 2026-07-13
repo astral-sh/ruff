@@ -10,7 +10,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::TomlSourceType;
 
 use crate::{
-    FixAvailability, Violation, checkers::ast::LintContext, codes::Rule,
+    AlwaysFixableViolation, checkers::ast::LintContext, codes::Rule,
     preview::is_human_readable_names_enabled, pyproject_toml::text_range_from_std,
     rule_redirects::get_redirect_target,
 };
@@ -43,34 +43,31 @@ pub(crate) struct RuleCodesInSelectors {
     selector: &'static str,
 }
 
-impl Violation for RuleCodesInSelectors {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for RuleCodesInSelectors {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { selector } = self;
         format!("Rule code used instead of name in `{selector}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Replace rule code with name".to_string())
+    fn fix_title(&self) -> String {
+        "Replace rule code with name".to_string()
     }
 }
 
 /// RUF201
 pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSourceType) {
-    if !context.is_rule_enabled(Rule::RuleCodesInSelectors)
-        || !is_human_readable_names_enabled(context.settings().preview)
-    {
+    if !is_human_readable_names_enabled(context.settings().preview) {
         return;
     }
 
     let source_file = context.source_file();
-    let Ok(Some(document)) = Document::from_toml_str(source_file.source_text(), source_type) else {
+    let Ok(Some(config_file)) = ConfigFile::from_toml_str(source_file.source_text(), source_type)
+    else {
         return;
     };
 
-    for (spanned, selector) in document.selectors() {
+    for (spanned, selector) in config_file.selectors() {
         let code = spanned.get_ref();
         let code = get_redirect_target(code).unwrap_or(code);
         let Ok(rule) = Rule::from_code(code) else {
@@ -90,20 +87,21 @@ pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSo
             return;
         };
 
-        let mut diagnostic = context.report_diagnostic(RuleCodesInSelectors { selector }, range);
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            rule.name().to_string(),
-            range,
-        )));
+        context
+            .report_diagnostic(RuleCodesInSelectors { selector }, range)
+            .set_fix(Fix::safe_edit(Edit::range_replacement(
+                rule.name().to_string(),
+                range,
+            )));
     }
 }
 
-enum Document {
+enum ConfigFile {
     Pyproject(Pyproject),
     Ruff(Ruff),
 }
 
-impl Document {
+impl ConfigFile {
     fn from_toml_str(
         source: &str,
         source_type: TomlSourceType,
@@ -117,8 +115,8 @@ impl Document {
 
     fn selectors(&self) -> impl Iterator<Item = (&Spanned<String>, &'static str)> {
         let ruff = match self {
-            Document::Pyproject(pyproject) => &pyproject.tool.ruff,
-            Document::Ruff(ruff) => ruff,
+            ConfigFile::Pyproject(pyproject) => &pyproject.tool.ruff,
+            ConfigFile::Ruff(ruff) => ruff,
         };
         ruff.select
             .iter()

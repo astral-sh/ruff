@@ -5,10 +5,10 @@ use std::path::Path;
 use colored::Colorize;
 use log::warn;
 use pyproject_toml::PyProjectToml;
-use ruff_python_ast::TomlSourceType;
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff_db::diagnostic::Diagnostic;
+use ruff_python_ast::TomlSourceType;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::IOError;
 use crate::Locator;
@@ -26,7 +26,6 @@ pub struct TomlFixerResult<'a> {
     pub fixed: FixTable,
 }
 
-/// RUF200
 pub fn lint_toml(
     path: &Path,
     source: &str,
@@ -34,11 +33,15 @@ pub fn lint_toml(
     source_type: TomlSourceType,
 ) -> Vec<Diagnostic> {
     let context = LintContext::new(path, source, settings);
-    rule_codes_in_selectors(&context, source_type);
 
+    if context.is_rule_enabled(Rule::RuleCodesInSelectors) {
+        rule_codes_in_selectors(&context, source_type);
+    }
+
+    // RUF200
     if context.is_rule_enabled(Rule::InvalidPyprojectToml) && source_type.is_pyproject() {
         let Some(err) = toml::from_str::<PyProjectToml>(source).err() else {
-            return context.into_parts().0;
+            return context.into_diagnostics();
         };
 
         let range = match err.span() {
@@ -47,7 +50,7 @@ pub fn lint_toml(
             None => TextRange::default(),
             Some(range) => {
                 let Some(range) = text_range_from_std(range, &context) else {
-                    return context.into_parts().0;
+                    return context.into_diagnostics();
                 };
                 range
             }
@@ -57,11 +60,10 @@ pub fn lint_toml(
         context.report_diagnostic(InvalidPyprojectToml { message: toml_err }, range);
     }
 
-    context.into_parts().0
+    context.into_diagnostics()
 }
 
-/// Generate diagnostics for a TOML configuration file, iteratively applying fixes until the source
-/// stabilizes.
+/// Generate [`Diagnostic`]s for a TOML configuration file, iteratively fixing until stable.
 pub fn lint_fix_toml<'a>(
     path: &Path,
     source: &'a str,
