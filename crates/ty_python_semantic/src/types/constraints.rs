@@ -290,7 +290,7 @@ impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
             self.builder
                 .load(
                     self.db,
-                    lower.when_constraint_set_subtype_of_owned(self.db, subject),
+                    lower.when_constraint_set_assignable_to_owned_for_mapping(self.db, subject),
                 )
                 .node
         });
@@ -298,7 +298,7 @@ impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
             self.builder
                 .load(
                     self.db,
-                    subject.when_constraint_set_subtype_of_owned(self.db, upper),
+                    subject.when_constraint_set_assignable_to_owned_for_mapping(self.db, upper),
                 )
                 .node
         });

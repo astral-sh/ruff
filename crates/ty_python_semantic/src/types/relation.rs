@@ -494,7 +494,11 @@ impl<'db> Type<'db> {
         ))
     }
 
-    pub(super) fn when_constraint_set_subtype_of_owned(
+    /// Computes assignability while remapping an owned constraint set.
+    ///
+    /// Remapping can evaluate recursive protocol relations before the enclosing signature
+    /// comparison establishes its recursion guard, so recursive re-entry is provisionally true.
+    pub(super) fn when_constraint_set_assignable_to_owned_for_mapping(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
@@ -504,7 +508,7 @@ impl<'db> Type<'db> {
             cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
-        fn when_constraint_set_subtype_of_owned_impl<'db>(
+        fn when_constraint_set_assignable_to_owned_impl<'db>(
             db: &'db dyn Db,
             source: Type<'db>,
             target: Type<'db>,
@@ -516,13 +520,13 @@ impl<'db> Type<'db> {
                     target,
                     constraints,
                     InferableTypeVars::None,
-                    TypeRelation::Subtyping,
+                    TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
                 )
             })
         }
 
-        when_constraint_set_subtype_of_owned_impl(db, self, target)
+        when_constraint_set_assignable_to_owned_impl(db, self, target)
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
