@@ -386,12 +386,9 @@ fn transparent_callable_decorator_result<'db>(
         Type::Callable(_) => decorated_ty,
         _ => return None,
     };
-    let Some(decorator_callable) = decorator_ty
+    let decorator_callable = decorator_ty
         .try_upcast_to_callable(db)
-        .and_then(CallableTypes::exactly_one)
-    else {
-        return None;
-    };
+        .and_then(CallableTypes::exactly_one)?;
     let decorator_signatures = decorator_callable.signatures(db);
     let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
         return None;
@@ -400,16 +397,10 @@ fn transparent_callable_decorator_result<'db>(
         return None;
     };
 
-    let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
-        callable_paramspec_and_return_typevar(db, parameter.annotated_type())
-    else {
-        return None;
-    };
-    let Some((return_callable_paramspec, return_callable_typevar)) =
-        callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
-    else {
-        return None;
-    };
+    let (parameter_callable_paramspec, parameter_callable_return_typevar) =
+        callable_paramspec_and_return_typevar(db, parameter.annotated_type())?;
+    let (return_callable_paramspec, return_callable_typevar) =
+        callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)?;
     (parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
         && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar))
     .then_some(decorated_ty)
