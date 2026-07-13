@@ -898,6 +898,14 @@ class B2(A2):
 class C2(A2):
     def method[T: int](self, x: T) -> T: ...
 
+class ExplicitReceiverBase:
+    def method(self, x: int) -> int: ...
+
+class ExplicitReceiverChild(ExplicitReceiverBase):
+    # Binding this method adds `ExplicitReceiverChild <= T`, which is incompatible with the
+    # `T = int` specialization needed to implement the base method.
+    def method[T](self: T, x: T) -> T: ...  # error: [invalid-method-override]
+
 class D2(A2):
     # The type variable is bound to a type disjoint from `int`,
     # so the method will not accept integers, and therefore this is an invalid override
@@ -932,16 +940,13 @@ class G3(A3):
     def method(self: object) -> Self: ...  # fine
 
 class H3(A3):
-    # TODO: we should emit `invalid-method-override` here
-    # (`A3.method()` can be called on any instance of `A3`,
-    # but `H3.method()` can only be called on objects that are
-    # instances of `str`)
-    def method(self: str) -> Self: ...
+    # `A3.method()` can be called on any instance of `A3`, but `H3.method()` can only be called on
+    # objects that are instances of `str`.
+    def method(self: str) -> Self: ...  # error: [invalid-method-override]
 
 class I3(A3):
-    # TODO: we should emit `invalid-method-override` here
-    # (`I3.method()` cannot be called with any inhabited type!)
-    def method(self: Never) -> Self: ...
+    # `I3.method()` cannot be called with any inhabited type.
+    def method(self: Never) -> Self: ...  # error: [invalid-method-override]
 
 class A4:
     def method[T: int](self, x: T) -> T: ...

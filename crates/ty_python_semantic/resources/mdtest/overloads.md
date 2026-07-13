@@ -295,9 +295,8 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# TODO: `Signature::can_bind_self_to` currently reduces receiver matching to a boolean. Instead,
-# each retained overload should preserve its receiver constraints so later specialization can apply
-# them.
+# Receiver constraints are preserved for later relation checks, but are not yet solved into the
+# displayed bound signature.
 # TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
 ```
@@ -337,8 +336,7 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 reveal_type(ProtocolSelfImplementation().method)  # revealed: Overload[[ProtocolSelfT]() -> ProtocolSelfT, () -> bytes]
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
-# TODO: error: [invalid-assignment]
-bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
+bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
 ```
 
 ## Constructor

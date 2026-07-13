@@ -2108,7 +2108,7 @@ impl<'db> ClassType<'db> {
             let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = CallableType::new(
                 db,
-                dunder_new_signature.bind_self(db, Some(instance_ty)),
+                dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
             );
@@ -2158,7 +2158,7 @@ impl<'db> ClassType<'db> {
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
                         });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
-                    let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    let instance_ty = Type::instance(db, self);
                     let generic_context = GenericContext::merge_optional(
                         db,
                         class_generic_context,
@@ -2170,7 +2170,11 @@ impl<'db> ClassType<'db> {
                         return_type,
                     )
                     .with_definition(signature.definition())
-                    .bind_self(db, Some(instance_ty))
+                    .bind_self_with_receiver(
+                        db,
+                        Some(instance_ty),
+                        Some(instance_ty),
+                    )
                 };
 
                 let synthesized_dunder_init_signature = CallableSignature::from_overloads(
