@@ -639,7 +639,7 @@ terminate and preserve the alias at the recursive position.
 
 ```py
 from typing import Callable, Concatenate
-from ty_extensions import Top, Bottom
+from ty_extensions import Bottom, Intersection, Top
 
 type RecursiveParamspec[**P] = Callable[[], RecursiveParamspec[Concatenate[int, P]]]
 
@@ -664,6 +664,19 @@ def growing_union(x: GrowingUnion[int]):
 growing_union_int: GrowingUnion[int] = 1
 # error: [invalid-assignment] "Object of type `None` is not assignable to `GrowingUnion[int]`"
 growing_union_none: GrowingUnion[int] = None
+
+type IntOr[T] = int | IntOr[int]
+
+def nested_union(x: IntOr[IntOr[int]] | str):
+    reveal_type(x)  # revealed: int | str
+
+type Branch[T] = T | Branch[str] | Branch[int]
+
+def branch(x: Branch[Branch[int]] | bytes):
+    reveal_type(x)  # revealed: int | str | bytes
+
+def branch_intersection(x: Intersection[Branch[Branch[int]], object]):
+    reveal_type(x)  # revealed: int | str
 
 type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
 

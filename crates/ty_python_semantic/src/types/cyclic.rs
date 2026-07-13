@@ -159,9 +159,21 @@ impl<'a, 'db> RecursiveTypeStack<'a, 'db> {
         Self { db, active }
     }
 
+    /// Returns `true` if a union builder should stop unfolding the current alias application.
+    ///
+    /// Union builders allow one additional non-nested application to expose stable union elements.
+    pub(crate) fn contains_union_builder_reentry(self, current: Type<'db>) -> bool {
+        self.active.contains(&current)
+            || self
+                .reentry_index(current, AliasCycleThreshold::AfterSecondUnfold)
+                .is_some()
+    }
+
     pub(crate) fn contains_immediate_reentry(self, current: Type<'db>) -> bool {
-        self.reentry_index(current, AliasCycleThreshold::Immediate)
-            .is_some()
+        self.active.contains(&current)
+            || self
+                .reentry_index(current, AliasCycleThreshold::Immediate)
+                .is_some()
     }
 
     fn reentry_index(self, current: Type<'db>, threshold: AliasCycleThreshold) -> Option<usize> {

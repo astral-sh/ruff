@@ -654,7 +654,8 @@ def generic[T](
 
 ### Recursive aliases
 
-The materialization of recursive aliases may stop midway. This is because a recursion guard activates to interrupt the handling halfway to ensure termination.
+The materialization of recursive aliases may stop midway. This is because a recursion guard
+activates to interrupt the handling halfway to ensure termination.
 
 TODO: The current behavior where dynamic types remain in types after materialization is undesirable.
 

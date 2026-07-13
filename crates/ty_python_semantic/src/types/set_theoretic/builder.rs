@@ -749,7 +749,8 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
+                if RecursiveTypeStack::new(self.db, seen_aliases).contains_union_builder_reentry(ty)
+                {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
