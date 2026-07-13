@@ -376,55 +376,43 @@ fn callable_paramspec_and_return_typevar<'db>(
     Some((paramspec, signature.return_ty.as_typevar()?))
 }
 
-fn is_transparent_callable_decorator<'db>(
-    db: &'db dyn Db,
-    decorator_ty: Type<'db>,
-    decorated_ty: Type<'db>,
-) -> bool {
-    if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
-        return false;
-    }
-    let Some(decorator_callable) = decorator_ty
-        .try_upcast_to_callable(db)
-        .and_then(CallableTypes::exactly_one)
-    else {
-        return false;
-    };
-    let decorator_signatures = decorator_callable.signatures(db);
-    let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
-        return false;
-    };
-    let [parameter] = decorator_signature.parameters().as_slice() else {
-        return false;
-    };
-
-    let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
-        callable_paramspec_and_return_typevar(db, parameter.annotated_type())
-    else {
-        return false;
-    };
-    let Some((return_callable_paramspec, return_callable_typevar)) =
-        callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
-    else {
-        return false;
-    };
-    parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
-        && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
-}
-
 fn transparent_callable_decorator_result<'db>(
     db: &'db dyn Db,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    if !is_transparent_callable_decorator(db, decorator_ty, decorated_ty) {
-        return None;
-    }
-
-    decorated_ty
+    let decorated_ty = match decorated_ty {
+        Type::FunctionLiteral(function) => Type::Callable(function.into_callable_type(db)),
+        Type::Callable(_) => decorated_ty,
+        _ => return None,
+    };
+    let Some(decorator_callable) = decorator_ty
         .try_upcast_to_callable(db)
         .and_then(CallableTypes::exactly_one)
-        .map(Type::Callable)
+    else {
+        return None;
+    };
+    let decorator_signatures = decorator_callable.signatures(db);
+    let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
+        return None;
+    };
+    let [parameter] = decorator_signature.parameters().as_slice() else {
+        return None;
+    };
+
+    let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
+        callable_paramspec_and_return_typevar(db, parameter.annotated_type())
+    else {
+        return None;
+    };
+    let Some((return_callable_paramspec, return_callable_typevar)) =
+        callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
+    else {
+        return None;
+    };
+    (parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+        && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar))
+    .then_some(decorated_ty)
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
