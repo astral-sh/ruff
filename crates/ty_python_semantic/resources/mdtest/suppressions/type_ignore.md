@@ -266,8 +266,9 @@ a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
 ```
 
-Unlike `ty: ignore`, an own-line `type: ignore` after executable code does not suppress the next
-line. This preserves the standardized semantics of `type: ignore` comments.
+Unlike `ty: ignore`, an own-line `type: ignore` does not suppress the following line (unless it
+appears before any Python statements in the file, in which case it suppresses the entire file). This
+preserves the standardized semantics of `type: ignore` comments.
 
 ```py
 seen_code = True
