@@ -84,7 +84,7 @@ fn classify_receiver_kind(
         FunctionType::ClassMethod => Some(ReceiverKind::Class),
         FunctionType::NewMethod => Some(ReceiverKind::Class),
         FunctionType::Method => Some(ReceiverKind::Instance),
-        _ => None,
+        FunctionType::Function => None,
     }
 }
 
