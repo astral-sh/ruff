@@ -54,7 +54,7 @@ reveal_type(C(1))
 Explicit generic receiver annotations constrain a bound method's callable type:
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class GenericReceiver:
     def method[T](self: T, value: T) -> T:
@@ -64,6 +64,7 @@ receiver = GenericReceiver()
 
 accepts_object: Callable[[object], object] = receiver.method
 accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
+accepts_any: Callable[[Any], Any] = receiver.method
 ```
 
 Declared bounds and constraints on receiver TypeVars are not yet enforced when comparing a bound
@@ -82,6 +83,22 @@ class InvalidConstrainedReceiver:
 # TypeVar's declared domain.
 invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method
 invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method
+```
+
+Receiver constraints preserve gradual assignability for an implicit `Self` variable too:
+
+```py
+from collections.abc import Callable, Generator
+from typing import Any, Self
+
+class Model:
+    @classmethod
+    def validate(cls: type[Self], value: Any) -> Self:
+        return cls()
+
+    @classmethod
+    def validators(cls) -> Generator[Callable[[Any], Any], None, None]:
+        yield cls.validate
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
