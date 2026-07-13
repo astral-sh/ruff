@@ -294,18 +294,15 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module {
-                    let module_kind = module.kind(self.db);
-                    if module_kind == ModuleKind::Package {
-                        entry.insert(listed);
-                        return;
-                    }
-                    // Or if we have two file modules and the new one
-                    // is a stub, then the stub takes priority.
-                    if module_kind == ModuleKind::Module && path.is_stub_file() {
-                        entry.insert(listed);
-                        return;
-                    }
+                // Or if we have two file modules and the new one
+                // is a stub, then the stub takes priority.
+                if existing.kind(self.db) == ModuleKind::Module
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
+                {
+                    entry.insert(listed);
+                    return;
                 }
                 // Or... if we have a stub package, the stub package
                 // always gets priority.

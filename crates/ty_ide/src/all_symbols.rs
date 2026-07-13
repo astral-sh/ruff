@@ -66,8 +66,8 @@ pub fn all_symbols<'db>(
             let _entered = symbols_for_file_span.entered();
 
             let mut symbols = vec![];
-            if query.is_match_symbol_name(name) {
-                symbols.push(AllSymbolInfo::from_module(module, file, name));
+            if query.is_match_symbol_name(module.name(db)) {
+                symbols.push(AllSymbolInfo::from_module(db, module, file));
             }
             for (_, symbol) in symbols_for_file_global_only(db, file).search(query) {
                 // Test functions (starting with `test_`) in third-party
@@ -76,10 +76,10 @@ pub fn all_symbols<'db>(
                     continue;
                 }
                 symbols.push(AllSymbolInfo::from_non_module_symbol(
+                    db,
                     symbol.to_owned(),
                     module,
                     file,
-                    name,
                 ));
             }
             symbols
@@ -111,14 +111,14 @@ pub struct AllSymbolInfo<'db> {
 
 impl<'db> AllSymbolInfo<'db> {
     fn from_non_module_symbol(
+        db: &'_ dyn Db,
         symbol: SymbolInfo<'static>,
         module: Module<'db>,
         file: File,
-        module_name: &ModuleName,
     ) -> AllSymbolInfo<'db> {
         let qualified = compact_str::format_compact!(
             "{module_name}.{name}",
-            module_name = module_name,
+            module_name = module.name(db),
             name = symbol.name,
         );
         AllSymbolInfo {
@@ -130,14 +130,10 @@ impl<'db> AllSymbolInfo<'db> {
     }
 
     /// Creates a new symbol referencing an entire module.
-    fn from_module(
-        module: Module<'db>,
-        file: File,
-        module_name: &ModuleName,
-    ) -> AllSymbolInfo<'db> {
+    fn from_module(db: &'_ dyn Db, module: Module<'db>, file: File) -> AllSymbolInfo<'db> {
         AllSymbolInfo {
             symbol: None,
-            qualified: module_name.as_str().into(),
+            qualified: module.name(db).as_str().into(),
             module,
             file,
         }

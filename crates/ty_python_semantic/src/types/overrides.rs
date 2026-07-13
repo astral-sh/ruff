@@ -894,11 +894,12 @@ fn symbol_definition<'db>(
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> Option<Definition<'db>> {
-    use_def_map(db, scope)
+    let use_def_map = use_def_map(db, scope);
+    use_def_map
         .end_of_scope_symbol_declarations(symbol)
         .find_map(|declaration| declaration.declaration.definition())
         .or_else(|| {
-            use_def_map(db, scope)
+            use_def_map
                 .end_of_scope_symbol_bindings(symbol)
                 .find_map(|binding| binding.binding.definition())
         })

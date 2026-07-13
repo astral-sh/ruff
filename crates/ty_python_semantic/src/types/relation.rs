@@ -1428,14 +1428,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
                 if !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
+                    && let Some(bound_or_constraints) =
+                        bound_typevar.typevar(db).bound_or_constraints(db) =>
             {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         self.check_type_pair(db, bound, target)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
                         typevar_constraints.elements(db).iter().when_all(
                             db,
                             self.constraints,

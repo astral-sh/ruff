@@ -713,16 +713,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ) => {
                         let ty = if n.as_i64() < 1 {
                             Type::string_literal(db, "")
-                        } else if let Ok(n) = usize::try_from(n.as_i64()) {
-                            let value = s.value(db);
-                            if n.checked_mul(value.len()).is_some_and(|new_length| {
+                        } else if let Ok(n) = usize::try_from(n.as_i64())
+                            && let value = s.value(db)
+                            && n.checked_mul(value.len()).is_some_and(|new_length| {
                                 new_length <= Self::MAX_STRING_LITERAL_SIZE
-                            }) {
-                                let new_literal = value.repeat(n);
-                                Type::string_literal(db, &*new_literal)
-                            } else {
-                                Type::literal_string()
-                            }
+                            })
+                        {
+                            let new_literal = value.repeat(n);
+                            Type::string_literal(db, &*new_literal)
                         } else {
                             Type::literal_string()
                         };

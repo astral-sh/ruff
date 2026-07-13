@@ -362,16 +362,15 @@ impl<'db> SemanticTokenVisitor<'db> {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
 
-                let parsed = parsed_module(db, file);
-                let parsed = parsed.load(db);
-                let value = match kind {
-                    DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
+                let value_ty = match kind {
+                    DefinitionKind::Assignment(assignment) => {
+                        let parsed = parsed_module(db, file).load(db);
+                        assignment.value(&parsed).inferred_type(&model)
+                    }
                     _ => None,
                 };
 
-                if let Some(value) = value
-                    && let Some(value_ty) = value.inferred_type(&model)
-                {
+                if let Some(value_ty) = value_ty {
                     if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
                         modifiers.remove(SemanticTokenModifier::READONLY);
                         return Some((SemanticTokenType::TypeParameter, modifiers));
