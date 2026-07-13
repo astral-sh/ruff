@@ -51,7 +51,9 @@ use std::borrow::Cow;
 
 use ruff_text_size::TextSize;
 
-use crate::docstring::document::syntax::{find_backtick_run, markdown_code_span_len};
+use crate::docstring::document::syntax::{
+    find_backtick_run, is_backtick_run_escaped, markdown_code_span,
+};
 
 /// Exposes an interface for rendering a line of prose that may contain a hyperlink.
 #[derive(Default)]
@@ -283,7 +285,7 @@ fn find_link(input: &str) -> Option<(usize, Candidate<'_>)> {
         let index = run.start().to_usize();
 
         // An escaped run is literal text, so continue immediately after it.
-        if is_escaped(input, index) {
+        if is_backtick_run_escaped(input, index) {
             offset = run.end();
             continue;
         }
@@ -297,8 +299,7 @@ fn find_link(input: &str) -> Option<(usize, Candidate<'_>)> {
         }
 
         // Skip other backtick-delimited spans rather than searching inside them.
-        let span_len = markdown_code_span_len(&input[index..])?;
-        offset = run.start() + span_len;
+        offset = markdown_code_span(input, run)?.end();
     }
 
     None
@@ -500,15 +501,6 @@ fn is_link_suffix(input: &str) -> bool {
                 '-' | '/' | ':' | '.' | ',' | ';' | '!' | '?' | '"' | '\'' | ')' | '>' | ']' | '}'
             )
     })
-}
-
-fn is_escaped(input: &str, index: usize) -> bool {
-    !input[..index]
-        .bytes()
-        .rev()
-        .take_while(|byte| *byte == b'\\')
-        .count()
-        .is_multiple_of(2)
 }
 
 fn render_markdown_link(output: &mut String, label: Option<&str>, uri: &str) {
