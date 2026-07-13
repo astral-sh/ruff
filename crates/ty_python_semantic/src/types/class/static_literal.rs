@@ -1448,7 +1448,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                let dunder_set = field_ty.class_member(db, "__set__".into());
+                let dunder_set = field_ty.class_member(db, "__set__");
                 if let Place::Defined(DefinedPlace {
                     ty: dunder_set,
                     definedness: Definedness::AlwaysDefined,
@@ -2811,10 +2811,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 }
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
-                            && declared_ty
-                                .class_member(db, "__get__".into())
-                                .place
-                                .is_undefined()
+                            && declared_ty.class_member(db, "__get__").place.is_undefined()
                         {
                             // For dataclass-like classes, declared fields are assigned
                             // by the synthesized `__init__`, so they are instance

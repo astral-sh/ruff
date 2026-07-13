@@ -573,7 +573,7 @@ pub(crate) fn imported_symbol<'db>(
             "__builtins__" => Place::bound(Type::any()).into(),
             _ => KnownClass::ModuleType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP),
+                .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_GETATTR_LOOKUP),
         }
     })
 }
@@ -2117,11 +2117,7 @@ pub(crate) mod implicit_globals {
             {
                 KnownClass::ModuleType
                     .to_instance(db)
-                    .member_lookup_with_policy(
-                        db,
-                        name.into(),
-                        MemberLookupPolicy::NO_GETATTR_LOOKUP,
-                    )
+                    .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_GETATTR_LOOKUP)
             }
 
             _ => Place::Undefined.into(),

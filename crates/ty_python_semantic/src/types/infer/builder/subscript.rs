@@ -1278,7 +1278,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) = identity_instance
                 .member_lookup_with_policy(
                     db,
-                    "__setitem__".into(),
+                    "__setitem__",
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
                 .place

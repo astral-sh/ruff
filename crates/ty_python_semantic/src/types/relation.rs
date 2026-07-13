@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use itertools::Itertools;
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
@@ -3175,11 +3174,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::NominalInstance(nominal),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
             ) if nominal.class(db).is_final(db) => Type::NominalInstance(nominal)
-                .member_lookup_with_policy(
-                    db,
-                    Name::new_static("__call__"),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
+                .member_lookup_with_policy(db, "__call__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
                 .place
                 .ignore_possibly_undefined()
                 .when_none_or(db, self.constraints, |dunder_call| {

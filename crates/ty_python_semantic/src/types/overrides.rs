@@ -877,7 +877,7 @@ fn variable_kind<'db>(
         ..
     }) = class_member.place
         && class_member_ty
-            .class_member(db, "__get__".into())
+            .class_member(db, "__get__")
             .place
             .ignore_possibly_undefined()
             .is_some()

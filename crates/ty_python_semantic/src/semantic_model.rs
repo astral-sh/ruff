@@ -515,7 +515,7 @@ impl<'db> SemanticModel<'db> {
                 value_ty
                     .member_lookup_with_policy(
                         self.db,
-                        attr.attr.id.clone(),
+                        &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
                     .qualifiers

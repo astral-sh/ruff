@@ -309,7 +309,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             if emit_diagnostics {
                 let is_setattr_synthesized = match object_ty.class_member_with_policy(
                     db,
-                    "__setattr__".into(),
+                    "__setattr__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 ) {
                     PlaceAndQualifiers {
