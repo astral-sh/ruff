@@ -732,30 +732,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    /// Return `true` if none of the constraints' explicit bounds contain concrete type information.
-    pub(crate) fn has_only_typevar_constraints(self, db: &'db dyn Db) -> bool {
-        let has_concrete_content = |bound: Type<'db>| {
-            !bound.has_typevar(db)
-                || matches!(bound.resolve_type_alias(db), Type::Union(union) if union
-                    .elements(db)
-                    .iter()
-                    .any(|element| !element.has_typevar(db)))
-        };
-        let mut has_constraint = false;
-        let mut has_only_typevar_constraints = true;
-        self.node
-            .for_each_unique_constraint(self.builder, &mut |constraint, _| {
-                has_constraint = true;
-                let bounds = self.builder.constraint_data(constraint).bounds;
-                has_only_typevar_constraints &= bounds
-                    .lower
-                    .into_iter()
-                    .chain(bounds.upper)
-                    .all(|bound| !has_concrete_content(bound));
-            });
-        has_constraint && has_only_typevar_constraints
-    }
-
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance

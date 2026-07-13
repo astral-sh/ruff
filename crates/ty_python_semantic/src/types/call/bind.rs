@@ -4965,16 +4965,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let return_constraints = return_ty
                 .when_constraint_set_assignable_to(self.db, tcx, constraints)
                 .remove_unspecialized_type_var_constraints(self.db, constraints);
-
-            // Temporarily ignore contexts that only relate this call's type variables to outer
-            // type variables. Solving those relationships can produce a combinatorial number of
-            // BDD paths for recursive overloaded calls.
-            if return_constraints.has_only_typevar_constraints(self.db) {
-                false
-            } else {
-                builder.add_constraints(return_constraints);
-                true
-            }
+            builder.add_constraints(return_constraints);
+            true
         } else {
             false
         };
