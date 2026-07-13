@@ -1349,7 +1349,6 @@ impl ConstraintId {
 /// Atomic types and bare typevars have constructor depth zero. The typevar depth is `0` if `ty`
 /// does not contain any typevars.
 fn max_constructor_and_typevar_depth<'db>(db: &'db dyn Db, ty: Type<'db>) -> (u16, u16) {
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| (0, 0))]
     fn max_constructor_and_typevar_depth_impl<'db>(
         db: &'db dyn Db,
         ty: Type<'db>,
