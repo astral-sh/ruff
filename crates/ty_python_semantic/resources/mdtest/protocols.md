@@ -3154,6 +3154,19 @@ class NominalReturningOtherClass:
     def g(self) -> Other:
         raise NotImplementedError
 
+class ConcreteMethod(Protocol):
+    def f(self, input: int) -> int: ...
+
+class GenericReceiver:
+    def f[T](self: T, input: T) -> T:
+        return self
+
+class ExplicitReceiverProtocol(Protocol):
+    def method(self: "ExplicitReceiverProtocol") -> None: ...
+
+class StructuralExplicitReceiver:
+    def method(self: ExplicitReceiverProtocol) -> None: ...
+
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
@@ -3184,6 +3197,16 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctio
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
 
 static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
+
+# Binding `GenericReceiver.f` adds the constraint `GenericReceiver <= T`. It cannot choose
+# `T = int`, so the resulting bound method does not satisfy `ConcreteMethod.f`.
+static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
+static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
+
+# Checking the receiver constraint requires the same protocol relation that is already in
+# progress. The recursive check should terminate and establish the structural relation.
+static_assert(is_assignable_to(StructuralExplicitReceiver, ExplicitReceiverProtocol))
+static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
