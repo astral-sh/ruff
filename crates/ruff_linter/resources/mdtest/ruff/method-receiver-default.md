@@ -9,51 +9,51 @@ lint.preview = true
 
 ```py
 class InstanceReceiverDefault:
-	def method(self=None): ...  # TODO: error: [method-receiver-default]
+    def method(self=None): ...  # TODO: error: [method-receiver-default]
 
 
 class ClassReceiverDefault:
-	@classmethod
-	def build(cls=None): ...  # TODO: error: [method-receiver-default]
+    @classmethod
+    def build(cls=None): ...  # TODO: error: [method-receiver-default]
 
 
 class NewMethodClassReceiver:
-	def __new__(cls=None): ...  # TODO: error: [method-receiver-default]
+    def __new__(cls=None): ...  # TODO: error: [method-receiver-default]
 
 
 class OverrideReceiverDefault:
-	@override
-	def method(self=None): ...
+    @override
+    def method(self=None): ...
 
 
 class CustomDecoratorReceiverDefault:
-	@decorator
-	def method(self=None): ...
+    @decorator
+    def method(self=None): ...
 ```
 
 ## No errors
 
 ```py
 class StaticMethodWithDefault:
-	@staticmethod
-	def helper(arg=None): ...
+    @staticmethod
+    def helper(arg=None): ...
 
 
 class InstanceReceiverNoDefault:
-	def method(self): ...
+    def method(self): ...
 
 
 class ClassReceiverNoDefault:
-	@classmethod
-	def build(cls): ...
+    @classmethod
+    def build(cls): ...
 
 
 class OverrideReceiverNoDefault:
-	@override
-	def method(self): ...
+    @override
+    def method(self): ...
 
 
 class CustomDecoratorReceiverNoDefault:
-	@decorator
-	def method(self): ...
+    @decorator
+    def method(self): ...
 ```
