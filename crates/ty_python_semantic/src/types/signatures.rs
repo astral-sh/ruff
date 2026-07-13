@@ -1405,6 +1405,27 @@ impl<'db> Signature<'db> {
         bindings.when_satisfied(checker, db)
     }
 
+    fn receiver_binding_typevar_domain<'c>(
+        &self,
+        db: &'db dyn Db,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if !self
+            .receiver_bindings
+            .is_some_and(|bindings| bindings.contains_typevar(db))
+        {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        ConstraintSet::valid_typevar_specializations(
+            db,
+            constraints,
+            self.generic_context
+                .into_iter()
+                .flat_map(|context| context.variables(db)),
+        )
+    }
+
     fn receiver_binding_types(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db {
         self.receiver_bindings
             .into_iter()
@@ -2108,17 +2129,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
-        let when = checker.with_signature_recursion_guard(source, target, || {
-            source
-                .receiver_bindings_when_satisfied(&checker, db)
-                .and(db, self.constraints, || {
-                    target.receiver_bindings_when_satisfied(&checker, db).and(
+        let receiver_typevar_domain = source.receiver_binding_typevar_domain(db, self.constraints);
+        let when = receiver_typevar_domain
+            .and(db, self.constraints, || {
+                target.receiver_binding_typevar_domain(db, self.constraints)
+            })
+            .and(db, self.constraints, || {
+                checker.with_signature_recursion_guard(source, target, || {
+                    source.receiver_bindings_when_satisfied(&checker, db).and(
                         db,
                         self.constraints,
-                        || checker.check_signature_pair_inner(db, source, target),
+                        || {
+                            target.receiver_bindings_when_satisfied(&checker, db).and(
+                                db,
+                                self.constraints,
+                                || checker.check_signature_pair_inner(db, source, target),
+                            )
+                        },
                     )
                 })
-        });
+            });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
