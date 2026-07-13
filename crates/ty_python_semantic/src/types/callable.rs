@@ -601,37 +601,6 @@ pub enum CallableTypeKind {
     /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     FunctionLike,
 
-    /// A `Callable[P, R]`-typed dunder attribute whose parameters come from a `ParamSpec`.
-    ///
-    /// This has the runtime assumptions of [`Self::Regular`]: truthiness is ambiguous,
-    /// member lookup exposes `object` attributes, and we do not treat these callables as
-    /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
-    /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
-    /// already describe the callable's arguments.
-    ///
-    /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
-    /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    ///
-    /// class Callback[**P]:
-    ///     __call__: Callable[P, int]
-    ///
-    /// class Length(Callback[[str]]):
-    ///     def __call__(self, text: str) -> int:
-    ///         return len(text)
-    ///
-    /// def invoke(callback: Callback[[str]]) -> int:
-    ///     return callback("hello")
-    ///
-    /// invoke(Length())  # Returns 5.
-    /// ```
-    ///
-    /// This variant is used to represent the callable object itself; [`Self::ParamSpecValue`]
-    /// represents the parameter list substituted for `P`.
-    DunderParamSpec,
-
     /// A callable with the descriptor behavior of `staticmethod`.
     StaticMethodLike,
 
@@ -836,10 +805,6 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
-    }
-
     pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::Regular)
     }
@@ -927,10 +892,6 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::FunctionLike)
-    }
-
-    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }
 
     pub(crate) fn apply_self_with_receiver(

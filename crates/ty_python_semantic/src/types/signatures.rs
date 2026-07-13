@@ -564,6 +564,12 @@ impl<'db> CallableSignature<'db> {
             .any(|signature| !signature.parameters().as_slice().is_empty())
     }
 
+    pub(crate) fn is_gradual(&self) -> bool {
+        self.overloads
+            .iter()
+            .all(|signature| signature.parameters().is_gradual())
+    }
+
     /// Replaces `typing.Self` while supplying the runtime receiver for a previously bound
     /// explicit receiver annotation. This does not bind a visible receiver parameter.
     pub(crate) fn apply_self_with_receiver(
