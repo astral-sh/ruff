@@ -2930,9 +2930,9 @@ class Foo:
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
 ```
 
-Because method members are always looked up on the meta-type of an object when testing assignability
-and subtyping, we understand that `IterableClass` here is a subtype of `Iterable[int]` even though
-`IterableClass.__iter__` has the wrong signature:
+Special method members are looked up on the meta-type of an object when testing assignability and
+subtyping, matching Python's special-method lookup. We therefore understand that `IterableClass`
+here is a subtype of `Iterable[int]` even though `IterableClass.__iter__` has the wrong signature:
 
 ```py
 from typing import Iterator, Iterable
@@ -3302,6 +3302,65 @@ class BadFactory:
 
 static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
 static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
+```
+
+## Class objects and `Self`-returning instance-method protocol members
+
+A class object can satisfy a protocol with a regular instance-method member if the class object's
+directly accessible member has a compatible bound signature. Class and static methods therefore
+work, but a regular instance method does not: accessing it through the class produces an unbound
+function rather than a method bound to the class object.
+
+A custom dunder such as `__custom__` is an ordinary method: it is accessed directly on the class
+object and does not use Python's special-method lookup.
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class CopierProtocol(Protocol):
+    def copy(self) -> Self: ...
+
+class CustomCopierProtocol(Protocol):
+    def __custom__(self, value: int) -> str: ...
+
+class Copier:
+    def copy(self) -> Self:
+        return self
+
+class ClassCopier:
+    @classmethod
+    def copy(cls) -> Self:
+        return cls()
+
+class StaticCopier:
+    @staticmethod
+    def copy() -> "StaticCopier":
+        return StaticCopier()
+
+class CustomCopier:
+    @classmethod
+    def __custom__(cls, value: int) -> str:
+        return str(value)
+
+class CopierMeta(type):
+    def copy(cls) -> "BadDirectCopier":
+        return BadDirectCopier()
+
+class BadDirectCopier(metaclass=CopierMeta):
+    def copy(self, value: int) -> Self:
+        return self
+
+static_assert(is_assignable_to(Copier, CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[Copier], CopierProtocol))
+static_assert(is_assignable_to(TypeOf[ClassCopier], CopierProtocol))
+static_assert(is_assignable_to(TypeOf[StaticCopier], CopierProtocol))
+static_assert(is_assignable_to(TypeOf[CustomCopier], CustomCopierProtocol))
+# The metaclass method is compatible, but ordinary protocol methods describe direct access on the
+# class object, where `BadDirectCopier.copy` is an incompatible unbound function.
+static_assert(not is_assignable_to(TypeOf[BadDirectCopier], CopierProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
