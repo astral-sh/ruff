@@ -761,6 +761,16 @@ impl<'db> Bindings<'db> {
             .filter_map(CallableItem::as_constructor_mut)
     }
 
+    /// Return `true` if `argument_index` is matched to the keyword-variadic parameter of an
+    /// `__init__` constructor.
+    pub(crate) fn constructor_init_argument_matches_keyword_variadic(
+        &self,
+        argument_index: usize,
+    ) -> bool {
+        self.iter_constructor_items()
+            .any(|constructor| constructor.init_argument_matches_keyword_variadic(argument_index))
+    }
+
     fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
         for binding in self.iter_flat_mut() {
             binding.clear_deferred_constructor_errors_for_partial_application();
@@ -3143,6 +3153,20 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
+    }
+
+    pub(super) fn argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
+        let argument_index = argument_index + usize::from(self.bound_type.is_some());
+        self.matching_overloads().any(|(_, overload)| {
+            overload
+                .argument_matches()
+                .get(argument_index)
+                .is_some_and(|argument| {
+                    argument.parameters.iter().any(|parameter| {
+                        overload.signature.parameters()[parameter.index].is_keyword_variadic()
+                    })
+                })
+        })
     }
 
     /// Returns the source overload indexes that should be shown in diagnostics.

@@ -47,6 +47,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
@@ -8243,6 +8244,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(self.db());
             }
         };
+
+        if let Some(class) = class {
+            pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
+        }
 
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
