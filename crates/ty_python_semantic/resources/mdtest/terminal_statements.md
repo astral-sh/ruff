@@ -728,6 +728,39 @@ def g(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+Narrowing in a non-terminal branch must also be preserved when the other branch contains a
+`NoReturn` call, even if the terminal branch did not narrow the binding itself. This includes
+exception handlers and module scope.
+
+```py
+import sys
+from typing import cast
+
+def terminal_except(value: str | int) -> int:
+    try:
+        if not isinstance(value, int):
+            value = 0
+    except Exception:
+        sys.exit()
+    return value
+
+def terminal_sibling(value: str | int, flag: bool) -> int:
+    if flag:
+        sys.exit()
+    elif not isinstance(value, int):
+        value = 0
+    return value
+
+value = cast(str | int, 1)
+flag = cast(bool, True)
+if flag:
+    sys.exit()
+elif not isinstance(value, int):
+    value = 0
+
+reveal_type(value)  # revealed: int
+```
+
 ### Possibly unresolved diagnostics
 
 If the codepath on which a variable is not defined eventually returns `Never`, use of the variable

@@ -1383,9 +1383,10 @@ struct PendingReachabilityId;
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     constraint: ScopedReachabilityConstraintId,
+    narrowing_constraint: ScopedNarrowingConstraint,
 }
 
-/// An append-only tree of scope-wide reachability constraints.
+/// An append-only tree of scope-wide reachability constraints and terminal-call narrowing gates.
 ///
 /// Each [`PendingPlaceState`] remembers the last node applied to its place state, so snapshots can
 /// share place states and defer applying subsequent constraints until the place is observed or
@@ -1403,6 +1404,7 @@ impl Default for PendingReachability {
         constraints.push(PendingReachabilityConstraint {
             parent: root,
             constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
         });
         Self {
             constraints,
@@ -1416,6 +1418,15 @@ impl PendingReachability {
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             constraint,
+            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+        });
+    }
+
+    fn push_narrowing_constraint(&mut self, narrowing_constraint: ScopedNarrowingConstraint) {
+        self.current = self.constraints.push(PendingReachabilityConstraint {
+            parent: self.current,
+            constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            narrowing_constraint,
         });
     }
 
@@ -1428,13 +1439,17 @@ impl PendingReachability {
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) -> &'a mut PlaceState {
-        if pending.reachability != target {
-            let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
+        if pending.reachability != target
+            || pending.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            let mut unapplied =
+                SmallVec::<[(ScopedReachabilityConstraintId, ScopedNarrowingConstraint); 4]>::new();
             let mut current = target;
             while current != pending.reachability {
                 let event = &self.constraints[current];
-                unapplied.push(event.constraint);
+                unapplied.push((event.constraint, event.narrowing_constraint));
                 assert_ne!(
                     current, event.parent,
                     "pending reachability must be an ancestor"
@@ -1443,10 +1458,25 @@ impl PendingReachability {
             }
 
             let state = Rc::make_mut(&mut pending.state);
-            for constraint in unapplied.into_iter().rev() {
-                state.record_reachability_constraint(reachability_constraints, constraint);
+            if pending.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                state.record_narrowing_constraint(
+                    narrowing_constraints,
+                    pending.narrowing_constraint,
+                );
+            }
+            for (reachability_constraint, narrowing_constraint) in unapplied.into_iter().rev() {
+                if reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                    state.record_reachability_constraint(
+                        reachability_constraints,
+                        reachability_constraint,
+                    );
+                }
+                if narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                    state.record_narrowing_constraint(narrowing_constraints, narrowing_constraint);
+                }
             }
             pending.reachability = target;
+            pending.narrowing_constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
         }
 
         Rc::make_mut(&mut pending.state)
@@ -1462,42 +1492,62 @@ impl PendingReachability {
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) -> &'a PlaceState {
-        if pending.reachability != target {
-            self.materialize(pending, target, reachability_constraints);
+        if pending.reachability != target
+            || pending.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            self.materialize(
+                pending,
+                target,
+                reachability_constraints,
+                narrowing_constraints,
+            );
         }
         &pending.state
     }
 
-    /// Combines the constraints after `ancestor` through `target` into a single constraint.
+    /// Combines the constraints after `ancestor` through `target`.
     ///
-    /// `ancestor` must be an ancestor of `target`.
-    fn constraint_between(
+    /// Constraints are applied in source order to keep their decision diagrams compact.
+    fn constraints_between(
         &self,
         ancestor: PendingReachabilityId,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> ScopedReachabilityConstraintId {
-        let mut constraint = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) -> (ScopedReachabilityConstraintId, ScopedNarrowingConstraint) {
+        let mut unapplied =
+            SmallVec::<[(ScopedReachabilityConstraintId, ScopedNarrowingConstraint); 4]>::new();
         let mut current = target;
         while current != ancestor {
             let event = &self.constraints[current];
-            constraint = reachability_constraints.add_and_constraint(constraint, event.constraint);
+            unapplied.push((event.constraint, event.narrowing_constraint));
             assert_ne!(
                 current, event.parent,
                 "pending reachability must be an ancestor"
             );
             current = event.parent;
         }
-        constraint
+
+        let mut reachability_constraint = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        let mut narrowing_constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
+        for (reachability, narrowing) in unapplied.into_iter().rev() {
+            reachability_constraint =
+                reachability_constraints.add_and_constraint(reachability_constraint, reachability);
+            narrowing_constraint =
+                narrowing_constraints.add_and_constraint(narrowing_constraint, narrowing);
+        }
+        (reachability_constraint, narrowing_constraint)
     }
 }
 
-/// A copy-on-write place state and the last reachability node materialized into it.
+/// A copy-on-write place state, its last materialized node, and any merged terminal-call gate.
 #[derive(Clone, Debug)]
 struct PendingPlaceState {
     state: Rc<PlaceState>,
     reachability: PendingReachabilityId,
+    narrowing_constraint: ScopedNarrowingConstraint,
 }
 
 impl PendingPlaceState {
@@ -1505,6 +1555,7 @@ impl PendingPlaceState {
         Self {
             state: Rc::new(state),
             reachability,
+            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
         }
     }
 }
@@ -1538,7 +1589,12 @@ impl PendingReachability {
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
-                let current = self.materialize(current, self.current, reachability_constraints);
+                let current = self.materialize(
+                    current,
+                    self.current,
+                    reachability_constraints,
+                    narrowing_constraints,
+                );
                 current.merge(
                     PlaceState::undefined(branch_reachability),
                     narrowing_constraints,
@@ -1553,19 +1609,23 @@ impl PendingReachability {
             if current.reachability == branch_state.reachability
                 && Rc::ptr_eq(&current.state, &branch_state.state)
             {
-                if self.current == branch {
+                if self.current == branch
+                    && current.narrowing_constraint == branch_state.narrowing_constraint
+                {
                     continue;
                 }
 
-                let current_constraint = self.constraint_between(
+                let (current_constraint, current_narrowing_constraint) = self.constraints_between(
                     current.reachability,
                     self.current,
                     reachability_constraints,
+                    narrowing_constraints,
                 );
-                let branch_constraint = self.constraint_between(
+                let (branch_constraint, branch_narrowing_constraint) = self.constraints_between(
                     branch_state.reachability,
                     branch,
                     reachability_constraints,
+                    narrowing_constraints,
                 );
                 let merged_constraint = reachability_constraints
                     .add_or_constraint(current_constraint, branch_constraint);
@@ -1575,13 +1635,32 @@ impl PendingReachability {
                         merged_constraint,
                     );
                 }
+
+                let current_constraint = narrowing_constraints
+                    .add_and_constraint(current.narrowing_constraint, current_narrowing_constraint);
+                let branch_constraint = narrowing_constraints.add_and_constraint(
+                    branch_state.narrowing_constraint,
+                    branch_narrowing_constraint,
+                );
+                current.narrowing_constraint =
+                    narrowing_constraints.add_or_constraint(current_constraint, branch_constraint);
                 current.reachability = self.current;
                 continue;
             }
 
-            self.materialize(&mut branch_state, branch, reachability_constraints);
+            self.materialize(
+                &mut branch_state,
+                branch,
+                reachability_constraints,
+                narrowing_constraints,
+            );
             let branch_state = Rc::unwrap_or_clone(branch_state.state);
-            let current = self.materialize(current, self.current, reachability_constraints);
+            let current = self.materialize(
+                current,
+                self.current,
+                reachability_constraints,
+                narrowing_constraints,
+            );
             current.merge(
                 branch_state,
                 narrowing_constraints,
@@ -1764,6 +1843,7 @@ impl<'db> UseDefMapBuilder<'db> {
             place_state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
         let definitions_at_definition = DefinitionsAtDefinition {
             bindings: place_state.bindings().clone(),
@@ -1857,6 +1937,7 @@ impl<'db> UseDefMapBuilder<'db> {
             state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
         state.record_narrowing_constraint_for_bindings_at_use(
             &mut self.narrowing_constraints,
@@ -1886,6 +1967,7 @@ impl<'db> UseDefMapBuilder<'db> {
             state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
         state.record_narrowing_constraint_for_bindings(
             &mut self.narrowing_constraints,
@@ -1932,6 +2014,7 @@ impl<'db> UseDefMapBuilder<'db> {
                             state,
                             pending,
                             &mut self.reachability_constraints,
+                            &mut self.narrowing_constraints,
                         );
                         state.record_narrowing_constraint(
                             &mut self.narrowing_constraints,
@@ -1945,6 +2028,7 @@ impl<'db> UseDefMapBuilder<'db> {
                             state,
                             pending,
                             &mut self.reachability_constraints,
+                            &mut self.narrowing_constraints,
                         );
                         state.record_narrowing_constraint(
                             &mut self.narrowing_constraints,
@@ -1974,6 +2058,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.symbol_states[symbol],
                 pending,
                 &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
             )
             .clone();
         let mut associated_member_states = FxHashMap::default();
@@ -1982,6 +2067,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.member_states[member_id],
                 pending,
                 &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
             );
             associated_member_states.insert(member_id, state.clone());
         }
@@ -2035,6 +2121,7 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.symbol_states[symbol],
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
         let mut post_definition_state =
             std::mem::replace(symbol_state, pre_definition.symbol_state);
@@ -2063,6 +2150,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.member_states[member_id],
                 pending,
                 &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
             );
             let mut post_definition_state =
                 std::mem::replace(member_state, pre_definition_member_state);
@@ -2085,28 +2173,17 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Records a narrowing constraint for all places in the current scope.
+    /// Records a pending narrowing constraint for all places in the current scope.
     ///
     /// This is used to gate narrowing by `IsNonTerminalCall` constraints: when a branch contains
     /// a call to a `NoReturn` function, all narrowing in that branch should be conditional
-    /// on the call actually returning `Never`.
+    /// on the call returning normally.
     pub(super) fn record_narrowing_constraint_for_all_places(
         &mut self,
         constraint: ScopedNarrowingConstraint,
     ) {
-        let pending = self.pending_reachability.current;
-        for state in self
-            .symbol_states
-            .iter_mut()
-            .chain(self.member_states.iter_mut())
-        {
-            let state = self.pending_reachability.materialize(
-                state,
-                pending,
-                &mut self.reachability_constraints,
-            );
-            state.record_narrowing_constraint(&mut self.narrowing_constraints, constraint);
-        }
+        self.pending_reachability
+            .push_narrowing_constraint(constraint);
     }
 
     pub(super) fn record_reachability_constraint(
@@ -2132,6 +2209,7 @@ impl<'db> UseDefMapBuilder<'db> {
             place_state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
 
         self.definitions_by_definition.insert(
@@ -2170,6 +2248,7 @@ impl<'db> UseDefMapBuilder<'db> {
             place_state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
         place_state.record_declaration(def_id, self.reachability);
         place_state.record_binding(
@@ -2210,6 +2289,7 @@ impl<'db> UseDefMapBuilder<'db> {
             place_state,
             pending,
             &mut self.reachability_constraints,
+            &mut self.narrowing_constraints,
         );
 
         place_state.record_binding(
@@ -2228,7 +2308,12 @@ impl<'db> UseDefMapBuilder<'db> {
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
         let bindings = self
             .pending_reachability
-            .materialize_ref(place_state, pending, &mut self.reachability_constraints)
+            .materialize_ref(
+                place_state,
+                pending,
+                &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
+            )
             .bindings()
             .clone();
 
@@ -2246,7 +2331,12 @@ impl<'db> UseDefMapBuilder<'db> {
                 pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
             let bindings = self
                 .pending_reachability
-                .materialize_ref(place_state, pending, &mut self.reachability_constraints)
+                .materialize_ref(
+                    place_state,
+                    pending,
+                    &mut self.reachability_constraints,
+                    &mut self.narrowing_constraints,
+                )
                 .bindings()
                 .clone();
 
@@ -2328,7 +2418,12 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings = self
             .pending_reachability
-            .materialize_ref(place_state, pending, &mut self.reachability_constraints)
+            .materialize_ref(
+                place_state,
+                pending,
+                &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
+            )
             .bindings();
 
         let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
@@ -2372,6 +2467,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.symbol_states[enclosing_symbol],
                 pending,
                 &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
             )
             .bindings()
             .clone();
@@ -2432,7 +2528,12 @@ impl<'db> UseDefMapBuilder<'db> {
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
         let bindings = self
             .pending_reachability
-            .materialize_ref(place_state, pending, &mut self.reachability_constraints)
+            .materialize_ref(
+                place_state,
+                pending,
+                &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
+            )
             .bindings();
 
         bindings.iter().copied()
@@ -2523,6 +2624,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 state,
                 pending,
                 &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
             );
         }
 
@@ -2812,5 +2914,102 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_place_states_keep_terminal_gates_pending() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
+        let first_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
+        let second_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
+        let mut pending = PendingReachability::default();
+        let mut current_states = IndexVec::<ScopedSymbolId, _>::new();
+        let symbol = current_states.push(PendingPlaceState::new(
+            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE),
+            pending.current,
+        ));
+        let shared_state = Rc::clone(&current_states[symbol].state);
+        let branch_states = current_states.clone();
+        let fork = pending.current;
+
+        pending.push_narrowing_constraint(first_gate);
+        let branch = pending.current;
+        pending.current = fork;
+        pending.push_narrowing_constraint(second_gate);
+
+        pending.merge_place_states(
+            &mut current_states,
+            branch_states,
+            branch,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+
+        let expected_gate = narrowing_constraints.add_or_constraint(first_gate, second_gate);
+        assert!(Rc::ptr_eq(&shared_state, &current_states[symbol].state));
+        assert_eq!(current_states[symbol].narrowing_constraint, expected_gate);
+
+        let state = pending.materialize(
+            &mut current_states[symbol],
+            pending.current,
+            &mut reachability_constraints,
+            &mut narrowing_constraints,
+        );
+        let binding = state.bindings().iter().next().expect("unbound binding");
+        assert_eq!(binding.narrowing_constraint(), expected_gate);
+    }
+
+    #[test]
+    fn divergent_place_states_materialize_terminal_gates_before_merge() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
+        let branch_narrowing = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
+        let branch_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
+        let current_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(2));
+        let mut pending = PendingReachability::default();
+        let mut current_states = IndexVec::<ScopedSymbolId, _>::new();
+        let symbol = current_states.push(PendingPlaceState::new(
+            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE),
+            pending.current,
+        ));
+        let mut branch_states = current_states.clone();
+        Rc::make_mut(&mut branch_states[symbol].state)
+            .record_narrowing_constraint(&mut narrowing_constraints, branch_narrowing);
+        let fork = pending.current;
+
+        pending.push_narrowing_constraint(branch_gate);
+        let branch = pending.current;
+        pending.current = fork;
+        pending.push_narrowing_constraint(current_gate);
+
+        pending.merge_place_states(
+            &mut current_states,
+            branch_states,
+            branch,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
+
+        let narrowed_branch =
+            narrowing_constraints.add_and_constraint(branch_narrowing, branch_gate);
+        let expected = narrowing_constraints.add_or_constraint(current_gate, narrowed_branch);
+        let binding = current_states[symbol]
+            .state
+            .bindings()
+            .iter()
+            .next()
+            .expect("unbound binding");
+        assert_eq!(binding.narrowing_constraint(), expected);
+        assert_eq!(
+            current_states[symbol].narrowing_constraint,
+            ScopedNarrowingConstraint::ALWAYS_TRUE
+        );
     }
 }
