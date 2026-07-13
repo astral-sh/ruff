@@ -678,6 +678,30 @@ Summary.
         "#);
     }
 
+    #[test]
+    fn seealso_block() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Read the main description first.
+
+        .. seealso:: Related APIs and examples
+            Further details remain prose.
+
+        Continue with the main description.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Read the main description first.<HB>
+        <HB>
+        **See also:** Related APIs and examples<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Further details remain prose.<HB>
+        <HB>
+        Continue with the main description.
+        ");
+    }
+
     // `warning` and several other directives are special languages that should actually
     // still be shown as text and not ```code```.
     #[test]
@@ -696,6 +720,8 @@ Summary.
 
            You really shouldnt use it
 
+        .. version-removed:: 5.0 Use `eggs` instead.
+
         And that's the docs
         "#;
 
@@ -713,6 +739,8 @@ Summary.
         &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.<HB>
         <HB>
         &nbsp;&nbsp;&nbsp;You really shouldnt use it<HB>
+        <HB>
+        **Removed in version 5.0:** Use `eggs` instead.<HB>
         <HB>
         And that's the docs
         ");
@@ -1037,12 +1065,42 @@ Summary.
     }
 
     #[test]
+    fn code_directive_aliases() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        .. code-block:: rust
+            fn main() {}
+
+        .. testoutput:: default
+            operation complete
+
+        Finished.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        <HB>
+        ```````````rust
+            fn main() {}
+
+        ```````````
+        <HB>
+        ```````````text
+            operation complete
+
+        ```````````
+        Finished.
+        ");
+    }
+
+    #[test]
     fn math_blocks() {
         let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
         Compute the value.
 
-        .. math:: x^2 + y^2 = z^2
+        .. MATH:: x^2 + y^2 = z^2
 
         A multiline formula follows.
 
@@ -1075,6 +1133,50 @@ Summary.
         ");
     }
 
+    #[test]
+    fn productionlist_group_is_not_rendered_as_content() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        .. productionlist:: python
+            expression: `term` | expression "+" `term`
+
+        Finished.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        <HB>
+        ```````````text
+            expression: `term` | expression "+" `term`
+
+        ```````````
+        Finished.
+        "#);
+    }
+
+    #[test]
+    fn control_directive_does_not_consume_following_prose() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Before.
+
+        .. highlight:: rust
+            :linenothreshold: 5
+
+        After.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Before.<HB>
+        <HB>
+        <HB>
+        After.
+        ");
+    }
+
     // I don't know if this is valid syntax but we preserve stuff before `..code ::`
     #[test]
     fn code_block_prefix_gunk() {
@@ -1094,7 +1196,8 @@ Summary.
         ");
     }
 
-    // `.. asdgfhjkl-unknown::` is treated the same as `.. code::`
+    // Unknown directives default to prose because extension-defined directives can contain
+    // arbitrary reStructuredText body elements.
     #[test]
     fn unknown_block() {
         let _snap = bind_docstring_snapshot_filters();
@@ -1112,16 +1215,14 @@ Summary.
         assert_snapshot!(docstring.render_markdown(), @r#"
         Here's some code!<HB>
         <HB>
-        <HB>
-        ```````````python
-            fn main() {
-                println!("hello world!");
-            }
-        ```````````
+        *asdgfhjkl-unknown*<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;fn main() {<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;println!("hello world!");<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;}
         "#);
     }
 
-    // `.. asdgfhjkl-unknown:: rust` is treated the same as `.. code:: rust`
+    // An unknown directive's complete argument is displayed instead of becoming a code language.
     #[test]
     fn unknown_block_lang() {
         let _snap = bind_docstring_snapshot_filters();
@@ -1139,12 +1240,10 @@ Summary.
         assert_snapshot!(docstring.render_markdown(), @r#"
         Here's some Rust code!<HB>
         <HB>
-        <HB>
-        ```````````rust
-            fn main() {
-                print("hello world!")
-            }
-        ```````````
+        *asdgfhjkl-unknown* rust<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;fn main() {<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print("hello world!")<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;}
         "#);
     }
 
