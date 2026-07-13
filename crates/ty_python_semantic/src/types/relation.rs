@@ -1103,6 +1103,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
+        let bound_or_constraints;
+
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1427,21 +1429,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable)
-                    && let Some(bound_or_constraints) =
-                        bound_typevar.typevar(db).bound_or_constraints(db) =>
+                if !bound_typevar.is_inferable(db, self.inferable) && {
+                    bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db);
+                    bound_or_constraints.is_some()
+                } =>
             {
                 match bound_or_constraints {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         self.check_type_pair(db, bound, target)
                     }
-                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
+                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
                         typevar_constraints.elements(db).iter().when_all(
                             db,
                             self.constraints,
                             |constraint| self.check_type_pair(db, *constraint, target),
                         )
                     }
+                    None => unreachable!(),
                 }
             }
 
