@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF201 [*] Rule code used instead of name in select
+RUF201 [*] Rule code used instead of name in `select`
  --> pyproject.toml:3:6
   |
 1 | [tool.ruff]
@@ -20,7 +20,7 @@ help: Replace rule code with name
 5 |     "F",
   |
 
-RUF201 [*] Rule code used instead of name in extend-select
+RUF201 [*] Rule code used instead of name in `extend-select`
  --> pyproject.toml:7:19
   |
 5 |     "F",
@@ -38,7 +38,7 @@ help: Replace rule code with name
 8 | fixable = ["""E501"""]
   |
 
-RUF201 [*] Rule code used instead of name in fixable
+RUF201 [*] Rule code used instead of name in `fixable`
   --> pyproject.toml:8:15
    |
  6 | ]
@@ -56,7 +56,7 @@ help: Replace rule code with name
 9 | extend-fixable = ['''UP035''']
   |
 
-RUF201 [*] Rule code used instead of name in extend-fixable
+RUF201 [*] Rule code used instead of name in `extend-fixable`
   --> pyproject.toml:9:22
    |
  7 | extend-select = ['F841']
@@ -74,7 +74,7 @@ help: Replace rule code with name
 10 | ignore = ["F401"]
    |
 
-RUF201 [*] Rule code used instead of name in ignore
+RUF201 [*] Rule code used instead of name in `ignore`
   --> pyproject.toml:10:12
    |
  8 | fixable = ["""E501"""]
@@ -92,7 +92,7 @@ help: Replace rule code with name
 11 | extend-ignore = ["F841"]
    |
 
-RUF201 [*] Rule code used instead of name in extend-ignore
+RUF201 [*] Rule code used instead of name in `extend-ignore`
   --> pyproject.toml:11:19
    |
  9 | extend-fixable = ['''UP035''']
@@ -110,7 +110,7 @@ help: Replace rule code with name
 12 | per-file-ignores = { "foo.py" = ["E501"] }
    |
 
-RUF201 [*] Rule code used instead of name in per-file-ignores
+RUF201 [*] Rule code used instead of name in `per-file-ignores`
   --> pyproject.toml:12:35
    |
 10 | ignore = ["F401"]
@@ -128,7 +128,7 @@ help: Replace rule code with name
 13 | extend-per-file-ignores = { "bar.py" = ["UP035"] }
    |
 
-RUF201 [*] Rule code used instead of name in extend-per-file-ignores
+RUF201 [*] Rule code used instead of name in `extend-per-file-ignores`
   --> pyproject.toml:13:42
    |
 11 | extend-ignore = ["F841"]
@@ -146,7 +146,7 @@ help: Replace rule code with name
 14 | unfixable = ["F401"]
    |
 
-RUF201 [*] Rule code used instead of name in unfixable
+RUF201 [*] Rule code used instead of name in `unfixable`
   --> pyproject.toml:14:15
    |
 12 | per-file-ignores = { "foo.py" = ["E501"] }
@@ -164,7 +164,7 @@ help: Replace rule code with name
 15 | extend-unfixable = ["F841"]
    |
 
-RUF201 [*] Rule code used instead of name in extend-unfixable
+RUF201 [*] Rule code used instead of name in `extend-unfixable`
   --> pyproject.toml:15:22
    |
 13 | extend-per-file-ignores = { "bar.py" = ["UP035"] }
@@ -182,7 +182,7 @@ help: Replace rule code with name
 16 | extend-safe-fixes = ["E501"]
    |
 
-RUF201 [*] Rule code used instead of name in extend-safe-fixes
+RUF201 [*] Rule code used instead of name in `extend-safe-fixes`
   --> pyproject.toml:16:23
    |
 14 | unfixable = ["F401"]
@@ -199,7 +199,7 @@ help: Replace rule code with name
 17 | extend-unsafe-fixes = ["UP035"]
    |
 
-RUF201 [*] Rule code used instead of name in extend-unsafe-fixes
+RUF201 [*] Rule code used instead of name in `extend-unsafe-fixes`
   --> pyproject.toml:17:25
    |
 15 | extend-unfixable = ["F841"]
@@ -217,7 +217,7 @@ help: Replace rule code with name
 18 |
    |
 
-RUF201 [*] Rule code used instead of name in lint.select
+RUF201 [*] Rule code used instead of name in `lint.select`
   --> pyproject.toml:21:6
    |
 19 | [tool.ruff.lint]
@@ -236,7 +236,7 @@ help: Replace rule code with name
 23 |     "unknown-rule",
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-select
+RUF201 [*] Rule code used instead of name in `lint.extend-select`
   --> pyproject.toml:25:19
    |
 23 |     "unknown-rule",
@@ -254,7 +254,7 @@ help: Replace rule code with name
 26 | fixable = ["""E501"""]
    |
 
-RUF201 [*] Rule code used instead of name in lint.fixable
+RUF201 [*] Rule code used instead of name in `lint.fixable`
   --> pyproject.toml:26:15
    |
 24 | ]
@@ -272,7 +272,7 @@ help: Replace rule code with name
 27 | extend-fixable = ['''UP035''']
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-fixable
+RUF201 [*] Rule code used instead of name in `lint.extend-fixable`
   --> pyproject.toml:27:22
    |
 25 | extend-select = ['F841']
@@ -290,7 +290,7 @@ help: Replace rule code with name
 28 | ignore = ["F401"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.ignore
+RUF201 [*] Rule code used instead of name in `lint.ignore`
   --> pyproject.toml:28:12
    |
 26 | fixable = ["""E501"""]
@@ -308,7 +308,7 @@ help: Replace rule code with name
 29 | extend-ignore = ["F841"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-ignore
+RUF201 [*] Rule code used instead of name in `lint.extend-ignore`
   --> pyproject.toml:29:19
    |
 27 | extend-fixable = ['''UP035''']
@@ -326,7 +326,7 @@ help: Replace rule code with name
 30 | per-file-ignores = { "foo.py" = ["E501"] }
    |
 
-RUF201 [*] Rule code used instead of name in lint.per-file-ignores
+RUF201 [*] Rule code used instead of name in `lint.per-file-ignores`
   --> pyproject.toml:30:35
    |
 28 | ignore = ["F401"]
@@ -344,7 +344,7 @@ help: Replace rule code with name
 31 | extend-per-file-ignores = { "bar.py" = ["UP035"] }
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-per-file-ignores
+RUF201 [*] Rule code used instead of name in `lint.extend-per-file-ignores`
   --> pyproject.toml:31:42
    |
 29 | extend-ignore = ["F841"]
@@ -362,7 +362,7 @@ help: Replace rule code with name
 32 | unfixable = ["F401"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.unfixable
+RUF201 [*] Rule code used instead of name in `lint.unfixable`
   --> pyproject.toml:32:15
    |
 30 | per-file-ignores = { "foo.py" = ["E501"] }
@@ -380,7 +380,7 @@ help: Replace rule code with name
 33 | extend-unfixable = ["F841"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-unfixable
+RUF201 [*] Rule code used instead of name in `lint.extend-unfixable`
   --> pyproject.toml:33:22
    |
 31 | extend-per-file-ignores = { "bar.py" = ["UP035"] }
@@ -398,7 +398,7 @@ help: Replace rule code with name
 34 | extend-safe-fixes = ["E501"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-safe-fixes
+RUF201 [*] Rule code used instead of name in `lint.extend-safe-fixes`
   --> pyproject.toml:34:23
    |
 32 | unfixable = ["F401"]
@@ -415,7 +415,7 @@ help: Replace rule code with name
 35 | extend-unsafe-fixes = ["UP035"]
    |
 
-RUF201 [*] Rule code used instead of name in lint.extend-unsafe-fixes
+RUF201 [*] Rule code used instead of name in `lint.extend-unsafe-fixes`
   --> pyproject.toml:35:25
    |
 33 | extend-unfixable = ["F841"]

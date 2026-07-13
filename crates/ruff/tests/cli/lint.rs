@@ -5209,7 +5209,7 @@ fn ruff_toml_is_linted() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    rule-codes-in-selectors: [*] Rule code used instead of name in lint.select
+    rule-codes-in-selectors: [*] Rule code used instead of name in `lint.select`
      --> ruff.toml:1:17
       |
     1 | lint.select = ["F401"]
@@ -5251,7 +5251,7 @@ fn ruff_toml_respects_unfixable() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    rule-codes-in-selectors: Rule code used instead of name in lint.select
+    rule-codes-in-selectors: Rule code used instead of name in `lint.select`
      --> ruff.toml:1:17
       |
     1 | lint.select = ["F401"]
@@ -5288,7 +5288,7 @@ fn ruff_toml_respects_fix_safety_overrides() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    rule-codes-in-selectors: Rule code used instead of name in lint.select
+    rule-codes-in-selectors: Rule code used instead of name in `lint.select`
      --> ruff.toml:1:17
       |
     1 | lint.select = ["F401"]

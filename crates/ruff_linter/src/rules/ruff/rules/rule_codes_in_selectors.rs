@@ -49,7 +49,7 @@ impl Violation for RuleCodesInSelectors {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { selector } = self;
-        format!("Rule code used instead of name in {selector}")
+        format!("Rule code used instead of name in `{selector}`")
     }
 
     fn fix_title(&self) -> Option<String> {
