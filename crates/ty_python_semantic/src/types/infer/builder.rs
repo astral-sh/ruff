@@ -2733,13 +2733,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
-                if intersection.positive(db).iter().any(|element_ty| {
+                let positive = intersection.positive(db);
+                if positive.iter().any(|element_ty| {
                     self.validate_attribute_deletion(target, *element_ty, attribute, false)
                 }) {
                     true
                 } else {
-                    if emit_diagnostics && let Some(element_ty) = intersection.positive(db).first()
-                    {
+                    if emit_diagnostics && let Some(element_ty) = positive.first() {
                         self.validate_attribute_deletion(target, *element_ty, attribute, true);
                     }
                     false

@@ -902,10 +902,11 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = Type<'db>> {
-        if self.positive(db).is_empty() {
+        let positive = self.positive(db);
+        if positive.is_empty() {
             Either::Left(std::iter::once(Type::object()))
         } else {
-            Either::Right(self.positive(db).iter().copied())
+            Either::Right(positive.iter().copied())
         }
     }
 

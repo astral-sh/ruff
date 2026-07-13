@@ -89,7 +89,8 @@ impl InlayHint {
                         }
 
                         // Don't try to import symbols in scope
-                        if definition.file(db) == file {
+                        let definition_file = definition.file(db);
+                        if definition_file == file {
                             return None;
                         }
 
@@ -100,7 +101,7 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition.file(db))?;
+                        let module = file_to_module(db, definition_file)?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;

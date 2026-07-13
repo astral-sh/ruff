@@ -950,11 +950,12 @@ impl<'db> BoundTypeVarInstance<'db> {
                 .top_materialization(db),
         });
 
+        let typevar = self.typevar(db);
         let typevar = TypeVarInstance::new(
             db,
-            self.typevar(db).identity(db),
+            typevar.identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            self.typevar(db).explicit_variance(db),
+            typevar.explicit_variance(db),
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
@@ -981,13 +982,14 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.kind(db)
         );
 
+        let typevar = self.typevar(db);
         Self::new(
             db,
             TypeVarInstance::new(
                 db,
-                self.typevar(db).identity(db),
+                typevar.identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                self.typevar(db).explicit_variance(db),
+                typevar.explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),
@@ -1056,13 +1058,14 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(Option<TypeVarBoundOrConstraints<'db>>) -> Option<TypeVarBoundOrConstraints<'db>>,
     ) -> Self {
-        let bound_or_constraints = f(self.typevar(db).bound_or_constraints(db));
+        let typevar = self.typevar(db);
+        let bound_or_constraints = f(typevar.bound_or_constraints(db));
         let typevar = TypeVarInstance::new(
             db,
-            self.typevar(db).identity(db),
+            typevar.identity(db),
             bound_or_constraints.map(TypeVarBoundOrConstraintsEvaluation::Eager),
-            self.typevar(db).explicit_variance(db),
-            self.typevar(db)._default(db),
+            typevar.explicit_variance(db),
+            typevar._default(db),
         );
 
         Self::new(

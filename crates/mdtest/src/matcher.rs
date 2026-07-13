@@ -124,7 +124,11 @@ pub fn match_file(
     let mut current_assertions = line_assertions.next();
     let mut current_diagnostics = line_diagnostics.next();
 
-    let matcher = Matcher::from_file(db, file, options);
+    let matcher = Matcher {
+        line_index,
+        source: &source,
+        options,
+    };
     let mut failures = FailuresByLine::default();
     let mut snapshot_diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -316,21 +320,13 @@ fn normalize_paths(ty: &str) -> Cow<'_, str> {
     PATH_IN_CLASS_DISPLAY_REGEX.replace_all(ty, normalize_path_captures)
 }
 
-struct Matcher {
+struct Matcher<'a> {
     line_index: LineIndex,
-    source: SourceText,
+    source: &'a SourceText,
     options: RunOptions,
 }
 
-impl Matcher {
-    fn from_file(db: &dyn Db, file: File, options: RunOptions) -> Self {
-        Self {
-            line_index: line_index(db, file),
-            source: source_text(db, file),
-            options,
-        }
-    }
-
+impl Matcher<'_> {
     /// Check a slice of [`Diagnostic`]s against a slice of
     /// [`UnparsedAssertion`]s.
     ///
@@ -386,7 +382,7 @@ impl Matcher {
             .and_then(|span| span.range())
             .map(|range| {
                 self.line_index
-                    .line_column(range.start(), &self.source)
+                    .line_column(range.start(), self.source)
                     .column
             })
             .unwrap_or(OneIndexed::from_zero_indexed(0))

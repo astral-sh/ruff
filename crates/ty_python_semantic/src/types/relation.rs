@@ -3079,18 +3079,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
-                if a.function(db).name(db) != b.function(db).name(db) {
+                let a_function = a.function(db);
+                let b_function = b.function(db);
+                if a_function.name(db) != b_function.name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same
                     // method name would show up on both sides of this check. However for
                     // completeness, if we're ever comparing `BoundMethod` types with different
                     // method names, then they're clearly disjoint.
                     self.always()
-                } else if a.function(db) != b.function(db)
-                    && a.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
-                    && b.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                } else if a_function != b_function
+                    && a_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                    && b_function.has_known_decorator(db, FunctionDecorators::FINAL)
                 {
                     // If *both* methods are `@final` (and they're not literally the same
                     // definition), they must be disjoint.

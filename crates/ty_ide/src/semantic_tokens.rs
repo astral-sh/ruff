@@ -299,7 +299,8 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let model = SemanticModel::new(db, definition.file(db));
+        let file = definition.file(db);
+        let model = SemanticModel::new(db, file);
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -319,7 +320,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = parsed_module(db, file);
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -355,15 +356,15 @@ impl<'db> SemanticTokenVisitor<'db> {
                 // (e.g., imported classes as Class, imported functions as Function, etc.)
                 None
             }
-            _ => {
+            kind => {
                 // For other definition kinds (assignments, etc.), apply constant naming convention
                 if Self::is_constant_name(name_str) {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
 
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = parsed_module(db, file);
                 let parsed = parsed.load(db);
-                let value = match definition.kind(db) {
+                let value = match kind {
                     DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
                     _ => None,
                 };
