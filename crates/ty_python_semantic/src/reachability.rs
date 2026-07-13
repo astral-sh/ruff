@@ -660,6 +660,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     id: ScopedNarrowingConstraint,
     base_ty: Type<'db>,
     place: ScopedPlaceId,
+    cache: Option<&InferenceEvaluationCache<'db>>,
 ) -> Type<'db> {
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
@@ -667,16 +668,34 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
-    let projected_root = projector.project(id);
-    let mut context = ProjectedNarrowingContext {
-        db,
-        base_ty,
-        graph: &projector.graph,
-        joins: projector.graph.joins(projected_root),
-        join_cache: FxHashMap::default(),
+    let mut projector = if let Some(cache) = cache {
+        NarrowingProjector::with_state(
+            db,
+            constraints,
+            predicates,
+            place,
+            cache.take_narrowing_projection_state(constraints, place),
+        )
+    } else {
+        NarrowingProjector::new(db, constraints, predicates, place)
     };
-    context.narrow(projected_root, None)
+    let projected_root = projector.project(id);
+    let result = {
+        let mut context = ProjectedNarrowingContext {
+            db,
+            base_ty,
+            graph: &projector.graph,
+            joins: projector.graph.joins(projected_root),
+            join_cache: FxHashMap::default(),
+        };
+        context.narrow(projected_root, None)
+    };
+
+    if let Some(cache) = cache {
+        cache.store_narrowing_projection_state(constraints, place, projector.into_state());
+    }
+
+    result
 }
 
 fn apply_accumulated_narrowing<'db>(
@@ -896,6 +915,12 @@ struct NarrowingProjector<'a, 'db> {
     graph: ProjectedNarrowingGraph<'db>,
 }
 
+#[derive(Default)]
+struct NarrowingProjectionState<'db> {
+    project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
+    graph: ProjectedNarrowingGraph<'db>,
+}
+
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     fn new(
@@ -904,13 +929,36 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
+        Self::with_state(
+            db,
+            constraints,
+            predicates,
+            place,
+            NarrowingProjectionState::default(),
+        )
+    }
+
+    fn with_state(
+        db: &'db dyn Db,
+        constraints: &'a NarrowingConstraints,
+        predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        place: ScopedPlaceId,
+        state: NarrowingProjectionState<'db>,
+    ) -> Self {
         Self {
             db,
             constraints,
             predicates,
             place,
-            project_cache: FxHashMap::default(),
-            graph: ProjectedNarrowingGraph::default(),
+            project_cache: state.project_cache,
+            graph: state.graph,
+        }
+    }
+
+    fn into_state(self) -> NarrowingProjectionState<'db> {
+        NarrowingProjectionState {
+            project_cache: self.project_cache,
+            graph: self.graph,
         }
     }
 
@@ -1432,7 +1480,7 @@ pub(crate) fn evaluate_reachability(
         .evaluate(db, use_def.predicates(), reachability)
 }
 
-/// Inference-local cache for static reachability evaluations.
+/// Inference-local cache for static reachability and narrowing-projection evaluations.
 ///
 /// Place lookup may evaluate the same reachability constraint many times while inferring a single
 /// region: once for declarations, again for bindings, and again while recursively looking up
@@ -1444,14 +1492,19 @@ pub(crate) fn evaluate_reachability(
 /// from other use-def maps are less common and are stored separately, keyed by the address of their
 /// [`ReachabilityConstraints`] graph plus the local constraint id. The graph address is part of the
 /// key because scoped constraint ids are only unique within one graph.
-pub(crate) struct ReachabilityEvaluationCache<'db> {
+///
+/// Narrowing-projection state is stored per narrowing graph and place. It is temporarily removed
+/// while projecting because projection can recursively trigger inference and re-enter this cache.
+pub(crate) struct InferenceEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
     primary_entries: RefCell<Vec<Option<Truthiness>>>,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
+    narrowing_projection_states:
+        RefCell<FxHashMap<(usize, ScopedPlaceId), NarrowingProjectionState<'db>>>,
 }
 
-impl<'db> ReachabilityEvaluationCache<'db> {
+impl<'db> InferenceEvaluationCache<'db> {
     /// Creates a cache optimized for the use-def map of `primary_scope`.
     ///
     /// `primary_constraints` must be the reachability graph for `primary_scope`'s use-def map. The
@@ -1466,6 +1519,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
             primary_entries: RefCell::new(Vec::new()),
             other_entries: RefCell::new(FxHashMap::default()),
+            narrowing_projection_states: RefCell::new(FxHashMap::default()),
         }
     }
 
@@ -1517,12 +1571,36 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         entries[index] = Some(result);
         result
     }
+
+    fn take_narrowing_projection_state(
+        &self,
+        constraints: &NarrowingConstraints,
+        place: ScopedPlaceId,
+    ) -> NarrowingProjectionState<'db> {
+        let key = (std::ptr::from_ref(constraints).addr(), place);
+        self.narrowing_projection_states
+            .borrow_mut()
+            .remove(&key)
+            .unwrap_or_default()
+    }
+
+    fn store_narrowing_projection_state(
+        &self,
+        constraints: &NarrowingConstraints,
+        place: ScopedPlaceId,
+        state: NarrowingProjectionState<'db>,
+    ) {
+        let key = (std::ptr::from_ref(constraints).addr(), place);
+        self.narrowing_projection_states
+            .borrow_mut()
+            .insert(key, state);
+    }
 }
 
 /// Evaluates a reachability constraint, optionally using an inference-local cache.
 pub(crate) fn evaluate_reachability_with_cache<'db>(
     db: &'db dyn Db,
-    cache: Option<&ReachabilityEvaluationCache<'db>>,
+    cache: Option<&InferenceEvaluationCache<'db>>,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedReachabilityConstraintId,
@@ -1605,6 +1683,74 @@ mod tests {
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
+
+    #[test]
+    fn narrowing_projection_cache_reuses_prefixes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/test.py",
+            r#"
+            def f(x: int, flag: bool) -> None:
+                if flag:
+                    y = x
+            "#,
+        )?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let index = semantic_index(&db, file);
+        let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+        let use_def = index.use_def_map(function_scope);
+        let predicate = use_def
+            .predicates()
+            .iter()
+            .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
+            .unwrap();
+        let predicates: Predicates = std::iter::repeat_n(*predicate, 2).collect();
+        let constraints = NarrowingConstraints::from_test_nodes(
+            (0..2)
+                .map(|index| InteriorNode {
+                    atom: ScopedPredicateId::new(index),
+                    if_true: ScopedNarrowingConstraint::ALWAYS_TRUE,
+                    if_uncertain: if index == 0 {
+                        ScopedNarrowingConstraint::ALWAYS_FALSE
+                    } else {
+                        ScopedNarrowingConstraint::new(index - 1)
+                    },
+                    if_false: ScopedNarrowingConstraint::ALWAYS_FALSE,
+                })
+                .collect(),
+        );
+        let x = index.place_table(function_scope).symbol_id("x").unwrap();
+        let place = ScopedPlaceId::Symbol(x);
+        let cache = InferenceEvaluationCache::new(
+            function_scope.to_scope_id(&db, file),
+            use_def.reachability_constraints(),
+        );
+        let key = (std::ptr::from_ref(&constraints).addr(), place);
+
+        for index in 0..2 {
+            assert_eq!(
+                narrow_type_by_constraint(
+                    &db,
+                    &constraints,
+                    &predicates,
+                    ScopedNarrowingConstraint::new(index),
+                    Type::int_literal(1),
+                    place,
+                    Some(&cache),
+                ),
+                Type::int_literal(1)
+            );
+            assert_eq!(
+                cache.narrowing_projection_states.borrow()[&key]
+                    .project_cache
+                    .len(),
+                index + 1
+            );
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn deep_constraint_projection_does_not_overflow() -> anyhow::Result<()> {

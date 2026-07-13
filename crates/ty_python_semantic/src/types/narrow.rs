@@ -2,7 +2,9 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
 use crate::Db;
-use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
+use crate::reachability::{
+    InferenceEvaluationCache, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
+};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -4454,10 +4456,27 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
 
 pub(crate) trait NarrowingEvaluatorExtension<'db> {
     fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db>;
+    fn narrow_with_cache(
+        &self,
+        db: &'db dyn Db,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        cache: Option<&InferenceEvaluationCache<'db>>,
+    ) -> Type<'db>;
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
     fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db> {
+        self.narrow_with_cache(db, base_type, place, None)
+    }
+
+    fn narrow_with_cache(
+        &self,
+        db: &'db dyn Db,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        cache: Option<&InferenceEvaluationCache<'db>>,
+    ) -> Type<'db> {
         narrow_type_by_constraint(
             db,
             self.narrowing_constraints(),
@@ -4465,6 +4484,7 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
             self.constraint(),
             base_type,
             place,
+            cache,
         )
     }
 }

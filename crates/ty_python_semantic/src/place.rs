@@ -8,7 +8,7 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    InferenceEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
@@ -679,16 +679,16 @@ pub(super) fn place_from_bindings<'db>(
     )
 }
 
-pub(super) fn place_from_bindings_with_reachability_cache<'db>(
+pub(super) fn place_from_bindings_with_inference_cache<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    reachability_cache: &ReachabilityEvaluationCache<'db>,
+    inference_cache: &InferenceEvaluationCache<'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
         db,
         bindings_with_constraints,
         RequiresExplicitReExport::No,
-        Some(reachability_cache),
+        Some(inference_cache),
     )
 }
 
@@ -707,16 +707,16 @@ pub(crate) fn place_from_declarations<'db>(
     place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No, None)
 }
 
-pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
+pub(crate) fn place_from_declarations_with_inference_cache<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
-    reachability_cache: &ReachabilityEvaluationCache<'db>,
+    inference_cache: &InferenceEvaluationCache<'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
     place_from_declarations_impl(
         db,
         declarations,
         RequiresExplicitReExport::No,
-        Some(reachability_cache),
+        Some(inference_cache),
     )
 }
 
@@ -1210,7 +1210,7 @@ pub(crate) fn place_by_id<'db>(
 enum DeclarationsBoundnessEvaluator<'map, 'db> {
     AssumeBound,
     BasedOnUnboundVisibility {
-        reachability_cache: Option<&'map ReachabilityEvaluationCache<'db>>,
+        inference_cache: Option<&'map InferenceEvaluationCache<'db>>,
         unbound_visibility: Option<DeclarationWithConstraint<'db>>,
         reachability_constraints: &'map ReachabilityConstraints,
         predicates: &'map IndexSlice<ScopedPredicateId, Predicate<'db>>,
@@ -1233,7 +1233,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                 }
             }
             DeclarationsBoundnessEvaluator::BasedOnUnboundVisibility {
-                reachability_cache,
+                inference_cache,
                 reachability_constraints,
                 unbound_visibility,
                 predicates,
@@ -1250,7 +1250,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                     {
                         evaluate_reachability_with_cache(
                             db,
-                            reachability_cache,
+                            inference_cache,
                             reachability_constraints,
                             predicates,
                             reachability_constraint,
@@ -1471,7 +1471,7 @@ fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    inference_cache: Option<&InferenceEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1499,7 +1499,7 @@ fn place_from_bindings_impl<'db>(
         unbound_reachability_constraint.map(|reachability_constraint| {
             evaluate_reachability_with_cache(
                 db,
-                reachability_cache,
+                inference_cache,
                 reachability_constraints,
                 predicates,
                 reachability_constraint,
@@ -1536,7 +1536,7 @@ fn place_from_bindings_impl<'db>(
                     deleted_reachability = deleted_reachability.or_else(|| {
                         evaluate_reachability_with_cache(
                             db,
-                            reachability_cache,
+                            inference_cache,
                             reachability_constraints,
                             predicates,
                             reachability_constraint,
@@ -1552,7 +1552,7 @@ fn place_from_bindings_impl<'db>(
 
             let static_reachability = evaluate_reachability_with_cache(
                 db,
-                reachability_cache,
+                inference_cache,
                 reachability_constraints,
                 predicates,
                 reachability_constraint,
@@ -1636,7 +1636,12 @@ fn place_from_bindings_impl<'db>(
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
             Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
+                narrowing_constraint.narrow_with_cache(
+                    db,
+                    binding_ty,
+                    binding.place(db),
+                    inference_cache,
+                ),
                 static_reachability,
             ))
         },
@@ -1852,7 +1857,7 @@ fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
     declarations_iterator: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    inference_cache: Option<&InferenceEvaluationCache<'db>>,
 ) -> PlaceFromDeclarationsResult<'db> {
     let predicates = declarations_iterator.predicates();
     let reachability_constraints = declarations_iterator.reachability_constraints();
@@ -1870,7 +1875,7 @@ fn place_from_declarations_impl<'db>(
             let unbound_visibility = declarations_iterator.peek().cloned();
             declarations = Either::Right(declarations_iterator);
             DeclarationsBoundnessEvaluator::BasedOnUnboundVisibility {
-                reachability_cache,
+                inference_cache,
                 unbound_visibility,
                 predicates,
                 reachability_constraints,
@@ -1900,7 +1905,7 @@ fn place_from_declarations_impl<'db>(
 
         let static_reachability = evaluate_reachability_with_cache(
             db,
-            reachability_cache,
+            inference_cache,
             reachability_constraints,
             predicates,
             reachability_constraint,
