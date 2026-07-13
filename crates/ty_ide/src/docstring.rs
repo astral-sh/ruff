@@ -1036,6 +1036,45 @@ Summary.
         "#);
     }
 
+    #[test]
+    fn math_blocks() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Compute the value.
+
+        .. math:: x^2 + y^2 = z^2
+
+        A multiline formula follows.
+
+        .. math::
+            x_1 + x_2
+            = y
+
+        More prose after the formulas.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Compute the value.<HB>
+        <HB>
+
+        ```````````text
+        x^2 + y^2 = z^2
+
+        ```````````
+        A multiline formula follows.<HB>
+        <HB>
+        <HB>
+        ```````````text
+            x_1 + x_2
+            = y
+
+        ```````````
+        More prose after the formulas.
+        ");
+    }
+
     // I don't know if this is valid syntax but we preserve stuff before `..code ::`
     #[test]
     fn code_block_prefix_gunk() {
