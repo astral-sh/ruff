@@ -2,6 +2,20 @@
 
 Narrowing for `isinstance(object, classinfo)` expressions.
 
+## Builtins and typing protocols
+
+Builtin classes are treated as disjoint from typing protocols they do not already satisfy.
+
+```py
+from typing import Awaitable
+
+def _(value: int | Awaitable[str]) -> None:
+    if isinstance(value, Awaitable):
+        reveal_type(value)  # revealed: Awaitable[str]
+    else:
+        reveal_type(value)  # revealed: int
+```
+
 ## `classinfo` is a single type
 
 ```py

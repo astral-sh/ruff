@@ -900,22 +900,25 @@ def custom_container_union(
 
 ### A component with known containment
 
-After the `isinstance` check, `values` has type `Iterable[Literal[1]] & tuple[object, ...]`. Until
+After the `isinstance` check, `values` has type `LiteralOneIterable & tuple[object, ...]`. Until
 [this intersection can be simplified](https://github.com/astral-sh/ty/issues/3890) to
 `tuple[Literal[1], ...]`, membership narrowing preserves the behavior from before containment
 semantics were checked: the `tuple` component establishes that membership compares against its
-elements, while the `Iterable` component constrains those elements to `Literal[1]`.
+elements, while the protocol component constrains those elements to `Literal[1]`.
 
 ```py
-from collections.abc import Iterable
-from typing import Literal, final
+from collections.abc import Iterator
+from typing import Literal, Protocol, final
 
 @final
 class Token: ...
 
+class LiteralOneIterable(Protocol):
+    def __iter__(self) -> Iterator[Literal[1]]: ...
+
 def tuple_component_establishes_containment(
     value: Token | Literal[1],
-    values: Iterable[Literal[1]],
+    values: LiteralOneIterable,
 ) -> None:
     if isinstance(values, tuple) and value in values:
         reveal_type(value)  # revealed: Literal[1]
