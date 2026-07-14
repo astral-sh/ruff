@@ -458,15 +458,19 @@ impl<'db> CallableSignature<'db> {
             .any(|signature| !signature.parameters().as_slice().is_empty())
     }
 
-    /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
-    /// given type. (Does not bind the `self` parameter; to do that, use
-    /// [`bind_self`][Self::bind_self].)
-    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+    /// Replaces `typing.Self` while supplying the runtime receiver for a previously bound
+    /// explicit receiver annotation. This does not bind a visible receiver parameter.
+    pub(crate) fn apply_self_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
         Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.apply_self(db, self_type))
+                .map(|signature| signature.apply_self_with_receiver(db, receiver_type, self_type))
                 .collect(),
         }
     }
@@ -1049,7 +1053,7 @@ impl<'db> Signature<'db> {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                     db,
                     Type::object(),
-                    binding_context.unwrap_or(BindingContext::Synthetic),
+                    BindingContext::Synthetic,
                 ))
             });
             let annotation = if let Some(typing_self_type) = typing_self_type {
@@ -1170,12 +1174,38 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
     }
 
-    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+    fn apply_self_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
         let binding_context = self.definition.map(BindingContext::Definition);
+        let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
+            db,
+            receiver_type,
+            Some(BindingContext::Synthetic),
+        ));
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
-        let visitor = ApplyTypeMappingVisitor::default();
-        let receiver_constraints =
-            self.map_receiver_constraints(db, &self_mapping, TypeContext::default(), &visitor);
+        let receiver_visitor = ApplyTypeMappingVisitor::default();
+        let self_visitor = ApplyTypeMappingVisitor::default();
+        let receiver_constraints = self
+            .map_receiver_constraints(
+                db,
+                &receiver_mapping,
+                TypeContext::default(),
+                &receiver_visitor,
+            )
+            .map(|constraints| {
+                Self::map_constraints(
+                    db,
+                    &constraints,
+                    &self_mapping,
+                    TypeContext::default(),
+                    &self_visitor,
+                )
+            })
+            .filter(|constraints| !constraints.is_always());
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_constraints,
@@ -1187,11 +1217,14 @@ impl<'db> Signature<'db> {
             db,
             &self_mapping,
             TypeContext::default(),
-            &visitor,
+            &self_visitor,
         );
-        let return_ty =
-            self.return_ty
-                .apply_type_mapping(db, &self_mapping, TypeContext::default());
+        let return_ty = self.return_ty.apply_type_mapping_impl(
+            db,
+            &self_mapping,
+            TypeContext::default(),
+            &self_visitor,
+        );
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
@@ -1219,10 +1252,36 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<OwnedConstraintSet<'db>> {
-        self.receiver_constraints
-            .as_ref()
-            .map(|constraints| constraints.apply_type_mapping(db, type_mapping, tcx, visitor))
-            .filter(|constraints| !constraints.is_always())
+        let constraints = self.receiver_constraints.as_ref()?;
+        Some(Self::map_constraints(
+            db,
+            constraints,
+            type_mapping,
+            tcx,
+            visitor,
+        ))
+        .filter(|constraints| !constraints.is_always())
+    }
+
+    fn map_constraints(
+        db: &'db dyn Db,
+        constraints: &OwnedConstraintSet<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> OwnedConstraintSet<'db> {
+        if !constraints
+            .types()
+            .any(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != ty)
+        {
+            return constraints.clone();
+        }
+
+        constraints.query(|_builder, constraints| {
+            constraints
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                .into_owned(db)
+        })
     }
 
     fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {

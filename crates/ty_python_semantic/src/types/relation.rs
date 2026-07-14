@@ -237,24 +237,6 @@ impl TypeRelation {
     }
 }
 
-fn constraint_set_assignable_to_owned<'db>(
-    db: &'db dyn Db,
-    source: Type<'db>,
-    target: Type<'db>,
-) -> OwnedConstraintSet<'db> {
-    let constraints = ConstraintSetBuilder::new();
-    constraints.into_owned(|constraints| {
-        source.has_relation_to_with_typevar_evaluation(
-            db,
-            target,
-            constraints,
-            InferableTypeVars::None,
-            TypeRelation::Assignability,
-            TypeVarEvaluation::Lazy,
-        )
-    })
-}
-
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -490,38 +472,17 @@ impl<'db> Type<'db> {
             source: Type<'db>,
             target: Type<'db>,
         ) -> OwnedConstraintSet<'db> {
-            constraint_set_assignable_to_owned(db, source, target)
-        }
-
-        if self.is_trivially_constraint_set_assignable_to(db, target) {
-            return Cow::Owned(OwnedConstraintSet::always());
-        }
-
-        Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
-            db, self, target,
-        ))
-    }
-
-    /// Computes assignability while remapping an owned constraint set.
-    ///
-    /// Remapping can evaluate recursive protocol relations before the enclosing signature
-    /// comparison establishes its recursion guard, so recursive re-entry is provisionally true.
-    pub(super) fn when_constraint_set_assignable_to_owned_for_mapping(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-    ) -> Cow<'db, OwnedConstraintSet<'db>> {
-        #[salsa::tracked(
-            returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn when_constraint_set_assignable_to_owned_impl<'db>(
-            db: &'db dyn Db,
-            source: Type<'db>,
-            target: Type<'db>,
-        ) -> OwnedConstraintSet<'db> {
-            constraint_set_assignable_to_owned(db, source, target)
+            let constraints = ConstraintSetBuilder::new();
+            constraints.into_owned(|constraints| {
+                source.has_relation_to_with_typevar_evaluation(
+                    db,
+                    target,
+                    constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::Assignability,
+                    TypeVarEvaluation::Lazy,
+                )
+            })
         }
 
         if self.is_trivially_constraint_set_assignable_to(db, target) {

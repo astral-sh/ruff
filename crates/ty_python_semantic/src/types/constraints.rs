@@ -256,88 +256,6 @@ struct OwnedConstraintSetInner<'db> {
     node_indices: RankBitBox,
 }
 
-struct OwnedConstraintSetTypeMapper<'a, 'm, 'db> {
-    db: &'db dyn Db,
-    builder: &'a ConstraintSetBuilder<'db>,
-    inner: &'a OwnedConstraintSetInner<'db>,
-    type_mapping: &'a TypeMapping<'m, 'db>,
-    tcx: TypeContext<'db>,
-    visitor: &'a ApplyTypeMappingVisitor<'db>,
-    node_cache: FxHashMap<NodeId, NodeId>,
-    constraint_cache: FxHashMap<ConstraintId, NodeId>,
-}
-
-impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
-    fn map_constraint(&self, constraint: Constraint<'db>) -> NodeId {
-        let subject = Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
-            self.db,
-            self.type_mapping,
-            self.tcx,
-            self.visitor,
-        );
-        let lower = constraint.bounds.lower.map(|lower| {
-            lower.apply_type_mapping_impl(self.db, self.type_mapping, self.tcx, self.visitor)
-        });
-        let upper = constraint.bounds.upper.map(|upper| {
-            upper.apply_type_mapping_impl(self.db, self.type_mapping, self.tcx, self.visitor)
-        });
-
-        if let Type::TypeVar(typevar) = subject {
-            return Constraint::new_node_with_bounds(self.db, self.builder, typevar, lower, upper);
-        }
-
-        let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
-            self.builder
-                .load(
-                    self.db,
-                    &lower.when_constraint_set_assignable_to_owned_for_mapping(self.db, subject),
-                )
-                .node
-        });
-        let upper_holds = upper.map_or(ALWAYS_TRUE, |upper| {
-            self.builder
-                .load(
-                    self.db,
-                    &subject.when_constraint_set_assignable_to_owned_for_mapping(self.db, upper),
-                )
-                .node
-        });
-        lower_holds.and_with_offset(self.builder, upper_holds)
-    }
-
-    fn rebuild_node(&mut self, old_node: NodeId) -> NodeId {
-        if old_node.is_terminal() {
-            return old_node;
-        }
-        if let Some(mapped) = self.node_cache.get(&old_node) {
-            return *mapped;
-        }
-
-        let old_interior = self.inner.nodes[self.inner.retained_node_index(old_node)];
-        let condition =
-            if let Some(condition) = self.constraint_cache.get(&old_interior.constraint).copied() {
-                condition
-            } else {
-                let condition = self.map_constraint(
-                    self.inner.constraints[self
-                        .inner
-                        .retained_constraint_index(old_interior.constraint)],
-                );
-                self.constraint_cache
-                    .insert(old_interior.constraint, condition);
-                condition
-            };
-        let condition = condition
-            .with_adjusted_source_order(self.builder, old_interior.source_order.saturating_sub(1));
-        let if_true = self.rebuild_node(old_interior.if_true);
-        let if_uncertain = self.rebuild_node(old_interior.if_uncertain);
-        let if_false = self.rebuild_node(old_interior.if_false);
-        let mapped = condition.ite_uncertain(self.builder, if_true, if_uncertain, if_false);
-        self.node_cache.insert(old_node, mapped);
-        mapped
-    }
-}
-
 impl Default for OwnedConstraintSet<'_> {
     fn default() -> Self {
         Self {
@@ -386,69 +304,6 @@ impl<'db> OwnedConstraintSet<'db> {
                     .chain(constraint.bounds.lower)
                     .chain(constraint.bounds.upper)
             })
-        })
-    }
-
-    pub(crate) fn apply_type_mapping(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        let Some(inner) = &self.inner else {
-            return self.clone();
-        };
-
-        let changes_constraint = |constraint: &Constraint<'db>| {
-            Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
-                db,
-                type_mapping,
-                tcx,
-                visitor,
-            ) != Type::TypeVar(constraint.typevar)
-                || constraint.bounds.lower.is_some_and(|lower| {
-                    lower.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != lower
-                })
-                || constraint.bounds.upper.is_some_and(|upper| {
-                    upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != upper
-                })
-        };
-        if !inner.constraints.iter().any(changes_constraint) {
-            return self.clone();
-        }
-
-        let builder = ConstraintSetBuilder::new();
-        builder.into_owned(|builder| {
-            let mut mapper = OwnedConstraintSetTypeMapper {
-                db,
-                builder,
-                inner,
-                type_mapping,
-                tcx,
-                visitor,
-                node_cache: FxHashMap::default(),
-                constraint_cache: FxHashMap::default(),
-            };
-            if inner.nodes.len() == 1 {
-                let old_interior = inner.nodes[inner.retained_node_index(self.node)];
-                let old_constraint =
-                    inner.constraints[inner.retained_constraint_index(old_interior.constraint)];
-                let condition = mapper
-                    .map_constraint(old_constraint)
-                    .with_adjusted_source_order(
-                        builder,
-                        old_interior.source_order.saturating_sub(1),
-                    );
-                let node = condition.ite_uncertain(
-                    builder,
-                    old_interior.if_true,
-                    old_interior.if_uncertain,
-                    old_interior.if_false,
-                );
-                return ConstraintSet::from_node(builder, node);
-            }
-            ConstraintSet::from_node(builder, mapper.rebuild_node(self.node))
         })
     }
 }
@@ -740,8 +595,54 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    /// Copies this constraint set into an owned snapshot.
+    pub(crate) fn into_owned(self, db: &'db dyn Db) -> OwnedConstraintSet<'db> {
+        fn rebuild_node<'db>(
+            db: &'db dyn Db,
+            source: &ConstraintSetBuilder<'db>,
+            target: &ConstraintSetBuilder<'db>,
+            cache: &mut FxHashMap<NodeId, NodeId>,
+            old_node: NodeId,
+        ) -> NodeId {
+            if old_node.is_terminal() {
+                return old_node;
+            }
+            if let Some(remapped) = cache.get(&old_node) {
+                return *remapped;
+            }
+
+            let old_interior = source.interior_node_data(old_node);
+            let old_constraint = source.constraint_data(old_interior.constraint);
+            let condition = Constraint::new_node_with_bounds(
+                db,
+                target,
+                old_constraint.typevar,
+                old_constraint.bounds.lower,
+                old_constraint.bounds.upper,
+            )
+            .with_adjusted_source_order(target, old_interior.source_order.saturating_sub(1));
+            let if_true = rebuild_node(db, source, target, cache, old_interior.if_true);
+            let if_uncertain = rebuild_node(db, source, target, cache, old_interior.if_uncertain);
+            let if_false = rebuild_node(db, source, target, cache, old_interior.if_false);
+            let remapped = condition.ite_uncertain(target, if_true, if_uncertain, if_false);
+            cache.insert(old_node, remapped);
+            remapped
+        }
+
+        let builder = ConstraintSetBuilder::new();
+        builder.into_owned(|builder| {
+            let node = rebuild_node(
+                db,
+                self.builder,
+                builder,
+                &mut FxHashMap::default(),
+                self.node,
+            );
+            ConstraintSet::from_node(builder, node)
+        })
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by a stacked follow-up"))]
     pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -816,13 +717,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
                 } else {
                     let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
-                        lower
-                            .when_constraint_set_assignable_to(db, subject, builder)
+                        builder
+                            .load(
+                                db,
+                                &lower.when_constraint_set_assignable_to_owned(db, subject),
+                            )
                             .node
                     });
                     let upper_holds = upper.map_or(ALWAYS_TRUE, |upper| {
-                        subject
-                            .when_constraint_set_assignable_to(db, upper, builder)
+                        builder
+                            .load(
+                                db,
+                                &subject.when_constraint_set_assignable_to_owned(db, upper),
+                            )
                             .node
                     });
                     lower_holds.and_with_offset(builder, upper_holds)
@@ -8097,67 +8004,6 @@ mod tests {
                 └─₀ never
             "#},
         );
-    }
-
-    #[test]
-    fn mapped_owned_constraint_set_preserves_source_order() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
-            create_constraint(&db, builder, t, KnownClass::Int).and(&db, builder, || {
-                create_constraint(&db, builder, u, KnownClass::Str)
-            })
-        });
-        let generic_context =
-            crate::types::generics::GenericContext::from_typevar_instances(&db, [t, u]);
-        let mapped = owned.apply_type_mapping(
-            &db,
-            &TypeMapping::FreshenBoundTypeVars {
-                generic_context,
-                delta: 1,
-            },
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        );
-
-        mapped.query(|builder, set| {
-            let mut source_orders = Vec::new();
-            set.node
-                .for_each_unique_constraint(builder, &mut |_, source_order| {
-                    source_orders.push(source_order);
-                });
-            source_orders.sort_unstable();
-            assert_eq!(source_orders, [1, 2]);
-        });
-    }
-
-    #[test]
-    fn no_op_owned_constraint_set_mapping_reuses_storage() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let owned = ConstraintSetBuilder::new()
-            .into_owned(|builder| create_constraint(&db, builder, t, KnownClass::Int));
-        let generic_context =
-            crate::types::generics::GenericContext::from_typevar_instances(&db, [u]);
-        let mapped = owned.apply_type_mapping(
-            &db,
-            &TypeMapping::FreshenBoundTypeVars {
-                generic_context,
-                delta: 1,
-            },
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        );
-
-        assert!(Arc::ptr_eq(
-            owned.inner.as_ref().expect("owned set should have storage"),
-            mapped
-                .inner
-                .as_ref()
-                .expect("mapped set should have storage"),
-        ));
     }
 
     #[test]
