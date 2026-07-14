@@ -183,7 +183,138 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
-And of course the same is true if we have only an implicit assignment inside a method:
+### Implicit descriptor binding for annotated callables
+
+If no overload of an annotated callable matches the arguments of an implicit dunder call and an
+overload requires an additional argument, its first parameter binds the receiver. This includes
+annotations that refine methods inherited from a base class, while direct attribute access still
+exposes the unbound callable:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
+from typing import Any
+
+class Operand:
+    def __add__(self, value: Any, /) -> Any: ...
+    def __radd__(self, value: Any, /) -> Any: ...
+    def __iadd__(self, value: Any, /) -> Any: ...
+    def __neg__(self) -> Any: ...
+    def __eq__(self, value: Any, /) -> Any: ...
+    def __contains__(self, value: Any, /) -> Any: ...
+    def __getitem__(self, value: Any, /) -> Any: ...
+    def __setitem__(self, key: Any, value: Any, /) -> Any: ...
+    def __iter__(self) -> Any: ...
+    def __enter__(self) -> Any: ...
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any, /) -> Any: ...
+
+class Index(Operand):
+    __add__: Callable[["Index", Any], "Index"]
+    __radd__: Callable[["Index", Any], "Index"]
+    __iadd__: Callable[["Index", Any], "Index"]
+    __neg__: Callable[["Index"], "Index"]
+    __eq__: Callable[["Index", Any], list[bool]]
+    __contains__: Callable[["Index", Any], bool]
+    __getitem__: Callable[["Index", Any], str]
+    __setitem__: Callable[["Index", Any, str], None]
+    __iter__: Callable[["Index"], Iterator[int]]
+    __enter__: Callable[["Index"], "Index"]
+    __exit__: Callable[["Index", Any, Any, Any], bool]
+
+index = Index()
+reveal_type(index.__add__)  # revealed: (Index, Any, /) -> Index
+reveal_type(index + 1)  # revealed: Index
+reveal_type(1 + index)  # revealed: Index
+reveal_type(-index)  # revealed: Index
+reveal_type(index == 1)  # revealed: list[bool]
+reveal_type(1 in index)  # revealed: bool
+reveal_type(index[1])  # revealed: str
+index[1] = "value"
+
+for value in index:
+    reveal_type(value)  # revealed: int
+
+with index as entered:
+    reveal_type(entered)  # revealed: Index
+
+index += 1
+reveal_type(index)  # revealed: Index
+
+def add(value: Direct, other: int, /) -> Direct:
+    return value
+
+class Direct:
+    __add__: Callable[[Direct, int], Direct] = add
+
+reveal_type(Direct().__add__)  # revealed: (Direct, int, /) -> Direct
+reveal_type(Direct() + 1)  # revealed: Direct
+
+type AliasedAdd = Callable[[Aliased, int], Aliased]
+
+class Aliased:
+    __add__: AliasedAdd
+
+reveal_type(Aliased() + 1)  # revealed: Aliased
+
+class AddDescriptor:
+    def __get__(self, instance: WithDescriptor, owner: type[WithDescriptor], /) -> Callable[[int], str]:
+        raise NotImplementedError
+
+class WithDescriptor:
+    __add__: AddDescriptor = AddDescriptor()
+
+reveal_type(WithDescriptor() + 1)  # revealed: str
+
+class KeywordMapping:
+    __getitem__: Callable[[KeywordMapping, str], int]
+
+    def keys(self) -> list[str]:
+        raise NotImplementedError
+
+def accepts_keywords(**kwargs: int) -> None: ...
+
+accepts_keywords(**KeywordMapping())
+```
+
+Callables whose signatures already accept the implicit arguments remain regular, which supports
+class members implemented by callable objects:
+
+```py
+class BinaryCallable:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+class UnaryCallable:
+    def __call__(self) -> str:
+        return "called"
+
+type RegularBinary = Callable[[int], str]
+
+class WithCallableObjects:
+    __add__: RegularBinary = BinaryCallable()
+    __contains__: Callable[[int], str] = BinaryCallable()
+    __getitem__: Callable[[int], str] = BinaryCallable()
+    __neg__: Callable[[], str] = UnaryCallable()
+
+callable_objects = WithCallableObjects()
+reveal_type(callable_objects + 1)  # revealed: str
+reveal_type(1 in callable_objects)  # revealed: bool
+reveal_type(callable_objects[1])  # revealed: str
+reveal_type(-callable_objects)  # revealed: str
+
+def check_mixed_union(value: Index | WithCallableObjects) -> None:
+    reveal_type(value + 1)  # revealed: Index | str
+```
+
+### Dunder methods attached to instances
+
+Dunder methods assigned to an instance inside a method cannot be called implicitly:
 
 ```py
 from typing import Callable
