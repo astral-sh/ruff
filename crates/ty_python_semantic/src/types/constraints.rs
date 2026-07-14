@@ -681,6 +681,39 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Universally abstracts constraints involving the given type variables from this TDD.
+    ///
+    /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and
+    /// constraints are not applied implicitly, and must be encoded as implications in the input
+    /// constraint set.
+    ///
+    /// # Preconditions
+    ///
+    /// An atomic constraint must not relate a removed type variable to one that remains in the
+    /// result. Callers that need type-level quantification must project those relationships before
+    /// calling this method.
+    pub(crate) fn for_all(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        if to_remove == InferableTypeVars::None {
+            return self;
+        }
+
+        // Universal and existential quantification are duals. Reusing existential abstraction
+        // also keeps this operation on its cached, single-pass implementation.
+        Self::from_node(
+            builder,
+            self.node
+                .negate(builder)
+                .exists(db, builder, to_remove)
+                .negate(builder),
+        )
+    }
+
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance

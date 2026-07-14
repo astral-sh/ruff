@@ -150,6 +150,21 @@ fn freshen_generic_contexts_in_type<'db>(
         })
 }
 
+fn inferable_typevars_from_tuple<'db>(
+    db: &'db dyn Db,
+    instance: &NominalInstanceType<'db>,
+) -> Option<InferableTypeVars<'db>> {
+    let typevars: Option<FxOrderSet<_>> = instance
+        .tuple_spec(db)?
+        .fixed_elements()
+        .map(|ty| {
+            ty.as_typevar()
+                .map(|bound_typevar| bound_typevar.identity(db))
+        })
+        .collect();
+    typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
+}
+
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -2658,6 +2673,31 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetForAll(tracked)) => {
+                        let [Some(typevars)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(instance) = typevars.project_type_form(db) else {
+                            continue;
+                        };
+                        let Some(typevars) = inferable_typevars_from_tuple(db, &instance) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            constraints.load(db, tracked.constraints(db)).for_all(
+                                db,
+                                constraints,
+                                typevars,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
@@ -2666,15 +2706,7 @@ impl<'db> Bindings<'db> {
                                 // Caller explicitly passed None, so no typevars are inferable.
                                 return Some(InferableTypeVars::None);
                             }
-                            let typevars: Option<FxOrderSet<_>> = instance
-                                .tuple_spec(db)?
-                                .fixed_elements()
-                                .map(|ty| {
-                                    ty.as_typevar()
-                                        .map(|bound_typevar| bound_typevar.identity(db))
-                                })
-                                .collect();
-                            typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
+                            inferable_typevars_from_tuple(db, instance)
                         };
 
                         let inferable = match overload.parameter_types() {

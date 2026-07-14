@@ -114,6 +114,11 @@ class ConstraintSet:
         `other`.
         """
 
+    def for_all(self, typevars: TypeForm[tuple[object, ...]]) -> Self:
+        """
+        Universally abstracts the given type variables from this constraint set.
+        """
+
     def satisfied_by_all_typevars(
         self, *, inferable: TypeForm[tuple[object, ...]] | None = None
     ) -> bool:

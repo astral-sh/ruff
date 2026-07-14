@@ -861,6 +861,56 @@ def same_typevar[T]():
     static_assert(constraints == expected)
 ```
 
+## Universal quantification
+
+Universal quantification removes the listed typevars from a constraint set. Any constraints that do
+not involve those typevars must remain in the result, including constraints in an uncertain branch.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def preserves_uncertain_disjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).for_all(tuple[U])
+    static_assert(quantified == t_int)
+
+def removes_multiple_typevars[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).for_all(tuple[T, U])
+    static_assert(quantified == ConstraintSet.never())
+
+def no_typevars_is_identity[T]() -> None:
+    constraints = ConstraintSet.range(Never, T, int)
+    static_assert(constraints.for_all(tuple[()]) == constraints)
+```
+
+The order of existential and universal quantifiers matters. For each target truth assignment there
+is some matching source truth assignment, but no single source truth assignment matches every target
+truth assignment.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def quantifier_order[S, T]() -> None:
+    source_is_int = ConstraintSet.range(int, S, int)
+    target_is_int = ConstraintSet.range(int, T, int)
+    equal = source_is_int.satisfies(target_is_int) & target_is_int.satisfies(source_is_int)
+
+    # ∀T.∃S.equal(S, T) = ∀T.¬∀S.¬equal(S, T)
+    forall_target_exists_source = (~((~equal).for_all(tuple[S]))).for_all(tuple[T])
+    static_assert(forall_target_exists_source == ConstraintSet.always())
+
+    # ∃S.∀T.equal(S, T) = ¬∀S.¬∀T.equal(S, T)
+    forall_target = equal.for_all(tuple[T])
+    exists_source_forall_target = ~((~forall_target).for_all(tuple[S]))
+    static_assert(exists_source_forall_target == ConstraintSet.never())
+```
+
 ## Displaying constraints
 
 The `with_detailed_display` method can be used to print out the boolean formula that a constraint
