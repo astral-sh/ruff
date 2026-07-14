@@ -48,6 +48,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
+use crate::predicate::ScopedPredicateId;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
@@ -397,6 +398,17 @@ impl Bindings {
         }
     }
 
+    pub(super) fn forget_narrowing_predicates(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        predicates: &[ScopedPredicateId],
+    ) {
+        for binding in &mut self.live_bindings {
+            binding.narrowing_constraint =
+                narrowing_constraints.forget_predicates(binding.narrowing_constraint, predicates);
+        }
+    }
+
     /// Add given reachability constraint to all live bindings.
     pub(super) fn record_reachability_constraint(
         &mut self,
@@ -512,6 +524,15 @@ impl PlaceState {
     ) {
         self.bindings
             .record_narrowing_constraint(narrowing_constraints, constraint);
+    }
+
+    pub(super) fn forget_narrowing_predicates(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        predicates: &[ScopedPredicateId],
+    ) {
+        self.bindings
+            .forget_narrowing_predicates(narrowing_constraints, predicates);
     }
 
     /// Add the given constraint to live bindings that were also present at an earlier use.

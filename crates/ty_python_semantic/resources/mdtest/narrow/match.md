@@ -224,49 +224,95 @@ def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int])
 def test_match_exact_object_sequence(value: object) -> None:
     match value:
         case int(), str():
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
-            reveal_type(value[1])  # revealed: object
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
 
 def test_match_empty_object_sequence(value: object) -> None:
     match value:
         case []:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
+            reveal_type(len(value))  # revealed: Literal[0]
 
 def test_match_singleton_object_sequence(value: object) -> None:
     match value:
         case [int()]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
+            reveal_type(len(value))  # revealed: Literal[1]
+            reveal_type(value[0])  # revealed: int
+
+def test_match_singleton_object_sequence_capture(value: object) -> None:
+    match value:
+        case [int() as item]:
+            reveal_type(value[0])  # revealed: int
+            reveal_type(item)  # revealed: int
+
+def test_mutable_sequence_subject_discards_observations_after_method_call(
+    value: list[int | str] | None,
+) -> None:
+    match value:
+        case [int(), str()]:
+            reveal_type(value[0])  # revealed: int
+            value.reverse()
+            reveal_type(value)  # revealed: list[int | str]
+            reveal_type(value[0])  # revealed: int | str
+
+def reverse_sequence(value: list[int | str]) -> None:
+    value.reverse()
+
+# These tests deliberately document the current limits of the invalidation heuristic. The
+# revealed types are unsound because each operation can invalidate the observed first element.
+def test_sequence_observation_is_not_discarded_after_method_call_through_alias(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            alias = value
+            alias.reverse()
+            reveal_type(value[0])  # revealed: int
+
+def test_sequence_observation_is_not_discarded_after_passing_to_function(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            reverse_sequence(value)
+            reveal_type(value[0])  # revealed: int
+
+def test_sequence_observation_is_not_discarded_after_subscript_assignment(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            value[0] = "replacement"
+            reveal_type(value[0])  # revealed: int
 
 def test_match_prefix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
             reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
+            reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest, str()]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(value[0])  # revealed: object
-            reveal_type(value[-1])  # revealed: object
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[-1])  # revealed: str
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
     match value:
         case [int(), *rest]:
-            reveal_type(value[0])  # revealed: int | str
+            reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: int | str
             reveal_type(rest)  # revealed: list[int | str]
 ```
@@ -538,7 +584,8 @@ def failed_sequence_alternative_does_not_narrow_later_capture(
                 item.append(1)
                 match item:
                     case [only]:
-                        reveal_type(item)  # revealed: list[int]
+                        # revealed: list[int] & <Protocol with members '__getitem__', '__len__'>
+                        reveal_type(item)
 ```
 
 ## Declared pattern captures
@@ -678,7 +725,7 @@ def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
             whole.clear()
             match whole:
                 case []:
-                    reveal_type(whole)  # revealed: list[int]
+                    reveal_type(whole)  # revealed: list[int] & <Protocol with members '__len__'>
 
 def failed_sequence_pattern_does_not_narrow_mutable_subject(
     value: list[int],
@@ -692,7 +739,7 @@ def failed_sequence_pattern_does_not_narrow_mutable_subject(
             value.clear()
             match value:
                 case []:
-                    reveal_type(value)  # revealed: list[int]
+                    reveal_type(value)  # revealed: list[int] & <Protocol with members '__len__'>
 ```
 
 ## Indirect class patterns

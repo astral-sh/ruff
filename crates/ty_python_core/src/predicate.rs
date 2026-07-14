@@ -135,6 +135,11 @@ pub enum PredicateNode<'db> {
     /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
+    /// Flow-sensitive length and indexed-element facts observed by a sequence pattern.
+    ///
+    /// Unlike the ordinary pattern predicate, this constraint can be discarded after an operation
+    /// that may invalidate those observations.
+    PatternObservation(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }

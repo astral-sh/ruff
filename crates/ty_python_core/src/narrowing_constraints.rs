@@ -248,6 +248,50 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Existentially remove `predicates` from a narrowing formula.
+    ///
+    /// This preserves constraints established by every other predicate while forgetting facts
+    /// whose validity ended at the current control-flow point.
+    pub(crate) fn forget_predicates(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        predicates: &[ScopedPredicateId],
+    ) -> ScopedNarrowingConstraint {
+        fn forget(
+            builder: &mut NarrowingConstraintsBuilder,
+            constraint: ScopedNarrowingConstraint,
+            predicates: &[ScopedPredicateId],
+            cache: &mut FxHashMap<ScopedNarrowingConstraint, ScopedNarrowingConstraint>,
+        ) -> ScopedNarrowingConstraint {
+            if constraint.is_terminal() {
+                return constraint;
+            }
+            if let Some(result) = cache.get(&constraint) {
+                return *result;
+            }
+
+            let node = builder.interiors[constraint];
+            let if_true = forget(builder, node.if_true, predicates, cache);
+            let if_uncertain = forget(builder, node.if_uncertain, predicates, cache);
+            let if_false = forget(builder, node.if_false, predicates, cache);
+            let result = if predicates.contains(&node.atom) {
+                let either_value = builder.add_or_constraint(if_true, if_false);
+                builder.add_or_constraint(either_value, if_uncertain)
+            } else {
+                builder.add_interior(InteriorNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                })
+            };
+            cache.insert(constraint, result);
+            result
+        }
+
+        forget(self, constraint, predicates, &mut FxHashMap::default())
+    }
+
     pub(crate) fn add_negated_atom(
         &mut self,
         predicate: ScopedPredicateId,
@@ -462,6 +506,22 @@ mod tests {
                 evaluate(&constraints, formula, &values),
                 (values[0] || values[1]) && !values[2],
             );
+        }
+    }
+
+    #[test]
+    fn forgetting_a_predicate_preserves_other_constraints() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let a = predicate(0);
+        let b = predicate(1);
+        let a_constraint = constraints.add_atom(a);
+        let b_constraint = constraints.add_atom(b);
+        let formula = constraints.add_and_constraint(a_constraint, b_constraint);
+
+        let without_a = constraints.forget_predicates(formula, &[a]);
+        for mask in 0_u8..4 {
+            let values = [mask & 0b01 != 0, mask & 0b10 != 0];
+            assert_eq!(evaluate(&constraints, without_a, &values), values[1]);
         }
     }
 

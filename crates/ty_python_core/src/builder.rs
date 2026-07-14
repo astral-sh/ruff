@@ -1947,6 +1947,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
+                    PredicateNode::PatternObservation(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .pattern(pattern, module)
+                    }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::IsNonEmptyIterable(_)
@@ -2218,7 +2223,36 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             predicate_id
         };
+
+        if !is_catchall
+            && !subject_targets.is_empty()
+            && Self::pattern_observes_sequence_shape(pattern_predicate.kind(self.db))
+        {
+            let observation_id = self
+                .current_use_def_map_mut()
+                .add_sequence_observation_predicate(PredicateOrLiteral::Predicate(Predicate {
+                    node: PredicateNode::PatternObservation(pattern_predicate),
+                    is_positive: true,
+                }));
+            for (place, bindings) in subject_targets {
+                self.current_use_def_map_mut()
+                    .record_narrowing_constraint_for_bindings(observation_id, *place, bindings);
+            }
+        }
         (predicate, predicate_id)
+    }
+
+    fn pattern_observes_sequence_shape(pattern: &PatternPredicateKind<'_>) -> bool {
+        match pattern {
+            PatternPredicateKind::Sequence(_) => true,
+            PatternPredicateKind::Or(patterns) => {
+                patterns.iter().any(Self::pattern_observes_sequence_shape)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::pattern_observes_sequence_shape(pattern)
+            }
+            _ => false,
+        }
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -4648,6 +4682,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Await(_) => {
                 self.mark_current_comprehension_async();
                 walk_expr(self, expr);
+            }
+            ast::Expr::Call(call) => {
+                walk_expr(self, expr);
+
+                if let Some(receiver) = call.func.as_attribute_expr().map(|attr| &*attr.value)
+                    && let Some(receiver_place) = PlaceExpr::try_from_expr(receiver)
+                    && let Some(receiver_id) = self
+                        .current_place_table()
+                        .place_id((&receiver_place).into())
+                {
+                    self.current_use_def_map_mut()
+                        .forget_sequence_observations_for_place(receiver_id);
+                }
             }
             _ => {
                 walk_expr(self, expr);

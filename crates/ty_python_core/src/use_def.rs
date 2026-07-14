@@ -1611,6 +1611,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
 
+    /// Pattern predicates whose sequence-shape observations can become stale.
+    sequence_observation_predicates: Vec<ScopedPredicateId>,
+
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
@@ -1671,6 +1674,7 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             used_bindings: IndexVec::from_iter([false]),
             predicates: PredicatesBuilder::default(),
+            sequence_observation_predicates: Vec::new(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
@@ -1816,6 +1820,37 @@ impl<'db> UseDefMapBuilder<'db> {
             PredicateOrLiteral::Literal(true) => ScopedPredicateId::ALWAYS_TRUE,
             PredicateOrLiteral::Literal(false) => ScopedPredicateId::ALWAYS_FALSE,
         }
+    }
+
+    pub(super) fn add_sequence_observation_predicate(
+        &mut self,
+        predicate: PredicateOrLiteral<'db>,
+    ) -> ScopedPredicateId {
+        let predicate_id = self.add_predicate(predicate);
+        if predicate_id != ScopedPredicateId::ALWAYS_TRUE
+            && predicate_id != ScopedPredicateId::ALWAYS_FALSE
+        {
+            self.sequence_observation_predicates.push(predicate_id);
+        }
+        predicate_id
+    }
+
+    pub(super) fn forget_sequence_observations_for_place(&mut self, place: ScopedPlaceId) {
+        if self.sequence_observation_predicates.is_empty() {
+            return;
+        }
+        let pending = self.pending_reachability.current;
+        let state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let state = self.pending_reachability.materialize(
+            state,
+            pending,
+            &mut self.reachability_constraints,
+        );
+        state.forget_narrowing_predicates(
+            &mut self.narrowing_constraints,
+            &self.sequence_observation_predicates,
+        );
     }
 
     /// Records a narrowing constraint for only the specified places.

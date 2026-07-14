@@ -95,6 +95,11 @@ pub(crate) fn infer_narrowing_constraints<'db>(
                 .and_then(|constraints| constraints.get(&place).cloned());
             (positive, negative)
         }
+        PredicateNode::PatternObservation(pattern) => {
+            let positive = all_sequence_observation_constraints_for_pattern(db, pattern)
+                .and_then(|constraints| constraints.get(&place).cloned());
+            (positive, None)
+        }
         PredicateNode::SubjectElementPattern(subject_element) => {
             let positive = all_narrowing_constraints_for_subject_element_pattern(
                 db,
@@ -123,6 +128,21 @@ fn all_narrowing_constraints_for_pattern<'db>(
 ) -> Option<FrozenNarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
+}
+
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn all_sequence_observation_constraints_for_pattern<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> Option<FrozenNarrowingConstraints<'db>> {
+    let module = parsed_module(db, pattern.file(db)).load(db);
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::PatternObservation(pattern),
+        true,
+    )
+    .finish()
 }
 
 #[salsa::tracked(
@@ -1063,6 +1083,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::Pattern(pattern) => {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
+            PredicateNode::PatternObservation(pattern) => {
+                self.evaluate_pattern_observation(pattern)
+            }
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
@@ -1254,6 +1277,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             constraints.insert(place, subject_constraint);
         }
         (!constraints.is_empty()).then_some(constraints)
+    }
+
+    fn evaluate_pattern_observation(
+        &mut self,
+        pattern: PatternPredicate<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let subject = pattern.subject(self.db);
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        let subject_place = PlaceExpr::try_from_expr(subject_node)?;
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
+            return None;
+        }
+
+        let observation = necessary_match_pattern_type(self.db, pattern.kind(self.db));
+        let observed_subject_ty = IntersectionBuilder::new(self.db)
+            .add_positive(subject_ty)
+            .add_positive(observation)
+            .build();
+        if observed_subject_ty.is_equivalent_to(self.db, subject_ty) {
+            return None;
+        }
+
+        Some(NarrowingConstraints::from_iter([(
+            self.expect_place(&subject_place),
+            NarrowingConstraint::intersection(observation),
+        )]))
     }
 
     fn evaluate_positive_pattern_related_expressions(
@@ -2632,6 +2682,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
+            PredicateNode::PatternObservation(pattern) => pattern.scope(self.db),
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(self.db)
             }
