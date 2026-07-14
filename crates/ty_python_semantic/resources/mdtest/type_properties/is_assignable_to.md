@@ -1324,22 +1324,11 @@ def call_impl(a: A, x: int) -> str:
     return ""
 
 class A:
-    __call__ = call_impl
+    __call__: Callable[[A, int], str] = call_impl
 
 static_assert(is_assignable_to(A, Callable[[int], str]))
 static_assert(not is_assignable_to(A, Callable[[int], int]))
 reveal_type(A()(1))  # revealed: str
-
-class CallImpl:
-    def __call__(self, value: ExplicitA, x: int) -> str:
-        return ""
-
-class ExplicitA:
-    __call__: Callable[[ExplicitA, int], str] = CallImpl()
-
-static_assert(is_assignable_to(ExplicitA, Callable[[ExplicitA, int], str]))
-static_assert(not is_assignable_to(ExplicitA, Callable[[ExplicitA, int], int]))
-reveal_type(ExplicitA()(ExplicitA(), 1))  # revealed: str
 ```
 
 ### Subclass of

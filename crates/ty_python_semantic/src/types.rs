@@ -111,7 +111,7 @@ pub(crate) use literal::{
 };
 pub use special_form::SpecialFormType;
 pub(crate) use special_form::TypedDictModule;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
@@ -456,6 +456,7 @@ bitflags! {
         /// All other attributes use the `WithInstanceFallback` policy.
         ///
         /// If this flag is set - look up the attribute on the meta-type only.
+        /// This also selects method-like binding for concrete callable dunder declarations.
         const NO_INSTANCE_FALLBACK = 1 << 0;
 
         /// When looking up an attribute on a class, we sometimes need to avoid
@@ -483,12 +484,6 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
-
-        /// Promote explicitly annotated callable class members before descriptor access.
-        ///
-        /// Implicit dunder calls use this when the regular callable signature is missing an
-        /// argument, since its first parameter can represent the receiver.
-        const BIND_ANNOTATED_CALLABLE = 1 << 6;
     }
 }
 
@@ -2861,6 +2856,8 @@ impl<'db> Type<'db> {
                 ..
             }) => self.instance_member(db, &name),
             _ => {
+                let is_dunder_lookup =
+                    policy.no_instance_fallback() && name.starts_with("__") && name.ends_with("__");
                 let member = if let Type::TypeVar(_) = self
                     && let Some(class) = self.nominal_class(db)
                 {
@@ -2870,12 +2867,26 @@ impl<'db> Type<'db> {
                     self.class_member_with_policy(db, name, policy)
                 };
 
-                // Inferred class-body callables, `ClassVar` callables, and explicitly annotated
-                // callables selected during implicit dunder lookup behave as descriptors only
-                // when read through an instance. Keep their declared signatures intact for writes
-                // and protocol compatibility checks.
-                if policy.contains(MemberLookupPolicy::BIND_ANNOTATED_CALLABLE)
-                    || member.is_class_var()
+                let is_callable_dunder = is_dunder_lookup
+                    && matches!(member.place, Place::Defined(place) if place
+                    .provenance
+                    .definition()
+                    .is_some_and(|definition| {
+                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                            && inferred_declaration(db, definition)
+                                .declared()
+                                .is_some_and(|declared| {
+                                    let ty = declared.inner_type();
+                                    ty.into_function_like_callable(db) != ty
+                                })
+                    }));
+
+                // Inferred class-body callables, `ClassVar` callables, and concrete callable
+                // dunders behave as descriptors when read through an instance. Dunder lookup uses
+                // the unspecialized declaration so callable-bounded TypeVars and ParamSpecs keep
+                // their full signatures after specialization.
+                if member.is_class_var()
+                    || is_callable_dunder
                     || matches!(
                         member.place,
                         Place::Defined(DefinedPlace {
@@ -4518,14 +4529,12 @@ impl<'db> Type<'db> {
         let key = key
             .map(|key| Type::string_literal(db, key))
             .unwrap_or(Type::unknown());
-        let arguments = CallArguments::positional([key]);
 
         match self
-            .member_lookup_for_dunder_call(
+            .member_lookup_with_policy(
                 db,
-                "__getitem__",
-                &arguments,
-                MemberLookupPolicy::default(),
+                Name::new_static("__getitem__"),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
             .place
         {
@@ -4534,7 +4543,7 @@ impl<'db> Type<'db> {
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) => getitem_method
-                .try_call(db, &arguments)
+                .try_call(db, &CallArguments::positional([key]))
                 .ok()
                 .map(|bindings| bindings.return_type(db)),
 
@@ -5587,36 +5596,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Look up a dunder for an implicit call, promoting an annotated callable when its regular
-    /// signature is missing the receiver.
-    fn member_lookup_for_dunder_call(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        argument_types: &CallArguments<'_, 'db>,
-        policy: MemberLookupPolicy,
-    ) -> PlaceAndQualifiers<'db> {
-        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
-        let member = self.member_lookup_with_policy(db, name.into(), policy);
-        let requires_receiver = member.ignore_possibly_undefined().is_some_and(|ty| {
-            ty.into_function_like_callable(db) != ty
-                && ty
-                    .bindings(db)
-                    .match_parameters(db, argument_types)
-                    .requires_additional_arguments()
-        });
-
-        if requires_receiver {
-            self.member_lookup_with_policy(
-                db,
-                name.into(),
-                policy | MemberLookupPolicy::BIND_ANNOTATED_CALLABLE,
-            )
-        } else {
-            member
-        }
-    }
-
     /// Same as `try_call_dunder`, but allows specifying a policy for the member lookup. In
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
@@ -5640,8 +5619,11 @@ impl<'db> Type<'db> {
             return union.try_call_dunder_with_policy(db, name, argument_types, tcx, policy);
         }
 
+        // Implicit calls to dunder methods never access instance members, so we pass
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies:
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         match self
-            .member_lookup_for_dunder_call(db, name, argument_types, policy)
+            .member_lookup_with_policy(db, name.into(), policy)
             .place
         {
             Place::Defined(DefinedPlace {
@@ -7540,7 +7522,11 @@ impl<'db> UnionType<'db> {
 
         for element in elements {
             match element
-                .member_lookup_for_dunder_call(db, name, argument_types, policy)
+                .member_lookup_with_policy(
+                    db,
+                    name.into(),
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
                 .place
             {
                 Place::Defined(DefinedPlace {

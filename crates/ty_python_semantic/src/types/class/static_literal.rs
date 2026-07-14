@@ -1135,28 +1135,54 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        struct IntoRegularCallable;
+        #[derive(Clone, Copy)]
+        enum CallableTransform {
+            Regular,
+            GradualDunder,
+        }
 
-        fn into_regular_callable<'d>(
+        struct TransformCallable;
+
+        fn transform_callable<'d>(
             db: &'d dyn Db,
             ty: Type<'d>,
-            visitor: &TypeTransformer<'d, IntoRegularCallable>,
+            transform: CallableTransform,
+            visitor: &TypeTransformer<'d, TransformCallable>,
         ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty) => Type::Callable(callable_ty.into_regular(db)),
+            match (ty, transform) {
+                (Type::Callable(callable_ty), CallableTransform::Regular) => {
+                    Type::Callable(callable_ty.into_regular(db))
+                }
+                (Type::Callable(callable_ty), CallableTransform::GradualDunder)
+                    if callable_ty.is_regular(db)
+                        && callable_ty
+                            .signatures(db)
+                            .iter()
+                            .any(|signature| signature.parameters().is_gradual()) =>
+                {
+                    Type::Callable(callable_ty.into_function_like(db))
+                }
                 // A TypeVar annotation can specialize to a function literal. Erase that runtime
                 // provenance so the explicit annotation still behaves as a regular callable.
-                Type::FunctionLiteral(function) => {
+                (Type::FunctionLiteral(function), CallableTransform::Regular) => {
                     Type::Callable(function.into_callable_type(db).into_regular(db))
                 }
-                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
-                    into_regular_callable(db, alias.value_type(db), visitor)
+                (Type::TypeAlias(alias), transform) => visitor.visit_type(db, ty, || {
+                    let value_type = alias.value_type(db);
+                    let transformed = transform_callable(db, value_type, transform, visitor);
+                    if transformed == value_type {
+                        ty
+                    } else {
+                        transformed
+                    }
                 }),
-                Type::Union(union) => {
-                    union.map(db, |element| into_regular_callable(db, *element, visitor))
-                }
-                Type::Intersection(intersection) => intersection
-                    .map_positive(db, |element| into_regular_callable(db, *element, visitor)),
+                (Type::Union(union), transform) => union.map(db, |element| {
+                    transform_callable(db, *element, transform, visitor)
+                }),
+                (Type::Intersection(intersection), transform) => intersection
+                    .map_positive(db, |element| {
+                        transform_callable(db, *element, transform, visitor)
+                    }),
                 _ => ty,
             }
         }
@@ -1175,16 +1201,35 @@ impl<'db> StaticClassLiteral<'db> {
             }
         };
 
-        // An annotated callable does not tell us whether the runtime value implements the
-        // descriptor protocol. Preserve its regular callable behavior for raw MRO lookup; implicit
-        // dunder calls can promote it before descriptor access if the signature needs a receiver.
+        // A wholly gradual callable dunder generally describes a method. Keep it function-like so
+        // class-level inspection (for example, `Method.__call__.__code__`) remains available.
+        // Concrete callable dunders are promoted during implicit lookup, while other explicitly
+        // annotated callables remain regular after specialization.
         if !member.is_class_var()
             && let Place::Defined(place) = member.place
-            && place.provenance.definition().is_some_and(|definition| {
-                matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-            })
+            && let Some(definition) = place.provenance.definition()
+            && matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
         {
-            member.map_type(|ty| into_regular_callable(db, ty, &TypeTransformer::default()))
+            let is_gradual_callable_dunder = name.starts_with("__")
+                && name.ends_with("__")
+                && inferred_declaration(db, definition)
+                    .declared()
+                    .is_some_and(|declared| {
+                        let ty = declared.inner_type();
+                        transform_callable(
+                            db,
+                            ty,
+                            CallableTransform::GradualDunder,
+                            &TypeTransformer::default(),
+                        ) != ty
+                    });
+
+            let transform = if is_gradual_callable_dunder {
+                CallableTransform::GradualDunder
+            } else {
+                CallableTransform::Regular
+            };
+            member.map_type(|ty| transform_callable(db, ty, transform, &TypeTransformer::default()))
         } else {
             member
         }

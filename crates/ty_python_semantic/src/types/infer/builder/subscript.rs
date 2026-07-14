@@ -1276,11 +1276,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 definedness: boundness,
                 ..
             }) = identity_instance
-                .member_lookup_for_dunder_call(
+                .member_lookup_with_policy(
                     db,
-                    "__setitem__",
-                    &call_arguments,
-                    MemberLookupPolicy::default(),
+                    "__setitem__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
                 .place
             {

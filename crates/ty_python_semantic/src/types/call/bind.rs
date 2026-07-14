@@ -984,25 +984,6 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    /// Returns `true` if no overload matches the argument shape and at least one is missing a
-    /// required argument. This must be called after [`Self::match_parameters`].
-    pub(crate) fn requires_additional_arguments(&self) -> bool {
-        let mut has_compatible_overload = false;
-        let mut has_missing_arguments = false;
-
-        for callable in self.iter_flat() {
-            has_compatible_overload |= callable.matching_overloads().next().is_some();
-            has_missing_arguments |= callable.overloads().iter().any(|overload| {
-                overload
-                    .errors()
-                    .iter()
-                    .any(|error| matches!(error, BindingError::MissingArguments { .. }))
-            });
-        }
-
-        !has_compatible_overload && has_missing_arguments
-    }
-
     fn match_parameters_in_place(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         for item in self.iter_callable_items_mut() {
             item.match_parameters(db, arguments);

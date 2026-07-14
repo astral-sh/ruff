@@ -103,14 +103,16 @@ also fail at runtime.
 
 There is no perfect solution here, but for compatibility with other type checkers we treat inferred
 class-body callables and `ClassVar`-annotated callables with a positional receiver as bound-method
-descriptors. Wholly gradual signatures have no known receiver to bind, and explicit non-`ClassVar`
-callable annotations remain regular callables.
+descriptors. Wholly gradual signatures have no known receiver to bind during ordinary attribute
+access, and explicit non-`ClassVar` callable annotations remain regular. Concrete callable dunders
+are treated as methods when invoked implicitly; callable-bounded TypeVars and ParamSpecs remain
+regular. Gradual callable dunders retain function-like behavior for class-level inspection.
 
 ## Callable descriptor lookup modes
 
-Promotion to a bound-method descriptor only affects instance reads. Class reads and writes retain
-the declared callable signature. This also applies when the callable is hidden behind a PEP 695 type
-alias or has a gradual `Concatenate` tail:
+For inferred and `ClassVar` callables, promotion to a bound-method descriptor only affects instance
+reads. Class reads and writes retain the declared callable signature. This also applies when the
+callable is hidden behind a PEP 695 type alias or has a gradual `Concatenate` tail:
 
 ```py
 from collections.abc import Callable
@@ -315,8 +317,8 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-By contrast, explicitly annotated non-`ClassVar` dunder attributes remain regular callables during
-ordinary attribute access:
+An explicitly annotated non-`ClassVar` callable dunder without a positional first parameter remains
+a regular callable:
 
 ```py
 class Thunk:
@@ -328,8 +330,7 @@ class Thunk:
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
 ```
 
-In particular, a dunder name alone does not cause a concrete callable annotation to bind its first
-parameter during ordinary attribute access:
+In particular, ordinary attribute access retains the full signature of a concrete callable dunder:
 
 ```py
 def descriptor_candidate(value: str) -> int:
@@ -341,7 +342,8 @@ class DescriptorCandidate:
 reveal_type(DescriptorCandidate().__value__)  # revealed: (str, /) -> int
 ```
 
-A gradual callable annotation likewise remains regular and does not gain function attributes:
+A gradual callable annotation on a dunder also describes a method, so function attributes are
+available on the class member:
 
 ```py
 from typing import Any
@@ -349,7 +351,6 @@ from typing import Any
 class Method:
     __call__: Callable[..., Any]
 
-# error: [unresolved-attribute]
 Method.__call__.__code__
 ```
 
