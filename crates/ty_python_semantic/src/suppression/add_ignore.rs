@@ -272,7 +272,7 @@ fn add_to_existing_suppression(
     offset: TextSize,
 ) -> Option<Fix> {
     let mut existing_suppressions = suppressions
-        .line_suppressions(TextRange::empty(offset))
+        .inline_suppressions(TextRange::empty(offset))
         .filter(|suppression| {
             matches!(
                 suppression.target,

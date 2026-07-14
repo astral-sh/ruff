@@ -26,7 +26,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
     let mut unused = Vec::with_capacity(
         all.file
             .len()
-            .saturating_add(all.line.len())
+            .saturating_add(all.inline.len())
             .saturating_sub(diagnostics.used_len()),
     );
 

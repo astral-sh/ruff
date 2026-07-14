@@ -451,12 +451,12 @@ pub(crate) struct Suppressions {
     /// spans the entire file.
     file: SmallVec<[Suppression; 1]>,
 
-    /// Suppressions that apply to a specific line (or lines).
+    /// Suppressions that apply inline rather than to the entire file.
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
     /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
-    line: IntervalIndex<Suppression>,
+    inline: IntervalIndex<Suppression>,
 
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
@@ -478,17 +478,17 @@ impl Suppressions {
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.file
             .iter()
-            .chain(self.line_suppressions(range))
+            .chain(self.inline_suppressions(range))
             .filter(move |suppression| suppression.matches(id))
     }
 
-    /// Returns the line-level suppressions that apply for `range`.
+    /// Returns the inline suppressions that apply for `range`.
     ///
     /// A suppression applies for the given range if it contains the range's start or end offset.
     /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
     /// suppressions cover the following logical line.
-    fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        self.line.intersecting(range).filter(move |suppression| {
+    fn inline_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
+        self.inline.intersecting(range).filter(move |suppression| {
             // Don't use intersect to avoid that suppressions on inner-expression
             // ignore errors for outer expressions
             suppression.suppressed_range.contains(range.start())
@@ -497,7 +497,7 @@ impl Suppressions {
     }
 
     fn iter(&self) -> SuppressionsIter<'_> {
-        self.file.iter().chain(self.line.iter())
+        self.file.iter().chain(self.inline.iter())
     }
 }
 
@@ -634,7 +634,7 @@ struct SuppressionsBuilder<'a> {
     /// This boolean tracks if there has been any non trivia token.
     seen_non_trivia_token: bool,
 
-    line: Vec<Suppression>,
+    inline: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
     unknown: Vec<UnknownSuppression>,
     invalid: Vec<InvalidSuppression>,
@@ -646,7 +646,7 @@ impl<'a> SuppressionsBuilder<'a> {
             source,
             lint_registry,
             seen_non_trivia_token: false,
-            line: Vec::new(),
+            inline: Vec::new(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
             invalid: Vec::new(),
@@ -664,7 +664,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
         Suppressions {
             file: self.file,
-            line: IntervalIndex::from_sorted(self.line),
+            inline: IntervalIndex::from_sorted(self.inline),
             unknown: self.unknown,
             invalid: self.invalid,
         }
@@ -695,7 +695,7 @@ impl<'a> SuppressionsBuilder<'a> {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
-                self.line.push(suppression);
+                self.inline.push(suppression);
             }
         };
 
