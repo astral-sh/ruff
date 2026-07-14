@@ -1620,11 +1620,11 @@ impl PendingReachability {
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
         branch: PendingReachabilityId,
-        branch_ancestor: PendingReachabilityId,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        let branch_ancestor = self.common_ancestor(self.current, branch);
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
@@ -2647,14 +2647,10 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
         let branch = snapshot.pending_reachability;
-        let branch_ancestor = self
-            .pending_reachability
-            .common_ancestor(self.pending_reachability.current, branch);
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
             branch,
-            branch_ancestor,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -2663,7 +2659,6 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.member_states,
             snapshot.member_states,
             branch,
-            branch_ancestor,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
