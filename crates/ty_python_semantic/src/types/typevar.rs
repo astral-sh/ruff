@@ -1203,7 +1203,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::EraseNarrowingMaterialization
+            | TypeMapping::EraseDeferredMaterialization
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion

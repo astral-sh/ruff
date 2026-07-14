@@ -193,10 +193,10 @@ impl<'db> SubclassOfType<'db> {
                 .to_meta_type(db),
             SubclassOfInner::Dynamic(_) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top | MaterializationKind::TopForNarrowing => {
+                    MaterializationKind::Top | MaterializationKind::DeferredTop => {
                         KnownClass::Type.to_instance(db)
                     }
-                    MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing => {
+                    MaterializationKind::Bottom | MaterializationKind::DeferredBottom => {
                         Type::Never
                     }
                 },
