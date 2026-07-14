@@ -72,6 +72,72 @@ fn nfkc_normalizes_names() {
 }
 
 #[test]
+fn nested_expression_lists() {
+    let parsed = parse_expression(
+        r#"outer(first, inner(one, two), f"{nested(three, four)}", left < nested(five < six, seven) < right, (one, [two, {three, four}], target[one:two, three:four]), [x for x in values if one and inner(two, three) if other < thing], last)"#,
+    )
+    .unwrap();
+    let Expr::Call(outer) = parsed.expr() else {
+        panic!("expected call expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(outer.arguments.args.len(), 7);
+    let Expr::Call(inner) = &outer.arguments.args[1] else {
+        panic!("expected nested call expression");
+    };
+    assert_eq!(inner.arguments.args.len(), 2);
+    let Expr::Compare(compare) = &outer.arguments.args[3] else {
+        panic!("expected comparison expression");
+    };
+    assert_eq!(compare.comparators.len(), 2);
+    let Expr::Tuple(tuple) = &outer.arguments.args[4] else {
+        panic!("expected tuple expression");
+    };
+    assert_eq!(tuple.elts.len(), 3);
+    let Expr::ListComp(comprehension) = &outer.arguments.args[5] else {
+        panic!("expected list comprehension");
+    };
+    assert_eq!(comprehension.generators[0].ifs.len(), 2);
+}
+
+#[test]
+fn nested_statement_lists() {
+    let suite = parse_module(
+        r"
+def outer():
+    first
+    if condition:
+        nested_one
+        if other:
+            deep
+            deeper
+        nested_two
+    else:
+        alternative
+    last
+after
+",
+    )
+    .unwrap()
+    .into_suite();
+
+    assert_eq!(suite.len(), 2);
+    let Stmt::FunctionDef(outer) = &suite[0] else {
+        panic!("expected function definition");
+    };
+    assert_eq!(outer.body.len(), 3);
+    let Stmt::If(outer_if) = &outer.body[1] else {
+        panic!("expected if statement");
+    };
+    assert_eq!(outer_if.body.len(), 3);
+    assert_eq!(outer_if.elif_else_clauses[0].body.len(), 1);
+    let Stmt::If(inner_if) = &outer_if.body[1] else {
+        panic!("expected nested if statement");
+    };
+    assert_eq!(inner_if.body.len(), 2);
+}
+
+#[test]
 fn number_values() {
     let cases = [
         ("1E400", Number::Float(f64::INFINITY)),

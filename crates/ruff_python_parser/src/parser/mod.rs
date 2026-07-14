@@ -6,7 +6,7 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+    AtomicNodeIndex, Expr, Int, IpyEscapeKind, Mod, ModExpression, ModModule, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -68,6 +68,12 @@ pub(crate) struct Parser<'src> {
 
     /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
     max_nesting_depth: u32,
+
+    /// Reusable, nesting-safe scratch storage for expression lists.
+    expr_scratch: Vec<Expr>,
+
+    /// Reusable, nesting-safe scratch storage for statement lists.
+    stmt_scratch: Vec<Stmt>,
 }
 
 impl<'src> Parser<'src> {
@@ -98,6 +104,8 @@ impl<'src> Parser<'src> {
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
+            expr_scratch: Vec::new(),
+            stmt_scratch: Vec::new(),
         }
     }
 

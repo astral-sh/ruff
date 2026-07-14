@@ -3124,20 +3124,29 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
-        }) {
-            statements
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            Suite::new()
-        };
+        let statements =
+            if let Some(statements) = self.with_recursion(Parser::parse_block_statements) {
+                statements
+            } else {
+                self.report_recursion_limit_exceeded(self.current_token_range());
+                Suite::new()
+            };
 
         self.expect(TokenKind::Dedent);
 
+        statements
+    }
+
+    fn parse_block_statements(&mut self) -> Suite {
+        let start = self.stmt_scratch.len();
+        self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+            let statement = parser.parse_statement();
+            parser.stmt_scratch.push(statement);
+        });
+
+        let len = self.stmt_scratch.len() - start;
+        let mut statements = Suite::with_capacity(len);
+        statements.extend(self.stmt_scratch.drain(start..));
         statements
     }
 

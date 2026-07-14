@@ -815,7 +815,7 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let mut args = vec![];
+        let args_start = self.expr_scratch.len();
         let mut keywords = vec![];
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
@@ -936,12 +936,7 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        // Reserve exactly one slot for the first positional argument, while
-                        // avoiding any allocation for keyword-only calls.
-                        if args.is_empty() {
-                            args.reserve_exact(1);
-                        }
-                        args.push(parsed_expr.expr);
+                        parser.expr_scratch.push(parsed_expr.expr);
                     }
                 }
             });
@@ -951,7 +946,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: args.into_boxed_slice(),
+            args: self.expr_scratch.drain(args_start..).collect(),
             keywords: keywords.into(),
         };
 
@@ -1005,16 +1000,16 @@ impl<'src> Parser<'src> {
         // If there are more than one element in the slice, we need to create a tuple
         // expression to represent it.
         if self.eat(TokenKind::Comma) {
-            let mut slices = vec![slice];
+            let slices_start = self.expr_scratch.len();
+            self.expr_scratch.push(slice);
 
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
-                slices.push(parser.parse_slice());
+                let slice = parser.parse_slice();
+                parser.expr_scratch.push(slice);
             });
 
-            slices.shrink_to_fit();
-
             slice = Expr::Tuple(ast::ExprTuple {
-                elts: slices,
+                elts: self.expr_scratch.drain(slices_start..).collect(),
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
@@ -1252,8 +1247,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
-        let mut values = Vec::with_capacity(2);
-        values.push(lhs);
+        let values_start = self.expr_scratch.len();
+        self.expr_scratch.push(lhs);
         let mut progress = ParserProgress::default();
 
         // Keep adding the expression to `values` until we see a different
@@ -1263,17 +1258,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr =
                 self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
-            values.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
 
             if !self.eat(TokenKind::from(op)) {
                 break;
             }
         }
 
-        values.shrink_to_fit();
-
         ast::ExprBoolOp {
-            values,
+            values: self.expr_scratch.drain(values_start..).collect(),
             op,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -1322,7 +1315,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let mut comparators = vec![];
+        let comparators_start = self.expr_scratch.len();
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1330,13 +1323,13 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            comparators.push(
-                self.parse_binary_expression_or_higher(
+            let comparator = self
+                .parse_binary_expression_or_higher(
                     OperatorPrecedence::ComparisonsMembershipIdentity,
                     context,
                 )
-                .expr,
-            );
+                .expr;
+            self.expr_scratch.push(comparator);
 
             let next_token = self.current_token_kind();
             if matches!(next_token, TokenKind::In) && context.is_in_excluded() {
@@ -1356,7 +1349,7 @@ impl<'src> Parser<'src> {
         ast::ExprCompare {
             left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: comparators.into_boxed_slice(),
+            comparators: self.expr_scratch.drain(comparators_start..).collect(),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2455,20 +2448,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_start = self.expr_scratch.len();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
-            elts.push(parse_func(p).expr);
+            let element = parse_func(p).expr;
+            p.expr_scratch.push(element);
         });
 
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
 
-        elts.shrink_to_fit();
-
         ast::ExprTuple {
-            elts,
+            elts: self.expr_scratch.drain(elts_start..).collect(),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2484,22 +2477,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_start = self.expr_scratch.len();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
-            elts.push(
-                parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            );
+            let element = parser
+                .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                .expr;
+            parser.expr_scratch.push(element);
         });
 
         self.expect(TokenKind::Rsqb);
 
-        elts.shrink_to_fit();
-
         ast::ExprList {
-            elts,
+            elts: self.expr_scratch.drain(elts_start..).collect(),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2529,7 +2520,8 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let mut elts = vec![first_element.expr];
+        let elts_start = self.expr_scratch.len();
+        self.expr_scratch.push(first_element.expr);
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
             let parsed_expr =
@@ -2544,7 +2536,7 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            elts.push(parsed_expr.expr);
+            parser.expr_scratch.push(parsed_expr.expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -2552,7 +2544,7 @@ impl<'src> Parser<'src> {
         ast::ExprSet {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            elts,
+            elts: self.expr_scratch.drain(elts_start..).collect(),
         }
     }
 
@@ -2653,7 +2645,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
 
-        let mut ifs = Vec::new();
+        let ifs_start = self.expr_scratch.len();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
@@ -2661,20 +2653,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
 
-            if ifs.is_empty() {
-                ifs.reserve_exact(1);
-            }
-            ifs.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
         }
-
-        ifs.shrink_to_fit();
 
         ast::Comprehension {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
-            ifs,
+            ifs: self.expr_scratch.drain(ifs_start..).collect(),
             is_async,
         }
     }
