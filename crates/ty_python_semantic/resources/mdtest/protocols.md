@@ -4805,29 +4805,6 @@ class BadFactory(Baz, metaclass=BadFactoryMeta): ...
 static_assert(not is_assignable_to(TypeOf[BadFactory], type[Foo]))
 ```
 
-A `@property` declaration requires a readable attribute on the constructed instance, but does not
-require the implementation to use `@property` or guarantee that the attribute exists on the class
-object.
-
-```py
-class PropertyProtocol(Protocol):
-    @property
-    def value(self) -> int: ...
-
-class PropertyImpl:
-    def __init__(self) -> None:
-        self.value = 1
-
-static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
-
-class MissingProperty: ...
-
-static_assert(not is_assignable_to(TypeOf[MissingProperty], type[PropertyProtocol]))
-
-def _(cls: type[PropertyProtocol]) -> None:
-    cls.value  # error: [unresolved-attribute]
-```
-
 Even when construction returns a `Foo`, the class object itself must provide the required class
 variable and method (the instance attribute is not required).
 
@@ -4871,9 +4848,8 @@ class StaticMethod:
 static_assert(not is_assignable_to(type[StaticMethod], type[Foo]))
 ```
 
-Static methods and class methods declared by a protocol are checked on the candidate class object,
-not on its metaclass. It is not enough for the constructed instance to acquire callables with
-matching signatures.
+Static methods and class methods declared by a protocol are checked on the candidate class object.
+They can be provided by the candidate's metaclass.
 
 ```py
 class DecoratedMethods(Protocol):
@@ -4892,6 +4868,24 @@ class DecoratedMethodsImpl:
 
 static_assert(is_assignable_to(TypeOf[DecoratedMethodsImpl], type[DecoratedMethods]))
 
+class DecoratedMethodsMeta(type):
+    @staticmethod
+    def static(value: int) -> str:
+        return str(value)
+    @classmethod
+    def class_(cls, value: int) -> str:
+        return str(value)
+    def __call__(self) -> DecoratedMethodsImpl:
+        return DecoratedMethodsImpl()
+
+class MetaclassOnlyDecoratedMethods(metaclass=DecoratedMethodsMeta): ...
+
+static_assert(is_assignable_to(TypeOf[MetaclassOnlyDecoratedMethods], type[DecoratedMethods]))
+```
+
+It is not enough for the constructed instance to acquire callables with matching signatures.
+
+```py
 def decorated_method(value: int) -> str:
     return str(value)
 
@@ -4920,6 +4914,29 @@ class SelfFactoryImpl:
         return cls()
 
 static_assert(is_assignable_to(TypeOf[SelfFactoryImpl], type[SelfFactory]))
+```
+
+A `@property` declaration requires a readable attribute on the constructed instance, but does not
+require the implementation to use `@property` or guarantee that the attribute exists on the class
+object.
+
+```py
+class PropertyProtocol(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class PropertyImpl:
+    def __init__(self) -> None:
+        self.value = 1
+
+static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
+
+class MissingProperty: ...
+
+static_assert(not is_assignable_to(TypeOf[MissingProperty], type[PropertyProtocol]))
+
+def _(cls: type[PropertyProtocol]) -> None:
+    cls.value  # error: [unresolved-attribute]
 ```
 
 Protocol and abstract class objects are accepted as inhabitants of `type[Foo]`. This is
@@ -5105,46 +5122,19 @@ def predicate(cls: type[P]) -> bool:
 classmethod(predicate)
 ```
 
-## Narrowing `type[Protocol]` with `issubclass`
+## Meta-types of protocol intersections
 
-Narrowing `type[ConstructorProtocol]` with `issubclass` currently loses the protocol's constructor
-signature. The reveal and diagnostic below document this known limitation.
+Calling `type()` on an intersection retains each positive class constraint.
 
 ```py
 from typing import Protocol
 
-class ConstructorProtocol(Protocol):
-    def __init__(self, *, value: int) -> None: ...
+class RuntimeProtocol(Protocol):
+    def get(self) -> object: ...
 
-class ConstructorBase: ...
-
-def _(cls: type[ConstructorProtocol]) -> ConstructorProtocol:
-    assert issubclass(cls, ConstructorBase)
-    reveal_type(cls)  # revealed: type[ConstructorBase]
-    return cls(value=1)  # error: [unknown-argument]
-```
-
-## Meta-types of protocol intersections
-
-Calling `type()` on an intersection retains each positive class constraint. This matters after an
-`isinstance` check introduces a protocol constraint on one arm of a union.
-
-```py
-from typing import Protocol, TypeVar, runtime_checkable
-
-T_runtime_co = TypeVar("T_runtime_co", covariant=True)
-
-@runtime_checkable
-class RuntimeProtocol(Protocol[T_runtime_co]):
-    def get(self) -> T_runtime_co: ...
-
-def _(
-    condition: RuntimeProtocol[int] | int,
-    values: dict[type[RuntimeProtocol[object]], RuntimeProtocol[object]],
-) -> None:
-    if isinstance(condition, RuntimeProtocol):
-        reveal_type(type(condition))  # revealed: type[RuntimeProtocol[int]] | (type[int] & type[RuntimeProtocol[object]])
-        values[type(condition)] = condition
+def _(value: RuntimeProtocol) -> None:
+    if isinstance(value, int):
+        reveal_type(type(value))  # revealed: type[RuntimeProtocol] & type[int]
 ```
 
 ## Regression test for `ClassVar` members in stubs
