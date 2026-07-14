@@ -31,9 +31,7 @@ use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
-use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBound, Solutions,
-};
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder, PathBound, Solutions};
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,

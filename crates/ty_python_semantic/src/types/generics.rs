@@ -1985,6 +1985,10 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     inferred_pending: ConstraintSet<'db, 'c>,
     /// Context-derived constraints, retained only to rank solutions of `pending`.
     declared_pending: Option<ConstraintSet<'db, 'c>>,
+    /// Solution-selection hints for type variables that occur inside a formal type matched by an
+    /// `Any` argument. These are not constraints and are only used when no argument-derived
+    /// constraint determines the type variable.
+    any_preference_hints: FxHashSet<BoundTypeVarIdentity<'db>>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
@@ -2052,6 +2056,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             inferred_pending: ConstraintSet::from_bool(constraints, true),
             declared_pending: None,
+            any_preference_hints: FxHashSet::default(),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
@@ -2118,6 +2123,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> TypeVarInference<'db> {
         let declared = self.constraint_set_types(self.declared_pending);
         let inferred = self.constraint_set_types(Some(self.inferred_pending));
+        let has_declared = self.declared_pending.is_some();
+        let any_preference_hints = self.any_preference_hints.clone();
         let db = self.db;
         let constraints = self.constraints;
         // Keep the inferred candidate when the declared constraints do not change the solver's
@@ -2127,29 +2134,44 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let identity = typevar.identity(db);
             let inferred = inferred.get(&identity).copied();
             let declared = declared.get(&identity).copied();
-            let candidate = match (inferred, declared) {
-                (Some(inferred), Some(_))
-                    if bounds
-                        .and_then(|bounds| {
-                            PathBounds::default_solve(db, constraints, bounds)
-                                .ok()
-                                .flatten()
-                        })
-                        .is_some_and(|combined| combined.is_equivalent_to(db, inferred)) =>
-                {
-                    Some(inferred)
+            let prefer_any = any_preference_hints.contains(&identity)
+                && if has_declared {
+                    inferred.is_none()
+                } else {
+                    bounds.is_none()
+                };
+            let candidate = if prefer_any {
+                Some(Type::any())
+            } else {
+                match (inferred, declared) {
+                    (Some(inferred), Some(_))
+                        if bounds
+                            .and_then(|bounds| {
+                                PathBounds::default_solve(db, constraints, bounds)
+                                    .ok()
+                                    .flatten()
+                            })
+                            .is_some_and(|combined| combined.is_equivalent_to(db, inferred)) =>
+                    {
+                        Some(inferred)
+                    }
+                    (Some(_), Some(declared)) => Some(declared),
+                    (Some(inferred), _) => Some(inferred),
+                    (None, declared) => declared,
                 }
-                (Some(_), Some(declared)) => Some(declared),
-                (Some(inferred), _) => Some(inferred),
-                (None, declared) => declared,
             }
             .filter(|candidate| !candidate.has_unspecialized_type_var(db));
 
-            if let (Some(candidate), Some(bounds)) = (candidate, bounds) {
-                let candidate_bound = PathBound::exact(typevar, candidate);
-                let candidate = choose(typevar, Some(&candidate_bound)).unwrap_or(candidate);
-                if let Some(valid) = bounds.valid_preferred_solution(db, constraints, candidate) {
-                    return Some(valid);
+            if let Some(candidate) = candidate {
+                if let Some(bounds) = bounds {
+                    let candidate_bound = PathBound::exact(typevar, candidate);
+                    let candidate = choose(typevar, Some(&candidate_bound)).unwrap_or(candidate);
+                    if let Some(valid) = bounds.valid_preferred_solution(db, constraints, candidate)
+                    {
+                        return Some(valid);
+                    }
+                } else {
+                    return Some(candidate);
                 }
             }
 
@@ -2705,12 +2727,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if actual == Type::any() {
+            self.add_any_preference_hints(formal);
+        }
+
         self.infer_map_impl(
             formal,
             actual,
             TypeVarVariance::Covariant,
             &mut FxHashSet::default(),
         )
+    }
+
+    fn add_any_preference_hints(&mut self, formal: Type<'db>) {
+        let db = self.db;
+        let inferable = self.inferable;
+        let hints = &mut self.any_preference_hints;
+        let mut add_hint = |ty| {
+            if let Type::TypeVar(typevar) = ty
+                && !typevar.is_paramspec(db)
+                && typevar.is_inferable(db, inferable)
+            {
+                hints.insert(typevar.identity(db));
+            }
+        };
+
+        add_hint(formal);
+        formal.visit_specialization(db, |ty, _variance| add_hint(ty));
     }
 
     fn infer_map_impl(

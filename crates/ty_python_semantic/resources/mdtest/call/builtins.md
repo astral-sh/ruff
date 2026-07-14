@@ -225,6 +225,18 @@ def _(xs: Unknown):
     reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
+## Generic builtin call context preserves `Any`
+
+```py
+from collections.abc import Sequence
+from typing import Any
+
+def relative_error(x: Any, y: Any, values: Sequence[float]) -> float:
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Any | int | float
+    return largest * 1.0
+```
+
 ## Mapping methods accept arbitrary object types
 
 ```toml

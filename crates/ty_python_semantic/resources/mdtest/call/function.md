@@ -140,6 +140,39 @@ dynamic: Any = []
 reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 
+## `Any` preference hints for nested generic parameters
+
+Assigning `Any` to a type such as `tuple[T]` does not imply a constraint on `T`. However, `Any` is
+still a useful preference when no actual argument constraint determines `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+def g[T](x: tuple[T]) -> T:
+    raise NotImplementedError
+
+def f[T: int](x: T) -> T:
+    return x
+
+def f_tuple[T: tuple[int]](x: T) -> T:
+    return x
+
+def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
+    return fallback
+
+def _(x: Any):
+    reveal_type(g(x))  # revealed: Any
+    reveal_type(f(g(x)))  # revealed: Any
+    reveal_type(f_tuple(g(x)))  # revealed: Any
+    # A real argument-derived constraint takes precedence over the preference hint.
+    reveal_type(g_with_fallback(x, 1))  # revealed: Literal[1]
+```
+
 ## Decorated
 
 ```py
