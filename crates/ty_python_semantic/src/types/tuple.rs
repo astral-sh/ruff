@@ -134,10 +134,9 @@ impl TupleLength {
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
-    /// Whether this tuple is a specially marked top materialization used temporarily while
-    /// applying a relaxed narrowing constraint.
+    /// Whether this tuple is a deferred top materialization.
     #[returns(copy)]
-    pub(crate) top_materialization_for_narrowing: bool,
+    pub(crate) deferred_top_materialization: bool,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -223,8 +222,8 @@ impl<'db> TupleType<'db> {
                     .specialize_tuple(db, element_type, self)
                     .with_materialization_kind(
                         db,
-                        self.top_materialization_for_narrowing(db)
-                            .then_some(MaterializationKind::TopForNarrowing),
+                        self.deferred_top_materialization(db)
+                            .then_some(MaterializationKind::DeferredTop),
                     )
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -242,7 +241,7 @@ impl<'db> TupleType<'db> {
             db,
             self.tuple(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         ))
     }
 
@@ -255,29 +254,28 @@ impl<'db> TupleType<'db> {
     ) -> Option<Self> {
         if matches!(
             type_mapping,
-            TypeMapping::Materialize(MaterializationKind::TopForNarrowing)
+            TypeMapping::Materialize(MaterializationKind::DeferredTop)
         ) {
-            return Some(if self.top_materialization_for_narrowing(db) {
+            return Some(if self.deferred_top_materialization(db) {
                 self
             } else {
                 TupleType::new_internal(db, self.tuple(db), true)
             });
         }
 
-        if self.top_materialization_for_narrowing(db)
+        if self.deferred_top_materialization(db)
             && matches!(type_mapping, TypeMapping::Materialize(_))
         {
             return Some(self);
         }
 
-        let top_materialization_for_narrowing = self.top_materialization_for_narrowing(db)
-            && !matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization);
+        let deferred_top_materialization = self.deferred_top_materialization(db)
+            && !matches!(type_mapping, TypeMapping::EraseDeferredMaterialization);
         let tuple = self
             .tuple(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        TupleType::new(db, &tuple).map(|tuple| {
-            TupleType::new_internal(db, tuple.tuple(db), top_materialization_for_narrowing)
-        })
+        TupleType::new(db, &tuple)
+            .map(|tuple| TupleType::new_internal(db, tuple.tuple(db), deferred_top_materialization))
     }
 
     fn materialized_for_relation(
@@ -285,7 +283,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        if !self.top_materialization_for_narrowing(db) {
+        if !self.deferred_top_materialization(db) {
             return Some(self);
         }
 
@@ -674,8 +672,8 @@ fn to_class_type_cycle_initial<'db>(
                 .with_materialization_kind(
                     db,
                     self_
-                        .top_materialization_for_narrowing(db)
-                        .then_some(MaterializationKind::TopForNarrowing),
+                        .deferred_top_materialization(db)
+                        .then_some(MaterializationKind::DeferredTop),
                 )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))

@@ -168,7 +168,7 @@ impl<'db> Type<'db> {
                                 CallableSignature::from_overloads(signatures),
                                 callable.kind(db),
                                 callable.provenance(db),
-                                callable.top_materialization_for_narrowing(db),
+                                callable.deferred_top_materialization(db),
                             )
                         }))
                     }
@@ -190,7 +190,7 @@ impl<'db> Type<'db> {
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
                                     callable.provenance(db),
-                                    callable.top_materialization_for_narrowing(db),
+                                    callable.deferred_top_materialization(db),
                                 ));
                             }
                         }
@@ -439,10 +439,9 @@ pub struct CallableType<'db> {
     #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
 
-    /// Whether this callable is a specially marked top materialization used temporarily while
-    /// applying a relaxed narrowing constraint.
+    /// Whether this callable is a deferred top materialization.
     #[returns(copy)]
-    pub(crate) top_materialization_for_narrowing: bool,
+    pub(crate) deferred_top_materialization: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -533,7 +532,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::Regular,
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         )
     }
 
@@ -582,7 +581,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         )
     }
 
@@ -592,7 +591,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::FunctionLike,
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         )
     }
 
@@ -602,7 +601,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::DunderParamSpec,
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         )
     }
 
@@ -612,7 +611,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         )
     }
 
@@ -642,16 +641,16 @@ impl<'db> CallableType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
             self.provenance(db),
-            self.top_materialization_for_narrowing(db),
+            self.deferred_top_materialization(db),
         ))
     }
 
-    fn with_top_materialization_for_narrowing(
+    fn with_deferred_top_materialization(
         self,
         db: &'db dyn Db,
-        top_materialization_for_narrowing: bool,
+        deferred_top_materialization: bool,
     ) -> Self {
-        if self.top_materialization_for_narrowing(db) == top_materialization_for_narrowing {
+        if self.deferred_top_materialization(db) == deferred_top_materialization {
             self
         } else {
             Self::new(
@@ -659,7 +658,7 @@ impl<'db> CallableType<'db> {
                 self.signatures(db),
                 self.kind(db),
                 self.provenance(db),
-                top_materialization_for_narrowing,
+                deferred_top_materialization,
             )
         }
     }
@@ -669,11 +668,11 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if !self.top_materialization_for_narrowing(db) {
+        if !self.deferred_top_materialization(db) {
             return self;
         }
 
-        self.with_top_materialization_for_narrowing(db, false)
+        self.with_deferred_top_materialization(db, false)
             .apply_type_mapping_impl(
                 db,
                 &TypeMapping::Materialize(MaterializationKind::Top),
@@ -691,12 +690,12 @@ impl<'db> CallableType<'db> {
     ) -> Self {
         if matches!(
             type_mapping,
-            TypeMapping::Materialize(MaterializationKind::TopForNarrowing)
+            TypeMapping::Materialize(MaterializationKind::DeferredTop)
         ) {
-            return self.with_top_materialization_for_narrowing(db, true);
+            return self.with_deferred_top_materialization(db, true);
         }
 
-        if self.top_materialization_for_narrowing(db)
+        if self.deferred_top_materialization(db)
             && matches!(type_mapping, TypeMapping::Materialize(_))
         {
             return self;
@@ -712,8 +711,8 @@ impl<'db> CallableType<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
             self.provenance(db),
-            self.top_materialization_for_narrowing(db)
-                && !matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization),
+            self.deferred_top_materialization(db)
+                && !matches!(type_mapping, TypeMapping::EraseDeferredMaterialization),
         )
     }
 
