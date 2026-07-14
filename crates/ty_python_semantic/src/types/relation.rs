@@ -986,6 +986,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::TypeAlias(_), Type::TypeAlias(_))
         );
         if current_is_alias_pair && active_is_alias_pair {
+            // TODO: Recursive aliases can encode context-free languages, whose inclusion and
+            // equivalence are undecidable. No complete fallback exists, but more decidable cases
+            // can be recognized here before conservatively rejecting the pair.
             return self.never();
         }
 
