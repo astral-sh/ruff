@@ -218,6 +218,51 @@ def _(x: int | None, flag: bool):
     reveal_type(x)  # revealed: int
 ```
 
+Call constraints that precede a nested merge must still gate narrowing later in the outer branch:
+
+```py
+from typing_extensions import Never
+
+def fail_nested_merge() -> Never:
+    raise RuntimeError
+
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        fail_nested_merge()
+
+        if inner:
+            pass
+        else:
+            pass
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+```
+
+Call constraints introduced inside the nested branches are still discarded at that merge:
+
+```py
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        if inner:
+            pass
+        else:
+            fail_nested_merge()
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: None | int
+```
+
 And for elif branches:
 
 ```py

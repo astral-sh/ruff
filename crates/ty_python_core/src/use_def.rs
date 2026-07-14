@@ -1437,7 +1437,17 @@ impl PendingReachability {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a mut PlaceState {
         self.materialize_reachability(pending, target, reachability_constraints);
+        self.materialize_narrowing(pending, target, narrowing_constraints);
 
+        Rc::make_mut(&mut pending.state)
+    }
+
+    fn materialize_narrowing(
+        &self,
+        pending: &mut PendingPlaceState,
+        target: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) {
         if pending.narrowing != target {
             let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
             let mut current = target;
@@ -1461,8 +1471,6 @@ impl PendingReachability {
             }
             pending.narrowing = target;
         }
-
-        Rc::make_mut(&mut pending.state)
     }
 
     fn materialize_reachability<'a>(
@@ -1554,6 +1562,22 @@ impl PendingReachability {
         }
         constraint
     }
+
+    /// Returns the lowest common ancestor of two nodes in the pending-constraint tree.
+    fn common_ancestor(
+        &self,
+        mut left: PendingReachabilityId,
+        mut right: PendingReachabilityId,
+    ) -> PendingReachabilityId {
+        while left != right {
+            if left.index() > right.index() {
+                left = self.constraints[left].parent;
+            } else {
+                right = self.constraints[right].parent;
+            }
+        }
+        left
+    }
 }
 
 /// A copy-on-write place state and the last reachability node materialized into it.
@@ -1596,6 +1620,7 @@ impl PendingReachability {
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
         branch: PendingReachabilityId,
+        branch_ancestor: PendingReachabilityId,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
@@ -1628,6 +1653,10 @@ impl PendingReachability {
                     continue;
                 }
 
+                // Preserve call gates that precede the branch while discarding gates introduced
+                // inside either branch, which cannot be correlated with later narrowing.
+                self.materialize_narrowing(current, branch_ancestor, narrowing_constraints);
+
                 let current_constraint = self.constraint_between(
                     current.reachability,
                     self.current,
@@ -1646,9 +1675,6 @@ impl PendingReachability {
                         merged_constraint,
                     );
                 }
-                // Neither branch changed this place, so their pending narrowing gates cannot be
-                // correlated with branch-local narrowing and can be discarded. The merged
-                // reachability constraint above still excludes paths containing terminal calls.
                 current.reachability = self.current;
                 current.narrowing = self.current;
                 continue;
@@ -2621,10 +2647,14 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
         let branch = snapshot.pending_reachability;
+        let branch_ancestor = self
+            .pending_reachability
+            .common_ancestor(self.pending_reachability.current, branch);
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
             branch,
+            branch_ancestor,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -2633,6 +2663,7 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.member_states,
             snapshot.member_states,
             branch,
+            branch_ancestor,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
