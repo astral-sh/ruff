@@ -697,6 +697,9 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
+    /// the many shallow bounds that are cheap to walk once.
+    constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache.
@@ -1037,6 +1040,52 @@ impl<'db> ConstraintSetBuilder<'db> {
             return storage.constraints[ConstraintId::from_usize(index - split)];
         }
         storage.constraints[constraint]
+    }
+
+    fn cached_constraint_bound_depth(
+        &self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+    ) -> (u16, u16) {
+        if let Some(depth) = self
+            .storage
+            .borrow()
+            .constraint_bound_depth_cache
+            .get(&constraint)
+        {
+            return *depth;
+        }
+
+        let depth = self.constraint_data(constraint).bound_depth(db);
+        self.storage
+            .borrow_mut()
+            .constraint_bound_depth_cache
+            .insert(constraint, depth);
+        depth
+    }
+
+    /// Returns how much sequent fuel is needed to derive this constraint.
+    ///
+    /// This cost is driven by two factors.
+    ///
+    /// First, nested types containing typevars can produce increasingly complex families of
+    /// derived constraints. Charge more fuel for those constraints so that each additional level
+    /// of typevar depth shortens the remaining derivation chain.
+    ///
+    /// Second, even without considering typevars, the lower and upper bounds can become more
+    /// structurally complex. We consider a type to be more complex if it has deeper nesting of
+    /// type constructors. Each sequent is charged the _increase_ in that complexity between its
+    /// antecedents and its consequent. (Measuring growth rather than absolute depth avoids
+    /// penalizing a complex concrete bound that is merely propagated unchanged.)
+    fn sequent_fuel_cost(
+        &self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+        antecedent_constructor_depth: u16,
+    ) -> u16 {
+        let (constructor_depth, typevar_depth) = self.cached_constraint_bound_depth(db, constraint);
+        let constructor_growth = constructor_depth.saturating_sub(antecedent_constructor_depth);
+        typevar_depth.max(constructor_growth).saturating_add(1)
     }
 
     fn cached_constraint_implies(
@@ -1419,25 +1468,6 @@ impl<'db> Constraint<'db> {
                 typevar_depth.max(bound_typevar_depth),
             )
         })
-    }
-
-    /// Returns how much sequent fuel is needed to derive this constraint.
-    ///
-    /// This cost is driven by two factors.
-    ///
-    /// First, nested types containing typevars can produce increasingly complex families of
-    /// derived constraints. Charge more fuel for those constraints so that each additional level
-    /// of typevar depth shortens the remaining derivation chain.
-    ///
-    /// Second, even without considering typevars, the lower and upper bounds can become more
-    /// structurally complex. We consider a type to be more complex if it has deeper nesting of
-    /// type constructors. Each sequent is charged the _increase_ in that complexity between its
-    /// antecedents and its consequent. (Measuring growth rather than absolute depth avoids
-    /// penalizing a complex concrete bound that is merely propagated unchanged.)
-    fn sequent_fuel_cost(self, db: &'db dyn Db, antecedent_constructor_depth: u16) -> u16 {
-        let (constructor_depth, typevar_depth) = self.bound_depth(db);
-        let constructor_growth = constructor_depth.saturating_sub(antecedent_constructor_depth);
-        typevar_depth.max(constructor_growth).saturating_add(1)
     }
 
     /// Returns whether this constraint is produced by dropping exactly one bound from
@@ -6711,13 +6741,11 @@ impl PathAssignments {
                 continue;
             };
             let available_fuel = ante1_fuel.min(ante2_fuel);
-            let (ante1_constructor_depth, _) = builder.constraint_data(*ante1).bound_depth(db);
-            let (ante2_constructor_depth, _) = builder.constraint_data(*ante2).bound_depth(db);
+            let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante1);
+            let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante2);
             let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
             for post in posts {
-                let fuel_cost = builder
-                    .constraint_data(*post)
-                    .sequent_fuel_cost(db, antecedent_constructor_depth);
+                let fuel_cost = builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth);
                 add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
@@ -6727,13 +6755,14 @@ impl PathAssignments {
                 continue;
             };
             let ante_data = builder.constraint_data(*ante);
-            let (antecedent_constructor_depth, _) = ante_data.bound_depth(db);
+            let (antecedent_constructor_depth, _) =
+                builder.cached_constraint_bound_depth(db, *ante);
             for post in posts {
                 let post_data = builder.constraint_data(*post);
                 let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
                     1
                 } else {
-                    post_data.sequent_fuel_cost(db, antecedent_constructor_depth)
+                    builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth)
                 };
                 add_new_constraint(*post, available_fuel, fuel_cost);
             }
