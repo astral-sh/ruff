@@ -678,6 +678,12 @@ enum ProtocolMemberAccessMode {
     Class,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub(super) enum ProtocolClassAccess {
+    Check,
+    Skip,
+}
+
 fn cycle_normalized_optional_type<'db>(
     db: &'db dyn Db,
     current: Option<ProtocolMemberType<'db>>,
@@ -1919,10 +1925,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
-        check_class_access: bool,
+        class_access: ProtocolClassAccess,
     ) -> ConstraintSet<'db, 'c> {
         let mut capabilities = member.implementation_capabilities(db, ty);
-        if !check_class_access {
+        if class_access == ProtocolClassAccess::Skip {
             capabilities.class = ProtocolMemberAccess::NONE;
         }
         if let Some(context) = self.report_context() {

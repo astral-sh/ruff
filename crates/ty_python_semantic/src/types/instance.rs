@@ -18,7 +18,7 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+    ProtocolClass, ProtocolClassAccess, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
@@ -500,7 +500,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-        check_class_access: bool,
+        class_access: ProtocolClassAccess,
     ) -> ConstraintSet<'db, 'c> {
         // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `ty` has the protocol class in its MRO. This is a much cheaper check than the
@@ -566,7 +566,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .interface(db)
                 .members(db)
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member, check_class_access)
+                    self.type_satisfies_protocol_member(db, ty, &member, class_access)
                 })
         };
         if let Some(context) = self.report_context()
@@ -906,7 +906,12 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, Type::object(), protocol, true)
+                .check_type_satisfies_protocol(
+                    db,
+                    Type::object(),
+                    protocol,
+                    ProtocolClassAccess::Check,
+                )
                 .is_always_satisfied(db)
         }
 

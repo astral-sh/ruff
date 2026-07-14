@@ -13,6 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::protocol_class::ProtocolClassAccess;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
@@ -1034,7 +1035,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_type_pair_impl(db, source, target, true)
+        self.check_type_pair_impl(db, source, target, ProtocolClassAccess::Check)
     }
 
     pub(super) fn check_type_pair_without_protocol_class_access(
@@ -1043,7 +1044,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_type_pair_impl(db, source, target, false)
+        self.check_type_pair_impl(db, source, target, ProtocolClassAccess::Skip)
     }
 
     fn check_type_pair_impl(
@@ -1051,7 +1052,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
-        check_protocol_class_access: bool,
+        protocol_class_access: ProtocolClassAccess,
     ) -> ConstraintSet<'db, 'c> {
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
@@ -1931,7 +1932,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         db,
                         source,
                         target_proto,
-                        check_protocol_class_access,
+                        protocol_class_access,
                     )
                 })
             }
