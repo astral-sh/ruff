@@ -82,6 +82,7 @@ impl<'db> BoundMethodType<'db> {
             CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
             ),
+            false,
         )
     }
 
