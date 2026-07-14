@@ -224,49 +224,78 @@ def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int])
 def test_match_exact_object_sequence(value: object) -> None:
     match value:
         case int(), str():
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
-            reveal_type(value[1])  # revealed: object
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
 
 def test_match_empty_object_sequence(value: object) -> None:
     match value:
         case []:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
+            reveal_type(len(value))  # revealed: Literal[0]
 
 def test_match_singleton_object_sequence(value: object) -> None:
     match value:
         case [int()]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
             reveal_type(value)
-            reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
+            reveal_type(len(value))  # revealed: Literal[1]
+            reveal_type(value[0])  # revealed: int
+
+def test_match_singleton_object_sequence_capture(value: object) -> None:
+    match value:
+        case [int() as item]:
+            reveal_type(value[0])  # revealed: int
+            reveal_type(item)  # revealed: int
+
+def test_sequence_subject_facts_are_scoped_to_successful_case(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+        case _:
+            pass
+    reveal_type(len(value))  # revealed: int
+    reveal_type(value[0])  # revealed: int | str
+
+# This deliberately documents the remaining unsoundness. Mutating the subject inside the case can
+# invalidate the observed length and element types, but we retain them for the rest of the branch.
+def test_sequence_subject_facts_can_be_stale_after_mutation(
+    value: list[int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            value.reverse()
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
 
 def test_match_prefix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
             reveal_type(len(value))  # revealed: int
-            reveal_type(value[0])  # revealed: object
+            reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
     match value:
         case [int(), *rest, str()]:
-            # revealed: Sequence[object] & ~str & ~bytes & ~bytearray
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
-            reveal_type(value[0])  # revealed: object
-            reveal_type(value[-1])  # revealed: object
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[-1])  # revealed: str
             reveal_type(value[1])  # revealed: object
 
 def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
     match value:
         case [int(), *rest]:
-            reveal_type(value[0])  # revealed: int | str
+            reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: int | str
             reveal_type(rest)  # revealed: list[int | str]
 ```
@@ -538,7 +567,8 @@ def failed_sequence_alternative_does_not_narrow_later_capture(
                 item.append(1)
                 match item:
                     case [only]:
-                        reveal_type(item)  # revealed: list[int]
+                        # revealed: list[int] & <Protocol with members '__getitem__', '__len__'>
+                        reveal_type(item)
 ```
 
 ## Declared pattern captures
@@ -659,6 +689,8 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
 ) -> None:
     match value:
         case [int(), str()] as whole:
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
             reveal_type(len(whole))  # revealed: int
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
@@ -678,7 +710,7 @@ def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
             whole.clear()
             match whole:
                 case []:
-                    reveal_type(whole)  # revealed: list[int]
+                    reveal_type(whole)  # revealed: list[int] & <Protocol with members '__len__'>
 
 def failed_sequence_pattern_does_not_narrow_mutable_subject(
     value: list[int],
@@ -692,7 +724,7 @@ def failed_sequence_pattern_does_not_narrow_mutable_subject(
             value.clear()
             match value:
                 case []:
-                    reveal_type(value)  # revealed: list[int]
+                    reveal_type(value)  # revealed: list[int] & <Protocol with members '__len__'>
 ```
 
 ## Indirect class patterns
@@ -1660,14 +1692,15 @@ def builtin_class_pattern_narrows_subject(value: bool) -> None:
         case bool(True):
             reveal_type(value)  # revealed: Literal[True]
 
-def list_class_pattern_does_not_keep_index_types_after_mutation(
+def list_class_pattern_can_keep_stale_index_types_after_mutation(
     value: list[int | str],
 ) -> None:
     match value:
         case list([int(), str()]):
-            # Reversing the list invalidates the indexed-element facts established by the pattern.
+            # This is deliberately unsound: reversing the list invalidates the indexed-element
+            # facts, but we retain them for the rest of the successful case branch.
             value.reverse()
-            reveal_type(value[0])  # revealed: int | str
+            reveal_type(value[0])  # revealed: int
 
 def nested_list_pattern_does_not_keep_index_types_after_mutation(
     value: tuple[list[int | str]],

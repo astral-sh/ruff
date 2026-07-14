@@ -2343,8 +2343,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// Return the type established while a sequence pattern is being evaluated.
     ///
     /// Exact tuples can refine their tuple element types with the facts established by successful
-    /// child patterns. Other sequences retain the structural constraints already present in
-    /// `narrowed_subject_ty`.
+    /// child patterns. For other sequences, retain the observed length and indexed-element facts
+    /// while type-checking the successful case branch.
     fn successful_sequence_subject_type(
         &self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -2359,14 +2359,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             return refined;
         }
 
-        if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
-            self.intersect_types(
-                narrowed_subject_ty,
-                self.successful_sequence_pattern_type(kind, matched_element_types),
-            )
-        } else {
-            narrowed_subject_ty
-        }
+        self.intersect_types(
+            narrowed_subject_ty,
+            self.successful_sequence_pattern_type(kind, matched_element_types),
+        )
     }
 
     /// Return the sequence type safe to assign to a binding created by the pattern.
