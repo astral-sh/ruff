@@ -121,6 +121,8 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    pub(crate) strict_generic_narrowing: Option<bool>,
+
     /// Whether equality comparisons should only narrow to literals when it is safe to do so.
     pub(crate) strict_literal_narrowing: Option<bool>,
 
@@ -130,8 +132,6 @@ pub(crate) struct Analysis {
     pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
 
     pub(crate) replace_imports_with_any: Option<Vec<String>>,
-
-    pub(crate) strict_generic_narrowing: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
