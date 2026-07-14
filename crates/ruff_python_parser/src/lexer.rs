@@ -167,7 +167,10 @@ impl<'src> Lexer<'src> {
             }
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        else if let Some(indentation) = self.pending_indentation.take() {
+        // Avoid `Option::take` here: this check runs for every token, and `take` writes `None`
+        // even when there is no pending indentation.
+        else if let Some(indentation) = self.pending_indentation {
+            self.pending_indentation = None;
             self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
