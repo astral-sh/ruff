@@ -9,7 +9,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
-use ruff_python_ast::token::{Token, TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -685,8 +685,7 @@ impl<'a> SuppressionsBuilder<'a> {
         } else if !comment.kind().is_type_ignore()
             && indentation_at_offset(comment.range().start(), self.source).is_some()
         {
-            let (before, after) = tokens.split_at(comment.range().start());
-            own_line_suppression_range(comment.range(), before, after)
+            own_line_suppression_range(comment.range(), tokens)
         } else {
             line_range
         };
@@ -769,7 +768,8 @@ impl<'a> SuppressionsBuilder<'a> {
 /// A suppression before a logical line covers the entire logical line. A suppression inside a
 /// multiline logical line covers the next non-comment physical line instead. This matches Ruff's
 /// own-line suppression behavior.
-fn own_line_suppression_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
+fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
+    let (before, after) = tokens.split_at(range.start());
     let mut end = range.end();
     let is_inner_comment = before.iter().rev().find_map(|token| match token.kind() {
         TokenKind::Newline => Some(false),
