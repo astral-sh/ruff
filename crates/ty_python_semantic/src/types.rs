@@ -3804,13 +3804,36 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
             returns(copy),
+            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _| {
+                member.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn member_lookup_with_policy_inner<'db>(
+            db: &'db dyn Db,
+            key: MemberLookupKey<'db>,
+        ) -> PlaceAndQualifiers<'db> {
+            member_lookup_with_policy_impl(db, key, None)
+        }
+
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _| {
                 member.cycle_normalized(db, *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn member_lookup_with_policy_inner<'db>(
+        fn member_lookup_with_policy_and_receiver_inner<'db>(
+            db: &'db dyn Db,
+            key: MemberLookupKey<'db>,
+            receiver: Type<'db>,
+        ) -> PlaceAndQualifiers<'db> {
+            member_lookup_with_policy_impl(db, key, Some(receiver))
+        }
+
+        fn member_lookup_with_policy_impl<'db>(
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
@@ -4431,7 +4454,11 @@ impl<'db> Type<'db> {
             }
         }
 
-        member_lookup_with_policy_inner(db, MemberLookupKey::new(db, self, name, policy), receiver)
+        let key = MemberLookupKey::new(db, self, name, policy);
+        match receiver {
+            Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
+            None => member_lookup_with_policy_inner(db, key),
+        }
     }
 
     /// Return the type of `len()` on a type if it is known more precisely than `int`,
