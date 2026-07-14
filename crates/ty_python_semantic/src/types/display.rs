@@ -1856,6 +1856,10 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                Some(MaterializationKind::TopForNarrowing) => Some(("Top*", SpecialFormType::Top)),
+                Some(MaterializationKind::BottomForNarrowing) => {
+                    Some(("Bottom*", SpecialFormType::Bottom))
+                }
             };
             let suffix = match self.specialization.materialization_kind(db) {
                 None => "",
@@ -2203,6 +2207,7 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
+            top_materialization_for_narrowing: self.top_materialization_for_narrowing(db),
             db,
             env,
             settings,
@@ -2213,6 +2218,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
+    top_materialization_for_narrowing: bool,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -2258,6 +2264,10 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     f.write_char(']')?;
                 }
             }
+        }
+
+        if self.top_materialization_for_narrowing {
+            f.write_char(']')?;
         }
 
         Ok(())

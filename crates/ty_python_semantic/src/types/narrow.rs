@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
+use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -459,7 +460,7 @@ impl ClassInfoConstraintFunction {
         env: &ProgramEnvironment<'db>,
         classinfo: Type<'db>,
         is_positive: bool,
-        generic_narrowing: GenericNarrowing,
+        strict_generic_narrowing: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
@@ -552,7 +553,7 @@ impl ClassInfoConstraintFunction {
                             db,
                             constraints.as_type(db),
                             is_positive,
-                            generic_narrowing,
+                            strict_generic_narrowing,
                         ),
                 }
             }
@@ -603,7 +604,7 @@ impl ClassInfoConstraintFunction {
                     env,
                     alias.aliased_class().to_class_literal(db, env),
                     is_positive,
-                    generic_narrowing,
+                    strict_generic_narrowing,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
@@ -616,13 +617,13 @@ impl ClassInfoConstraintFunction {
                     env,
                     KnownClass::Type.to_class_literal(db, env),
                     is_positive,
-                    generic_narrowing,
+                    strict_generic_narrowing,
                 ),
                 SpecialFormType::Type => self.generate_constraint(
                     db,
                     KnownClass::Type.to_class_literal(db),
                     is_positive,
-                    generic_narrowing,
+                    strict_generic_narrowing,
                 ),
 
                 // We don't have a good meta-type for `Callable`s right now,
@@ -838,7 +839,7 @@ impl<'db> NarrowingConstraint<'db> {
         {
             union.add_in_place(conjunctions.evaluate_constraint_type(db, env));
         }
-        union.build()
+        union.build().erase_narrowing_materialization(db)
     }
 }
 
@@ -1003,7 +1004,7 @@ fn positive_class_pattern_type<'db>(
                 env,
                 class_expression_ty,
                 true,
-                GenericNarrowing::Strict,
+                true,
             )
         }
         _ => None,
@@ -3900,10 +3901,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let class_info_ty = inference.expression_type(second_arg);
 
-                let generic_narrowing = self
+                let strict_generic_narrowing = self
                     .db
                     .analysis_settings(self.scope().file(self.db))
-                    .generic_narrowing;
+                    .strict_generic_narrowing;
 
                 function
                     .generate_constraint(db, &self.env, class_info_ty, is_positive)

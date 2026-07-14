@@ -33,7 +33,7 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEv
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    IntersectionType, MaterializationKind, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -135,6 +135,8 @@ pub struct TupleType<'db> {
 
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
+    #[returns(copy)]
+    pub(crate) materialization_kind: Option<MaterializationKind>,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -267,6 +269,7 @@ impl<'db> TupleType<'db> {
             db,
             env.program(db),
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
+            None,
         )
     }
 
@@ -312,7 +315,46 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Self> {
-        TupleType::new(
+        let original_materialization_kind = self.materialization_kind(db);
+
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping
+            && materialization_kind.is_for_narrowing()
+        {
+            return Some(if original_materialization_kind.is_none() {
+                TupleType::new_internal(db, self.tuple(db), Some(*materialization_kind))
+            } else {
+                self
+            });
+        }
+
+        let materialization_kind =
+            if matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization)
+                && original_materialization_kind.is_some_and(MaterializationKind::is_for_narrowing)
+            {
+                None
+            } else {
+                original_materialization_kind
+            };
+        let tuple = self
+            .tuple(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        TupleType::new(db, &tuple)
+            .map(|tuple| TupleType::new_internal(db, tuple.tuple(db), materialization_kind))
+    }
+
+    fn materialized_for_relation(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Option<Self> {
+        let Some(materialization_kind) = self
+            .materialization_kind(db)
+            .filter(|kind| kind.is_for_narrowing())
+        else {
+            return Some(self);
+        };
+
+        let tuple = self.tuple(db).apply_type_mapping_impl(
             db,
             visitor.env,
             &self
@@ -341,6 +383,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let source = source.materialized_for_relation(db, self.materialization_visitor);
+        let target = target.materialized_for_relation(db, self.materialization_visitor);
+        let (Some(source), Some(target)) = (source, target) else {
+            return ConstraintSet::from_bool(self.constraints, source.is_none());
+        };
         self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
     }
 
@@ -700,6 +747,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: TupleType<'db>,
         right: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let visitor = ApplyTypeMappingVisitor::default();
+        let Some(left) = left.materialized_for_relation(db, &visitor) else {
+            return self.always();
+        };
+        let Some(right) = right.materialized_for_relation(db, &visitor) else {
+            return self.always();
+        };
         self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
     }
 
@@ -774,7 +828,9 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::divergent(id), self_)
+            generic_context
+                .specialize_tuple(db, Type::divergent(id), self_)
+                .with_materialization_kind(db, self_.materialization_kind(db))
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }
