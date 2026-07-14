@@ -14,7 +14,7 @@ use crate::types::{
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
-use ruff_db::files::FileRange;
+use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
@@ -340,9 +340,12 @@ pub fn definitions_for_attribute<'db>(
 /// Both `def`-style methods and attribute definitions are returned, whether the attribute is
 /// declared in the class body (`sound: str = ...`, `sound = ...`, or a bare `sound: str`) or
 /// assigned to `self` in a method body (`self.sound = ...`).
+///
+/// Subclasses are discovered by scanning the classes defined in `candidate_files`.
 pub fn implementation_definitions_for_attribute<'db>(
     model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
+    candidate_files: &[File],
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let member_name = attribute.attr.as_str();
@@ -355,15 +358,7 @@ pub fn implementation_definitions_for_attribute<'db>(
     let mut seen = FxHashSet::default();
     collect_implementation_root_classes(db, lhs_ty, &mut seen, &mut roots);
 
-    let mut definitions = Vec::new();
-    for root in roots {
-        for definition in implementation_definitions_for_member_family(db, root, member_name) {
-            if !definitions.contains(&definition) {
-                definitions.push(definition);
-            }
-        }
-    }
-    definitions
+    implementation_definitions_for_member_families(db, candidate_files, roots, member_name)
 }
 
 /// Returns definitions for the implementation family of a method declaration.
@@ -380,9 +375,12 @@ pub fn implementation_definitions_for_attribute<'db>(
 /// The containing class is used as the root, and same-named methods defined on known transitive
 /// subclasses are returned along with the method itself. This does not walk to parent classes: on
 /// `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
+///
+/// Subclasses are discovered by scanning the classes defined in `candidate_files`.
 pub fn implementation_definitions_for_method<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
+    candidate_files: &[File],
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let method_name = function.name.as_str();
@@ -400,7 +398,7 @@ pub fn implementation_definitions_for_method<'db>(
         return Vec::new();
     };
 
-    implementation_definitions_for_member_family(db, root, method_name)
+    implementation_definitions_for_member_families(db, candidate_files, vec![root], method_name)
 }
 
 /// Returns definitions for the implementation family of a class declaration.
@@ -417,15 +415,18 @@ pub fn implementation_definitions_for_method<'db>(
 /// The clicked class is the root and is returned first, followed by its known transitive
 /// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
 /// returns that class and its own subclasses, not its parents.
+///
+/// Subclasses are discovered by scanning the classes defined in `candidate_files`.
 pub fn implementation_definitions_for_class<'db>(
     model: &SemanticModel<'db>,
     class: &ast::StmtClassDef,
+    candidate_files: &[File],
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let Some(root) = extract_class_literal(db, binding_type(db, class.definition(model))) else {
         return Vec::new();
     };
-    class_implementation_family(db, root)
+    class_implementation_families(db, candidate_files, vec![root])
 }
 
 /// Returns definitions for the implementation family of a class reference, such as a base class,
@@ -446,12 +447,15 @@ pub fn implementation_definitions_for_class<'db>(
 /// because a class used as an annotation (`x: Animal`) infers as an instance of that class, which
 /// is indistinguishable from an actual instance variable. The resolved definition's type is a class
 /// object precisely when the name refers to a class.
+///
+/// Subclasses are discovered by scanning the classes defined in `candidate_files`.
 pub fn implementation_definitions_for_class_reference<'db>(
     model: &SemanticModel<'db>,
     name: &ast::ExprName,
+    candidate_files: &[File],
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let mut definitions = Vec::new();
+    let mut roots = Vec::new();
     let mut seen = FxHashSet::default();
     for resolved in definitions_for_name(
         model,
@@ -475,30 +479,49 @@ pub fn implementation_definitions_for_class_reference<'db>(
         let Some(root) = root else {
             continue;
         };
-        if !seen.insert(root) {
-            continue;
-        }
-        for definition in class_implementation_family(db, root) {
-            if !definitions.contains(&definition) {
-                definitions.push(definition);
-            }
+        if seen.insert(root) {
+            roots.push(root);
         }
     }
-    definitions
+    class_implementation_families(db, candidate_files, roots)
 }
 
-/// Collects a class root and its known transitive subclasses as implementation definitions, with
-/// the root first and duplicates removed.
-fn class_implementation_family<'db>(
+/// Collects class roots and their known transitive subclasses as implementation definitions, with
+/// the roots first and duplicates removed.
+///
+/// Subclasses are found with a single pass over the classes defined in `candidate_files`, keeping
+/// each class whose MRO contains one of the roots. Checking candidates upward through their MROs
+/// scans each file once, rather than once for every class discovered beneath a root.
+fn class_implementation_families<'db>(
     db: &'db dyn Db,
-    root: ClassLiteral<'db>,
+    candidate_files: &[File],
+    roots: Vec<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
-    for class_literal in std::iter::once(root).chain(transitive_subtypes(db, root)) {
-        if let Some(definition) = class_literal.definition(db) {
+    for root in &roots {
+        if let Some(definition) = root.definition(db) {
             let resolved = ResolvedDefinition::Definition(definition);
             if !definitions.contains(&resolved) {
                 definitions.push(resolved);
+            }
+        }
+    }
+
+    let roots: FxHashSet<_> = roots.into_iter().collect();
+    if roots.is_empty() {
+        return definitions;
+    }
+
+    for file in candidate_files {
+        for candidate in reachable_class_literals_in_file(db, *file) {
+            if roots.contains(&candidate) || !class_mro_intersects(db, candidate, &roots) {
+                continue;
+            }
+            if let Some(definition) = candidate.definition(db) {
+                let resolved = ResolvedDefinition::Definition(definition);
+                if !definitions.contains(&resolved) {
+                    definitions.push(resolved);
+                }
             }
         }
     }
@@ -586,7 +609,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     resolved
 }
 
-/// Returns the member implementation family rooted at `root`.
+/// Returns the member implementation families rooted at `roots`.
 ///
 /// ```py
 /// class Animal:
@@ -602,32 +625,79 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 /// For root `Dog` and member `speak`, this returns `Animal.speak` because that is the definition
 /// `Dog` inherits through MRO, followed by `LoudDog.speak` because it is a known subclass override.
 ///
-/// The first entry is the definition that would be selected for the root class itself, using MRO
-/// lookup. That matters for concrete subclasses that inherit a member without overriding it. After
-/// that, we add same-named definitions on known transitive subclasses, which are the concrete
-/// overrides a user expects from "go to implementation". The member may be a method or an attribute
-/// declared in the class body (`sound: str = ...`) or assigned to `self` in a method body.
-fn implementation_definitions_for_member_family<'db>(
+/// The first entries are the definitions that would be selected for the root classes themselves,
+/// using MRO lookup. That matters for concrete subclasses that inherit a member without overriding
+/// it. After that, we add same-named definitions on known transitive subclasses, which are the
+/// concrete overrides a user expects from "go to implementation". The member may be a method or an
+/// attribute declared in the class body (`sound: str = ...`) or assigned to `self` in a method
+/// body.
+///
+/// Subclasses are found with a single pass over the classes defined in `candidate_files`, keeping
+/// each class whose MRO contains one of the roots. Checking candidates upward through their MROs
+/// scans each file once, rather than once for every class discovered beneath a root.
+fn implementation_definitions_for_member_families<'db>(
     db: &'db dyn Db,
-    root: ClassLiteral<'db>,
+    candidate_files: &[File],
+    roots: Vec<ClassLiteral<'db>>,
     member_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let mut definitions = mro_member_definitions(db, root, member_name);
+    let mut definitions = Vec::new();
+    let mut family_roots = FxHashSet::default();
 
-    // Prevents scanning every known subclass for unrelated members when an actual MRO definition
-    // isn't found.
-    if definitions.is_empty() {
-        return definitions;
-    }
+    for root in roots {
+        let root_definitions = mro_member_definitions(db, root, member_name);
 
-    for subtype in transitive_subtypes(db, root) {
-        for definition in own_member_definitions(db, subtype, member_name).unwrap_or_default() {
+        // Prevents scanning every known subclass for unrelated members when an actual MRO
+        // definition isn't found.
+        if root_definitions.is_empty() {
+            continue;
+        }
+
+        for definition in root_definitions {
             if !definitions.contains(&definition) {
                 definitions.push(definition);
             }
         }
+        family_roots.insert(root);
+    }
+
+    if family_roots.is_empty() {
+        return definitions;
+    }
+
+    for file in candidate_files {
+        // A subclass can only contribute an override if it spells the member name somewhere in
+        // its file, whether as a method name, a class-body target, or a `self.member` assignment.
+        if !contains_identifier(&source_text(db, *file), member_name) {
+            continue;
+        }
+        for candidate in reachable_class_literals_in_file(db, *file) {
+            if family_roots.contains(&candidate)
+                || !class_mro_intersects(db, candidate, &family_roots)
+            {
+                continue;
+            }
+            for definition in own_member_definitions(db, candidate, member_name).unwrap_or_default()
+            {
+                if !definitions.contains(&definition) {
+                    definitions.push(definition);
+                }
+            }
+        }
     }
     definitions
+}
+
+/// Returns whether any class in `class`'s MRO is one of `roots`.
+fn class_mro_intersects<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    roots: &FxHashSet<ClassLiteral<'db>>,
+) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|ancestor| roots.contains(&ancestor.class_literal(db)))
 }
 
 /// Finds the member definition selected by normal Python MRO lookup for `class`.
@@ -2469,37 +2539,6 @@ pub fn type_hierarchy_subtypes(
         .collect()
 }
 
-/// Finds all known subclasses of `root`, including subclasses of subclasses.
-///
-/// ```py
-/// class Animal: ...
-/// class Dog(Animal): ...
-/// class LoudDog(Dog): ...
-/// ```
-///
-/// For `Animal`, this returns both `Dog` and `LoudDog`.
-fn transitive_subtypes<'db>(db: &'db dyn Db, root: ClassLiteral<'db>) -> Vec<ClassLiteral<'db>> {
-    fn collect<'db>(
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-        seen: &mut FxHashSet<ClassLiteral<'db>>,
-        subtypes: &mut Vec<ClassLiteral<'db>>,
-    ) {
-        for subtype in direct_subtypes(db, class) {
-            if seen.insert(subtype) {
-                subtypes.push(subtype);
-                collect(db, subtype, seen, subtypes);
-            }
-        }
-    }
-
-    let mut subtypes = Vec::new();
-    let mut seen = FxHashSet::default();
-    seen.insert(root);
-    collect(db, root, &mut seen, &mut subtypes);
-    subtypes
-}
-
 /// Finds classes that directly inherit from `target_class`.
 ///
 /// ```py
@@ -2508,8 +2547,7 @@ fn transitive_subtypes<'db>(db: &'db dyn Db, root: ClassLiteral<'db>) -> Vec<Cla
 /// class LoudDog(Dog): ...
 /// ```
 ///
-/// For `Animal`, this returns `Dog`, but not `LoudDog`. Transitive subclasses are collected by
-/// repeatedly calling this helper.
+/// For `Animal`, this returns `Dog`, but not `LoudDog`.
 fn direct_subtypes<'db>(
     db: &'db dyn Db,
     target_class: ClassLiteral<'db>,
@@ -2546,29 +2584,7 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        let index = semantic_index(db, file);
-        for scope_id in index.scope_ids() {
-            let scope = scope_id.node(db);
-            let Some(class_node) = scope.as_class() else {
-                continue;
-            };
-
-            let def = index.expect_single_definition(class_node);
-            if !matches!(def.kind(db), DefinitionKind::Class(_)) {
-                continue;
-            }
-
-            let file_scope_id = scope_id.file_scope_id(db);
-            let parsed = parsed_module(db, file).load(db);
-            if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
-                continue;
-            }
-
-            let ty = binding_type(db, def);
-            let Some(class_ty) = extract_class_literal(db, ty) else {
-                continue;
-            };
-
+        for class_ty in reachable_class_literals_in_file(db, file) {
             let bases = class_ty.explicit_bases(db);
             let is_subtype = if target_is_object
                 && bases.is_empty()
@@ -2587,6 +2603,36 @@ fn direct_subtypes<'db>(
         }
     }
     subtypes
+}
+
+/// Enumerates the reachable class definitions in `file`.
+fn reachable_class_literals_in_file(db: &dyn Db, file: File) -> Vec<ClassLiteral<'_>> {
+    let index = semantic_index(db, file);
+    let parsed = parsed_module(db, file).load(db);
+    let mut classes = Vec::new();
+
+    for scope_id in index.scope_ids() {
+        let scope = scope_id.node(db);
+        let Some(class_node) = scope.as_class() else {
+            continue;
+        };
+
+        let definition = index.expect_single_definition(class_node);
+        if !matches!(definition.kind(db), DefinitionKind::Class(_)) {
+            continue;
+        }
+
+        let file_scope_id = scope_id.file_scope_id(db);
+        if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
+            continue;
+        }
+
+        if let Some(class) = extract_class_literal(db, binding_type(db, definition)) {
+            classes.push(class);
+        }
+    }
+
+    classes
 }
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.

@@ -52,21 +52,29 @@ pub fn goto_implementation(
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
+    // Compute the search universe once: subclass discovery makes a single pass over these files,
+    // checking each candidate class's MRO against the implementation roots. Sort by path so
+    // results come back in a deterministic order.
+    let mut candidate_files: Vec<File> = db.project().files(db).iter().copied().collect();
+    candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
+
     let implementations = match &goto_target {
         GotoTarget::Expression(ruff_python_ast::ExprRef::Attribute(attribute))
         | GotoTarget::Call {
             callable: ruff_python_ast::ExprRef::Attribute(attribute),
             ..
-        } => implementation_definitions_for_attribute(&model, attribute),
+        } => implementation_definitions_for_attribute(&model, attribute, &candidate_files),
         GotoTarget::Expression(ruff_python_ast::ExprRef::Name(name))
         | GotoTarget::Call {
             callable: ruff_python_ast::ExprRef::Name(name),
             ..
-        } => implementation_definitions_for_class_reference(&model, name),
+        } => implementation_definitions_for_class_reference(&model, name, &candidate_files),
         GotoTarget::FunctionDef(function) => {
-            implementation_definitions_for_method(&model, function)
+            implementation_definitions_for_method(&model, function, &candidate_files)
         }
-        GotoTarget::ClassDef(class) => implementation_definitions_for_class(&model, class),
+        GotoTarget::ClassDef(class) => {
+            implementation_definitions_for_class(&model, class, &candidate_files)
+        }
         _ => return None,
     };
 
