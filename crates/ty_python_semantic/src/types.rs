@@ -2832,21 +2832,61 @@ impl<'db> Type<'db> {
     ///
     /// The meta-type of a type variable preserves method binding to that type variable, but it does
     /// not carry attributes stored in a nominal upper-bound class's namespace by its metaclass.
-    /// Add those attributes using the same lookup as a concrete nominal instance.
+    /// For constrained and union-bounded type variables, generated lookup is accepted only when
+    /// every alternative defines the member; otherwise the ordinary lookup is preserved for its
+    /// missing-member diagnostics. Type aliases and `NewType` wrappers are transparent here.
     fn instance_lookup_class_member_with_policy(
         self,
         db: &'db dyn Db,
-        name: Name,
+        name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Type::TypeVar(_) = self
-            && let Some(class) = self.nominal_class(db)
+        if let Type::TypeVar(typevar) = self
+            && let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
         {
-            self.to_meta_type(db)
-                .class_namespace_member(db, class, name.as_str(), policy)
-        } else {
-            self.class_member_with_policy(db, name, policy)
+            if let TypeVarBoundOrConstraints::UpperBound(bound) = bound_or_constraints
+                && let Some(class) = bound.nominal_class(db)
+            {
+                return self
+                    .to_meta_type(db)
+                    .class_namespace_member(db, class, name, policy);
+            }
+
+            let class_member = self.class_member_with_policy(db, name.into(), policy);
+            let alternative_member = |alternative: &Type<'db>| {
+                alternative
+                    .resolve_type_alias(db)
+                    .instance_lookup_class_member_with_policy(db, name, policy)
+            };
+            let member = match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => {
+                    union.map_with_boundness_and_qualifiers(db, alternative_member)
+                }
+                TypeVarBoundOrConstraints::UpperBound(bound) => alternative_member(&bound),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    constraints.map_with_boundness_and_qualifiers(db, alternative_member)
+                }
+            };
+            if member.place.is_definitely_bound() {
+                return member;
+            }
+            if !class_member.is_undefined()
+                && !class_member
+                    .qualifiers
+                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+            {
+                return class_member;
+            }
+            return PlaceAndQualifiers::default();
         }
+
+        if let Type::NewTypeInstance(newtype) = self {
+            return newtype
+                .concrete_base_type(db)
+                .instance_lookup_class_member_with_policy(db, name, policy);
+        }
+
+        self.class_member_with_policy(db, name.into(), policy)
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -2869,6 +2909,7 @@ impl<'db> Type<'db> {
             _ => self.to_class_type(db),
         };
         let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
+        let has_own_class_attr = own_class_attr.is_some_and(|member| !member.is_undefined());
 
         // A definitely-declared attribute in this class's own namespace is the contract for
         // values populated by metaclass initialization, analogous to a declared instance
@@ -2878,12 +2919,14 @@ impl<'db> Type<'db> {
             Some(PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
+                        origin,
                         definedness,
                         ..
                     }),
-                ..
-            }) => Some(definedness),
+                qualifiers,
+            }) if origin.is_declared() || qualifiers.contains(TypeQualifiers::FINAL) => {
+                Some(definedness)
+            }
             _ => None,
         };
         if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
@@ -2894,13 +2937,29 @@ impl<'db> Type<'db> {
             return class_attr;
         };
         let metaclass_attr = metaclass_instance.instance_member(db, name);
+        let metaclass_attr_is_optional = !has_own_class_attr
+            && metaclass_attr
+                .qualifiers
+                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
+        let metaclass_attr = if metaclass_attr_is_optional {
+            Self::with_definedness(metaclass_attr, Definedness::PossiblyUndefined)
+        } else {
+            metaclass_attr
+        };
 
-        if own_declaration_definedness.is_some() {
+        let result = if own_declaration_definedness.is_some() {
             // A conditionally-declared attribute is a contract only on paths where that
             // declaration is present; the metaclass value is the fallback on other paths.
             class_attr.or_fall_back_to(db, || metaclass_attr)
         } else {
             metaclass_attr.or_fall_back_to(db, || class_attr)
+        };
+        if metaclass_attr_is_optional {
+            // Preserve the existing convention that an inferred instance member is assumed to be
+            // available even when no lower-precedence fallback exists.
+            Self::with_definedness(result, Definedness::AlwaysDefined)
+        } else {
+            result
         }
     }
 
@@ -2989,6 +3048,15 @@ impl<'db> Type<'db> {
         } else {
             own_class_member
         };
+        let own_class_member_is_plain_inferred =
+            !own_class_member.qualifiers.contains(TypeQualifiers::FINAL)
+                && matches!(
+                    own_class_member.place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Inferred,
+                        ..
+                    })
+                );
         let inherited_class_member = class.class_literal(db).class_member_from_mro(
             db,
             name,
@@ -3001,9 +3069,12 @@ impl<'db> Type<'db> {
         } else {
             metaclass_member
         };
-        let class_member = own_class_member
-            .or_fall_back_to(db, || metaclass_member)
-            .or_fall_back_to(db, || inherited_class_member);
+        let class_member = if metaclass_member_is_implicit && own_class_member_is_plain_inferred {
+            metaclass_member.or_fall_back_to(db, || own_class_member)
+        } else {
+            own_class_member.or_fall_back_to(db, || metaclass_member)
+        }
+        .or_fall_back_to(db, || inherited_class_member);
         let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
@@ -3640,7 +3711,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
+            self.instance_lookup_class_member_with_policy(db, name, member_policy),
             Some(receiver),
             self.to_meta_type(db),
         );
