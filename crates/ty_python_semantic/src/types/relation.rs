@@ -502,7 +502,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> &'db OwnedConstraintSet<'db> {
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
@@ -526,7 +526,13 @@ impl<'db> Type<'db> {
             })
         }
 
-        when_constraint_set_assignable_to_owned_impl(db, self, target)
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Cow::Owned(OwnedConstraintSet::always());
+        }
+
+        Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
+            db, self, target,
+        ))
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(

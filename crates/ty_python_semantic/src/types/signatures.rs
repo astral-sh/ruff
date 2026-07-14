@@ -113,7 +113,10 @@ fn merge_receiver_constraints<'db>(
     first: Option<OwnedConstraintSet<'db>>,
     second: Option<OwnedConstraintSet<'db>>,
 ) -> Option<OwnedConstraintSet<'db>> {
-    match (first, second) {
+    match (
+        first.filter(|constraints| !constraints.is_always()),
+        second.filter(|constraints| !constraints.is_always()),
+    ) {
         (None, None) => None,
         (Some(constraints), None) | (None, Some(constraints)) => Some(constraints),
         (Some(first), Some(second)) => {
@@ -316,11 +319,21 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
-                        receiver_constraints: self_signature.receiver_constraints.as_ref().map(
-                            |constraints| {
-                                constraints.apply_type_mapping(db, type_mapping, tcx, visitor)
-                            },
-                        ),
+                        receiver_constraints: self_signature
+                            .receiver_constraints
+                            .as_ref()
+                            .and_then(|constraints| {
+                                merge_receiver_constraints(
+                                    db,
+                                    None,
+                                    Some(constraints.apply_type_mapping(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    )),
+                                )
+                            }),
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
@@ -881,10 +894,13 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            receiver_constraints: self
-                .receiver_constraints
-                .as_ref()
-                .map(|constraints| constraints.apply_type_mapping(db, type_mapping, tcx, visitor)),
+            receiver_constraints: self.receiver_constraints.as_ref().and_then(|constraints| {
+                merge_receiver_constraints(
+                    db,
+                    None,
+                    Some(constraints.apply_type_mapping(db, type_mapping, tcx, visitor)),
+                )
+            }),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -1178,8 +1194,17 @@ impl<'db> Signature<'db> {
         let binding_context = self.definition.map(BindingContext::Definition);
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
         let visitor = ApplyTypeMappingVisitor::default();
-        let receiver_constraints = self.receiver_constraints.as_ref().map(|constraints| {
-            constraints.apply_type_mapping(db, &self_mapping, TypeContext::default(), &visitor)
+        let receiver_constraints = self.receiver_constraints.as_ref().and_then(|constraints| {
+            merge_receiver_constraints(
+                db,
+                None,
+                Some(constraints.apply_type_mapping(
+                    db,
+                    &self_mapping,
+                    TypeContext::default(),
+                    &visitor,
+                )),
+            )
         });
         if !self.needs_self_mapping(db, false) {
             return Self {
@@ -1922,23 +1947,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        if source
-            .receiver_constraints
-            .as_ref()
-            .is_some_and(|constraints| {
-                constraints
-                    .types()
-                    .any(|ty| ty.has_typevar_or_typevar_instance(db))
-            })
-            || target
-                .receiver_constraints
-                .as_ref()
-                .is_some_and(|constraints| {
-                    constraints
-                        .types()
-                        .any(|ty| ty.has_typevar_or_typevar_instance(db))
-                })
-        {
+        // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
+        // sets are discarded when receiver constraints are merged, so presence alone is enough to
+        // require lazy typevar evaluation here.
+        if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
@@ -4781,6 +4793,17 @@ mod tests {
                 "source-backed parameter should have a definition"
             );
         }
+    }
+
+    #[test]
+    fn always_satisfied_receiver_constraints_are_discarded() {
+        let db = setup_db();
+        assert!(
+            merge_receiver_constraints(&db, Some(OwnedConstraintSet::always()), None).is_none()
+        );
+        assert!(
+            merge_receiver_constraints(&db, None, Some(OwnedConstraintSet::always())).is_none()
+        );
     }
 
     #[test]

@@ -290,7 +290,7 @@ impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
             self.builder
                 .load(
                     self.db,
-                    lower.when_constraint_set_assignable_to_owned_for_mapping(self.db, subject),
+                    &lower.when_constraint_set_assignable_to_owned_for_mapping(self.db, subject),
                 )
                 .node
         });
@@ -298,7 +298,7 @@ impl<'db> OwnedConstraintSetTypeMapper<'_, '_, 'db> {
             self.builder
                 .load(
                     self.db,
-                    subject.when_constraint_set_assignable_to_owned_for_mapping(self.db, upper),
+                    &subject.when_constraint_set_assignable_to_owned_for_mapping(self.db, upper),
                 )
                 .node
         });
@@ -355,6 +355,10 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
+    pub(crate) fn is_always(&self) -> bool {
+        self.node == ALWAYS_TRUE
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -396,6 +400,24 @@ impl<'db> OwnedConstraintSet<'db> {
             return self.clone();
         };
 
+        let changes_constraint = |constraint: &Constraint<'db>| {
+            Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ) != Type::TypeVar(constraint.typevar)
+                || constraint.bounds.lower.is_some_and(|lower| {
+                    lower.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != lower
+                })
+                || constraint.bounds.upper.is_some_and(|upper| {
+                    upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != upper
+                })
+        };
+        if !inner.constraints.iter().any(changes_constraint) {
+            return self.clone();
+        }
+
         let builder = ConstraintSetBuilder::new();
         builder.into_owned(|builder| {
             let mut mapper = OwnedConstraintSetTypeMapper {
@@ -408,6 +430,24 @@ impl<'db> OwnedConstraintSet<'db> {
                 node_cache: FxHashMap::default(),
                 constraint_cache: FxHashMap::default(),
             };
+            if inner.nodes.len() == 1 {
+                let old_interior = inner.nodes[inner.retained_node_index(self.node)];
+                let old_constraint =
+                    inner.constraints[inner.retained_constraint_index(old_interior.constraint)];
+                let condition = mapper
+                    .map_constraint(old_constraint)
+                    .with_adjusted_source_order(
+                        builder,
+                        old_interior.source_order.saturating_sub(1),
+                    );
+                let node = condition.ite_uncertain(
+                    builder,
+                    old_interior.if_true,
+                    old_interior.if_uncertain,
+                    old_interior.if_false,
+                );
+                return ConstraintSet::from_node(builder, node);
+            }
             ConstraintSet::from_node(builder, mapper.rebuild_node(self.node))
         })
     }
@@ -1150,6 +1190,27 @@ impl<'db> ConstraintSetBuilder<'db> {
             .inner
             .as_ref()
             .expect("storage-free owned constraint sets must have terminal roots");
+
+        if inner.nodes.len() == 1 {
+            let old_interior = inner.nodes[inner.retained_node_index(other.node)];
+            let old_constraint =
+                inner.constraints[inner.retained_constraint_index(old_interior.constraint)];
+            let condition = Constraint::new_node_with_bounds(
+                db,
+                self,
+                old_constraint.typevar,
+                old_constraint.bounds.lower,
+                old_constraint.bounds.upper,
+            )
+            .with_adjusted_source_order(self, old_interior.source_order.saturating_sub(1));
+            let node = condition.ite_uncertain(
+                self,
+                old_interior.if_true,
+                old_interior.if_uncertain,
+                old_interior.if_false,
+            );
+            return ConstraintSet::from_node(self, node);
+        }
 
         // Load all of the constraints into the this builder first, to maximize the chance that the
         // constraints and typevars will appear in the same order. (This is important because many
@@ -8069,6 +8130,34 @@ mod tests {
             source_orders.sort_unstable();
             assert_eq!(source_orders, [1, 2]);
         });
+    }
+
+    #[test]
+    fn no_op_owned_constraint_set_mapping_reuses_storage() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let owned = ConstraintSetBuilder::new()
+            .into_owned(|builder| create_constraint(&db, builder, t, KnownClass::Int));
+        let generic_context =
+            crate::types::generics::GenericContext::from_typevar_instances(&db, [u]);
+        let mapped = owned.apply_type_mapping(
+            &db,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta: 1,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        assert!(Arc::ptr_eq(
+            owned.inner.as_ref().expect("owned set should have storage"),
+            mapped
+                .inner
+                .as_ref()
+                .expect("mapped set should have storage"),
+        ));
     }
 
     #[test]
