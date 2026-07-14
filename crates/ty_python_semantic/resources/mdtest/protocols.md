@@ -2909,14 +2909,14 @@ static_assert(not is_assignable_to(Foo, SupportsFooMethod))
 static_assert(is_assignable_to(Foo, SupportsFooAttr))
 ```
 
-The reason for this is that some methods, such as dunder methods, are always looked up on the class
-directly. If a class with an `__iter__` instance attribute satisfied the `Iterable` protocol, for
-example, the `Iterable` protocol would not accurately describe the requirements Python has for a
-class to be iterable at runtime. Allowing callable instance attributes to satisfy method members of
-protocols would also make `issubclass()` narrowing of runtime-checkable protocols unsound, as the
-`issubclass()` mechanism at runtime for protocols only checks whether a method is accessible on the
-class object, not the instance. (Protocols with non-method members cannot be passed to
-`issubclass()` at all at runtime.)
+The reason for this is that some methods, such as Python's special methods, are always looked up on
+the class directly. If a class with an `__iter__` instance attribute satisfied the `Iterable`
+protocol, for example, the `Iterable` protocol would not accurately describe the requirements Python
+has for a class to be iterable at runtime. Allowing callable instance attributes to satisfy method
+members of protocols would also make `issubclass()` narrowing of runtime-checkable protocols
+unsound, as the `issubclass()` mechanism at runtime for protocols only checks whether a method is
+accessible on the class object, not the instance. (Protocols with non-method members cannot be
+passed to `issubclass()` at all at runtime.)
 
 ```py
 from typing import Iterable, Any
@@ -2928,26 +2928,6 @@ class Foo:
         self.__iter__: Callable[..., object] = lambda *args, **kwargs: None
 
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
-```
-
-Special method members are looked up on the meta-type of an object when testing assignability and
-subtyping, matching Python's special-method lookup. We therefore understand that `IterableClass`
-here is a subtype of `Iterable[int]` even though `IterableClass.__iter__` has the wrong signature:
-
-```py
-from typing import Iterator, Iterable
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_subtype_of
-
-class Meta(type):
-    def __iter__(self) -> Iterator[int]:
-        yield from range(42)
-
-class IterableClass(metaclass=Meta):
-    def __iter__(self) -> Iterator[str]:
-        yield from "abc"
-
-static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
 ```
 
 Enforcing that members must always be available on the class also means that it is safe to access a
@@ -3311,9 +3291,6 @@ directly accessible member has a compatible bound signature. Class and static me
 work, but a regular instance method does not: accessing it through the class produces an unbound
 function rather than a method bound to the class object.
 
-A custom dunder such as `__custom__` is an ordinary method: it is accessed directly on the class
-object and does not use Python's special-method lookup.
-
 ```py
 from typing import Protocol
 from typing_extensions import Self
@@ -3322,9 +3299,6 @@ from ty_extensions._internal import TypeOf, is_assignable_to
 
 class CopierProtocol(Protocol):
     def copy(self) -> Self: ...
-
-class CustomCopierProtocol(Protocol):
-    def __custom__(self, value: int) -> str: ...
 
 class Copier:
     def copy(self) -> Self:
@@ -3340,11 +3314,6 @@ class StaticCopier:
     def copy() -> "StaticCopier":
         return StaticCopier()
 
-class CustomCopier:
-    @classmethod
-    def __custom__(cls, value: int) -> str:
-        return str(value)
-
 class CopierMeta(type):
     def copy(cls) -> "BadDirectCopier":
         return BadDirectCopier()
@@ -3357,10 +3326,50 @@ static_assert(is_assignable_to(Copier, CopierProtocol))
 static_assert(not is_assignable_to(TypeOf[Copier], CopierProtocol))
 static_assert(is_assignable_to(TypeOf[ClassCopier], CopierProtocol))
 static_assert(is_assignable_to(TypeOf[StaticCopier], CopierProtocol))
-static_assert(is_assignable_to(TypeOf[CustomCopier], CustomCopierProtocol))
 # The metaclass method is compatible, but ordinary protocol methods describe direct access on the
 # class object, where `BadDirectCopier.copy` is an incompatible unbound function.
 static_assert(not is_assignable_to(TypeOf[BadDirectCopier], CopierProtocol))
+```
+
+## Class objects and dunder instance-method protocol members
+
+Special methods are looked up on the meta-type of an object when testing assignability and
+subtyping, matching Python's special-method lookup. We therefore understand that `IterableClass`
+here is a subtype of `Iterable[int]` even though `IterableClass.__iter__` has the wrong signature:
+
+```py
+from typing import Iterable, Iterator
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+```
+
+A custom dunder such as `__custom__` is an ordinary method: it is accessed directly on the class
+object and does not use Python's special-method lookup.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class CustomProtocol(Protocol):
+    def __custom__(self, value: int) -> str: ...
+
+class Custom:
+    @classmethod
+    def __custom__(cls, value: int) -> str:
+        return str(value)
+
+static_assert(is_assignable_to(TypeOf[Custom], CustomProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
