@@ -198,26 +198,6 @@ def _(val: int | None):
     reveal_type(val)  # revealed: int
 ```
 
-Narrowing that occurs after the `NoReturn` call must also be discarded with the unreachable branch:
-
-```py
-from typing_extensions import Never
-
-def fail() -> Never:
-    raise RuntimeError
-
-def _(x: int | None, flag: bool):
-    if flag:
-        fail()
-        if x is not None:
-            return
-    else:
-        if x is None:
-            return
-
-    reveal_type(x)  # revealed: int
-```
-
 And for elif branches:
 
 ```py
