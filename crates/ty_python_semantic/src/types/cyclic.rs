@@ -287,8 +287,16 @@ where
                 return false;
             }
             let (active_left, active_right) = active.type_pair();
-            RecursiveTypeStack::has_immediate_reentry_to(db, current_left, active_left)
-                || RecursiveTypeStack::has_immediate_reentry_to(db, current_right, active_right)
+            // An unchanged component does not represent recursive progress. Exact pair reentries
+            // are handled before this policy is consulted.
+            (current_left != active_left
+                && RecursiveTypeStack::has_immediate_reentry_to(db, current_left, active_left))
+                || (current_right != active_right
+                    && RecursiveTypeStack::has_immediate_reentry_to(
+                        db,
+                        current_right,
+                        active_right,
+                    ))
         })
     }
 }

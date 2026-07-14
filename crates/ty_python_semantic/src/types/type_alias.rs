@@ -328,12 +328,13 @@ impl<'db> TypeAliasApplication<'db> {
         alias.application(db)
     }
 
+    /// Returns whether a specialization argument contains `ty`, following named aliases.
     pub(crate) fn contains_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         self.specialization
             .types(db)
             .iter()
             .copied()
-            .any(|argument| visitor::any_over_type(db, argument, false, |nested| nested == ty))
+            .any(|argument| visitor::any_over_type(db, argument, true, |nested| nested == ty))
     }
 
     pub(crate) fn is_nested_within(

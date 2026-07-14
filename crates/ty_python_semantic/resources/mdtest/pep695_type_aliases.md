@@ -764,6 +764,33 @@ def nested_union(
     value: list[NonRecursiveId[NonRecursiveId[int]]] | list[int],
 ):
     reveal_type(value)  # revealed: list[NonRecursiveId[NonRecursiveId[int]]]
+
+# A finite nested application can also be hidden behind another named alias.
+type Intermediate[T] = T
+type LeftIntAlias = NonRecursiveId[int]
+type RightIntAlias = NonRecursiveId[int]
+
+def finite_alias_chain(x: NonRecursiveId[Intermediate[NonRecursiveId[int]]]):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(x == 1)  # revealed: bool
+    # error: [invalid-assignment]
+    invalid: str = x
+
+def equivalent_finite_aliases(x: NonRecursiveId[LeftIntAlias]):
+    valid: NonRecursiveId[RightIntAlias] = x
+
+type IntAlias = int
+
+def unchanged_alias_pair(x: NonRecursiveId[NonRecursiveId[bool]]):
+    # `bool` is a subtype of `int`. The unchanged target alias must not cause the finite source
+    # expansion to be treated as recursive.
+    valid: IntAlias = x
+
+type NoneAlias = NonRecursiveId[None]
+type NestedNoneAlias = NonRecursiveId[NoneAlias]
+
+def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
+    reveal_type(x if condition else 1)  # revealed: None | Literal[1]
 ```
 
 ### Subtyping of materializations of cyclic aliases
