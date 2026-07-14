@@ -9,6 +9,7 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
+use ruff_python_trivia::tab_offset;
 use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
@@ -201,7 +202,7 @@ impl LineWidthBuilder {
         for c in chars {
             match c {
                 '\t' => {
-                    let tab_offset = tab_size - (self.column % tab_size);
+                    let tab_offset = tab_offset(self.column, tab_size);
                     self.width += tab_offset;
                     self.column += tab_offset;
                 }
