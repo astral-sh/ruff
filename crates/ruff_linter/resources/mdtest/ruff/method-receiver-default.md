@@ -2,40 +2,28 @@
 
 ```toml
 lint.preview = true
-# lint.select = ["RUF077"]
+lint.select = ["RUF077"]
 ```
 
 ## Basic errors
 
 ```py
-from typing import override
-
-
-def decorator(func):
-    return func
-
-
 class InstanceReceiverDefault:
-    def method(self=None): ...  # TODO: error: [method-receiver-default]
+    def method(self=None): ...  # error: [method-receiver-default]
 
 
 class ClassReceiverDefault:
     @classmethod
-    def build(cls=None): ...  # TODO: error: [method-receiver-default]
+    def build(cls=None): ...  # error: [method-receiver-default]
 
 
 class NewMethodClassReceiver:
-    def __new__(cls=None): ...  # TODO: error: [method-receiver-default]
+    def __new__(cls=None): ...  # error: [method-receiver-default]
 
 
-class OverrideReceiverDefault:
-    @override
-    def method(self=None): ...
-
-
-class CustomDecoratorReceiverDefault:
-    @decorator
-    def method(self=None): ...
+class NestedInIfReceiverDefault:
+    if True:
+        def method(self=None): ...  # error: [method-receiver-default]
 ```
 
 ## No errors

@@ -188,9 +188,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::MutableArgumentDefault) {
                 flake8_bugbear::rules::mutable_argument_default(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::MethodReceiverDefault) {
-                ruff::rules::method_receiver_default(checker, function_def);
-            }
             if checker.is_rule_enabled(Rule::ReturnInGenerator) {
                 flake8_bugbear::rules::return_in_generator(checker, function_def);
             }

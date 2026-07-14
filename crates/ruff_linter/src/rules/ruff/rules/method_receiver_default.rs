@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
+use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -66,14 +67,16 @@ impl Violation for MethodReceiverDefault {
 }
 
 /// Determine the receiver kind for a function, if it has a receiver parameter.
-fn classify_receiver_kind(
-    function: &ast::StmtFunctionDef,
+fn receiver_kind(
+    name: &str,
+    decorator_list: &[ast::Decorator],
+    parent_scope: &Scope,
     checker: &Checker,
 ) -> Option<ReceiverKind> {
     let function_kind = function_type::classify(
-        function.name.as_str(),
-        &function.decorator_list,
-        checker.semantic().current_scope(),
+        name,
+        decorator_list,
+        parent_scope,
         checker.semantic(),
         &checker.settings().pep8_naming.classmethod_decorators,
         &checker.settings().pep8_naming.staticmethod_decorators,
@@ -83,76 +86,53 @@ fn classify_receiver_kind(
         FunctionType::StaticMethod => None,
         FunctionType::ClassMethod => Some(ReceiverKind::Class),
         FunctionType::NewMethod => Some(ReceiverKind::Class),
-        FunctionType::Method => Some(ReceiverKind::Instance),
+        FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
+        FunctionType::Method => None,
         FunctionType::Function => None,
     }
 }
 
 /// RUF077 — Method receiver parameter should not have a default value
-pub(crate) fn method_receiver_default(checker: &Checker, function: &ast::StmtFunctionDef) {
-    // Only check functions directly in a class body
-    let Some(Stmt::ClassDef(_)) = checker.semantic().current_statement_parent() else {
+pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
+    let ScopeKind::Function(ast::StmtFunctionDef {
+        name,
+        parameters,
+        decorator_list,
+        ..
+    }) = &scope.kind
+    else {
+        panic!("Expected ScopeKind::Function")
+    };
+
+    let semantic = checker.semantic();
+
+    let Some(parent_scope) = semantic.first_non_type_parent_scope(scope) else {
         return;
     };
 
-    // Conservatively bail out if there are decorators beyond the standard ones we handle
-    // This includes @override and other custom decorators that may indicate inherited signatures
-    let classmethod_decorators = &checker.settings().pep8_naming.classmethod_decorators;
-    let staticmethod_decorators = &checker.settings().pep8_naming.staticmethod_decorators;
-
-    for decorator in &function.decorator_list {
-        let decorator_name = match decorator {
-            ast::Decorator {
-                expression: ast::Expr::Name(name),
-                ..
-            } => Some(name.id.as_str()),
-            ast::Decorator {
-                expression: ast::Expr::Attribute(attr),
-                ..
-            } => Some(attr.attr.as_str()),
-            _ => None,
-        };
-
-        if let Some(name) = decorator_name {
-            // Skip standard decorators we handle
-            if name == "classmethod"
-                || name == "staticmethod"
-                || classmethod_decorators.contains(&name.to_string())
-                || staticmethod_decorators.contains(&name.to_string())
-                || name == "property"
-                || name == "override"
-            {
-                continue;
-            }
-            // If we encounter any other decorator, bail out conservatively
-            return;
-        }
-    }
+    let ScopeKind::Class(_) = parent_scope.kind else {
+        return;
+    };
 
     // Determine receiver kind
-    let Some(receiver_kind) = classify_receiver_kind(function, checker) else {
+    let Some(receiver_kind) = receiver_kind(name.as_str(), decorator_list, parent_scope, checker)
+    else {
         return;
     };
 
     // Get the first parameter (the receiver)
-    let Some(first_param) = function
-        .parameters
+    let Some(first_param) = parameters
         .posonlyargs
         .first()
-        .or_else(|| function.parameters.args.first())
+        .or_else(|| parameters.args.first())
     else {
         return;
     };
 
     // Check if the receiver parameter has a default value
-    if first_param.default.is_some() {
+    if let Some(default_expr) = &first_param.default {
         let diagnostic = MethodReceiverDefault { receiver_kind };
 
-        // Report at the default value location if available, otherwise at the parameter
-        if let Some(default_expr) = &first_param.default {
-            checker.report_diagnostic(diagnostic, default_expr.range());
-        } else {
-            checker.report_diagnostic(diagnostic, first_param.range());
-        }
+        checker.report_diagnostic(diagnostic, default_expr.range());
     }
 }
