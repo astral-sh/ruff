@@ -4,8 +4,9 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{
-    SemanticModel, implementation_definitions_for_attribute, implementation_definitions_for_class,
-    implementation_definitions_for_class_reference, implementation_definitions_for_method,
+    ImportAliasResolution, SemanticModel, implementation_definitions_for_attribute,
+    implementation_definitions_for_class, implementation_definitions_for_class_references,
+    implementation_definitions_for_method,
 };
 
 /// Navigate from an attribute access or method declaration to that member and known subclass overrides.
@@ -37,7 +38,9 @@ use ty_python_semantic::{
 /// ```
 ///
 /// For a reference to a class (a base class, annotation, or `Animal()`), this behaves like clicking
-/// the class declaration: the referenced class plus its known transitive subclasses.
+/// the class declaration: the referenced class plus its known transitive subclasses. The reference
+/// is resolved through its definitions rather than its syntax, so a qualified reference such as
+/// `module.Animal` or `Outer.Inner` behaves the same as a bare name.
 ///
 /// ```py
 /// class Dog(Animal): ...
@@ -59,16 +62,36 @@ pub fn goto_implementation(
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
     let implementations = match &goto_target {
-        GotoTarget::Expression(ruff_python_ast::ExprRef::Attribute(attribute))
+        GotoTarget::Expression(expression)
         | GotoTarget::Call {
-            callable: ruff_python_ast::ExprRef::Attribute(attribute),
+            callable: expression,
             ..
-        } => implementation_definitions_for_attribute(&model, attribute, &candidate_files),
-        GotoTarget::Expression(ruff_python_ast::ExprRef::Name(name))
-        | GotoTarget::Call {
-            callable: ruff_python_ast::ExprRef::Name(name),
-            ..
-        } => implementation_definitions_for_class_reference(&model, name, &candidate_files),
+        } if matches!(
+            expression,
+            ruff_python_ast::ExprRef::Name(_) | ruff_python_ast::ExprRef::Attribute(_)
+        ) =>
+        {
+            let resolved = goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
+            let resolved = resolved
+                .as_ref()
+                .map(|definitions| definitions.iter().as_slice())
+                .unwrap_or(&[]);
+
+            // A target that resolves to class objects gets class-family lookup regardless of
+            // syntax: a bare name, a qualified reference like `module.Animal`, or a constructor call.
+            implementation_definitions_for_class_references(db, resolved, &candidate_files)
+                .or_else(|| match expression {
+                    // Otherwise attribute accesses fall back to member handling.
+                    ruff_python_ast::ExprRef::Attribute(attribute) => {
+                        Some(implementation_definitions_for_attribute(
+                            &model,
+                            attribute,
+                            &candidate_files,
+                        ))
+                    }
+                    _ => None,
+                })?
+        }
         GotoTarget::FunctionDef(function) => {
             implementation_definitions_for_method(&model, function, &candidate_files)
         }
@@ -1166,6 +1189,206 @@ class MyClass:
         3 |     pass
         4 |
         5 | class Dog(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_qualified_class_reference_in_base_list() {
+        let test = CursorTest::builder()
+            .source(
+                "animals.py",
+                r#"
+                class Animal:
+                    pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                import animals
+
+                class Dog(animals.Anim<CURSOR>al):
+                    pass
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:19
+          |
+        4 | class Dog(animals.Animal):
+          |                   ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> animals.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+          |
+         ::: main.py:4:7
+          |
+        4 | class Dog(animals.Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_qualified_class_reference_in_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "animals.py",
+                r#"
+                class Animal:
+                    pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                import animals
+
+                class Dog(animals.Animal):
+                    pass
+
+                def f(x: animals.Anim<CURSOR>al):
+                    pass
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:7:18
+          |
+        7 | def f(x: animals.Animal):
+          |                  ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> animals.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+          |
+         ::: main.py:4:7
+          |
+        4 | class Dog(animals.Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_qualified_class_reference_in_instantiation() {
+        let test = CursorTest::builder()
+            .source(
+                "animals.py",
+                r#"
+                class Animal:
+                    pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                import animals
+
+                class Dog(animals.Animal):
+                    pass
+
+                animals.Anim<CURSOR>al()
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:7:9
+          |
+        7 | animals.Animal()
+          |         ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> animals.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+          |
+         ::: main.py:4:7
+          |
+        4 | class Dog(animals.Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_nested_class_reference() {
+        let test = cursor_test(
+            r#"
+            class Outer:
+                class Inner:
+                    pass
+
+            class SubInner(Outer.Inner):
+                pass
+
+            def f(x: Outer.In<CURSOR>ner):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:16
+          |
+        9 | def f(x: Outer.Inner):
+          |                ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:3:11
+          |
+        3 |     class Inner:
+          |           -----
+        4 |         pass
+        5 |
+        6 | class SubInner(Outer.Inner):
+          |       --------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_bound_to_class() {
+        // An attribute that resolves to a class object is a class reference, not a member
+        // lookup, matching how a bare name bound to a class behaves.
+        let test = cursor_test(
+            r#"
+            class Dog:
+                pass
+
+            class Factory:
+                dog_cls = Dog
+
+            def f(factory: Factory):
+                factory.dog_<CURSOR>cls
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:13
+          |
+        9 |     factory.dog_cls
+          |             ^^^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> main.py:2:7
+          |
+        2 | class Dog:
           |       ---
           |
         ");

@@ -429,8 +429,8 @@ pub fn implementation_definitions_for_class<'db>(
     class_implementation_families(db, candidate_files, vec![root])
 }
 
-/// Returns definitions for the implementation family of a class reference, such as a base class,
-/// an annotation, or a constructor call.
+/// Returns definitions for the implementation families of the classes referred to by `resolved`,
+/// covering class references such as a base class, an annotation, or a constructor call.
 ///
 /// ```py
 /// class Animal: ...
@@ -440,36 +440,37 @@ pub fn implementation_definitions_for_class<'db>(
 /// ```
 ///
 /// The referenced class is the root and is returned first, followed by its known transitive
-/// subclasses, just like clicking the class declaration. Names that don't resolve to a class object
-/// (for example instance variables) return nothing.
+/// subclasses, just like clicking the class declaration.
 ///
-/// The name is resolved to the definition it refers to rather than using its inferred value type,
-/// because a class used as an annotation (`x: Animal`) infers as an instance of that class, which
-/// is indistinguishable from an actual instance variable. The resolved definition's type is a class
-/// object precisely when the name refers to a class.
+/// The resolved definitions' binding types are used rather than the reference's inferred value
+/// type, because a class used as an annotation (`x: Animal`) infers as an instance of that class,
+/// which is indistinguishable from an actual instance variable. The resolved definition's type is
+/// a class object precisely when the reference refers to a class.
+///
+/// Returns `None` when none of the resolved definitions refer to a class object (for example
+/// instance variables or methods), so callers can fall back to member handling.
 ///
 /// Subclasses are discovered by scanning the classes defined in `candidate_files`.
-pub fn implementation_definitions_for_class_reference<'db>(
-    model: &SemanticModel<'db>,
-    name: &ast::ExprName,
+pub fn implementation_definitions_for_class_references<'db>(
+    db: &'db dyn Db,
+    resolved: &[ResolvedDefinition<'db>],
     candidate_files: &[File],
-) -> Vec<ResolvedDefinition<'db>> {
-    let db = model.db();
+) -> Option<Vec<ResolvedDefinition<'db>>> {
     let mut roots = Vec::new();
     let mut seen = FxHashSet::default();
-    for resolved in definitions_for_name(
-        model,
-        name.id.as_str(),
-        name.into(),
-        ImportAliasResolution::ResolveAliases,
-    ) {
+    for resolved in resolved {
         let ResolvedDefinition::Definition(definition) = resolved else {
             continue;
         };
+        // Declaration-only definitions such as a bare `sound: str` annotation have no binding
+        // type and cannot refer to a class object.
+        if !resolved.category(db).is_binding() {
+            continue;
+        }
         // Only references that resolve to a class object (a base class, annotation, `Animal()`, or
         // a name bound to a class) are class implementation requests; instances resolve to their
         // own definitions, whose type is the instance rather than the class object.
-        let ty = binding_type(db, definition);
+        let ty = binding_type(db, *definition);
         let root = match ty {
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => {
                 extract_class_literal(db, ty)
@@ -483,7 +484,10 @@ pub fn implementation_definitions_for_class_reference<'db>(
             roots.push(root);
         }
     }
-    class_implementation_families(db, candidate_files, roots)
+    if roots.is_empty() {
+        return None;
+    }
+    Some(class_implementation_families(db, candidate_files, roots))
 }
 
 /// Collects class roots and their known transitive subclasses as implementation definitions, with
