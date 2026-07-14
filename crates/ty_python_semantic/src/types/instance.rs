@@ -584,12 +584,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// The effective constructor return must satisfy the instance protocol, while the class object
     /// itself must provide the protocol's `ClassVar` and unbound method requirements. Ordinary
     /// instance attributes and properties are intentionally not required on the class object.
+    ///
+    /// `meta_ty` must be a class-object type represented by `ClassLiteral`, `SubclassOf`, or
+    /// `GenericAlias`. Other types are not necessarily subtypes of `type` or callable, and could
+    /// therefore incorrectly satisfy this check through an `Unknown` constructor return type.
     pub(super) fn check_meta_type_satisfies_protocol(
         &self,
         db: &'db dyn Db,
         meta_ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        debug_assert!(matches!(
+            meta_ty,
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
+        ));
+
         let constructed_ty = meta_ty.bindings(db).return_type(db);
         self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
             .and(db, self.constraints, || {
