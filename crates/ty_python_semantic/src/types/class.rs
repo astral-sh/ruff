@@ -1030,7 +1030,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(crate) fn materialized_for_relation(
+    pub(crate) fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -1040,7 +1040,7 @@ impl<'db> ClassType<'db> {
             Self::Generic(alias) => {
                 let specialization = alias
                     .specialization(db)
-                    .materialized_for_relation(db, visitor);
+                    .apply_deferred_materialization(db, visitor);
                 Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
             }
         }
