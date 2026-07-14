@@ -273,6 +273,10 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
+    pub(crate) fn is_always(&self) -> bool {
+        self.node == ALWAYS_TRUE
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -291,6 +295,16 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let set = ConstraintSet::from_node(&builder, self.node);
         f(&builder, set)
+    }
+
+    pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.inner.iter().flat_map(|inner| {
+            inner.constraints.iter().flat_map(|constraint| {
+                std::iter::once(Type::TypeVar(constraint.typevar))
+                    .chain(constraint.bounds.lower)
+                    .chain(constraint.bounds.upper)
+            })
+        })
     }
 }
 
@@ -581,8 +595,54 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    /// Copies this constraint set into an owned snapshot.
+    pub(crate) fn into_owned(self, db: &'db dyn Db) -> OwnedConstraintSet<'db> {
+        fn rebuild_node<'db>(
+            db: &'db dyn Db,
+            source: &ConstraintSetBuilder<'db>,
+            target: &ConstraintSetBuilder<'db>,
+            cache: &mut FxHashMap<NodeId, NodeId>,
+            old_node: NodeId,
+        ) -> NodeId {
+            if old_node.is_terminal() {
+                return old_node;
+            }
+            if let Some(remapped) = cache.get(&old_node) {
+                return *remapped;
+            }
+
+            let old_interior = source.interior_node_data(old_node);
+            let old_constraint = source.constraint_data(old_interior.constraint);
+            let condition = Constraint::new_node_with_bounds(
+                db,
+                target,
+                old_constraint.typevar,
+                old_constraint.bounds.lower,
+                old_constraint.bounds.upper,
+            )
+            .with_adjusted_source_order(target, old_interior.source_order.saturating_sub(1));
+            let if_true = rebuild_node(db, source, target, cache, old_interior.if_true);
+            let if_uncertain = rebuild_node(db, source, target, cache, old_interior.if_uncertain);
+            let if_false = rebuild_node(db, source, target, cache, old_interior.if_false);
+            let remapped = condition.ite_uncertain(target, if_true, if_uncertain, if_false);
+            cache.insert(old_node, remapped);
+            remapped
+        }
+
+        let builder = ConstraintSetBuilder::new();
+        builder.into_owned(|builder| {
+            let node = rebuild_node(
+                db,
+                self.builder,
+                builder,
+                &mut FxHashMap::default(),
+                self.node,
+            );
+            ConstraintSet::from_node(builder, node)
+        })
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by a stacked follow-up"))]
     pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -657,13 +717,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
                 } else {
                     let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
-                        lower
-                            .when_constraint_set_assignable_to(db, subject, builder)
+                        builder
+                            .load(
+                                db,
+                                &lower.when_constraint_set_assignable_to_owned(db, subject),
+                            )
                             .node
                     });
                     let upper_holds = upper.map_or(ALWAYS_TRUE, |upper| {
-                        subject
-                            .when_constraint_set_assignable_to(db, upper, builder)
+                        builder
+                            .load(
+                                db,
+                                &subject.when_constraint_set_assignable_to_owned(db, upper),
+                            )
                             .node
                     });
                     lower_holds.and_with_offset(builder, upper_holds)
@@ -1031,6 +1097,27 @@ impl<'db> ConstraintSetBuilder<'db> {
             .inner
             .as_ref()
             .expect("storage-free owned constraint sets must have terminal roots");
+
+        if inner.nodes.len() == 1 {
+            let old_interior = inner.nodes[inner.retained_node_index(other.node)];
+            let old_constraint =
+                inner.constraints[inner.retained_constraint_index(old_interior.constraint)];
+            let condition = Constraint::new_node_with_bounds(
+                db,
+                self,
+                old_constraint.typevar,
+                old_constraint.bounds.lower,
+                old_constraint.bounds.upper,
+            )
+            .with_adjusted_source_order(self, old_interior.source_order.saturating_sub(1));
+            let node = condition.ite_uncertain(
+                self,
+                old_interior.if_true,
+                old_interior.if_uncertain,
+                old_interior.if_false,
+            );
+            return ConstraintSet::from_node(self, node);
+        }
 
         // Load all of the constraints into the this builder first, to maximize the chance that the
         // constraints and typevars will appear in the same order. (This is important because many
