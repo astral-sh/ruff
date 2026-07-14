@@ -804,7 +804,7 @@ impl<'db> GenericContext<'db> {
                             signatures,
                             callable.kind(db),
                             callable.provenance(db),
-                            callable.top_materialization_for_narrowing(db),
+                            callable.deferred_top_materialization(db),
                         );
 
                         Some((callable, replacement))
@@ -1503,8 +1503,8 @@ impl<'db> Specialization<'db> {
 
         // Keep this check in sync with every field that can be transformed above.
         let original_materialization_kind = self.materialization_kind(db);
-        if matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization)
-            && new_materialization_kind.is_some_and(MaterializationKind::is_for_narrowing)
+        if matches!(type_mapping, TypeMapping::EraseDeferredMaterialization)
+            && new_materialization_kind.is_some_and(MaterializationKind::is_deferred)
         {
             new_materialization_kind = None;
         }
@@ -1606,10 +1606,10 @@ impl<'db> Specialization<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        // A narrowing materialization retains the gradual arguments and marks the specialization
-        // as a whole. Relations materialize a temporary copy to the corresponding ordinary top or
+        // A deferred materialization retains the gradual arguments and marks the specialization as
+        // a whole. Relations materialize a temporary copy to the corresponding ordinary top or
         // bottom materialization, while the stored type can later be restored by removing the tag.
-        if materialization_kind.is_for_narrowing() {
+        if materialization_kind.is_deferred() {
             if self.materialization_kind(db).is_none() {
                 return self.with_materialization_kind(db, Some(materialization_kind));
             }
@@ -1705,14 +1705,14 @@ impl<'db> Specialization<'db> {
     ) -> Self {
         let Some(materialization_kind) = self
             .materialization_kind(db)
-            .filter(|kind| kind.is_for_narrowing())
+            .filter(|kind| kind.is_deferred())
         else {
             return self;
         };
 
         self.with_materialization_kind(db, None).materialize_impl(
             db,
-            materialization_kind.without_narrowing_marker(),
+            materialization_kind.without_deferred_marker(),
             visitor,
         )
     }
@@ -2160,15 +2160,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
             (
-                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
-                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+                MaterializationKind::Top | MaterializationKind::DeferredTop,
+                MaterializationKind::Top | MaterializationKind::DeferredTop,
             ) => is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
                 is_subtype_of(source_top, target_top)
             }),
             // One bottom is a subtype of another if it covers a strictly larger set of materializations.
             (
-                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
-                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+                MaterializationKind::Bottom | MaterializationKind::DeferredBottom,
+                MaterializationKind::Bottom | MaterializationKind::DeferredBottom,
             ) => is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
                 is_subtype_of(target_top, source_top)
             }),
@@ -2177,8 +2177,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // range of types covered by derived and within the range covered by base, because if such a type
             // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
             (
-                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
-                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+                MaterializationKind::Bottom | MaterializationKind::DeferredBottom,
+                MaterializationKind::Top | MaterializationKind::DeferredTop,
             ) => is_subtype_of(target_bottom, source_bottom)
                 .and(db, self.constraints, || {
                     is_subtype_of(source_bottom, target_top)
@@ -2196,8 +2196,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A top materialization is a subtype of a bottom materialization only if both original
             // un-materialized types are the same fully static type.
             (
-                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
-                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+                MaterializationKind::Top | MaterializationKind::DeferredTop,
+                MaterializationKind::Bottom | MaterializationKind::DeferredBottom,
             ) => is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
                 is_subtype_of(target_top, source_bottom)
             }),

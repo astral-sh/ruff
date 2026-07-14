@@ -1856,8 +1856,8 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
-                Some(MaterializationKind::TopForNarrowing) => Some(("Top*", SpecialFormType::Top)),
-                Some(MaterializationKind::BottomForNarrowing) => {
+                Some(MaterializationKind::DeferredTop) => Some(("Top*", SpecialFormType::Top)),
+                Some(MaterializationKind::DeferredBottom) => {
                     Some(("Bottom*", SpecialFormType::Bottom))
                 }
             };
@@ -2207,7 +2207,7 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            top_materialization_for_narrowing: self.top_materialization_for_narrowing(db),
+            deferred_top_materialization: self.deferred_top_materialization(db),
             db,
             env,
             settings,
@@ -2218,7 +2218,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    top_materialization_for_narrowing: bool,
+    deferred_top_materialization: bool,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -2266,7 +2266,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
             }
         }
 
-        if self.top_materialization_for_narrowing {
+        if self.deferred_top_materialization {
             f.write_char(']')?;
         }
 
