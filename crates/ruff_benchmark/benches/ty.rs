@@ -1413,6 +1413,31 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3986>.
+///
+/// Non-terminal-call predicates must gate later narrowing. Keeping these scope-wide constraints in
+/// an append-only tree avoids eagerly rewriting every live place state after each call.
+fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("def f() -> None:\n    value = 'abc'\n");
+    for _ in 0..1_500 {
+        code.push_str("    value.upper()\n");
+    }
+
+    criterion.bench_function("ty_micro[repeated_statement_calls]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -1930,6 +1955,7 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
+    benchmark_repeated_statement_calls,
     benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
