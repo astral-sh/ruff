@@ -4778,9 +4778,11 @@ static_assert(is_subtype_of(type[Baz], type[Foo]))
 static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))
 ```
 
-If a metaclass customizes construction, its return type determines whether the class object
-satisfies `type[Foo]`. `BadFactory` would normally construct a `Foo`, but its metaclass returns an
-`object` instead.
+As stated above, a class object must construct instances that satisfy `Foo` in order to inhabit
+`type[Foo]`. The type of instances a class is considered to construct respects the `__call__` of its
+metaclass. `Factory` constructs `Baz` instances (and itself has the necessary attributes to satisfy
+the classvar/method portion of `Foo`), so it inhabits `type[Foo]`. `BadFactory` constructs `object`,
+which does not satisfy `Foo`, so it cannot inhabit `type[Foo]`.
 
 ```py
 class FactoryMeta(type):
