@@ -109,8 +109,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -578,6 +578,107 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
+    }
+
+    /// Applies a type mapping to every constraint in this constraint set.
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by a stacked follow-up"))]
+    pub(crate) fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        fn rebuild_node(
+            builder: &ConstraintSetBuilder<'_>,
+            old_node: NodeId,
+            mapped_constraints: &FxHashMap<ConstraintId, NodeId>,
+            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
+        ) -> NodeId {
+            if old_node.is_terminal() {
+                return old_node;
+            }
+            if let Some(mapped) = mapped_nodes.get(&old_node) {
+                return *mapped;
+            }
+
+            let old_interior = builder.interior_node_data(old_node);
+            let condition = mapped_constraints[&old_interior.constraint]
+                .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
+            let if_true = rebuild_node(
+                builder,
+                old_interior.if_true,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let if_uncertain = rebuild_node(
+                builder,
+                old_interior.if_uncertain,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let if_false = rebuild_node(
+                builder,
+                old_interior.if_false,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let mapped = condition.ite_uncertain(builder, if_true, if_uncertain, if_false);
+            mapped_nodes.insert(old_node, mapped);
+            mapped
+        }
+
+        let builder = self.builder;
+        let mut mapped_constraints = FxHashMap::default();
+        self.node
+            .for_each_unique_constraint(builder, &mut |constraint_id, _| {
+                if mapped_constraints.contains_key(&constraint_id) {
+                    return;
+                }
+
+                let constraint = builder.constraint_data(constraint_id);
+                let subject = Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                );
+                let lower = constraint
+                    .bounds
+                    .lower
+                    .map(|lower| lower.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let upper = constraint
+                    .bounds
+                    .upper
+                    .map(|upper| upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+                let mapped = if let Type::TypeVar(typevar) = subject {
+                    Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
+                } else {
+                    let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
+                        lower
+                            .when_constraint_set_assignable_to(db, subject, builder)
+                            .node
+                    });
+                    let upper_holds = upper.map_or(ALWAYS_TRUE, |upper| {
+                        subject
+                            .when_constraint_set_assignable_to(db, upper, builder)
+                            .node
+                    });
+                    lower_holds.and_with_offset(builder, upper_holds)
+                };
+                mapped_constraints.insert(constraint_id, mapped);
+            });
+
+        Self::from_node(
+            builder,
+            rebuild_node(
+                builder,
+                self.node,
+                &mapped_constraints,
+                &mut FxHashMap::default(),
+            ),
+        )
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
@@ -7030,6 +7131,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use crate::db::tests::setup_db;
+    use crate::types::generics::ApplySpecialization;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
@@ -7049,6 +7151,52 @@ mod tests {
 
     fn known_instance(db: &dyn Db, class: KnownClass) -> Type<'_> {
         class.to_instance(db)
+    }
+
+    #[test]
+    fn type_mapping_updates_constraint_bounds() {
+        // (list[U] ≤ T ≤ list[U])[U ↦ int] = (list[int] ≤ T ≤ list[int])
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let list_of_u = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(u)]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, t, list_of_u, list_of_u);
+
+        let int = KnownClass::Int.to_instance(&db);
+        let mapped = set.apply_type_mapping_impl(
+            &db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(u, int)),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let list_of_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+        let expected = ConstraintSet::constrain_typevar(&db, &builder, t, list_of_int, list_of_int);
+
+        assert!(mapped.iff(&db, &builder, expected).is_always_satisfied(&db));
+    }
+
+    #[test]
+    fn type_mapping_evaluates_mapped_subjects() {
+        // ((T = int) ∧ ¬(T = str))[T ↦ int] = true
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
+            create_constraint(&db, &builder, t, KnownClass::Str).negate(&db, &builder)
+        });
+
+        let mapped = set.apply_type_mapping_impl(
+            &db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                t,
+                KnownClass::Int.to_instance(&db),
+            )),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        assert!(mapped.is_always_satisfied(&db));
     }
 
     #[test]
