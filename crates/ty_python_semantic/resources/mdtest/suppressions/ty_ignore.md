@@ -49,6 +49,8 @@ b = missing
 The suppression covers every statement on the following logical line.
 
 ```py
+seen_code = True
+
 # ty: ignore[unresolved-reference]
 first = 1; second = missing  # fmt: skip
 ```
