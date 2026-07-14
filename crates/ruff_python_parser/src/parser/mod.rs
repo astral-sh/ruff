@@ -113,10 +113,10 @@ impl<'src> Parser<'src> {
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
-            expr_scratch: Vec::new(),
+            expr_scratch: Vec::with_capacity(16),
             keyword_scratch: Vec::new(),
             parameter_scratch: Vec::new(),
-            stmt_scratch: Vec::new(),
+            stmt_scratch: Vec::with_capacity(32),
         }
     }
 
