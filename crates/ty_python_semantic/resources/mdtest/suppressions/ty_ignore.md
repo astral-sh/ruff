@@ -242,6 +242,72 @@ help: Remove the unused suppression codes
 def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[invalid-type-form, unresolved-reference]
 ```
 
+## Nested comments
+
+An own-line suppression can be nested after another pragma comment:
+
+```py
+seen_code = True
+
+# fmt: off # ty: ignore[division-by-zero]
+value = 1 / 0
+# fmt: on
+```
+
+Removing an unused nested suppression is safe when another pragma precedes it, but unsafe when
+removal would promote a following pragma to an own-line comment:
+
+```py
+seen_code = True
+
+# snapshot
+# fmt: off # ty: ignore[division-by-zero]
+value = 1
+# fmt: on
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:9:12
+  |
+9 | # fmt: off # ty: ignore[division-by-zero]
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+   |
+8  | # snapshot
+   - # fmt: off # ty: ignore[division-by-zero]
+9  + # fmt: off
+10 | value = 1
+   |
+```
+
+```py
+seen_code = True
+
+# snapshot
+# ty: ignore[division-by-zero] # fmt: off
+value = 1
+# fmt: on
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+  --> src/mdtest_snippet.py:15:1
+   |
+15 | # ty: ignore[division-by-zero] # fmt: off
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the unused suppression comment
+   |
+14 | # snapshot
+   - # ty: ignore[division-by-zero] # fmt: off
+15 + # fmt: off
+16 | value = 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ## Can't suppress syntax errors
 
 <!-- fmt:off -->
@@ -343,6 +409,17 @@ File level suppression comments suppress all errors in a file with a given code.
 
 a = 4 / 0
 b = a + c  # error: [unresolved-reference]
+```
+
+## File-level suppression nested after another pragma
+
+File-level suppressions can be nested after another pragma comment:
+
+```py
+# fmt: off # ty: ignore[division-by-zero]
+
+a = 4 / 0
+# fmt: on
 ```
 
 ## Unknown rule

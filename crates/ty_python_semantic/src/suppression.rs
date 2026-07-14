@@ -690,11 +690,12 @@ impl<'a> SuppressionsBuilder<'a> {
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = !self.seen_non_trivia_token;
+        let comment_token_start = tokens.token_range(comment.range().start()).start();
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
         } else if !comment.kind().is_type_ignore()
-            && indentation_at_offset(comment.range().start(), self.source).is_some()
+            && indentation_at_offset(comment_token_start, self.source).is_some()
         {
             own_line_suppression_range(comment.range(), tokens)
         } else {
@@ -780,7 +781,8 @@ impl<'a> SuppressionsBuilder<'a> {
 /// multiline logical line covers the next non-comment physical line instead. This matches Ruff's
 /// own-line suppression behavior.
 fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
-    let (before, after) = tokens.split_at(range.start());
+    let comment_token_start = tokens.token_range(range.start()).start();
+    let (before, after) = tokens.split_at(comment_token_start);
     let mut end = range.end();
 
     // In `values = [\n    # ty: ignore`, the `[` makes the suppression part of an

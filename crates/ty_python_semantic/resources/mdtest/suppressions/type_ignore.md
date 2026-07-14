@@ -178,7 +178,6 @@ help: Remove the unused suppression comment
 9  +   + 2)  # fmt: skip
 10 | a = (3
    |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```py

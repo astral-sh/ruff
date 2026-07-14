@@ -1,5 +1,6 @@
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
@@ -211,8 +212,14 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
-        // and don't promote a following suppression to an own-line suppression.
-        return Fix::unsafe_edit(Edit::range_deletion(suppression.comment_range));
+        let edit = Edit::range_deletion(suppression.comment_range);
+
+        if indentation_at_offset(comment_start, source).is_some() {
+            // Don't promote a following pragma to the primary own-line comment.
+            return Fix::unsafe_edit(edit);
+        }
+
+        return Fix::safe_edit(edit);
     }
 
     // Remove any leading whitespace before the comment
