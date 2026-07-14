@@ -54,17 +54,16 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type `Top[Callable[..., object]]` represents the set of all possible callable types
-(including, e.g., functions that take no arguments and functions that require arguments). While such
-objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
-be valid.
+With relaxed generic narrowing, `isinstance(x, Callable)` produces the gradual type
+`Callable[..., Unknown]`. Any arguments can be passed to a gradual callable, and its return type is
+`Unknown`:
 
 ```py
 import typing as t
 
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
-        # error: [call-top-callable]
+        reveal_type(y)  # revealed: (...) -> Unknown
         return y(a, b)
     return None
 ```
@@ -139,9 +138,17 @@ import collections.abc
 
 def f(x: object):
     if isinstance(x, typing.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+    else:
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
     if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+
+def g(x: typing.Callable[[int], str] | None):
+    if isinstance(x, collections.abc.Callable):
+        reveal_type(x)  # revealed: (int, /) -> str
+    else:
+        reveal_type(x)  # revealed: None
 ```
 
 ## `Callable` special-form identity
@@ -235,4 +242,25 @@ def _(subj: None | typing.Callable[..., str]) -> None:
         # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
         case typing.Callable(): ...
         case _: ...
+```
+
+## Strict generic narrowing
+
+With strict generic narrowing, `isinstance(x, Callable)` retains the fully static top
+materialization. No particular argument list is known to be valid for this type:
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Callable
+
+def call_with_args(y: object, a: int, b: str) -> object:
+    if isinstance(y, Callable):
+        reveal_type(y)  # revealed: Top[(...) -> object]
+        # error: [call-top-callable]
+        return y(a, b)
+    return None
 ```

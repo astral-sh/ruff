@@ -22,7 +22,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
 use ty_python_core::platform::PythonPlatform;
-use ty_python_semantic::{GenericNarrowing, lint::Level};
+use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -159,7 +159,7 @@ pub(crate) struct Analysis {
 
     pub(crate) replace_imports_with_any: Option<Vec<String>>,
 
-    pub(crate) generic_narrowing: Option<GenericNarrowing>,
+    pub(crate) strict_generic_narrowing: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

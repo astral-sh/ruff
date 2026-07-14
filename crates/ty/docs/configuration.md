@@ -83,44 +83,6 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
-### `generic-narrowing`
-
-Controls how ty narrows to unspecialized generic classes in `isinstance()` and
-`issubclass()` checks.
-
-With `strict`, ty narrows to the top materialization of the class. For example,
-`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
-representing the (infinite) union of all possible `list` specializations. Iterating
-over the list would yield values of type `object`.
-
-With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
-check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
-would yield values of type `Unknown`, which is more permissive than `object`.
-
-Defaults to `relaxed`.
-
-**Default value**: `relaxed`
-
-**Type**: `strict | relaxed`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.analysis]
-    generic-narrowing = "strict"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [analysis]
-    generic-narrowing = "strict"
-    ```
-
----
-
 ### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -198,87 +160,102 @@ Defaults to `true`.
 
 ---
 
-### `strict-equality-semantics`
+### `strict-generic-narrowing`
 
-Configure ty's behavior regarding type inference and narrowing of equality
-checks. Defaults to `false`.
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
 
-By default, ty makes various assumptions about equality checks that match the
-intuitions of most Python programmers, but may not be fully sound in all situations.
-Enabling this option makes ty more conservative about these assumptions, making it
-less likely to infer `Literal[True]` or `Literal[False]` as the result of an
-equality check. This has various effects on type checking, including fewer type
-narrowing opportunities and more conservative assumptions regarding control flow.
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
 
-One way in which ty will by default make unsound assumptions is by narrowing an
-object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
-unsound because a subclass of `str` with value `"a"` will (by default) compare equal
-to `"a"`, but will not be of type `Literal["a"]`:
+When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
+check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
+yields values of type `Unknown`, which is more permissive than `object`.
 
-```pycon
->>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
->>> # subclasses, but str subclasses compare equal by default:
->>> class StringSubclass(str): ...
-...
->>> StringSubclass("a") == "a"
-True
->>>
->>> # This also applies to `StrEnum`s:
->>> from enum import StrEnum
->>> class MyEnum(StrEnum):
-...     A = "a"
-...
->>> MyEnum.A == "a"
-True
-```
+Defaults to `false`.
 
-Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
-and instead keeps it as `str`:
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+---
+
+### `strict-literal-narrowing`
+
+Whether equality-based checks should preserve broad builtin types rather than narrow them to
+literal types.
+
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+membership tests and literal match patterns, which use equality comparisons.
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
-    # with `strict-equality-semantics = true`, no narrowing will occur here,
-    # and an error will be emitted on the `return` statement.
     if value == "a":
-        return value
+        return value  # Accepted by default; `value` remains `str` in strict mode.
     return None
 ```
 
-Another assumption ty makes by default is that subclasses will never override `__eq__` or
-`__ne__`. This allows ty to narrow the following union based on an equality check, despite
-the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
-perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+Broad builtin types include subclasses, but literal types distinguish values by both their
+runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+builtin equality. For example:
 
 ```python
-def narrow(x: Foo | None, other: Foo) -> None:
-    if x == other:
-        # with this option enabled, `x` will still have type `Foo | None` here,
-        # since it is legal to subclass `Foo` and override its `__eq__` method.
-        reveal_type(x)
+class StringSubclass(str): ...
+
+result = parse(StringSubclass("a"))
+# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
 ```
 
-Many operations in Python implicitly call `__eq__` under the hood; enabling this option
-will also impact those operations. For example, this option will also impact narrowing from
-`in` checks, and narrowing in `match` statements that use value patterns:
+The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
+respectively. This means enum members can encounter the same unsoundness:
 
 ```python
-def narrow_in(x: Foo | None, other: list[Foo]) -> None:
-    if x in other:
-        # with this option enabled, `x` will still have type `Foo | None` here,
-        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
-        reveal_type(x)
+from enum import StrEnum
 
+class Choice(StrEnum):
+    A = "a"
 
-def narrow_match(x: str) -> None:
-    match x:
-        case "a":
-            # with this option enabled, `x` will still have type `str` here,
-            # since this `case` branch will be taken by any object that compares
-            # equal to `"a"`, including subclasses of `str`.
-            reveal_type(x)
+result = parse(Choice.A)
+# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
 ```
+
+A subclass can also override `__eq__` to compare equal to a literal with a different value:
+
+```python
+class MisleadingStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+result = parse(MisleadingStr("b"))
+# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+```
+
+Enable this option to preserve the broader builtin type instead.
+
+Defaults to `false`.
 
 **Default value**: `false`
 
@@ -291,7 +268,7 @@ def narrow_match(x: str) -> None:
     ```toml
     [tool.ty.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
-    strict-equality-semantics = true
+    strict-literal-narrowing = true
     ```
 
 === "ty.toml"
@@ -299,7 +276,7 @@ def narrow_match(x: str) -> None:
     ```toml
     [analysis]
     # Preserve broad builtin types instead of narrowing them to literals
-    strict-equality-semantics = true
+    strict-literal-narrowing = true
     ```
 
 ---
@@ -721,44 +698,6 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
-#### `generic-narrowing`
-
-Controls how ty narrows to unspecialized generic classes in `isinstance()` and
-`issubclass()` checks.
-
-With `strict`, ty narrows to the top materialization of the class. For example,
-`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
-representing the (infinite) union of all possible `list` specializations. Iterating
-over the list would yield values of type `object`.
-
-With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
-check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
-would yield values of type `Unknown`, which is more permissive than `object`.
-
-Defaults to `relaxed`.
-
-**Default value**: `relaxed`
-
-**Type**: `strict | relaxed`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.overrides.analysis]
-    generic-narrowing = "strict"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [overrides.analysis]
-    generic-narrowing = "strict"
-    ```
-
----
-
 #### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -836,87 +775,102 @@ Defaults to `true`.
 
 ---
 
-#### `strict-equality-semantics`
+#### `strict-generic-narrowing`
 
-Configure ty's behavior regarding type inference and narrowing of equality
-checks. Defaults to `false`.
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
 
-By default, ty makes various assumptions about equality checks that match the
-intuitions of most Python programmers, but may not be fully sound in all situations.
-Enabling this option makes ty more conservative about these assumptions, making it
-less likely to infer `Literal[True]` or `Literal[False]` as the result of an
-equality check. This has various effects on type checking, including fewer type
-narrowing opportunities and more conservative assumptions regarding control flow.
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
 
-One way in which ty will by default make unsound assumptions is by narrowing an
-object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
-unsound because a subclass of `str` with value `"a"` will (by default) compare equal
-to `"a"`, but will not be of type `Literal["a"]`:
+When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
+check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
+yields values of type `Unknown`, which is more permissive than `object`.
 
-```pycon
->>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
->>> # subclasses, but str subclasses compare equal by default:
->>> class StringSubclass(str): ...
-...
->>> StringSubclass("a") == "a"
-True
->>>
->>> # This also applies to `StrEnum`s:
->>> from enum import StrEnum
->>> class MyEnum(StrEnum):
-...     A = "a"
-...
->>> MyEnum.A == "a"
-True
-```
+Defaults to `false`.
 
-Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
-and instead keeps it as `str`:
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+---
+
+#### `strict-literal-narrowing`
+
+Whether equality-based checks should preserve broad builtin types rather than narrow them to
+literal types.
+
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+membership tests and literal match patterns, which use equality comparisons.
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
-    # with `strict-equality-semantics = true`, no narrowing will occur here,
-    # and an error will be emitted on the `return` statement.
     if value == "a":
-        return value
+        return value  # Accepted by default; `value` remains `str` in strict mode.
     return None
 ```
 
-Another assumption ty makes by default is that subclasses will never override `__eq__` or
-`__ne__`. This allows ty to narrow the following union based on an equality check, despite
-the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
-perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+Broad builtin types include subclasses, but literal types distinguish values by both their
+runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+builtin equality. For example:
 
 ```python
-def narrow(x: Foo | None, other: Foo) -> None:
-    if x == other:
-        # with this option enabled, `x` will still have type `Foo | None` here,
-        # since it is legal to subclass `Foo` and override its `__eq__` method.
-        reveal_type(x)
+class StringSubclass(str): ...
+
+result = parse(StringSubclass("a"))
+# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
 ```
 
-Many operations in Python implicitly call `__eq__` under the hood; enabling this option
-will also impact those operations. For example, this option will also impact narrowing from
-`in` checks, and narrowing in `match` statements that use value patterns:
+The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
+respectively. This means enum members can encounter the same unsoundness:
 
 ```python
-def narrow_in(x: Foo | None, other: list[Foo]) -> None:
-    if x in other:
-        # with this option enabled, `x` will still have type `Foo | None` here,
-        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
-        reveal_type(x)
+from enum import StrEnum
 
+class Choice(StrEnum):
+    A = "a"
 
-def narrow_match(x: str) -> None:
-    match x:
-        case "a":
-            # with this option enabled, `x` will still have type `str` here,
-            # since this `case` branch will be taken by any object that compares
-            # equal to `"a"`, including subclasses of `str`.
-            reveal_type(x)
+result = parse(Choice.A)
+# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
 ```
+
+A subclass can also override `__eq__` to compare equal to a literal with a different value:
+
+```python
+class MisleadingStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+result = parse(MisleadingStr("b"))
+# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+```
+
+Enable this option to preserve the broader builtin type instead.
+
+Defaults to `false`.
 
 **Default value**: `false`
 
@@ -929,7 +883,7 @@ def narrow_match(x: str) -> None:
     ```toml
     [tool.ty.overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
-    strict-equality-semantics = true
+    strict-literal-narrowing = true
     ```
 
 === "ty.toml"
@@ -937,7 +891,7 @@ def narrow_match(x: str) -> None:
     ```toml
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
-    strict-equality-semantics = true
+    strict-literal-narrowing = true
     ```
 
 ---

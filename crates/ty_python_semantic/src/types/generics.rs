@@ -1120,8 +1120,9 @@ pub struct Specialization<'db> {
     /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
     /// with `Some(MaterializationKind::Bottom)`.
-    /// The `materialization_kind` field may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions.
+    /// An ordinary `materialization_kind` may be non-`None` only if the specialization contains
+    /// dynamic types in invariant positions. A narrowing-only materialization temporarily tags
+    /// the whole gradual specialization regardless of variance.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
@@ -1401,9 +1402,15 @@ impl<'db> Specialization<'db> {
         });
 
         // Keep this check in sync with every field that can be transformed above.
+        let original_materialization_kind = self.materialization_kind(db);
+        if matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization)
+            && new_materialization_kind.is_some_and(MaterializationKind::is_for_narrowing)
+        {
+            new_materialization_kind = None;
+        }
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
-            && new_materialization_kind == self.materialization_kind(db);
+            && new_materialization_kind == original_materialization_kind;
         if specialization_unchanged {
             self
         } else {
@@ -1497,6 +1504,16 @@ impl<'db> Specialization<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        // A narrowing materialization retains the gradual arguments and marks the specialization
+        // as a whole. Relations materialize a temporary copy to the corresponding ordinary top or
+        // bottom materialization, while the stored type can later be restored by removing the tag.
+        if materialization_kind.is_for_narrowing() {
+            if self.materialization_kind(db).is_none() {
+                return self.with_materialization_kind(db, Some(materialization_kind));
+            }
+            return self;
+        }
+
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
         if self.materialization_kind(db).is_some() {
@@ -1558,6 +1575,25 @@ impl<'db> Specialization<'db> {
         }
     }
 
+    pub(crate) fn materialized_for_relation(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let Some(materialization_kind) = self
+            .materialization_kind(db)
+            .filter(|kind| kind.is_for_narrowing())
+        else {
+            return self;
+        };
+
+        self.with_materialization_kind(db, None).materialize_impl(
+            db,
+            materialization_kind.without_narrowing_marker(),
+            visitor,
+        )
+    }
+
     pub(crate) fn is_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
@@ -1604,6 +1640,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: Specialization<'db>,
         target: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let source = source.materialized_for_relation(db, self.materialization_visitor);
+        let target = target.materialized_for_relation(db, self.materialization_visitor);
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1809,44 +1847,48 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_materialization, target_materialization) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
-            (MaterializationKind::Top, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
-                    is_subtype_of(source_top, target_top)
-                })
-            }
+            (
+                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+            ) => is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
+                is_subtype_of(source_top, target_top)
+            }),
             // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-            (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
-                is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
-                    is_subtype_of(target_top, source_top)
-                })
-            }
+            (
+                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+            ) => is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
+                is_subtype_of(target_top, source_top)
+            }),
             // The bottom materialization of `source` is a subtype of the top materialization
             // of `target` if there is some type that is both within the
             // range of types covered by derived and within the range covered by base, because if such a type
             // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
-            (MaterializationKind::Bottom, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom)
-                    .and(db, self.constraints, || {
+            (
+                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+            ) => is_subtype_of(target_bottom, source_bottom)
+                .and(db, self.constraints, || {
+                    is_subtype_of(source_bottom, target_top)
+                })
+                .or(db, self.constraints, || {
+                    is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
+                        is_subtype_of(source_top, target_top)
+                    })
+                })
+                .or(db, self.constraints, || {
+                    is_subtype_of(target_top, source_top).and(db, self.constraints, || {
                         is_subtype_of(source_bottom, target_top)
                     })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_top, target_top)
-                        })
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_bottom, target_top)
-                        })
-                    })
-            }
+                }),
             // A top materialization is a subtype of a bottom materialization only if both original
             // un-materialized types are the same fully static type.
-            (MaterializationKind::Top, MaterializationKind::Bottom) => {
-                is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
-                    is_subtype_of(target_top, source_bottom)
-                })
-            }
+            (
+                MaterializationKind::Top | MaterializationKind::TopForNarrowing,
+                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing,
+            ) => is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
+                is_subtype_of(target_top, source_bottom)
+            }),
         }
     }
 }
@@ -1873,6 +1915,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: Specialization<'db>,
         right: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let left = left.materialized_for_relation(db, &materialization_visitor);
+        let right = right.materialized_for_relation(db, &materialization_visitor);
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();
