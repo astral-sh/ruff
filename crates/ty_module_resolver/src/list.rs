@@ -74,9 +74,10 @@ fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<ListedModule<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+    let path = search_path.path(db);
+    tracing::debug!("Listing modules in search path '{}'", path);
+    let mut lister = Lister::new(db, path);
+    match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             let Ok(listing) = directory_listing(db, system_search_path) else {
                 return vec![];
@@ -293,17 +294,12 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Package
-                {
-                    entry.insert(listed);
-                    return;
-                }
                 // Or if we have two file modules and the new one
                 // is a stub, then the stub takes priority.
                 if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Module
-                    && path.is_stub_file()
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
                 {
                     entry.insert(listed);
                     return;

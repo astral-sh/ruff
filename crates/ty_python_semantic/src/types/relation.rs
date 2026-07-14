@@ -1103,6 +1103,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
+        let bound_or_constraints;
+
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1427,11 +1429,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
+                if !bound_typevar.is_inferable(db, self.inferable) && {
+                    bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db);
+                    bound_or_constraints.is_some()
+                } =>
             {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => unreachable!(),
+                match bound_or_constraints {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         self.check_type_pair(db, bound, target)
                     }
@@ -1442,6 +1445,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             |constraint| self.check_type_pair(db, *constraint, target),
                         )
                     }
+                    None => unreachable!(),
                 }
             }
 
@@ -3079,18 +3083,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
-                if a.function(db).name(db) != b.function(db).name(db) {
+                let a_function = a.function(db);
+                let b_function = b.function(db);
+                if a_function.name(db) != b_function.name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same
                     // method name would show up on both sides of this check. However for
                     // completeness, if we're ever comparing `BoundMethod` types with different
                     // method names, then they're clearly disjoint.
                     self.always()
-                } else if a.function(db) != b.function(db)
-                    && a.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
-                    && b.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                } else if a_function != b_function
+                    && a_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                    && b_function.has_known_decorator(db, FunctionDecorators::FINAL)
                 {
                     // If *both* methods are `@final` (and they're not literally the same
                     // definition), they must be disjoint.

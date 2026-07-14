@@ -327,7 +327,8 @@ fn file_to_module_impl<'db, 'a>(
     let module = resolve_module(db, file, &module_name)?;
     let module_file = module.file(db)?;
 
-    if file.path(db) == module_file.path(db) {
+    let file_path = file.path(db);
+    if file_path == module_file.path(db) {
         return Some(module);
     } else if file.source_type(db) == PySourceType::Python
         && module_file.source_type(db) == PySourceType::Stub
@@ -337,7 +338,7 @@ fn file_to_module_impl<'db, 'a>(
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
         let module = resolve_real_module(db, file, &module_name)?;
         let module_file = module.file(db)?;
-        if file.path(db) == module_file.path(db) {
+        if file_path == module_file.path(db) {
             return Some(module);
         }
     }
