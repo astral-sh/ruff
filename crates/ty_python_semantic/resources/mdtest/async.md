@@ -174,10 +174,11 @@ If some intersection elements are not awaitable, we skip them and use the return
 awaitable elements:
 
 ```py
-from typing import Coroutine
+from typing import Coroutine, Protocol
 from ty_extensions import Intersection
 
-class NotAwaitable: ...
+class NotAwaitable(Protocol):
+    not_awaitable: int
 
 async def test(x: Intersection[Coroutine[object, object, str], NotAwaitable]):
     y = await x
@@ -200,12 +201,14 @@ When an intersection has three or more elements, some awaitable and some not, th
 elements are skipped:
 
 ```py
-from typing import Coroutine
+from typing import Coroutine, Protocol
 from ty_extensions import Intersection
 
 class A: ...
 class B: ...
-class NotAwaitable: ...
+
+class NotAwaitable(Protocol):
+    not_awaitable: int
 
 async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B], NotAwaitable]):
     y = await x

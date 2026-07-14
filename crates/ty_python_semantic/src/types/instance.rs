@@ -239,10 +239,6 @@ impl<'db> NominalInstanceType<'db> {
         file_to_module(db, file).map(|module| module.name(db))
     }
 
-    pub(super) fn is_builtin_instance(self, db: &'db dyn Db) -> bool {
-        class_is_defined_in_known_module(db, self.class(db), KnownModule::Builtins)
-    }
-
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
@@ -642,19 +638,18 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 .filter_map(ClassBase::into_class)
                 .any(|mro_class| mro_class.class_literal(db) == base.class_literal(db))
         };
-        let builtin_and_typing_abc_are_disjoint =
-            |builtin: ClassType<'db>, typing_abc: ClassType<'db>| {
-                class_is_defined_in_known_module(db, builtin, KnownModule::Builtins)
-                    && class_is_defined_in_known_module(db, typing_abc, KnownModule::Typing)
-                    && !typing_abc.is_protocol(db)
-                    && !class_inherits_from(builtin, typing_abc)
-                    && !class_inherits_from(typing_abc, builtin)
+        let typing_class_is_disjoint_base =
+            |typing_class: ClassType<'db>, other: ClassType<'db>| {
+                class_is_defined_in_known_module(db, typing_class, KnownModule::Typing)
+                    && !typing_class.is_protocol(db)
+                    && !class_inherits_from(other, typing_class)
+                    && !class_inherits_from(typing_class, other)
             };
         if !db
             .analysis_settings(left_class.class_literal(db).file(db))
             .strict_subclass_narrowing
-            && (builtin_and_typing_abc_are_disjoint(left_class, right_class)
-                || builtin_and_typing_abc_are_disjoint(right_class, left_class))
+            && (typing_class_is_disjoint_base(left_class, right_class)
+                || typing_class_is_disjoint_base(right_class, left_class))
         {
             return self.always();
         }
