@@ -759,11 +759,11 @@ python-version = "3.12"
 strict-generic-narrowing = false
 ```
 
-In `relaxed` mode, narrowing to a generic class using `isinstance()` also intersects with the
-top materialization of the generic class, but after the intersection has been created and
-simplified, the top materialization is removed, leaving `Unknown`-specializations. For example,
-in the case below, we build the intersection `object & Top*[Covariant[Unknown]]`, where the star
-is a marker indicating that the materialization will be removed. This intersection simplifies to
+In `relaxed` mode, narrowing to a generic class using `isinstance()` also intersects with the top
+materialization of the generic class, but after the intersection has been created and simplified,
+the top materialization is removed, leaving `Unknown`-specializations. For example, in the case
+below, we build the intersection `object & Top*[Covariant[Unknown]]`, where the star is a marker
+indicating that the materialization will be removed. This intersection simplifies to
 `Top*[Covariant[Unknown]]`, so after removing `Top*[..]`, we are left with `Covariant[Unknown]`:
 
 ```py
