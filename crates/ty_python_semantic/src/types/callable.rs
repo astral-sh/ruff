@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
@@ -170,6 +168,7 @@ impl<'db> Type<'db> {
                                 CallableSignature::from_overloads(signatures),
                                 callable.kind(db),
                                 callable.provenance(db),
+                                callable.top_materialization_for_narrowing(db),
                             )
                         }))
                     }
@@ -191,6 +190,7 @@ impl<'db> Type<'db> {
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
                                     callable.provenance(db),
+                                    callable.top_materialization_for_narrowing(db),
                                 ));
                             }
                         }
@@ -239,6 +239,7 @@ impl<'db> Type<'db> {
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
+                false,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -247,6 +248,7 @@ impl<'db> Type<'db> {
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
+                    false,
                 )))
             }
 
@@ -414,7 +416,7 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
@@ -457,25 +459,13 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
-    pub(crate) fn new<S>(
-        db: &'db dyn Db,
-        signatures: S,
-        kind: CallableTypeKind,
-        provenance: CallableFunctionProvenance,
-    ) -> CallableType<'db>
-    where
-        S: salsa::plumbing::Lookup<CallableSignature<'db>> + Hash,
-        CallableSignature<'db>: salsa::plumbing::HashEqLike<S>,
-    {
-        CallableType::new_internal(db, signatures, kind, provenance, false)
-    }
-
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
+            false,
         )
     }
 
@@ -485,6 +475,7 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::None,
+            false,
         )
     }
 
@@ -497,6 +488,7 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
             CallableFunctionProvenance::None,
+            false,
         )
     }
 
@@ -536,7 +528,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db),
             CallableTypeKind::Regular,
@@ -555,6 +547,7 @@ impl<'db> CallableType<'db> {
             CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
+            false,
         ))
     }
 
@@ -584,7 +577,7 @@ impl<'db> CallableType<'db> {
             return self.into_regular(db);
         }
 
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
@@ -594,7 +587,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db),
             CallableTypeKind::FunctionLike,
@@ -604,7 +597,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db),
             CallableTypeKind::DunderParamSpec,
@@ -614,7 +607,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
@@ -633,6 +626,7 @@ impl<'db> CallableType<'db> {
             CallableSignature::bottom(),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
+            false,
         )
     }
 
@@ -642,7 +636,7 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(CallableType::new_internal(
+        Some(CallableType::new(
             db,
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
@@ -660,7 +654,7 @@ impl<'db> CallableType<'db> {
         if self.top_materialization_for_narrowing(db) == top_materialization_for_narrowing {
             self
         } else {
-            Self::new_internal(
+            Self::new(
                 db,
                 self.signatures(db),
                 self.kind(db),
@@ -712,7 +706,7 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new_internal(
+        CallableType::new(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -815,6 +809,7 @@ impl<'db> CallableTypes<'db> {
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
+            false,
         )
         .into_precise_functools_partial_instance(db, wrapped)
     }
