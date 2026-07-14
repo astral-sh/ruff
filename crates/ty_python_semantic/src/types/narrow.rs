@@ -614,15 +614,227 @@ impl ClassInfoConstraintFunction {
     }
 }
 
+/// Apply a positive runtime constraint to a union while preferring relationships that already
+/// exist in the declared types over intersections that require a hypothetical unrelated subclass.
+///
+/// This intentionally does not change global disjointness. If no union member definitely matches
+/// the runtime constraint, the fully conservative intersection is preserved.
+fn prefer_union_runtime_narrowing<'db>(
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    runtime_constraint: Type<'db>,
+) -> Type<'db> {
+    let full_intersection = || {
+        IntersectionBuilder::new(db)
+            .add_positive(base_ty)
+            .add_positive(runtime_constraint)
+            .build()
+    };
+
+    let Type::Union(union) = base_ty.resolve_type_alias(db) else {
+        return full_intersection();
+    };
+
+    if !union
+        .elements(db)
+        .iter()
+        .any(|element| type_definitely_matches_runtime_constraint(db, *element, runtime_constraint))
+    {
+        return full_intersection();
+    }
+
+    union.map(db, |element| {
+        narrow_runtime_union_arm(db, *element, runtime_constraint)
+    })
+}
+
+fn narrow_runtime_union_arm<'db>(
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    runtime_constraint: Type<'db>,
+) -> Type<'db> {
+    let intersect = || {
+        IntersectionBuilder::new(db)
+            .add_positive(base_ty)
+            .add_positive(runtime_constraint)
+            .build()
+    };
+
+    if base_ty.is_subtype_of(db, runtime_constraint) {
+        return base_ty;
+    }
+
+    if let Type::Union(union) = runtime_constraint.resolve_type_alias(db) {
+        return union.map(db, |element| {
+            narrow_runtime_union_arm(db, base_ty, *element)
+        });
+    }
+
+    if type_definitely_matches_runtime_constraint(db, base_ty, runtime_constraint) {
+        // A runtime `TypedDict` is a dictionary, but its static type intentionally hides mutating
+        // dictionary methods. Preserve that static interface for nominal class checks. Protocol
+        // checks still need the intersection to expose the members established by the check.
+        if matches!(base_ty.resolve_type_alias(db), Type::TypedDict(_))
+            && runtime_constraint
+                .nominal_class(db)
+                .is_some_and(|class| class.is_protocol(db))
+        {
+            return intersect();
+        }
+        return base_ty;
+    }
+
+    if !runtime_union_arm_is_relevant(db, base_ty, runtime_constraint) {
+        Type::Never
+    } else {
+        intersect()
+    }
+}
+
+/// Return whether every value in `ty` is known to satisfy the positive runtime constraint.
+///
+/// Dynamic types deliberately do not count as direct witnesses. A different union arm must
+/// establish that the runtime test describes an intended branch before arm preference applies.
+fn type_definitely_matches_runtime_constraint<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    runtime_constraint: Type<'db>,
+) -> bool {
+    let ty = ty.resolve_type_alias(db);
+    let runtime_constraint = runtime_constraint.resolve_type_alias(db);
+    if type_is_runtime_dynamic(ty) || type_is_runtime_dynamic(runtime_constraint) {
+        return false;
+    }
+    if matches!(ty, Type::TypedDict(_))
+        && typed_dict_matches_runtime_constraint(db, runtime_constraint)
+    {
+        return true;
+    }
+    ty.is_subtype_of(db, runtime_constraint)
+}
+
+fn type_is_runtime_dynamic(ty: Type<'_>) -> bool {
+    ty.is_dynamic() || matches!(ty, Type::SubclassOf(subclass_of) if subclass_of.is_dynamic())
+}
+
+/// `TypedDict` is structural in the static type system, but every runtime value is a dictionary.
+fn typed_dict_matches_runtime_constraint(db: &dyn Db, runtime_constraint: Type<'_>) -> bool {
+    match runtime_constraint.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| typed_dict_matches_runtime_constraint(db, *element)),
+        Type::Intersection(intersection) => {
+            !intersection.positive(db).is_empty()
+                && intersection
+                    .positive(db)
+                    .iter()
+                    .all(|positive| typed_dict_matches_runtime_constraint(db, *positive))
+                && intersection
+                    .negative(db)
+                    .iter()
+                    .all(|negative| !typed_dict_matches_runtime_constraint(db, *negative))
+        }
+        constraint => constraint
+            .nominal_class(db)
+            .is_some_and(|class| typed_dict_matches_class_pattern(db, class.class_literal(db))),
+    }
+}
+
+/// Return whether an original union arm should remain in a positive runtime branch.
+fn runtime_union_arm_is_relevant<'db>(
+    db: &'db dyn Db,
+    arm: Type<'db>,
+    runtime_constraint: Type<'db>,
+) -> bool {
+    let arm = arm.resolve_type_alias(db);
+    type_is_runtime_dynamic(arm)
+        || type_definitely_matches_runtime_constraint(db, arm, runtime_constraint)
+        || (!arm.is_disjoint_from(db, runtime_constraint)
+            && types_have_existing_runtime_overlap(db, arm, runtime_constraint))
+}
+
+/// Return whether two types can overlap through an inheritance or structural relationship already
+/// present in the types, rather than only through a newly introduced common subclass.
+fn types_have_existing_runtime_overlap<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> bool {
+    let left = left.resolve_type_alias(db);
+    let right = right.resolve_type_alias(db);
+
+    if type_is_runtime_dynamic(left) || type_is_runtime_dynamic(right) {
+        return true;
+    }
+    if (matches!(left, Type::TypedDict(_)) && typed_dict_matches_runtime_constraint(db, right))
+        || (matches!(right, Type::TypedDict(_)) && typed_dict_matches_runtime_constraint(db, left))
+    {
+        return true;
+    }
+    if left.is_subtype_of(db, right) || right.is_subtype_of(db, left) {
+        return true;
+    }
+
+    match (left, right) {
+        (Type::Union(union), right) => union
+            .elements(db)
+            .iter()
+            .any(|left| types_have_existing_runtime_overlap(db, *left, right)),
+        (left, Type::Union(union)) => union
+            .elements(db)
+            .iter()
+            .any(|right| types_have_existing_runtime_overlap(db, left, *right)),
+        (Type::Intersection(intersection), right) => intersection
+            .positive(db)
+            .iter()
+            .any(|left| types_have_existing_runtime_overlap(db, *left, right)),
+        (left, Type::Intersection(intersection)) => intersection
+            .positive(db)
+            .iter()
+            .any(|right| types_have_existing_runtime_overlap(db, left, *right)),
+        (left, right) => {
+            let runtime_class = |ty: Type<'db>| match ty {
+                Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                    SubclassOfInner::Class(class) => Some(class),
+                    SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => None,
+                },
+                _ => ty.nominal_class(db),
+            };
+            let Some(left_class) = runtime_class(left) else {
+                return false;
+            };
+            let Some(right_class) = runtime_class(right) else {
+                return false;
+            };
+            left_class.is_subtype_of_class_literal(db, right_class.class_literal(db))
+                || right_class.is_subtype_of_class_literal(db, left_class.class_literal(db))
+        }
+    }
+}
+
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[Type<'db>; 2]>,
+    /// Bits identifying positive runtime constraints in `conjuncts`.
+    ///
+    /// `u64::MAX` is also used as an overflow sentinel. Either multiple constraints or overflow
+    /// disables arm preference and falls back to the fully conservative intersection.
+    positive_runtime_conjuncts: u64,
 }
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
             conjuncts: smallvec![ty],
+            positive_runtime_conjuncts: 0,
+        }
+    }
+
+    fn positive_runtime(ty: Type<'db>) -> Self {
+        Self {
+            conjuncts: smallvec![ty],
+            positive_runtime_conjuncts: 1,
         }
     }
 
@@ -631,12 +843,56 @@ impl<'db> Conjunctions<'db> {
             return Self::singleton(Type::Never);
         }
 
-        for conjunct in other.conjuncts {
-            if !self.conjuncts.contains(&conjunct) {
-                self.conjuncts.push(conjunct);
+        let runtime_count = self.positive_runtime_count() + other.positive_runtime_count();
+        if runtime_count != 1 {
+            for conjunct in other.conjuncts {
+                if !self.conjuncts.contains(&conjunct) {
+                    self.conjuncts.push(conjunct);
+                }
+            }
+            self.positive_runtime_conjuncts = if runtime_count == 0 { 0 } else { u64::MAX };
+            return self;
+        }
+
+        let other_runtime_conjuncts = other.positive_runtime_conjuncts;
+        for (other_index, conjunct) in other.conjuncts.into_iter().enumerate() {
+            let is_runtime = Self::runtime_mask_contains(other_runtime_conjuncts, other_index);
+            let already_present = self.conjuncts.iter().enumerate().any(|(index, existing)| {
+                *existing == conjunct
+                    && Self::runtime_mask_contains(self.positive_runtime_conjuncts, index)
+                        == is_runtime
+            });
+            if already_present {
+                continue;
+            }
+
+            let new_index = self.conjuncts.len();
+            self.conjuncts.push(conjunct);
+            if is_runtime {
+                if let Ok(new_index) = u32::try_from(new_index) {
+                    self.positive_runtime_conjuncts =
+                        1_u64.checked_shl(new_index).unwrap_or(u64::MAX);
+                } else {
+                    self.positive_runtime_conjuncts = u64::MAX;
+                }
             }
         }
         self
+    }
+
+    fn runtime_mask_contains(mask: u64, index: usize) -> bool {
+        u32::try_from(index)
+            .ok()
+            .and_then(|index| 1_u64.checked_shl(index))
+            .is_some_and(|bit| mask & bit != 0)
+    }
+
+    fn positive_runtime_count(&self) -> u32 {
+        if self.positive_runtime_conjuncts == u64::MAX {
+            2
+        } else {
+            self.positive_runtime_conjuncts.count_ones()
+        }
     }
 
     fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -649,6 +905,42 @@ impl<'db> Conjunctions<'db> {
             intersection = intersection.add_positive(conjunct);
         }
         intersection.build()
+    }
+
+    fn evaluate_with_runtime_preference(
+        self,
+        db: &'db dyn Db,
+        base_ty: Option<Type<'db>>,
+    ) -> Type<'db> {
+        let mut constrained_base = IntersectionBuilder::new(db);
+        if let Some(base_ty) = base_ty {
+            constrained_base = constrained_base.add_positive(base_ty);
+        }
+        if self.positive_runtime_count() != 1 {
+            // Multiple runtime constraints can interact in ways that make arm preference
+            // order-dependent. Preserve the fully conservative intersection in that case.
+            return self
+                .conjuncts
+                .into_iter()
+                .fold(constrained_base, IntersectionBuilder::add_positive)
+                .build();
+        }
+
+        let runtime_index = self.positive_runtime_conjuncts.trailing_zeros() as usize;
+        let Some(&runtime_constraint) = self.conjuncts.get(runtime_index) else {
+            return self
+                .conjuncts
+                .into_iter()
+                .fold(constrained_base, IntersectionBuilder::add_positive)
+                .build();
+        };
+        for (index, conjunct) in self.conjuncts.into_iter().enumerate() {
+            if index != runtime_index {
+                constrained_base = constrained_base.add_positive(conjunct);
+            }
+        }
+        let constrained_base = constrained_base.build();
+        prefer_union_runtime_narrowing(db, constrained_base, runtime_constraint)
     }
 }
 
@@ -693,6 +985,14 @@ impl<'db> NarrowingConstraint<'db> {
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            replacement_disjuncts: smallvec![],
+        }
+    }
+
+    /// Create an intersection constraint originating from a positive runtime type test.
+    fn positive_runtime_intersection(constraint: Type<'db>) -> Self {
+        Self {
+            intersection_disjuncts: smallvec_inline![Conjunctions::positive_runtime(constraint)],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -778,6 +1078,19 @@ impl<'db> NarrowingConstraint<'db> {
             .chain(self.intersection_disjuncts)
         {
             union = union.add(conjunctions.evaluate_constraint_type(db));
+        }
+        union.build()
+    }
+
+    /// Apply this constraint to a previously known type, preserving the distinction between
+    /// ordinary intersections and relaxed positive runtime narrowing.
+    pub(crate) fn apply_to(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        let mut union = UnionBuilder::new(db);
+        for conjunctions in self.replacement_disjuncts {
+            union = union.add(conjunctions.evaluate_with_runtime_preference(db, None));
+        }
+        for conjunctions in self.intersection_disjuncts {
+            union = union.add(conjunctions.evaluate_with_runtime_preference(db, Some(base_ty)));
         }
         union.build()
     }
@@ -1085,6 +1398,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         constraints.map(FrozenNarrowingConstraints::from)
     }
 
+    fn runtime_intersection_constraint(
+        &self,
+        constraint: Type<'db>,
+        is_positive: bool,
+    ) -> NarrowingConstraint<'db> {
+        if is_positive
+            && !self
+                .db
+                .analysis_settings(self.scope().file(self.db))
+                .strict_subclass_narrowing
+        {
+            NarrowingConstraint::positive_runtime_intersection(constraint)
+        } else {
+            NarrowingConstraint::intersection(constraint)
+        }
+    }
+
     fn evaluate_expression_predicate(
         &mut self,
         expression: Expression<'db>,
@@ -1366,6 +1696,38 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .analysis_settings(self.scope.file(self.db))
                 .strict_literal_narrowing,
         )
+    }
+
+    fn strict_subclass_narrowing(&self) -> bool {
+        self.db
+            .analysis_settings(self.scope.file(self.db))
+            .strict_subclass_narrowing
+    }
+
+    fn prefer_existing_pattern_arms(
+        &self,
+        subject_ty: Type<'db>,
+        runtime_constraint: Type<'db>,
+    ) -> bool {
+        if self.strict_subclass_narrowing() {
+            return false;
+        }
+        let Type::Union(union) = subject_ty.resolve_type_alias(self.db) else {
+            return false;
+        };
+        union.elements(self.db).iter().any(|element| {
+            type_definitely_matches_runtime_constraint(self.db, *element, runtime_constraint)
+        })
+    }
+
+    fn runtime_pattern_arm_is_relevant(
+        &self,
+        subject_ty: Type<'db>,
+        runtime_constraint: Type<'db>,
+        prefer_existing_arms: bool,
+    ) -> bool {
+        !prefer_existing_arms
+            || runtime_union_arm_is_relevant(self.db, subject_ty, runtime_constraint)
     }
 
     fn merge_binding(
@@ -1652,9 +2014,23 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             Type::TypeAlias(alias) => {
                 self.filter_class_pattern_subject_type(class, class_ty, alias.value_type(self.db))
             }
-            Type::Union(union) => union.map(self.db, |element| {
-                self.filter_class_pattern_subject_type(class, class_ty, *element)
-            }),
+            Type::Union(union) => {
+                let prefer_existing_arms = !self.strict_subclass_narrowing()
+                    && union.elements(self.db).iter().any(|element| {
+                        type_definitely_matches_runtime_constraint(self.db, *element, class_ty)
+                    });
+                union.map(self.db, |element| {
+                    if !self.runtime_pattern_arm_is_relevant(
+                        *element,
+                        class_ty,
+                        prefer_existing_arms,
+                    ) {
+                        Type::Never
+                    } else {
+                        self.filter_class_pattern_subject_type(class, class_ty, *element)
+                    }
+                })
+            }
             Type::Intersection(intersection) if intersection.positive(self.db).is_empty() => {
                 self.intersect_types(subject_ty, class_ty)
             }
@@ -1677,7 +2053,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             Type::TypedDict(_)
                 if class.is_some_and(|class| typed_dict_matches_class_pattern(self.db, class)) =>
             {
-                subject_ty
+                if class.is_some_and(|class| class.is_protocol(self.db)) {
+                    self.intersect_types(subject_ty, class_ty)
+                } else {
+                    subject_ty
+                }
             }
             _ if subject_ty.is_subtype_of(self.db, class_ty) => subject_ty,
             _ if subject_ty.is_disjoint_from(self.db, class_ty) => Type::Never,
@@ -1972,10 +2352,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         context: &ClassPatternContext<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, context.class_ty);
         self.analyze_matched_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, original_subject_ty, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    context.class_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, arguments) =
                     analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
                 let mut matched_subject_ty = narrowed_subject_ty;
@@ -2026,10 +2414,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         context: &ClassPatternContext<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, context.class_ty);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, original_subject_ty, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    context.class_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, arguments) =
                     analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
                 let mut matched_subject_ty = narrowed_subject_ty;
@@ -2174,10 +2570,19 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let key_types = self.mapping_pattern_key_types(kind);
+        let mapping_ty = mapping_pattern_type(self.db);
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, mapping_ty);
         self.analyze_matched_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, _, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    mapping_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, value_types) =
                     analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
@@ -2199,10 +2604,19 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let key_types = self.mapping_pattern_key_types(kind);
+        let mapping_ty = mapping_pattern_type(self.db);
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, mapping_ty);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, _, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    mapping_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, value_types) =
                     analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
                 let mut bindings = BTreeMap::new();
@@ -2255,10 +2669,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Type<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let sequence_ty = sequence_pattern_type_builder(self.db).build();
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, sequence_ty);
         self.analyze_matched_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::TypeVariablesOnly,
             |analyzer, _, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    sequence_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, element_types) =
                     analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
                 let mut persistent_element_types = Vec::with_capacity(kind.patterns.len());
@@ -2301,10 +2723,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let sequence_ty = sequence_pattern_type_builder(self.db).build();
+        let prefer_existing_arms = self.prefer_existing_pattern_arms(subject_ty, sequence_ty);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::TypeVariablesOnly,
             |analyzer, _, subject_ty| {
+                if !analyzer.runtime_pattern_arm_is_relevant(
+                    subject_ty,
+                    sequence_ty,
+                    prefer_existing_arms,
+                ) {
+                    return None;
+                }
                 let (narrowed_subject_ty, element_types) =
                     analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
                 let mut bindings = BTreeMap::new();
@@ -3564,14 +3994,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        let callable_ty = inference.expression_type(&*expr_call.func);
+        let is_builtin_callable = matches!(
+            callable_ty,
+            Type::FunctionLiteral(function)
+                if function.known(self.db) == Some(KnownFunction::Callable)
+        );
 
         if let Some(type_guard_call_constraints) =
-            self.evaluate_type_guard_call(inference, expr_call, is_positive)
+            self.evaluate_type_guard_call(inference, expr_call, is_positive, is_builtin_callable)
         {
             return Some(type_guard_call_constraints);
         }
-
-        let callable_ty = inference.expression_type(&*expr_call.func);
 
         match callable_ty {
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
@@ -3638,8 +4072,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(
+                            self.runtime_intersection_constraint(
                                 constraint.negate_if(self.db, !is_positive),
+                                is_positive,
                             ),
                         )])
                     })
@@ -3667,19 +4102,23 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         inference: &ExpressionInference<'db>,
         expr_call: &ast::ExprCall,
         is_positive: bool,
+        is_builtin_callable: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let return_ty = inference.expression_type(expr_call);
 
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(self.db)?;
+                let narrowed_ty = type_is
+                    .return_type(self.db)
+                    .negate_if(self.db, !is_positive);
                 Some((
                     place,
-                    NarrowingConstraint::intersection(
-                        type_is
-                            .return_type(self.db)
-                            .negate_if(self.db, !is_positive),
-                    ),
+                    if is_builtin_callable {
+                        self.runtime_intersection_constraint(narrowed_ty, is_positive)
+                    } else {
+                        NarrowingConstraint::intersection(narrowed_ty)
+                    },
                 ))
             }
             // TypeGuard only narrows in the positive case

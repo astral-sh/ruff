@@ -685,9 +685,7 @@ fn apply_accumulated_narrowing<'db>(
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+        Some(constraint) => constraint.apply_to(db, base_ty),
         None => base_ty,
     }
 }

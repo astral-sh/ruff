@@ -241,6 +241,66 @@ Defaults to `false`.
 
 ---
 
+### `strict-subclass-narrowing`
+
+Whether positive runtime narrowing should preserve intersections that can only be inhabited
+by an unrelated subclass when another union member already matches the runtime test.
+
+By default, a positive runtime check prefers union members that match through an existing
+inheritance or structural relationship. It discards remaining intersections whose only
+inhabitants would require a new subclass combining otherwise unrelated classes. This
+produces simpler types for annotations such as `T | list[T]` while retaining ordinary
+overlaps such as `Mapping[K, V] | Iterable[K]`.
+
+The policy applies to positive `isinstance`, `issubclass`, and builtin `callable` checks,
+along with class, mapping, and sequence patterns.
+
+This default is deliberately pragmatic rather than fully sound. Python permits an
+unannotated runtime class to inherit from otherwise unrelated bases, so a discarded
+intersection can still be inhabited. For example, a value reaching this function through
+the `Area` arm could be a `list[int]` subclass, even though the direct list arm is
+`list[str]`:
+
+```python
+class Area: ...
+class IntegerAreaList(Area, list[int]): ...
+
+def first(value: Area | list[str]) -> str:
+    if isinstance(value, list):
+        return value[0]  # Accepted by default, but can return an `int`.
+    return ""
+
+first(IntegerAreaList([1]))
+```
+
+Enable this option to preserve all possible subclass intersections.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve intersections involving hypothetical unrelated subclasses
+    strict-subclass-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve intersections involving hypothetical unrelated subclasses
+    strict-subclass-narrowing = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -812,6 +872,66 @@ Defaults to `false`.
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-literal-narrowing = true
+    ```
+
+---
+
+#### `strict-subclass-narrowing`
+
+Whether positive runtime narrowing should preserve intersections that can only be inhabited
+by an unrelated subclass when another union member already matches the runtime test.
+
+By default, a positive runtime check prefers union members that match through an existing
+inheritance or structural relationship. It discards remaining intersections whose only
+inhabitants would require a new subclass combining otherwise unrelated classes. This
+produces simpler types for annotations such as `T | list[T]` while retaining ordinary
+overlaps such as `Mapping[K, V] | Iterable[K]`.
+
+The policy applies to positive `isinstance`, `issubclass`, and builtin `callable` checks,
+along with class, mapping, and sequence patterns.
+
+This default is deliberately pragmatic rather than fully sound. Python permits an
+unannotated runtime class to inherit from otherwise unrelated bases, so a discarded
+intersection can still be inhabited. For example, a value reaching this function through
+the `Area` arm could be a `list[int]` subclass, even though the direct list arm is
+`list[str]`:
+
+```python
+class Area: ...
+class IntegerAreaList(Area, list[int]): ...
+
+def first(value: Area | list[str]) -> str:
+    if isinstance(value, list):
+        return value[0]  # Accepted by default, but can return an `int`.
+    return ""
+
+first(IntegerAreaList([1]))
+```
+
+Enable this option to preserve all possible subclass intersections.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve intersections involving hypothetical unrelated subclasses
+    strict-subclass-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve intersections involving hypothetical unrelated subclasses
+    strict-subclass-narrowing = true
     ```
 
 ---
