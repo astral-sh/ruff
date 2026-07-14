@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::cell::Cell;
 use std::fmt;
 use std::slice::Iter;
 use std::sync::Arc;
@@ -607,6 +608,38 @@ impl<'db> SignatureRelationKey<'db> {
 }
 
 pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+
+// Receiver constraints can re-enter signature comparison while a signature is being prepared,
+// before the declaration-based recursion guard below is active. Until that recursion can be
+// represented structurally, bound it so an unsupported relation is rejected instead of
+// overflowing the process stack.
+const MAX_RECEIVER_CONSTRAINT_RELATION_DEPTH: u16 = 16;
+
+std::thread_local! {
+    static RECEIVER_CONSTRAINT_RELATION_DEPTH: Cell<u16> = const { Cell::new(0) };
+}
+
+struct ReceiverConstraintRelationDepthGuard;
+
+impl ReceiverConstraintRelationDepthGuard {
+    fn enter() -> Option<Self> {
+        RECEIVER_CONSTRAINT_RELATION_DEPTH.with(|depth| {
+            let current = depth.get();
+            if current >= MAX_RECEIVER_CONSTRAINT_RELATION_DEPTH {
+                None
+            } else {
+                depth.set(current + 1);
+                Some(Self)
+            }
+        })
+    }
+}
+
+impl Drop for ReceiverConstraintRelationDepthGuard {
+    fn drop(&mut self) {
+        RECEIVER_CONSTRAINT_RELATION_DEPTH.with(|depth| depth.set(depth.get() - 1));
+    }
+}
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -1953,6 +1986,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let _receiver_constraint_depth_guard =
+            if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
+                let Some(guard) = ReceiverConstraintRelationDepthGuard::enter() else {
+                    return self.never();
+                };
+                Some(guard)
+            } else {
+                None
+            };
+
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
@@ -4846,6 +4889,21 @@ mod tests {
         assert!(
             merge_receiver_constraints(&db, None, Some(OwnedConstraintSet::always())).is_none()
         );
+    }
+
+    #[test]
+    fn receiver_constraint_relation_depth_is_bounded() {
+        let guards: Vec<_> = (0..MAX_RECEIVER_CONSTRAINT_RELATION_DEPTH)
+            .filter_map(|_| ReceiverConstraintRelationDepthGuard::enter())
+            .collect();
+        assert_eq!(
+            guards.len(),
+            usize::from(MAX_RECEIVER_CONSTRAINT_RELATION_DEPTH)
+        );
+        assert!(ReceiverConstraintRelationDepthGuard::enter().is_none());
+
+        drop(guards);
+        assert!(ReceiverConstraintRelationDepthGuard::enter().is_some());
     }
 
     #[test]
