@@ -136,6 +136,7 @@ pub(crate) enum ErrorContext<'db> {
         member_name: Name,
         ty: Type<'db>,
     },
+    ProtocolSpecialMethodNotDefinedOnMetaType,
     ProtocolMemberIncompatible {
         member_name: Name,
     },
@@ -355,6 +356,10 @@ impl<'db> ErrorContext<'db> {
                 "protocol member `{member_name}` is not defined on type `{}`",
                 ty.display(db),
             ),
+            Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
+                "special methods must be defined on the meta-type when matching a protocol"
+                    .to_string()
+            }
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }

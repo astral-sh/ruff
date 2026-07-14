@@ -1745,12 +1745,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
 
-        // For a method on a class object, `Self` names instances of that class: a
-        // `@classmethod` returning `Self` returns `Factory`, not `type[Factory]`. For a
-        // non-method member, `Self` names the object whose attribute is being checked, so a
-        // class object must stay a class object.
-        let non_method_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
-        let method_self_binding_ty = ty
+        // `Self` in a protocol member names the value satisfying the protocol. `Self` in a
+        // method on a class object names instances of that class: a `@classmethod` returning
+        // `Self` returns `Factory`, not `type[Factory]`. Keep the bindings separate so a method
+        // that returns an instance cannot satisfy a protocol that promises the class object.
+        let protocol_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
+        let implementation_self_binding_ty = ty
             .to_instance(db)
             .or_else(|| ty.literal_fallback_instance(db))
             .unwrap_or(ty);
@@ -1776,8 +1776,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
-                        &callables.map(|callable| callable.apply_self(db, method_self_binding_ty)),
-                        required_callable.apply_self(db, method_self_binding_ty),
+                        &callables.map(|callable| {
+                            callable.apply_self(db, implementation_self_binding_ty)
+                        }),
+                        required_callable.apply_self(db, protocol_self_binding_ty),
                     )
                 })
         } else if member.is_instance_method() {
@@ -1794,11 +1796,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if callable.is_function_like(db) {
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, Some(method_self_binding_ty)),
+                                callable.bind_self(db, Some(implementation_self_binding_ty)),
                                 protocol_bind_self(
                                     db,
                                     required_callable,
-                                    Some(method_self_binding_ty),
+                                    Some(protocol_self_binding_ty),
                                 ),
                             )
                         } else {
@@ -1816,11 +1818,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(required_callable.apply_self(db, method_self_binding_ty)),
+                Type::Callable(required_callable.apply_self(db, protocol_self_binding_ty)),
             )
         } else {
             required_ty
-                .bind_self(db, non_method_self_binding_ty)
+                .bind_self(db, protocol_self_binding_ty)
                 .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
@@ -1940,6 +1942,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
                 .is_none();
             if instance_read_missing || class_read_missing {
+                if instance_read_missing
+                    && is_class_object_type(ty)
+                    && member.is_instance_method()
+                    && member.uses_special_method_lookup()
+                {
+                    context.push(ErrorContext::ProtocolSpecialMethodNotDefinedOnMetaType);
+                }
                 context.push(ErrorContext::ProtocolMemberNotDefined {
                     member_name: member.name.into(),
                     ty,

@@ -3258,10 +3258,12 @@ parser: Parser = IntParser
 ## Class objects and `Self`-returning class-method protocol members
 
 When a class object is checked against a class-method protocol member, `Self` in the protocol
-signature is bound to instances of the class object rather than to the class object itself:
+signature names the class object. A class method that returns `Self` returns an instance and cannot
+satisfy that requirement; a class method that returns `type[Self]` can satisfy a `type[C]`
+candidate:
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to
@@ -3280,8 +3282,25 @@ class BadFactory:
     def make(cls) -> int:
         return 1
 
-static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
+class ClassObjectFactory:
+    @classmethod
+    def make(cls) -> type[Self]:
+        return cls
+
+static_assert(not is_assignable_to(TypeOf[Factory], FactoryProtocol))
 static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
+static_assert(is_assignable_to(type[ClassObjectFactory], FactoryProtocol))
+
+T = TypeVar("T", bound=FactoryProtocol)
+
+def exact_factory(value: T) -> T:
+    return value.make()
+
+exact_factory(Factory)  # error: [invalid-argument-type]
+exact_factory(ClassObjectFactory)  # error: [invalid-argument-type]
+
+def _(factory: type[ClassObjectFactory]) -> None:
+    exact_factory(factory)
 ```
 
 ## Class objects and `Self`-returning instance-method protocol members
@@ -3289,16 +3308,20 @@ static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
 A class object can satisfy a protocol with a regular instance-method member if the class object's
 directly accessible member has a compatible bound signature. Class and static methods therefore
 work, but a regular instance method does not: accessing it through the class produces an unbound
-function rather than a method bound to the class object.
+function rather than a method bound to the class object. If the protocol method returns `Self`, the
+implementation must return the class object, not an instance of the class.
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to
 
 class CopierProtocol(Protocol):
     def copy(self) -> Self: ...
+
+class PlainCopierProtocol(Protocol):
+    def copy(self) -> str: ...
 
 class Copier:
     def copy(self) -> Self:
@@ -3314,6 +3337,21 @@ class StaticCopier:
     def copy() -> "StaticCopier":
         return StaticCopier()
 
+class ClassObjectCopier:
+    @classmethod
+    def copy(cls) -> type[Self]:
+        return cls
+
+class PlainClassCopier:
+    @classmethod
+    def copy(cls) -> str:
+        return "copy"
+
+class PlainStaticCopier:
+    @staticmethod
+    def copy() -> str:
+        return "copy"
+
 class CopierMeta(type):
     def copy(cls) -> "BadDirectCopier":
         return BadDirectCopier()
@@ -3324,11 +3362,26 @@ class BadDirectCopier(metaclass=CopierMeta):
 
 static_assert(is_assignable_to(Copier, CopierProtocol))
 static_assert(not is_assignable_to(TypeOf[Copier], CopierProtocol))
-static_assert(is_assignable_to(TypeOf[ClassCopier], CopierProtocol))
-static_assert(is_assignable_to(TypeOf[StaticCopier], CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[ClassCopier], CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[StaticCopier], CopierProtocol))
+static_assert(is_assignable_to(type[ClassObjectCopier], CopierProtocol))
+static_assert(is_assignable_to(TypeOf[PlainClassCopier], PlainCopierProtocol))
+static_assert(is_assignable_to(TypeOf[PlainStaticCopier], PlainCopierProtocol))
 # The metaclass method is compatible, but ordinary protocol methods describe direct access on the
 # class object, where `BadDirectCopier.copy` is an incompatible unbound function.
 static_assert(not is_assignable_to(TypeOf[BadDirectCopier], CopierProtocol))
+
+T = TypeVar("T", bound=CopierProtocol)
+
+def exact_copy(value: T) -> T:
+    return value.copy()
+
+exact_copy(ClassCopier)  # error: [invalid-argument-type]
+exact_copy(StaticCopier)  # error: [invalid-argument-type]
+exact_copy(ClassObjectCopier)  # error: [invalid-argument-type]
+
+def _(copier: type[ClassObjectCopier]) -> None:
+    exact_copy(copier)
 ```
 
 ## Class objects and dunder instance-method protocol members
@@ -3351,6 +3404,27 @@ class IterableClass(metaclass=Meta):
         yield from "abc"
 
 static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+
+class DirectIterable:
+    @classmethod
+    def __iter__(cls) -> Iterator[int]:
+        yield from range(42)
+
+iterable: Iterable[int] = DirectIterable  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
+  --> src/mdtest_snippet.py:20:11
+   |
+20 | iterable: Iterable[int] = DirectIterable  # snapshot
+   |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`
+   |           |
+   |           Declared type
+   |
+info: type `<class 'DirectIterable'>` is not assignable to protocol `Iterable[int]`
+info: └── protocol member `__iter__` is not defined on type `<class 'DirectIterable'>`
+info:     └── special methods must be defined on the meta-type when matching a protocol
 ```
 
 A custom dunder such as `__custom__` is an ordinary method: it is accessed directly on the class
