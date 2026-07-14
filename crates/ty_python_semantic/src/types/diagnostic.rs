@@ -110,6 +110,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_MATCH_PATTERN);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
+    registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
@@ -680,6 +681,18 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
         summary: "detects malformed type guard functions",
         status: LintStatus::stable("0.0.1-alpha.11"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
+    pub(crate) static INVALID_TYPE_GUARD_CALL = {
+        summary: "detects type guard function calls that have no narrowing effect",
+        status: LintStatus::removed(
+            "0.0.60",
+            "Type guard calls without a narrowing target are valid and have no narrowing effect.",
+        ),
         default_level: Level::Error,
     }
 }
