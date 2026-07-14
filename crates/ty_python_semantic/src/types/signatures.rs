@@ -608,14 +608,6 @@ impl<'db> SignatureRelationKey<'db> {
 
 pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct ReceiverConstraintRelation;
-
-std::thread_local! {
-    static ACTIVE_RECEIVER_CONSTRAINT_RELATIONS:
-        ActiveRecursionDetector<ReceiverConstraintRelation> = ActiveRecursionDetector::default();
-}
-
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
@@ -1956,45 +1948,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     /// Implementation of subtyping and assignability for signature.
     fn check_signature_pair(
-        &self,
-        db: &'db dyn Db,
-        source: &Signature<'db>,
-        target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        if source.receiver_constraints.is_none() && target.receiver_constraints.is_none() {
-            return self.check_signature_pair_impl(db, source, target);
-        }
-
-        ACTIVE_RECEIVER_CONSTRAINT_RELATIONS.with(|active| {
-            active.visit(
-                &ReceiverConstraintRelation,
-                // TODO: Support nested relations involving bound receiver constraints. Until
-                // then, fall back to comparing the signatures without those constraints rather
-                // than overflowing the process stack.
-                || self.check_signature_pair_without_receiver_constraints(db, source, target),
-                || self.check_signature_pair_impl(db, source, target),
-            )
-        })
-    }
-
-    fn check_signature_pair_without_receiver_constraints(
-        &self,
-        db: &'db dyn Db,
-        source: &Signature<'db>,
-        target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let source = Signature {
-            receiver_constraints: None,
-            ..source.clone()
-        };
-        let target = Signature {
-            receiver_constraints: None,
-            ..target.clone()
-        };
-        self.check_signature_pair_impl(db, &source, &target)
-    }
-
-    fn check_signature_pair_impl(
         &self,
         db: &'db dyn Db,
         source: &Signature<'db>,
@@ -4893,40 +4846,6 @@ mod tests {
         assert!(
             merge_receiver_constraints(&db, None, Some(OwnedConstraintSet::always())).is_none()
         );
-    }
-
-    #[test]
-    fn nested_receiver_constraint_relation_uses_unconstrained_fallback() {
-        let mut db = setup_db();
-        db.write_dedented("/src/a.py", "def f(self: int) -> None: ...")
-            .unwrap();
-        let function = get_function_f(&db, "/src/a.py")
-            .literal(&db)
-            .last_definition;
-        let signature = function
-            .signature(&db)
-            .bind_self(&db, Some(KnownClass::Str.to_instance(&db)));
-
-        let constraints = ConstraintSetBuilder::new();
-        assert!(
-            signature
-                .when_constraint_set_assignable_to(&db, &signature, &constraints)
-                .is_never_satisfied(&db)
-        );
-
-        let uses_fallback = ACTIVE_RECEIVER_CONSTRAINT_RELATIONS.with(|active| {
-            active.visit(
-                &ReceiverConstraintRelation,
-                || false,
-                || {
-                    let constraints = ConstraintSetBuilder::new();
-                    signature
-                        .when_constraint_set_assignable_to(&db, &signature, &constraints)
-                        .is_always_satisfied(&db)
-                },
-            )
-        });
-        assert!(uses_fallback);
     }
 
     #[test]
