@@ -115,11 +115,12 @@ impl<'db> Type<'db> {
     }
 
     /// Promote regular callables with a positional receiver to function-like callables.
-    pub(crate) fn into_function_like_callable(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn into_function_like_callable(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         struct IntoFunctionLikeCallable;
 
         fn transform<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
         ) -> Type<'db> {
@@ -132,22 +133,22 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
                     let value_type = alias.value_type(db);
-                    let transformed = transform(db, value_type, visitor);
+                    let transformed = transform(db, env, value_type, visitor);
                     if transformed == value_type {
                         ty
                     } else {
                         transformed
                     }
                 }),
-                Type::Union(union) => union.map(db, |element| transform(db, *element, visitor)),
+                Type::Union(union) => union.map(db, env, |element| transform(db, env, *element, visitor)),
                 Type::Intersection(intersection) => {
-                    intersection.map_positive(db, |element| transform(db, *element, visitor))
+                    intersection.map_positive(db, env, |element| transform(db, env, *element, visitor))
                 }
                 _ => ty,
             }
         }
 
-        transform(db, self, &TypeTransformer::default())
+        transform(db, env, self, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`
@@ -553,25 +554,9 @@ pub enum CallableTypeKind {
     /// Calculator().add(1, 2)  # Returns 3; both arguments are still required.
     /// ```
     ///
-    /// As a heuristic, class-member lookup converts dunder attributes of this kind to
-    /// [`Self::FunctionLike`] if their signatures can accept parameters. See
-    /// [`Self::DunderParamSpec`] for the exception for `Callable[P, R]` attributes.
-    ///
-    /// For example, `len(Sized())` implicitly calls `__len__` on the `Sized` instance. We
-    /// treat the `Callable`-typed `__len__` as a function, so accessing `Sized().__len__`
-    /// binds the `instance` parameter and gives it the signature `() -> int`:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    ///
-    /// def length(instance: "Sized") -> int:
-    ///     return 1
-    ///
-    /// class Sized:
-    ///     __len__: Callable[["Sized"], int] = length
-    ///
-    /// len(Sized())  # Returns 1.
-    /// ```
+    /// Class-member lookup can treat inferred class-body callables, `ClassVar` callables,
+    /// and explicitly annotated callable dunders as function-like descriptors. Generic callable
+    /// declarations retain their complete signatures after specialization.
     Regular,
 
     /// Callable objects modeled as instances of Python's `types.FunctionType`.

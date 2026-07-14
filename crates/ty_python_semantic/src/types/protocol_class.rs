@@ -3664,7 +3664,7 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, &env, *previous, cycle)
 }
 
-/// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
+/// Bind `self` and *also* discard the functionlike-ness
 /// of the callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
@@ -3681,10 +3681,6 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    if callable.is_dunder_paramspec(db) {
-        return callable.into_regular(db);
-    }
-
     let env = ProgramEnvironment::from_program(program);
     callable
         .with_signatures(
