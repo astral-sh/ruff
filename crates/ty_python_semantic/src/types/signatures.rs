@@ -1557,6 +1557,7 @@ impl<'db> Signature<'db> {
                 })),
                 CallableTypeKind::ParamSpecValue,
                 CallableFunctionProvenance::None,
+                false,
             ));
             let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
@@ -1807,6 +1808,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -1859,6 +1861,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2248,6 +2251,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2278,6 +2282,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2402,6 +2407,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
+                            false,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_lower_bound(
@@ -2427,6 +2433,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
+                            false,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_upper_bound(
@@ -2462,6 +2469,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2602,6 +2610,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2626,6 +2635,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2738,6 +2748,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
+                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,

@@ -1887,6 +1887,7 @@ impl<'db> ClassType<'db> {
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
                             CallableFunctionProvenance::None,
+                            false,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2127,6 +2128,7 @@ impl<'db> ClassType<'db> {
                 dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
+                false,
             );
 
             if returns_non_subclass {
@@ -2202,6 +2204,7 @@ impl<'db> ClassType<'db> {
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
+                    false,
                 ))
             } else {
                 None
