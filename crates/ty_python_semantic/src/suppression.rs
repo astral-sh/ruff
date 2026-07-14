@@ -785,9 +785,21 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
     let (before, after) = tokens.split_at(comment_token_start);
     let mut end = range.end();
 
-    // In `values = [\n    # ty: ignore`, the `[` makes the suppression part of an
-    // unfinished logical line. In `value = 1\n# ty: ignore`, the logical newline
-    // means that the suppression instead precedes the next logical line.
+    // A suppression after a logical newline precedes a new logical line:
+    //
+    // # ty: ignore
+    // value = (
+    //     missing
+    // )
+    //
+    // A suppression after a non-logical newline is inside an unfinished logical line:
+    //
+    // values = [
+    //     # ty: ignore
+    //     missing,
+    // ]
+    //
+    // Walk backwards through comments and non-logical newlines to distinguish the two cases.
     let is_inner_comment = before.iter().rev().find_map(|token| match token.kind() {
         TokenKind::Newline => Some(false),
         TokenKind::NonLogicalNewline | TokenKind::Comment => None,
@@ -795,20 +807,21 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
     });
 
     let is_inner_comment = is_inner_comment.unwrap_or(false);
+    // For an inner suppression, the first non-logical newline ends the suppression's own
+    // physical line. Subsequent blank or comment-only lines are skipped before the range ends at
+    // the first physical line containing code.
     let mut is_blank_or_comment_only = true;
     let mut past_suppression_line = false;
 
     for token in after {
         match token.kind() {
             TokenKind::Newline => {
-                // `# ty: ignore\nvalue = (\n    1\n)`: include the complete logical line.
+                // A suppression preceding a logical line includes that complete logical line.
                 end = token.start();
                 break;
             }
             TokenKind::Comment => {}
             TokenKind::NonLogicalNewline if is_inner_comment => {
-                // `values = [\n    # ty: ignore\n    value,\n]`: include the next
-                // non-comment physical line.
                 end = token.start();
                 if past_suppression_line && !is_blank_or_comment_only {
                     break;
