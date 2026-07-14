@@ -438,7 +438,7 @@ impl ClassInfoConstraintFunction {
         strict_generic_narrowing: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let (specialization, is_narrowing_materialization) =
+            let (specialization, is_deferred_materialization) =
                 if is_positive && !strict_generic_narrowing {
                     (class.unknown_specialization(db), true)
                 } else {
@@ -451,8 +451,8 @@ impl ClassInfoConstraintFunction {
                 ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, specialization),
             };
 
-            if is_narrowing_materialization {
-                constraint.top_materialization_for_narrowing(db)
+            if is_deferred_materialization {
+                constraint.deferred_top_materialization(db)
             } else {
                 constraint
             }
@@ -616,7 +616,7 @@ impl ClassInfoConstraintFunction {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
                         let callable = Type::Callable(CallableType::unknown(db));
                         if is_positive && !strict_generic_narrowing {
-                            callable.top_materialization_for_narrowing(db)
+                            callable.deferred_top_materialization(db)
                         } else {
                             callable.top_materialization(db)
                         }
@@ -729,8 +729,8 @@ pub(crate) struct NarrowingConstraint<'db> {
     /// we may eagerly intersect conjunctions with a later intersection narrowing.
     replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
 
-    /// Whether this constraint was built using a narrowing-only top materialization.
-    has_narrowing_materialization: bool,
+    /// Whether this constraint was built using a deferred top materialization.
+    has_deferred_materialization: bool,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -740,15 +740,15 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
-            has_narrowing_materialization: false,
+            has_deferred_materialization: false,
         }
     }
 
-    fn class_info(constraint: Type<'db>, has_narrowing_materialization: bool) -> Self {
+    fn class_info(constraint: Type<'db>, has_deferred_materialization: bool) -> Self {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
-            has_narrowing_materialization,
+            has_deferred_materialization,
         }
     }
 
@@ -758,7 +758,7 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec![],
             replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
-            has_narrowing_materialization: false,
+            has_deferred_materialization: false,
         }
     }
 
@@ -781,8 +781,8 @@ impl<'db> NarrowingConstraint<'db> {
             return other;
         }
 
-        let has_narrowing_materialization =
-            self.has_narrowing_materialization || other.has_narrowing_materialization;
+        let has_deferred_materialization =
+            self.has_deferred_materialization || other.has_deferred_materialization;
 
         let mut new_intersection_disjuncts = smallvec![];
         for intersection_disjunct in &self.intersection_disjuncts {
@@ -815,13 +815,13 @@ impl<'db> NarrowingConstraint<'db> {
         NarrowingConstraint {
             intersection_disjuncts: new_intersection_disjuncts,
             replacement_disjuncts: new_replacement_disjuncts,
-            has_narrowing_materialization,
+            has_deferred_materialization,
         }
     }
 
     /// Merge two constraints with OR semantics (union/disjunction).
     fn merge_constraint_or(&mut self, other: Self) {
-        self.has_narrowing_materialization |= other.has_narrowing_materialization;
+        self.has_deferred_materialization |= other.has_deferred_materialization;
         self.intersection_disjuncts
             .extend(other.intersection_disjuncts);
         self.replacement_disjuncts
@@ -832,7 +832,7 @@ impl<'db> NarrowingConstraint<'db> {
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
     pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        let has_narrowing_materialization = self.has_narrowing_materialization;
+        let has_deferred_materialization = self.has_deferred_materialization;
         let mut union = UnionBuilder::new(db);
         for conjunctions in self
             .replacement_disjuncts
@@ -842,8 +842,8 @@ impl<'db> NarrowingConstraint<'db> {
             union = union.add(conjunctions.evaluate_constraint_type(db));
         }
         let ty = union.build();
-        if has_narrowing_materialization {
-            ty.erase_narrowing_materialization(db)
+        if has_deferred_materialization {
+            ty.erase_deferred_materialization(db)
         } else {
             ty
         }
