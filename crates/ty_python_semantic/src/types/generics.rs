@@ -3176,9 +3176,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return Ok(());
                 };
 
-                // The `__call__` method is bound to `self`, so we need to bind it to get the
-                // callable signature that the actual type needs to match.
-                let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                // The protocol interface exposes the callable signature already bound for
+                // instance access.
+                let formal_signature = call_method.signatures(self.db);
 
                 // For callable-signature inference, keep unsatisfiable constraint-set
                 // comparisons non-fatal for now. The hybrid inference/checking pipeline still

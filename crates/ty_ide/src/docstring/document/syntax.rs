@@ -55,31 +55,8 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
 /// For example, this returns `true` for ``"`value`"`` and `false` for
 /// ``"`value` trailing"``.
 pub(in crate::docstring) fn is_markdown_code_span(text: &str) -> bool {
-    markdown_code_span_len(text) == Some(TextSize::of(text))
-}
-
-/// Returns the length of a complete Markdown code span at the start of `text`.
-///
-/// For example, given `text` equal to ``"`value` trailing"``, the returned length covers only
-/// ``"`value`"``.
-///
-/// Lengths are measured in UTF-8 bytes. A closing backtick run must be the same length as the
-/// opening run.
-pub(in crate::docstring) fn markdown_code_span_len(text: &str) -> Option<TextSize> {
-    let opening = find_backtick_run(text, TextSize::ZERO)?;
-    if opening.start() != TextSize::ZERO {
-        return None;
-    }
-
-    let mut search_from = opening.end();
-    while let Some(closing) = find_backtick_run(text, search_from) {
-        if closing.len() == opening.len() {
-            return Some(closing.end());
-        }
-        search_from = closing.end();
-    }
-
-    None
+    find_backtick_run(text, TextSize::ZERO).and_then(|opening| markdown_code_span(text, opening))
+        == Some(TextRange::up_to(TextSize::of(text)))
 }
 
 /// Returns the byte range of the first consecutive backtick run at or after `from`.
@@ -97,6 +74,36 @@ pub(in crate::docstring) fn find_backtick_run(text: &str, from: TextSize) -> Opt
         TextSize::of(&text[..start]),
         TextSize::of(&text[..start + len]),
     ))
+}
+
+/// Returns the Markdown code span delimited by `opening`, if it has a matching closing run.
+///
+/// For example, the opening run in "``value`with:ticks`` trailing" produces the range covering
+/// "``value`with:ticks``".
+pub(in crate::docstring) fn markdown_code_span(
+    text: &str,
+    opening: TextRange,
+) -> Option<TextRange> {
+    let mut search_from = opening.end();
+    loop {
+        let closing = find_backtick_run(text, search_from)?;
+        if closing.len() == opening.len() {
+            return Some(opening.cover(closing));
+        }
+        search_from = closing.end();
+    }
+}
+
+/// Returns whether the backtick run at `index` is escaped by a preceding backslash.
+///
+/// For example, the backtick in ``"\`"`` is escaped, while the backtick in ``"\\`"`` is not.
+pub(in crate::docstring) fn is_backtick_run_escaped(text: &str, index: usize) -> bool {
+    !text[..index]
+        .bytes()
+        .rev()
+        .take_while(|byte| *byte == b'\\')
+        .count()
+        .is_multiple_of(2)
 }
 
 /// Returns the end of an indented Markdown or reStructuredText container block.
@@ -240,26 +247,21 @@ pub(super) fn indentation(line: &str) -> TextSize {
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::TextSize;
-
-    use super::markdown_code_span_len;
+    use super::is_markdown_code_span;
 
     #[test]
-    fn finds_markdown_code_span_len() {
-        assert_eq!(
-            markdown_code_span_len("`value` trailing"),
-            Some(TextSize::of("`value`"))
-        );
-        assert_eq!(
-            markdown_code_span_len("``value`with:ticks``"),
-            Some(TextSize::of("``value`with:ticks``"))
-        );
-        assert_eq!(
-            markdown_code_span_len("`first` second`"),
-            Some(TextSize::of("`first`"))
-        );
-        assert_eq!(markdown_code_span_len("``value```"), None);
-        assert_eq!(markdown_code_span_len("``"), None);
-        assert_eq!(markdown_code_span_len("value"), None);
+    fn recognizes_complete_markdown_code_spans() {
+        for (text, expected) in [
+            ("`value`", true),
+            ("``value`with:ticks``", true),
+            ("`value` trailing", false),
+            ("before `value`", false),
+            ("`first` second`", false),
+            ("``value```", false),
+            ("``", false),
+            ("value", false),
+        ] {
+            assert_eq!(is_markdown_code_span(text), expected, "{text:?}");
+        }
     }
 }
