@@ -283,6 +283,13 @@ impl<'db> CallableItem<'db> {
             .map_or(Ok(()), |bindings| bindings.as_result(db))
     }
 
+    /// True if this item is a constructor whose method is `object`'s trivial `__init__`/`__new__`
+    /// (the constructed class defines no constructor of its own).
+    fn uses_trivial_object_constructor(&self, db: &'db dyn Db) -> bool {
+        self.as_constructor()
+            .is_some_and(|binding| binding.uses_trivial_object_constructor(db))
+    }
+
     fn has_own_diagnostics(&self) -> bool {
         self.callable().as_result().is_err()
     }
@@ -441,6 +448,29 @@ impl<'db> BindingsElement<'db> {
                     || item.error_priority(db) == CallErrorPriority::TopCallable
             });
         }
+    }
+
+    /// In a `type[...]` intersection, drop constructor items that only inherit `object`'s trivial
+    /// `__init__`/`__new__` when a sibling item defines a real constructor.
+    ///
+    /// Constructing such an intersection resolves each element's constructor independently, so a
+    /// bare sibling like `Empty` in `type[Ctor] & type[Empty]` injects an `object.__init__`
+    /// binding. Left in place, that binding would spuriously report a failing argument against
+    /// `object.__init__` (and could veto an otherwise-successful call). The real constructor's
+    /// element already governs the resolved signature and return type (mirroring the member-lookup
+    /// filtering), so the trivial one contributes nothing but noise.
+    fn prune_trivial_object_constructors(&mut self, db: &'db dyn Db) {
+        if !self.is_intersection() {
+            return;
+        }
+        let has_real_constructor = self.items.iter().any(|item| {
+            item.as_constructor().is_some() && !item.uses_trivial_object_constructor(db)
+        });
+        if !has_real_constructor {
+            return;
+        }
+        self.items
+            .retain(|item| !item.uses_trivial_object_constructor(db));
     }
 
     /// Returns the error priority for this element (used when all bindings failed).
@@ -1072,6 +1102,13 @@ impl<'db> Bindings<'db> {
                 call_expression_tcx,
                 dataclass_field_specifiers,
             );
+        }
+
+        // Drop trivial `object.__init__`/`__new__` constructor items from `type[...]`
+        // intersections where a sibling defines a real constructor, so they neither veto the call
+        // nor report a bad argument against `object`.
+        for element in &mut self.elements {
+            element.prune_trivial_object_constructors(db);
         }
 
         // For intersection elements with at least one successful binding,

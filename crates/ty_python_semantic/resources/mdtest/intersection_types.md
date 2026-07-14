@@ -1120,6 +1120,78 @@ def _(x: type[A] & type[B]) -> None:
     reveal_type(x())  # revealed: A & B
 ```
 
+### Class constructors where one element defines `__init__`
+
+When only one element of a `type[...]` intersection defines a non-trivial `__init__`, that
+constructor should be used: the other element only contributes the trivial `object.__init__`, which
+must not veto the call.
+
+Such an intersection is inhabitable: `HasInit` and `Empty` are ordinary classes, so a subclass
+`Both(HasInit, Empty)` exists and `type[Both]` inhabits `type[HasInit] & type[Empty]`. The `x` below
+is therefore a real value (e.g. `Both`), and `x(...)` a real constructor call.
+
+```py
+class HasInit:
+    def __init__(self, x: int) -> None: ...
+
+class Empty: ...
+class Both(HasInit, Empty): ...
+
+def _(x: type[HasInit] & type[Empty]) -> None:
+    # `__init__` resolves to `HasInit.__init__`, not intersected with the trivial
+    # `object.__init__` (which would collapse the signature to `Never`).
+    reveal_type(x.__init__)  # revealed: def __init__(self, x: int) -> None
+    reveal_type(x(1))  # revealed: HasInit
+
+# `Both` inhabits the intersection, so this is a valid call:
+_(Both)
+```
+
+The same holds for `__new__`:
+
+```py
+from typing_extensions import Self
+
+class HasNew:
+    def __new__(cls, x: int) -> Self:
+        return super().__new__(cls)
+
+class Empty2: ...
+
+def _(x: type[HasNew] & type[Empty2]) -> None:
+    reveal_type(x.__new__)  # revealed: def __new__[Self](cls, x: int) -> Self
+    reveal_type(x(1))  # revealed: HasNew
+```
+
+### Failing construction reports only the real constructor's errors
+
+When constructing a `type[...]` intersection with a bad argument, the errors must come only from the
+element that defines a non-trivial constructor. The element that contributes just the trivial
+`object.__init__` must not additionally report the failing argument against `object.__init__`: that
+is a spurious cascade, since `object.__init__` never participates once a sibling defines a real
+constructor (mirroring the member-lookup filtering).
+
+As above, the intersection is inhabited by `Both(Ctor, Empty)`, so `x(...)` is a real constructor
+call whose diagnostics we are checking.
+
+```py
+class Ctor:
+    def __init__(self, x: int) -> None: ...
+
+class Empty: ...
+class Both(Ctor, Empty): ...
+
+def _(x: type[Ctor] & type[Empty]) -> None:
+    # The only real errors belong to `Ctor.__init__`: the missing required `x`,
+    # and the unexpected keyword `y`. No `object.__init__` diagnostic.
+    # error: [missing-argument] "No argument provided for required parameter `x` of `Ctor.__init__`"
+    # error: [unknown-argument] "Argument `y` does not match any known parameter of `Ctor.__init__`"
+    x(y="wrong")
+
+# `Both` inhabits the intersection, so this is a valid call:
+_(Both)
+```
+
 ### Intersection with `Any`
 
 When one intersection element is `Any`, both elements are called. `Any` is callable and returns

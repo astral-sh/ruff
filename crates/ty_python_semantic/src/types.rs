@@ -1044,6 +1044,70 @@ fn object_type_form(db: &dyn Db) -> Type<'_> {
     TypeFormType::from_type_expression(db, Type::object())
 }
 
+/// True if `elem` contributes a constructor dunder (`__init__` or `__new__`, per `name_str`)
+/// that is NOT merely `object`'s trivial one.
+///
+/// For a metatype element (`type[X]`), the constructor lives on the instance's MRO, so we
+/// consult `X` (via `to_instance`) with the no-`object` policy; for an instance element, we
+/// consult it directly. Dynamic elements (e.g. `Any`) resolve to `undefined` under
+/// `MRO_NO_OBJECT_FALLBACK`, so they return `false` here (they define no *concrete* constructor)
+/// and are therefore *kept* by the callers, which only ever drop elements this returns `false`
+/// for when some sibling returns `true`.
+fn defines_non_object_constructor<'db>(
+    db: &'db dyn Db,
+    elem: Type<'db>,
+    name_str: &str,
+    policy: MemberLookupPolicy,
+) -> bool {
+    // A dynamic element (`Any`/`Unknown`/`Todo`) resolves *every* attribute, so a naive lookup
+    // would report it as defining a constructor. But it defines no *concrete* one, and dropping
+    // sibling elements on its behalf would discard their real return-type contributions (e.g.
+    // collapsing `type[Foo] & Any` to `Any`). Treat dynamic elements as non-defining so callers
+    // never filter on their account and never drop them.
+    let lookup_on = elem.to_instance(db).unwrap_or(elem);
+    if lookup_on.is_dynamic() {
+        return false;
+    }
+    let no_object_policy = policy | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
+    !lookup_on
+        .member_lookup_with_policy_and_receiver(db, name_str.into(), no_object_policy, None)
+        .place
+        .is_undefined()
+}
+
+/// For a constructor dunder `name_str` (`__init__`/`__new__`) looked up on the positive elements
+/// of `intersection`: if *any* element defines a non-`object` constructor, return the subset of
+/// positive elements that do. Otherwise return `None` (the caller should not filter).
+///
+/// This lets us drop siblings whose only constructor is `object`'s trivial one (which would
+/// otherwise inject a spurious `object.__init__` binding), while leaving purely-dynamic
+/// intersections (e.g. `type[Foo] & Any`, where no element defines a concrete constructor)
+/// completely untouched.
+fn intersection_constructor_defining_elements<'db>(
+    db: &'db dyn Db,
+    intersection: IntersectionType<'db>,
+    name_str: &str,
+    policy: MemberLookupPolicy,
+) -> Option<Vec<Type<'db>>> {
+    if name_str != "__init__" && name_str != "__new__" {
+        return None;
+    }
+    let positive = intersection.positive(db);
+    if !positive
+        .iter()
+        .any(|elem| defines_non_object_constructor(db, *elem, name_str, policy))
+    {
+        return None;
+    }
+    Some(
+        positive
+            .iter()
+            .copied()
+            .filter(|elem| defines_non_object_constructor(db, *elem, name_str, policy))
+            .collect(),
+    )
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -3898,6 +3962,43 @@ impl<'db> Type<'db> {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
+
+                        // For the constructor dunders `__init__`/`__new__`, an
+                        // intersection element that only inherits `object`'s
+                        // trivial version must not be conjoined with a sibling
+                        // element that defines a real one: `object.__init__` /
+                        // `object.__new__` would otherwise collapse the resolved
+                        // signature to an uninhabitable `Never` (e.g. looking up
+                        // `__init__` on `type[HasInit] & type[Empty]`). This
+                        // mirrors the `MRO_NO_OBJECT_FALLBACK` policy already used
+                        // when resolving a single class's constructor. Restrict to
+                        // the elements that provide a non-`object` definition when
+                        // any of them do.
+                        if let Some(defining) = intersection_constructor_defining_elements(
+                            db,
+                            intersection,
+                            name_str,
+                            policy,
+                        ) {
+                            let filtered = IntersectionType::from_elements(db, defining);
+                            if let Type::Intersection(filtered) = filtered {
+                                return filtered.map_with_boundness_and_qualifiers(db, |elem| {
+                                    elem.member_lookup_with_policy_and_receiver(
+                                        db,
+                                        name_str.into(),
+                                        policy,
+                                        receiver,
+                                    )
+                                });
+                            }
+                            return filtered.member_lookup_with_policy_and_receiver(
+                                db,
+                                name_str.into(),
+                                policy,
+                                receiver,
+                            );
+                        }
+
                         intersection.map_with_boundness_and_qualifiers(db, |elem| {
                             elem.member_lookup_with_policy_and_receiver(
                                 db,

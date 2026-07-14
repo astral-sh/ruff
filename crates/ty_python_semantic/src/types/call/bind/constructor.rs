@@ -4,7 +4,9 @@ use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::{
+    BoundTypeVarInstance, ClassLiteral, DynamicType, MemberLookupPolicy, Type, TypeContext,
+};
 
 /// Bindings for a constructor call.
 ///
@@ -504,6 +506,38 @@ impl<'db> ConstructorBinding<'db> {
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
         self.constructor_context.kind()
+    }
+
+    /// True if this binding's constructor is `object`'s trivial `__init__`/`__new__`, i.e. the
+    /// constructed class defines no constructor of its own and only inherits `object`'s.
+    ///
+    /// Used to suppress this binding within a `type[...]` intersection when a sibling element
+    /// defines a real constructor: `object.__init__` must neither veto the call nor report the
+    /// bad argument against itself.
+    pub(super) fn uses_trivial_object_constructor(&self, db: &'db dyn Db) -> bool {
+        let name = match self.constructor_kind() {
+            ConstructorCallableKind::Init => "__init__",
+            ConstructorCallableKind::New => "__new__",
+            // A metaclass `__call__` is never `object`'s trivial constructor.
+            ConstructorCallableKind::MetaclassCall => return false,
+        };
+        // `constructed_instance_type` is already the constructed *instance* (e.g. `Empty`), so the
+        // dunder is looked up directly on it.
+        let instance = self.constructed_instance_type();
+        // A dynamic instance (e.g. `Any`) resolves every dunder; it is not a *concrete* trivial
+        // constructor and must not be treated as one.
+        if instance.is_dynamic() {
+            return false;
+        }
+        instance
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+            .place
+            .is_undefined()
     }
 }
 
