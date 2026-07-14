@@ -258,11 +258,23 @@ File level suppressions must come before any non-trivia token,
 including module docstrings.
 """
 
-# error: [unused-type-ignore-comment] "Unused blanket `type: ignore` directive"
+# error: [invalid-ignore-comment] "Invalid `type: ignore` comment: own-line comments must appear before any Python statements"
 # type: ignore
 
 a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
+```
+
+An own-line `type: ignore` after the first Python statement is invalid and does not suppress the
+following line.
+
+```py
+seen_code = True
+
+# error: [invalid-ignore-comment] "own-line comments must appear before any Python statements"
+# type: ignore
+# error: [unresolved-reference]
+value = missing
 ```
 
 ## `respect-type-ignore-comments=false`

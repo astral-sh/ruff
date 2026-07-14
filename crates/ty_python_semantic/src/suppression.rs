@@ -10,6 +10,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::TokenKind;
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
@@ -112,6 +113,11 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                                 }
 
                                 builder.add_invalid_comment(kind, error);
+                            }
+                            ParseErrorKind::InvalidOwnLineTypeIgnore => {
+                                if respect_type_ignore {
+                                    builder.add_invalid_comment(SuppressionKind::TypeIgnore, error);
+                                }
                             }
                         },
                     }
@@ -544,6 +550,20 @@ impl<'a> SuppressionsBuilder<'a> {
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = !self.seen_non_trivia_token;
+
+        if !is_file_suppression
+            && comment.kind().is_type_ignore()
+            && indentation_at_offset(comment.range().start(), self.source).is_some()
+        {
+            self.add_invalid_comment(
+                comment.kind(),
+                ParseError {
+                    kind: ParseErrorKind::InvalidOwnLineTypeIgnore,
+                    range: comment.range(),
+                },
+            );
+            return;
+        }
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())

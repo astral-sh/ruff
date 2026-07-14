@@ -266,6 +266,9 @@ pub(super) enum ParseErrorKind {
     /// `ty: ignore[a, b`
     #[error("expected a closing bracket")]
     CodesMissingClosingBracket(SuppressionKind),
+
+    #[error("own-line comments must appear before any Python statements")]
+    InvalidOwnLineTypeIgnore,
 }
 
 #[cfg(test)]
