@@ -175,15 +175,16 @@ impl<'db> ReceiverBinding<'db> {
         }
     }
 
-    fn apply_self(
+    fn apply_self_with_receiver(
         self,
         db: &'db dyn Db,
+        receiver_type: Type<'db>,
         self_type: Type<'db>,
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
         let mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
         Self {
-            receiver: self.receiver.or(Some(self_type)),
+            receiver: self.receiver.or(Some(receiver_type)),
             annotation: self
                 .annotation
                 .apply_type_mapping(db, &mapping, TypeContext::default()),
@@ -294,9 +295,10 @@ impl<'db> ReceiverBindings<'db> {
         )
     }
 
-    fn apply_self(
+    fn apply_self_with_receiver(
         self,
         db: &'db dyn Db,
+        receiver_type: Type<'db>,
         self_type: Type<'db>,
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
@@ -304,7 +306,9 @@ impl<'db> ReceiverBindings<'db> {
             db,
             self.bindings(db)
                 .iter()
-                .map(|binding| binding.apply_self(db, self_type, binding_context))
+                .map(|binding| {
+                    binding.apply_self_with_receiver(db, receiver_type, self_type, binding_context)
+                })
                 .collect::<Box<[_]>>(),
         )
     }
@@ -656,15 +660,19 @@ impl<'db> CallableSignature<'db> {
             .any(|signature| !signature.parameters().as_slice().is_empty())
     }
 
-    /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
-    /// given type. (Does not bind the `self` parameter; to do that, use
-    /// [`bind_self`][Self::bind_self].)
-    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+    /// Replaces `typing.Self` while supplying the runtime receiver for a previously bound
+    /// explicit receiver annotation. This does not bind a visible receiver parameter.
+    pub(crate) fn apply_self_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
         Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.apply_self(db, self_type))
+                .map(|signature| signature.apply_self_with_receiver(db, receiver_type, self_type))
                 .collect(),
         }
     }
@@ -1260,8 +1268,14 @@ impl<'db> Signature<'db> {
             }),
         );
         if let Some(typing_self_type) = typing_self_type {
-            receiver_bindings = receiver_bindings
-                .map(|bindings| bindings.apply_self(db, typing_self_type, binding_context));
+            receiver_bindings = receiver_bindings.map(|bindings| {
+                bindings.apply_self_with_receiver(
+                    db,
+                    receiver_type.unwrap_or(typing_self_type),
+                    typing_self_type,
+                    binding_context,
+                )
+            });
         }
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, removed_receiver)
@@ -1366,11 +1380,16 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
     }
 
-    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+    fn apply_self_with_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_bindings = self
-            .receiver_bindings
-            .map(|bindings| bindings.apply_self(db, self_type, binding_context));
+        let receiver_bindings = self.receiver_bindings.map(|bindings| {
+            bindings.apply_self_with_receiver(db, receiver_type, self_type, binding_context)
+        });
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_bindings,
