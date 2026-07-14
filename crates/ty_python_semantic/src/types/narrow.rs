@@ -3111,16 +3111,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         rhs_ty => overlaps_only_at_runtime(rhs_ty),
                     };
                     if !has_runtime_only_overlap {
-                        builder
-                    } else {
-                        let runtime_overlap =
-                            IntersectionType::from_two_elements(self.db, element, rhs_identity_ty);
-                        builder.add(if runtime_overlap.is_never() {
-                            element
-                        } else {
-                            runtime_overlap
-                        })
+                        return builder;
                     }
+
+                    let runtime_overlap =
+                        IntersectionType::from_two_elements(self.db, element, rhs_identity_ty);
+                    builder.add(if runtime_overlap.is_never() {
+                        element
+                    } else {
+                        runtime_overlap
+                    })
                 };
 
                 if let Type::Union(union) = lhs_ty.resolve_type_alias(self.db) {
