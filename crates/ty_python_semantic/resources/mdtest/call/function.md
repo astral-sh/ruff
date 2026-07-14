@@ -127,8 +127,8 @@ reveal_type(cn)  # revealed: (int, /) -> int
 ## Recursive callable constraints in constructors
 
 When inferring the generic constructor for `map`, an overloaded callable together with a gradual
-iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
-substituting those constraints.
+iterable can produce recursive constraints. The gradual lower bound should propagate through those
+constraints without repeatedly expanding them.
 
 ```py
 import operator
@@ -137,13 +137,13 @@ from typing import Any
 ints: list[int] = []
 dynamic: Any = []
 
-reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[int | Any]
 ```
 
-## `Any` preference hints for nested generic parameters
+## Gradual constraints for nested generic parameters
 
-Assigning `Any` to a type such as `tuple[T]` does not imply a constraint on `T`. However, `Any` is
-still a useful preference when no actual argument constraint determines `T`.
+When a gradual type is assigned to a type such as `tuple[T]`, generic inference projects its
+evidence into the nested type variable as a lower bound such as `Any <: T` or `Unknown <: T`.
 
 ```toml
 [environment]
@@ -152,6 +152,7 @@ python-version = "3.12"
 
 ```py
 from typing import Any
+from ty_extensions import Unknown
 
 def g[T](x: tuple[T]) -> T:
     raise NotImplementedError
@@ -165,12 +166,23 @@ def f_tuple[T: tuple[int]](x: T) -> T:
 def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
     return fallback
 
+def g_union[T, U](x: tuple[T | U]) -> tuple[T, U]:
+    raise NotImplementedError
+
 def _(x: Any):
     reveal_type(g(x))  # revealed: Any
     reveal_type(f(g(x)))  # revealed: Any
     reveal_type(f_tuple(g(x)))  # revealed: Any
-    # A real argument-derived constraint takes precedence over the preference hint.
-    reveal_type(g_with_fallback(x, 1))  # revealed: Literal[1]
+    # Gradual evidence combines with other argument-derived constraints.
+    reveal_type(g_with_fallback(x, 1))  # revealed: Any | Literal[1]
+    reveal_type(g_union(x))  # revealed: tuple[Any, Any]
+
+def _(x: Unknown):
+    reveal_type(g(x))  # revealed: Unknown
+    reveal_type(f(g(x)))  # revealed: Unknown
+    reveal_type(f_tuple(g(x)))  # revealed: Unknown
+    reveal_type(g_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
+    reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
 ```
 
 ## Decorated

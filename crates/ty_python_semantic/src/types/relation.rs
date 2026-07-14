@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
@@ -15,14 +16,16 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, FxOrderSet,
     types::{
         ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
         generics::InferableTypeVars,
@@ -218,6 +221,16 @@ pub(crate) enum TypeVarEvaluation {
     Lazy,
 }
 
+/// Controls how gradual types contribute to relation checks.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum GradualConstraints {
+    /// Collapse gradual assignability to an unconditional result.
+    Collapse,
+
+    /// Distribute gradual evidence into constraints on nested type variables.
+    Distribute,
+}
+
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
@@ -346,6 +359,7 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: None,
             given: assuming,
             relation_visitor: &relation_visitor,
@@ -383,6 +397,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
@@ -578,6 +593,28 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
     ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to_with_options(
+            db,
+            target,
+            constraints,
+            inferable,
+            relation,
+            typevar_evaluation,
+            GradualConstraints::Collapse,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_with_options<'c>(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+        gradual_mode: GradualConstraints,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -587,6 +624,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             typevar_evaluation,
+            gradual_mode,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
@@ -742,6 +780,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
+    gradual_mode: GradualConstraints,
     context_tree: Option<ErrorContextTree<'db>>,
     pub(super) given: ConstraintSet<'db, 'c>,
 
@@ -771,6 +810,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -792,6 +832,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -813,6 +854,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -834,6 +876,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -862,6 +905,52 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
+    }
+
+    /// A gradual type is assignable to every target regardless of its type arguments, so these
+    /// bounds are inference evidence rather than logical consequences of assignability.
+    fn distribute_gradual_constraints(
+        &self,
+        db: &'db dyn Db,
+        gradual: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        struct CollectTypeVars<'db> {
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars.borrow_mut().insert(typevar);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let visitor = CollectTypeVars {
+            typevars: RefCell::default(),
+            recursion_guard: TypeCollector::default(),
+        };
+        visitor.visit_type(db, target);
+
+        visitor
+            .typevars
+            .into_inner()
+            .into_iter()
+            .when_all(db, self.constraints, |typevar| {
+                ConstraintSet::constrain_typevar_lower_bound(db, self.constraints, typevar, gradual)
+            })
     }
 
     pub(super) fn never(&self) -> ConstraintSet<'db, 'c> {
@@ -1305,18 +1394,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
-                self.constraints,
-                match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability => true,
-                    TypeRelation::Redundancy { .. } => match target {
+            (Type::Dynamic(_), _) => match self.relation {
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => self.never(),
+                TypeRelation::Assignability => {
+                    if self.gradual_mode == GradualConstraints::Distribute {
+                        self.distribute_gradual_constraints(db, source, target)
+                    } else {
+                        self.always()
+                    }
+                }
+                TypeRelation::Redundancy { .. } => ConstraintSet::from_bool(
+                    self.constraints,
+                    match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                         _ => false,
                     },
-                },
-            ),
+                ),
+            },
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
@@ -2367,6 +2462,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
@@ -2452,6 +2548,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         TypeRelationChecker {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_mode: GradualConstraints::Collapse,
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
