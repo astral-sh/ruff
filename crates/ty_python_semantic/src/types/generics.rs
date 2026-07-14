@@ -804,6 +804,7 @@ impl<'db> GenericContext<'db> {
                             signatures,
                             callable.kind(db),
                             callable.provenance(db),
+                            callable.top_materialization_for_narrowing(db),
                         );
 
                         Some((callable, replacement))

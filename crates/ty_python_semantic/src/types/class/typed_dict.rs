@@ -219,6 +219,7 @@ fn synthesize_typed_dict_init<'db>(
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -261,6 +262,7 @@ fn synthesize_typed_dict_getitem<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -321,6 +323,7 @@ fn synthesize_typed_dict_setitem<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -375,6 +378,7 @@ fn synthesize_typed_dict_delitem<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -503,6 +507,7 @@ fn synthesize_typed_dict_get<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -653,6 +658,7 @@ fn synthesize_typed_dict_pop<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -704,6 +710,7 @@ fn synthesize_typed_dict_setdefault<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
@@ -825,6 +832,7 @@ fn synthesize_typed_dict_merge<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
+        false,
     ))
 }
 
