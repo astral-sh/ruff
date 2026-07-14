@@ -228,6 +228,7 @@ use ty_python_core::{
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -526,6 +527,8 @@ std::thread_local! {
     static ACTIVE_NON_TERMINAL_CALL_PREFIXES: ActiveRecursionDetector<salsa::Id> = ActiveRecursionDetector::default();
 }
 
+const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
+
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -562,31 +565,111 @@ fn analyze_non_terminal_call_prefix<'db>(
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) {
-    let range = 0..=root_predicate.index();
-    if !range.clone().any(|index| {
-        matches!(
-            predicates[ScopedPredicateId::new(index)].node,
-            PredicateNode::IsNonTerminalCall(_)
-        )
-    }) {
-        return;
-    }
+    let scope = predicate_scope(db, &predicates[root_predicate]);
+    let has_many_calls = predicates
+        .iter()
+        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
+        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
+        .is_some();
 
-    let key = predicate_scope(db, &predicates[root_predicate]).as_id();
     ACTIVE_NON_TERMINAL_CALL_PREFIXES.with(|active| {
         active.visit(
-            &key,
+            &scope.as_id(),
             || {},
             || {
-                for index in range {
-                    let predicate = &predicates[ScopedPredicateId::new(index)];
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                        analyze_single(db, predicate);
+                if !has_many_calls {
+                    for predicate in &predicates.raw[..=root_predicate.index()] {
+                        if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                            analyze_single(db, predicate);
+                        }
                     }
+                    return;
                 }
+
+                let call_predicates = non_terminal_call_predicates(db, scope);
+                let call_count =
+                    call_predicates.partition_point(|predicate| *predicate <= root_predicate);
+                if call_count <= NON_TERMINAL_CALL_CHUNK_SIZE {
+                    analyze_non_terminal_calls(db, predicates, &call_predicates[..call_count]);
+                    return;
+                }
+
+                let mut start = 0;
+                let mut remaining = call_count / NON_TERMINAL_CALL_CHUNK_SIZE;
+
+                while remaining > 0 {
+                    let level = remaining.ilog2();
+                    let length = 1 << level;
+                    analyze_non_terminal_call_range(db, scope, level, start >> level);
+                    start += length;
+                    remaining -= length;
+                }
+
+                let tail_start =
+                    call_count / NON_TERMINAL_CALL_CHUNK_SIZE * NON_TERMINAL_CALL_CHUNK_SIZE;
+                analyze_non_terminal_calls(
+                    db,
+                    predicates,
+                    &call_predicates[tail_start..call_count],
+                );
             },
         );
     });
+}
+
+/// Returns the statement-call predicates for `scope` in source order.
+///
+/// This tracked index is used only once a scope exceeds [`NON_TERMINAL_CALL_CHUNK_SIZE`], avoiding
+/// a persistent allocation for the common case of scopes with few calls.
+#[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
+fn non_terminal_call_predicates<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Box<[ScopedPredicateId]> {
+    use_def_map(db, scope)
+        .predicates()
+        .iter_enumerated()
+        .filter_map(|(id, predicate)| {
+            matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)).then_some(id)
+        })
+        .collect()
+}
+
+fn analyze_non_terminal_calls<'db>(
+    db: &'db dyn Db,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    call_predicates: &[ScopedPredicateId],
+) {
+    for id in call_predicates {
+        analyze_single(db, &predicates[*id]);
+    }
+}
+
+/// Analyzes a power-of-two range of call-predicate blocks in source order.
+///
+/// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
+/// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
+/// requested prefix contains thousands of calls. Each leaf handles multiple calls iteratively to
+/// avoid retaining a Salsa argument and query result for every individual predicate.
+#[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
+fn analyze_non_terminal_call_range<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    level: u32,
+    index: usize,
+) {
+    if level == 0 {
+        let use_def = use_def_map(db, scope);
+        let call_predicates = non_terminal_call_predicates(db, scope);
+        let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
+        let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
+        analyze_non_terminal_calls(db, use_def.predicates(), &call_predicates[start..end]);
+        return;
+    }
+
+    let child_index = index * 2;
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index);
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
