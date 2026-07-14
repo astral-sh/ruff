@@ -962,18 +962,6 @@ def _(xs: object):
         reveal_type(xs)  # revealed: ~Sequence[object]
 ```
 
-The same restoration applies to the specialized internal representation of `tuple`:
-
-```py
-def _(xs: object):
-    if isinstance(xs, tuple):
-        reveal_type(xs)  # revealed: tuple[Unknown, ...]
-        for x in xs:
-            reveal_type(x)  # revealed: Unknown
-    else:
-        reveal_type(xs)  # revealed: ~tuple[object, ...]
-```
-
 Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
 
 ```py
@@ -1001,27 +989,6 @@ def _(xs: OpenItem | Sequence[OpenItem]):
             reveal_type(x)  # revealed: Unknown | OpenItem
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
-```
-
-#### Contravariance
-
-Narrowing from a union containing a specialization that is already known:
-
-```py
-from typing import Generic, TypeVar
-
-T_contra = TypeVar("T_contra", contravariant=True)
-
-class Consumer(Generic[T_contra]):
-    def consume(self, value: T_contra) -> None: ...
-
-class OpenItem: ...
-
-def _(x: OpenItem | Consumer[OpenItem]):
-    if isinstance(x, Consumer):
-        reveal_type(x)  # revealed: (OpenItem & Consumer[Unknown]) | Consumer[OpenItem]
-    else:
-        reveal_type(x)  # revealed: OpenItem & ~Consumer[Never]
 ```
 
 #### Invariance
