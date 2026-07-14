@@ -4805,8 +4805,9 @@ class BadFactory(Baz, metaclass=BadFactoryMeta): ...
 static_assert(not is_assignable_to(TypeOf[BadFactory], type[Foo]))
 ```
 
-A property declaration requires a readable attribute on the constructed instance, but does not
-guarantee that the attribute exists on the class object.
+A `@property` declaration requires a readable attribute on the constructed instance, but does not
+require the implementation to use `@property` or guarantee that the attribute exists on the class
+object.
 
 ```py
 class PropertyProtocol(Protocol):
@@ -4818,6 +4819,10 @@ class PropertyImpl:
         self.value = 1
 
 static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
+
+class MissingProperty: ...
+
+static_assert(not is_assignable_to(TypeOf[MissingProperty], type[PropertyProtocol]))
 
 def _(cls: type[PropertyProtocol]) -> None:
     cls.value  # error: [unresolved-attribute]
