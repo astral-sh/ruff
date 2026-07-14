@@ -466,6 +466,11 @@ impl ClassInfoConstraintFunction {
                     // e.g. `isinstance(x, list[int])` fails at runtime.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                    // TODO: This narrowing is not fully sound:
+                    // - `type[protocol]` currently admits non-concrete classes, some of which are
+                    //   not valid runtime class-info arguments.
+                    // - A class can inhabit `type[protocol]` because its metaclass constructs
+                    //   protocol-conforming objects even if its nominal instances do not conform.
                     SubclassOfInner::Protocol(protocol) => match self {
                         ClassInfoConstraintFunction::IsInstance => {
                             Some(Type::ProtocolInstance(protocol))
