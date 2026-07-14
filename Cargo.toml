@@ -189,6 +189,7 @@ thiserror = { version = "2.0.0" }
 thin-vec = { version = "0.2.14" }
 tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "1.0.0" }
+toml_parser = { version = "1.0.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }

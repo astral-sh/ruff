@@ -2104,6 +2104,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
+ "toml_parser",
  "tracing",
 ]
 
@@ -3434,6 +3435,7 @@ dependencies = [
  "ruff_linter",
  "ruff_python_ast",
  "ruff_ranged_value",
+ "ruff_source_file",
  "ruff_workspace",
  "salsa",
 ]

@@ -17,7 +17,9 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
 use crate::RunOptions;
-use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::assertion::{
+    AssertionSource, InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion,
+};
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
@@ -97,25 +99,34 @@ pub fn match_file(
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let source = source_text(db, file);
-    let parsed = parsed_module(db, file).load(db);
     let line_index = line_index(db, file);
-    let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index);
+    let (assertions, diagnostics) = if file.path(db).extension() == Some("toml") {
+        let assertions =
+            InlineFileAssertions::from_file(source.as_str(), AssertionSource::Toml, &line_index);
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            line_index.line_index(diagnostic_range.start())
+        });
+        (assertions, diagnostics)
+    } else {
+        let parsed = parsed_module(db, file).load(db);
+        let assertions = InlineFileAssertions::from_file(
+            source.as_str(),
+            AssertionSource::Python(&parsed),
+            &line_index,
+        );
 
-    // Sort diagnostics according to the line number of the starting offset of the token in which the diagnostic appears.
-    //
-    // This can be different to the line number of the starting offset of the diagnostic range!
-    // For example, if the diagnostic is a syntax error inside a stringized annotation,
-    // the syntax error's range will likely point to a sub-range of the string literal,
-    // which will make the error unmatchable by mdtest unless we look at the token in which
-    // the diagnostic occurs (the string-literal) and use the token start as the basis for
-    // the line number.
-    let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
-        let token_start = parsed
-            .tokens()
-            .token_range(diagnostic_range.start())
-            .start();
-        line_index.line_index(token_start)
-    });
+        // Sort diagnostics according to the line number of the starting offset of the token in
+        // which the diagnostic appears. This can differ from the line containing the start of the
+        // diagnostic range, for example for syntax errors inside stringized annotations.
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            let token_start = parsed
+                .tokens()
+                .token_range(diagnostic_range.start())
+                .start();
+            line_index.line_index(token_start)
+        });
+        (assertions, diagnostics)
+    };
 
     let mut line_diagnostics = diagnostics.iter_lines();
 
