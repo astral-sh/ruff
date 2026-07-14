@@ -1210,6 +1210,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                         return f.write_str("bound method `ConstraintSet.satisfies`");
                     }
+                    KnownBoundMethodType::ConstraintSetForAll(_) => {
+                        return f.write_str("bound method `ConstraintSet.for_all`");
+                    }
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");

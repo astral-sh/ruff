@@ -3979,6 +3979,14 @@ impl<'db> Type<'db> {
                     .into()
                 }
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "for_all" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetForAll(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                     if name == "satisfied_by_all_typevars" =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -6382,6 +6390,7 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetNever
                         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                         | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                        | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
                 )
@@ -6751,6 +6760,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
@@ -7007,6 +7017,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
