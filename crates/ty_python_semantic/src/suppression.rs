@@ -771,6 +771,10 @@ impl<'a> SuppressionsBuilder<'a> {
 fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
     let (before, after) = tokens.split_at(range.start());
     let mut end = range.end();
+
+    // In `values = [\n    # ty: ignore`, the `[` makes the suppression part of an
+    // unfinished logical line. In `value = 1\n# ty: ignore`, the logical newline
+    // means that the suppression instead precedes the next logical line.
     let is_inner_comment = before.iter().rev().find_map(|token| match token.kind() {
         TokenKind::Newline => Some(false),
         TokenKind::NonLogicalNewline | TokenKind::Comment => None,
@@ -784,11 +788,14 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
     for token in after {
         match token.kind() {
             TokenKind::Newline => {
+                // `# ty: ignore\nvalue = (\n    1\n)`: include the complete logical line.
                 end = token.start();
                 break;
             }
             TokenKind::Comment => {}
             TokenKind::NonLogicalNewline if is_inner_comment => {
+                // `values = [\n    # ty: ignore\n    value,\n]`: include the next
+                // non-comment physical line.
                 end = token.start();
                 if seen_nonlogical_newline && !is_blank_or_comment_only {
                     break;
