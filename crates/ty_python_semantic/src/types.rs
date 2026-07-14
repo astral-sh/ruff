@@ -23,8 +23,8 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
-pub(crate) use self::cyclic::{ActiveRecursionDetector, TypePairCyclePolicy, TypeTransformer};
-pub use self::cyclic::{CycleDetector, TypeCyclePolicy};
+pub(crate) use self::cyclic::{ActiveRecursionDetector, TypePairCycleDetector, TypeTransformer};
+pub use self::cyclic::{CycleDetector, TypeCycleDetector};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -291,8 +291,9 @@ fn definition_expression_annotation<'db>(
 }
 
 struct ApplyTypeMappingTag;
+struct MaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, TypePairCyclePolicy, (Type<'db>, Type<'db>), bool, 1>>;
+    Rc<TypePairCycleDetector<MaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -314,7 +315,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
 impl<'db> ApplyTypeMappingVisitor<'db> {
     fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
         self.materialization_equivalence
-            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+            .get_or_init(|| Rc::new(TypePairCycleDetector::new(true)))
     }
 
     pub(crate) fn visit(
@@ -369,12 +370,13 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) type FindLegacyTypeVarsVisitor<'db> =
-    CycleDetector<'db, TypeCyclePolicy, Type<'db>, (), 3>;
+/// A [`TypeCycleDetector`] that is used in `find_legacy_typevars` methods.
+pub(crate) struct FindLegacyTypeVars;
+pub(crate) type FindLegacyTypeVarsVisitor<'db> = TypeCycleDetector<'db, FindLegacyTypeVars, (), 3>;
 
-/// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> = CycleDetector<'db, TypeCyclePolicy, Type<'db>, (), 3>;
+/// A [`TypeCycleDetector`] that is used in `visit_specialization` methods.
+pub(crate) struct VisitSpecialization;
+pub(crate) type SpecializationVisitor<'db> = TypeCycleDetector<'db, VisitSpecialization, (), 3>;
 
 /// How a generic type has been specialized.
 ///

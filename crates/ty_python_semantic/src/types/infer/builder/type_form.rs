@@ -2,9 +2,7 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{
-    CycleDetector, DynamicType, KnownClass, Type, TypeContext, TypeCyclePolicy, TypeFormType,
-};
+use crate::types::{DynamicType, KnownClass, Type, TypeContext, TypeCycleDetector, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -70,8 +68,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
+        struct ContainsTypeFormValue;
         type ContainsTypeFormValueVisitor<'db> =
-            CycleDetector<'db, TypeCyclePolicy, Type<'db>, bool, 3>;
+            TypeCycleDetector<'db, ContainsTypeFormValue, bool, 3>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,

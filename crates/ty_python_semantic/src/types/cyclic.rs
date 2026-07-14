@@ -37,7 +37,7 @@ use crate::types::type_alias::TypeAliasApplication;
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-pub enum TypeIdentity<'db> {
+pub(crate) enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
     TypeAlias(Definition<'db>),
@@ -68,65 +68,46 @@ impl<'db> Type<'db> {
     }
 }
 
-pub trait HasIdentity<'db> {
+pub(crate) type PairVisitor<'db, Tag, C> = TypePairCycleDetector<Tag, (Type<'db>, Type<'db>), C, 1>;
+
+/// An item whose recursive identity is determined by a pair of types plus optional context.
+pub(crate) trait TypePairCycleKey<'db> {
     type Id: Sized + PartialEq;
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
-}
+    fn identity(&self, db: &'db dyn Db) -> Self::Id;
 
-impl<'db> HasIdentity<'db> for Type<'db> {
-    type Id = TypeIdentity<'db>;
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        self.to_type_identity(db)
-    }
-}
-
-pub(crate) type PairVisitor<'db, C> =
-    CycleDetector<'db, TypePairCyclePolicy, (Type<'db>, Type<'db>), C, 1>;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
-    type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_identity(db), self.1.to_identity(db))
-    }
-}
-
-impl<'db, Context> HasIdentity<'db> for (Type<'db>, Context, Type<'db>)
-where
-    Context: Copy + PartialEq,
-{
-    type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_identity(db), self.1, self.2.to_identity(db))
-    }
-}
-
-/// An item whose recursive identity is determined by a pair of types.
-pub(crate) trait TypePairItem<'db>: HasIdentity<'db> {
     fn type_pair(&self) -> (Type<'db>, Type<'db>);
 }
 
-impl<'db> TypePairItem<'db> for (Type<'db>, Type<'db>) {
+impl<'db> TypePairCycleKey<'db> for (Type<'db>, Type<'db>) {
+    type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
+
+    fn identity(&self, db: &'db dyn Db) -> Self::Id {
+        (self.0.to_type_identity(db), self.1.to_type_identity(db))
+    }
+
     fn type_pair(&self) -> (Type<'db>, Type<'db>) {
         *self
     }
 }
 
-impl<'db, Context> TypePairItem<'db> for (Type<'db>, Context, Type<'db>)
+impl<'db, Context> TypePairCycleKey<'db> for (Type<'db>, Context, Type<'db>)
 where
     Context: Copy + PartialEq,
 {
+    type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
+
+    fn identity(&self, db: &'db dyn Db) -> Self::Id {
+        (
+            self.0.to_type_identity(db),
+            self.1,
+            self.2.to_type_identity(db),
+        )
+    }
+
     fn type_pair(&self) -> (Type<'db>, Type<'db>) {
         (self.0, self.2)
     }
-}
-
-/// Decides when an abstract-identity reentry requires the recursive fallback.
-pub trait CyclePolicy<'db, T: HasIdentity<'db>> {
-    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize>;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -250,61 +231,121 @@ impl<'db> Type<'db> {
     }
 }
 
-/// Uses the first repeated abstract identity as the recursive fallback boundary.
-pub(crate) struct IdentityCyclePolicy;
+/// A [`CycleDetector`] that also treats repeated recursive type identities as active cycles.
+pub struct TypeCycleDetector<'db, Tag, R, const INLINE_CAPACITY: usize> {
+    inner: CycleDetector<Tag, Type<'db>, R, INLINE_CAPACITY>,
+}
 
-impl<'db, T: HasIdentity<'db>> CyclePolicy<'db, T> for IdentityCyclePolicy {
-    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize> {
-        let identity = current.to_identity(db);
-        active
-            .iter()
-            .position(|active| active.to_identity(db) == identity)
+impl<Tag, R, const INLINE_CAPACITY: usize> TypeCycleDetector<'_, Tag, R, INLINE_CAPACITY> {
+    pub fn new(fallback: R) -> Self {
+        Self {
+            inner: CycleDetector::new(fallback),
+        }
     }
 }
 
-/// Applies recursive-type semantics to a single type stack.
-pub struct TypeCyclePolicy;
-
-impl<'db> CyclePolicy<'db, Type<'db>> for TypeCyclePolicy {
-    fn reentry_index(db: &'db dyn Db, current: &Type<'db>, active: &[Type<'db>]) -> Option<usize> {
-        RecursiveTypeStack::new(db, active).reentry_index(*current, AliasCycleThreshold::Immediate)
-    }
-}
-
-/// Applies recursive-type semantics to an item containing a pair of types.
-pub(crate) struct TypePairCyclePolicy;
-
-impl<'db, T> CyclePolicy<'db, T> for TypePairCyclePolicy
-where
-    T: TypePairItem<'db>,
+impl<'db, Tag, R: Clone, const INLINE_CAPACITY: usize>
+    TypeCycleDetector<'db, Tag, R, INLINE_CAPACITY>
 {
-    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize> {
-        let identity = current.to_identity(db);
-        let (current_left, current_right) = current.type_pair();
+    #[inline]
+    pub fn visit(&self, db: &'db dyn Db, ty: Type<'db>, compute: impl FnOnce() -> R) -> R {
+        self.inner.visit_with(
+            ty,
+            |current, active| {
+                RecursiveTypeStack::new(db, active)
+                    .reentry_index(*current, AliasCycleThreshold::Immediate)
+            },
+            compute,
+        )
+    }
+}
 
-        active.iter().position(|active| {
-            if active.to_identity(db) != identity {
-                return false;
-            }
-            let (active_left, active_right) = active.type_pair();
-            // An unchanged component does not represent recursive progress. Exact pair reentries
-            // are handled before this policy is consulted.
-            (current_left != active_left
-                && RecursiveTypeStack::has_immediate_reentry_to(db, current_left, active_left))
-                || (current_right != active_right
-                    && RecursiveTypeStack::has_immediate_reentry_to(
-                        db,
-                        current_right,
-                        active_right,
-                    ))
+impl<Tag, R: Default, const INLINE_CAPACITY: usize> Default
+    for TypeCycleDetector<'_, Tag, R, INLINE_CAPACITY>
+{
+    fn default() -> Self {
+        Self::new(R::default())
+    }
+}
+
+/// A [`CycleDetector`] for operations whose recursive identity is a pair of types.
+pub(crate) struct TypePairCycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
+    inner: CycleDetector<Tag, T, R, INLINE_CAPACITY>,
+}
+
+impl<Tag, T, R, const INLINE_CAPACITY: usize> TypePairCycleDetector<Tag, T, R, INLINE_CAPACITY> {
+    pub(crate) fn new(fallback: R) -> Self {
+        Self {
+            inner: CycleDetector::new(fallback),
+        }
+    }
+}
+
+impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
+    TypePairCycleDetector<Tag, T, R, INLINE_CAPACITY>
+where
+    T: Hash + Eq + Clone + TypePairCycleKey<'db>,
+{
+    #[inline]
+    pub(crate) fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
+        self.inner.visit_with(
+            item,
+            |current, active| type_pair_reentry_index(db, current, active),
+            compute,
+        )
+    }
+
+    pub(crate) fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+        self.inner.begin_visit_with(item, |current, active| {
+            type_pair_reentry_index(db, current, active)
         })
     }
+
+    pub(crate) fn finish_visit(&self, item: T, result: R) -> R {
+        self.inner.finish_visit(item, result)
+    }
 }
 
+impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
+    for TypePairCycleDetector<Tag, T, R, INLINE_CAPACITY>
+where
+    T: TypePairCycleKey<'db>,
+{
+    fn default() -> Self {
+        Self::new(R::default())
+    }
+}
+
+fn type_pair_reentry_index<'db, T>(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize>
+where
+    T: TypePairCycleKey<'db>,
+{
+    let identity = current.identity(db);
+    let (current_left, current_right) = current.type_pair();
+
+    active.iter().position(|active| {
+        if active.identity(db) != identity {
+            return false;
+        }
+        let (active_left, active_right) = active.type_pair();
+        // An unchanged component does not represent recursive progress. Exact pair reentries
+        // are handled before this recursive-identity check is consulted.
+        (current_left != active_left
+            && RecursiveTypeStack::has_immediate_reentry_to(db, current_left, active_left))
+            || (current_right != active_right
+                && RecursiveTypeStack::has_immediate_reentry_to(db, current_right, active_right))
+    })
+}
+
+/// `CycleDetector` detects exact recursive visits for one operation kind.
+///
+/// The `Tag` parameter only separates otherwise identical detectors for different operations.
+/// Recursive type-identity behavior belongs in [`TypeCycleDetector`] or [`TypePairCycleDetector`].
+///
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
-pub struct CycleDetector<'db, Policy, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
+pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
     /// The active recursion stack. Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[T; INLINE_CAPACITY]>>,
 
@@ -313,34 +354,37 @@ pub struct CycleDetector<'db, Policy, T: HasIdentity<'db>, R, const INLINE_CAPAC
 
     fallback: R,
 
-    _policy: PhantomData<fn(&'db ()) -> Policy>,
+    _tag: PhantomData<fn() -> Tag>,
 }
 
-impl<'db, Policy, T, R, const INLINE_CAPACITY: usize>
-    CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
-where
-    T: HasIdentity<'db>,
-    Policy: CyclePolicy<'db, T>,
-{
+impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CAPACITY> {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
             cache: RefCell::new(CycleDetectorCache::new()),
             fallback,
-            _policy: PhantomData,
+            _tag: PhantomData,
         }
     }
 }
 
-impl<'db, Policy, T, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
+impl<Tag, T, R: Clone, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CAPACITY>
 where
-    T: Hash + Eq + Clone + HasIdentity<'db>,
-    Policy: CyclePolicy<'db, T>,
+    T: Hash + Eq + Clone,
 {
     #[inline]
-    pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.begin_visit(db, item) {
+    pub fn visit(&self, item: T, compute: impl FnOnce() -> R) -> R {
+        self.visit_with(item, |_, _| None, compute)
+    }
+
+    #[inline]
+    fn visit_with(
+        &self,
+        item: T,
+        find_reentry: impl FnOnce(&T, &[T]) -> Option<usize>,
+        compute: impl FnOnce() -> R,
+    ) -> R {
+        match self.begin_visit_with(item, find_reentry) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
@@ -350,9 +394,12 @@ where
         }
     }
 
-    /// Start visiting an item, exposing recursive cycles to callers that need an item-specific
-    /// fallback.
-    pub(crate) fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+    /// Start visiting an item, using `find_reentry` to detect non-exact active reentries.
+    fn begin_visit_with(
+        &self,
+        item: T,
+        find_reentry: impl FnOnce(&T, &[T]) -> Option<usize>,
+    ) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -362,7 +409,7 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        if let Some(active_index) = Policy::reentry_index(db, &item, &seen) {
+        if let Some(active_index) = find_reentry(&item, &seen) {
             return CycleDetectorVisit::Cycle(CycleDetectorReentry {
                 current: item,
                 active: seen[active_index].clone(),
@@ -475,11 +522,8 @@ enum TypeTransformerVisit<'db> {
     Pending(Type<'db>),
 }
 
-impl<'db, Policy, T, R: Default, const INLINE_CAPACITY: usize> Default
-    for CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
-where
-    T: HasIdentity<'db>,
-    Policy: CyclePolicy<'db, T>,
+impl<Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
+    for CycleDetector<Tag, T, R, INLINE_CAPACITY>
 {
     fn default() -> Self {
         CycleDetector::new(R::default())
@@ -610,184 +654,31 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CycleDetector, CycleDetectorVisit, CyclePolicy, Db, HasIdentity, IdentityCyclePolicy,
-    };
-    use crate::db::tests::setup_db;
+    use super::CycleDetector;
 
-    type Detector<'db> = CycleDetector<'db, IdentityCyclePolicy, u8, u8, 1>;
-    type IdentityDetector<'db> = CycleDetector<'db, IdentityCyclePolicy, TestItem, u8, 1>;
+    struct TestVisit;
 
-    impl<'db> HasIdentity<'db> for u8 {
-        type Id = u8;
-
-        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            *self
-        }
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    struct TestItem {
-        value: u8,
-        identity: u8,
-    }
-
-    impl<'db> HasIdentity<'db> for TestItem {
-        type Id = u8;
-
-        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            self.identity
-        }
-    }
-
-    struct ConditionalIdentityCyclePolicy;
-
-    type ExactIdentityDetector<'db> =
-        CycleDetector<'db, ConditionalIdentityCyclePolicy, ExactIdentityItem, u8, 1>;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    struct ExactIdentityItem {
-        value: u8,
-        identity: u8,
-        recursive_identity: bool,
-    }
-
-    impl<'db> HasIdentity<'db> for ExactIdentityItem {
-        type Id = u8;
-
-        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            self.identity
-        }
-    }
-
-    impl<'db> CyclePolicy<'db, ExactIdentityItem> for ConditionalIdentityCyclePolicy {
-        fn reentry_index(
-            db: &'db dyn Db,
-            current: &ExactIdentityItem,
-            active: &[ExactIdentityItem],
-        ) -> Option<usize> {
-            if !current.recursive_identity {
-                return None;
-            }
-            let identity = current.to_identity(db);
-            active
-                .iter()
-                .position(|active| active.recursive_identity && active.to_identity(db) == identity)
-        }
-    }
+    type Detector = CycleDetector<TestVisit, u8, u8, 1>;
 
     #[test]
     fn caches_results_and_spills_after_two_entries() {
-        let db = setup_db();
         let detector = Detector::new(0);
 
-        assert_eq!(detector.visit(&db, 1, || 10), 10);
-        assert_eq!(detector.visit(&db, 1, || 40), 10);
-        assert_eq!(detector.visit(&db, 2, || 20), 20);
+        assert_eq!(detector.visit(1, || 10), 10);
+        assert_eq!(detector.visit(1, || 40), 10);
+        assert_eq!(detector.visit(2, || 20), 20);
         assert!(!detector.cache.borrow().is_spilled());
-        assert_eq!(detector.visit(&db, 3, || 30), 30);
+        assert_eq!(detector.visit(3, || 30), 30);
         assert!(detector.cache.borrow().is_spilled());
 
-        assert_eq!(detector.visit(&db, 2, || 40), 20);
-        assert_eq!(detector.visit(&db, 3, || 40), 30);
+        assert_eq!(detector.visit(2, || 40), 20);
+        assert_eq!(detector.visit(3, || 40), 30);
     }
 
     #[test]
     fn nested_visit_short_circuits_on_cycle() {
-        let db = setup_db();
         let detector = Detector::new(0);
 
-        assert_eq!(
-            detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
-            10
-        );
-    }
-
-    #[test]
-    fn nested_visit_short_circuits_on_identity_cycle_without_caching_it() {
-        let db = setup_db();
-        let detector = IdentityDetector::new(0);
-        let first = TestItem {
-            value: 1,
-            identity: 1,
-        };
-        let second = TestItem {
-            value: 2,
-            identity: 1,
-        };
-
-        assert_eq!(
-            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
-            10
-        );
-        assert_eq!(detector.visit(&db, second, || 30), 30);
-    }
-
-    #[test]
-    fn exact_identity_items_ignore_shared_abstract_identity() {
-        let db = setup_db();
-        let detector = ExactIdentityDetector::new(0);
-        let first = ExactIdentityItem {
-            value: 1,
-            identity: 1,
-            recursive_identity: false,
-        };
-        let second = ExactIdentityItem {
-            value: 2,
-            identity: 1,
-            recursive_identity: false,
-        };
-
-        assert_eq!(
-            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
-            30
-        );
-    }
-
-    #[test]
-    fn active_items_that_skip_recursive_identity_do_not_trigger_identity_cycles() {
-        let db = setup_db();
-        let detector = ExactIdentityDetector::new(0);
-        let first = ExactIdentityItem {
-            value: 1,
-            identity: 1,
-            recursive_identity: false,
-        };
-        let second = ExactIdentityItem {
-            value: 2,
-            identity: 1,
-            recursive_identity: true,
-        };
-
-        assert_eq!(
-            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
-            30
-        );
-    }
-
-    #[test]
-    fn identity_cycle_reports_current_item() {
-        let db = setup_db();
-        let detector = IdentityDetector::new(0);
-        let first = TestItem {
-            value: 1,
-            identity: 1,
-        };
-        let second = TestItem {
-            value: 2,
-            identity: 1,
-        };
-
-        let CycleDetectorVisit::Pending(active_item) = detector.begin_visit(&db, first) else {
-            panic!("first visit should be pending");
-        };
-
-        let CycleDetectorVisit::Cycle(reentry) = detector.begin_visit(&db, second) else {
-            panic!("second visit should detect an identity cycle");
-        };
-        assert_eq!(reentry.current, second);
-        assert_eq!(reentry.active, first);
-
-        detector.finish_visit(active_item, 10);
+        assert_eq!(detector.visit(1, || detector.visit(1, || 20) + 10), 10);
     }
 }

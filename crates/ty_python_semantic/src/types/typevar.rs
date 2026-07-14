@@ -6,7 +6,6 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
-use crate::types::cyclic::{HasIdentity, IdentityCyclePolicy};
 use crate::{
     Db, TypeQualifiers,
     place::{
@@ -283,7 +282,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        visitor.visit(db, self, || {
+        visitor.visit(self, || {
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
                 TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
@@ -1805,13 +1804,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
+pub(crate) struct TypeVarDefault;
+
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<'db, IdentityCyclePolicy, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
-
-impl<'db> HasIdentity<'db> for TypeVarInstance<'db> {
-    type Id = TypeVarInstance<'db>;
-
-    fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-        *self
-    }
-}
+    CycleDetector<TypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;

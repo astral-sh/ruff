@@ -25,11 +25,11 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeCyclePolicy, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, DynamicType,
+    InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
+    Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeCycleDetector, TypeVarBoundOrConstraints, UnionType,
+    UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
@@ -62,8 +62,9 @@ fn string_literal_values<'db>(
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
+        struct TypedDictKeyExpectedType;
         type TypedDictKeyExpectedTypeVisitor<'db> =
-            CycleDetector<'db, TypeCyclePolicy, Type<'db>, Option<Type<'db>>, 3>;
+            TypeCycleDetector<'db, TypedDictKeyExpectedType, Option<Type<'db>>, 3>;
 
         fn imp<'db>(
             db: &'db dyn Db,

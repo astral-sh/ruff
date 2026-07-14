@@ -6,7 +6,7 @@ use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
-use crate::types::cyclic::{CycleDetector, TypePairCyclePolicy};
+use crate::types::cyclic::TypePairCycleDetector;
 use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
@@ -23,10 +23,11 @@ enum IntersectionOn {
     Right,
 }
 
-/// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
-pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
-    'db,
-    TypePairCyclePolicy,
+/// A [`TypePairCycleDetector`] that is used in [`infer_binary_type_comparison`].
+pub(super) struct BinaryComparison;
+
+pub(super) type BinaryComparisonVisitor<'db> = TypePairCycleDetector<
+    BinaryComparison,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
     1,

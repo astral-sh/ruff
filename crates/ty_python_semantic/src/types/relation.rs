@@ -9,19 +9,16 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{
-    CycleDetectorReentry, CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity,
-    TypePairCyclePolicy, TypePairItem,
-};
+use crate::types::cyclic::{CycleDetectorReentry, CycleDetectorVisit, PairVisitor};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypePairCycleDetector, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -715,38 +712,13 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
-    'db,
-    TypePairCyclePolicy,
-    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
-    ConstraintSet<'db, 'c>,
-    1,
->;
+/// A [`TypePairCycleDetector`] that is used in `has_relation_to` methods.
+pub(crate) struct HasRelationTo;
 
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
-    type Id = (
-        TypeIdentity<'db>,
-        TypeIdentity<'db>,
-        TypeRelation,
-        TypeVarEvaluation,
-    );
+type RelationCycleKey<'db> = (Type<'db>, (TypeRelation, TypeVarEvaluation), Type<'db>);
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (
-            self.0.to_identity(db),
-            self.1.to_identity(db),
-            self.2,
-            self.3,
-        )
-    }
-}
-
-impl<'db> TypePairItem<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
-    fn type_pair(&self) -> (Type<'db>, Type<'db>) {
-        (self.0, self.1)
-    }
-}
+pub(crate) type HasRelationToVisitor<'db, 'c> =
+    TypePairCycleDetector<HasRelationTo, RelationCycleKey<'db>, ConstraintSet<'db, 'c>, 1>;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -754,8 +726,10 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, ConstraintSet<'db, 'c>>;
+/// A [`TypePairCycleDetector`] that is used in `is_disjoint_from` methods.
+pub(crate) struct IsDisjoint;
+
+pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
 
 impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -959,12 +933,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        match self
-            .relation_visitor
-            .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
-        {
+        match self.relation_visitor.begin_visit(
+            db,
+            (source, (self.relation, self.typevar_evaluation), target),
+        ) {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(reentry) => self.recursive_type_pair_fallback(db, &reentry),
+            CycleDetectorVisit::Cycle(reentry) => self.recursive_type_pair_fallback(&reentry),
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
                 self.relation_visitor.finish_visit(item, result)
@@ -974,27 +948,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn recursive_type_pair_fallback(
         &self,
-        _db: &'db dyn Db,
-        reentry: &CycleDetectorReentry<(Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation)>,
+        reentry: &CycleDetectorReentry<RelationCycleKey<'db>>,
     ) -> ConstraintSet<'db, 'c> {
-        let current_is_alias_pair = matches!(
-            (reentry.current.0, reentry.current.1),
-            (Type::TypeAlias(_), Type::TypeAlias(_))
-        );
-        let active_is_alias_pair = matches!(
-            (reentry.active.0, reentry.active.1),
-            (Type::TypeAlias(_), Type::TypeAlias(_))
-        );
-        if current_is_alias_pair && active_is_alias_pair {
+        if matches!(
+            (
+                reentry.active.0,
+                reentry.active.2,
+                reentry.current.0,
+                reentry.current.2,
+            ),
+            (
+                Type::TypeAlias(_),
+                Type::TypeAlias(_),
+                Type::TypeAlias(_),
+                Type::TypeAlias(_)
+            )
+        ) {
             // TODO: Recursive aliases can encode context-free languages, whose inclusion and
             // equivalence are undecidable. No complete fallback exists, but more decidable cases
             // can be recognized here before conservatively rejecting the pair.
             return self.never();
         }
 
-        // Mixed recursive cycles (for example, alias vs. protocol) keep the existing
-        // coinductive fallback. Alias pairs are rejected above instead of generating another
-        // recursive obligation.
+        // Mixed recursive cycles (for example, alias vs. protocol) keep the existing coinductive
+        // fallback. Alias pairs are rejected above instead of generating another recursive
+        // obligation.
         self.always()
     }
 
