@@ -311,7 +311,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: Top[(...) -> object]
+        reveal_type(y)  # revealed: (...) -> Unknown
 ```
 
 ## Class types
@@ -616,7 +616,7 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
 python-version = "3.12"
 
 [analysis]
-generic-narrowing = "strict"
+strict-generic-narrowing = true
 ```
 
 In `strict` mode, narrowing to a generic class using `isinstance()` uses the top materialization of
@@ -756,11 +756,13 @@ def _(x: type[object], y: type[object], z: type[object]):
 python-version = "3.12"
 
 [analysis]
-generic-narrowing = "relaxed"
+strict-generic-narrowing = false
 ```
 
-In `relaxed` mode, narrowing to a generic class using `isinstance()` uses the
-`Unknown`-specialization of the generic.
+In `relaxed` mode, narrowing to a generic class using `isinstance()` first intersects with a
+specially marked top materialization of the generic. It behaves like the ordinary top
+materialization while simplifying the intersection. The marker is then removed, restoring the
+`Unknown`-specialization.
 
 ```py
 from typing import Self
@@ -822,7 +824,7 @@ def _(x: type[object], y: type[object], z: type[object]):
 
 ```toml
 [analysis]
-generic-narrowing = "strict"
+strict-generic-narrowing = true
 ```
 
 #### Covariance
@@ -932,14 +934,14 @@ def _(xs: list[str] | set[str]) -> str:
 
 ### Relaxed mode
 
-The `analysis.generic-narrowing` option can be set to `relaxed` to narrow the positive branch to the
-Unknown-specialization of a generic class without top-materializing it. The negative branch still
-excludes the top materialization because a negative `isinstance` result excludes every
-specialization of the class:
+With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified against a
+specially marked top materialization before removing the marker to restore its
+`Unknown`-specialization. The negative branch still excludes the ordinary top materialization
+because a negative `isinstance` result excludes every specialization of the class:
 
 ```toml
 [analysis]
-generic-narrowing = "relaxed"
+strict-generic-narrowing = false
 ```
 
 #### Covariance
@@ -958,6 +960,18 @@ def _(xs: object):
         reveal_type(xs)  # revealed: ~Sequence[object]
 ```
 
+The same restoration applies to the specialized internal representation of `tuple`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, tuple):
+        reveal_type(xs)  # revealed: tuple[Unknown, ...]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(xs)  # revealed: ~tuple[object, ...]
+```
+
 Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
 
 ```py
@@ -966,9 +980,9 @@ class Item: ...
 
 def _(xs: Item | Sequence[Item]):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: Sequence[Item] & Sequence[Unknown]
+        reveal_type(xs)  # revealed: Sequence[Item]
         for x in xs:
-            reveal_type(x)  # revealed: Item & Unknown
+            reveal_type(x)  # revealed: Item
     else:
         reveal_type(xs)  # revealed: Item
 ```
@@ -980,11 +994,32 @@ class OpenItem: ...
 
 def _(xs: OpenItem | Sequence[OpenItem]):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | (Sequence[OpenItem] & Sequence[Unknown])
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | Sequence[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: Unknown | OpenItem
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Contravariance
+
+Narrowing from a union containing a specialization that is already known:
+
+```py
+from typing import Generic, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Consumer(Generic[T_contra]):
+    def consume(self, value: T_contra) -> None: ...
+
+class OpenItem: ...
+
+def _(x: OpenItem | Consumer[OpenItem]):
+    if isinstance(x, Consumer):
+        reveal_type(x)  # revealed: (OpenItem & Consumer[Unknown]) | Consumer[OpenItem]
+    else:
+        reveal_type(x)  # revealed: OpenItem & ~Consumer[Never]
 ```
 
 #### Invariance

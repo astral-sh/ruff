@@ -342,6 +342,82 @@ fn divergent_type() {
 }
 
 #[test]
+fn narrowing_materialization_tags() {
+    let db = setup_db();
+
+    let list_unknown = KnownClass::List.to_specialized_instance(&db, &[Type::unknown()]);
+    let marked_list = list_unknown.top_materialization_for_narrowing(&db);
+    assert_eq!(marked_list.display(&db).to_string(), "Top*[list[Unknown]]");
+    assert_eq!(
+        marked_list.erase_narrowing_materialization(&db),
+        list_unknown
+    );
+
+    let sequence_unknown = KnownClass::Sequence.to_specialized_instance(&db, &[Type::unknown()]);
+    let marked_sequence = sequence_unknown.top_materialization_for_narrowing(&db);
+    assert_eq!(
+        marked_sequence.display(&db).to_string(),
+        "Top*[Sequence[Unknown]]"
+    );
+    assert!(
+        KnownClass::Sequence
+            .to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)])
+            .is_subtype_of(&db, marked_sequence)
+    );
+    assert_eq!(
+        marked_sequence.erase_narrowing_materialization(&db),
+        sequence_unknown
+    );
+
+    let tuple_unknown = Type::homogeneous_tuple(&db, Type::unknown());
+    let marked_tuple = tuple_unknown.top_materialization_for_narrowing(&db);
+    assert!(
+        Type::homogeneous_tuple(&db, KnownClass::Int.to_instance(&db))
+            .is_subtype_of(&db, marked_tuple)
+    );
+    assert_eq!(
+        marked_tuple.erase_narrowing_materialization(&db),
+        tuple_unknown
+    );
+
+    let callable_unknown = Type::Callable(CallableType::unknown(&db));
+    let marked_callable = callable_unknown.top_materialization_for_narrowing(&db);
+    assert_eq!(
+        marked_callable.display(&db).to_string(),
+        "Top*[(...) -> Unknown]"
+    );
+    assert!(Type::Callable(CallableType::bottom(&db)).is_subtype_of(&db, marked_callable));
+    assert_eq!(
+        marked_callable.erase_narrowing_materialization(&db),
+        callable_unknown
+    );
+    let regular_callable = callable_unknown.top_materialization(&db);
+    assert_eq!(
+        regular_callable.display(&db).to_string(),
+        "Top[(...) -> object]"
+    );
+    assert_eq!(
+        regular_callable.erase_narrowing_materialization(&db),
+        regular_callable
+    );
+
+    let regular_list = list_unknown.top_materialization(&db);
+    assert_eq!(regular_list.display(&db).to_string(), "Top[list[Unknown]]");
+    assert_eq!(
+        regular_list.erase_narrowing_materialization(&db),
+        regular_list
+    );
+    assert_eq!(
+        Type::object().erase_narrowing_materialization(&db),
+        Type::object()
+    );
+    assert_eq!(
+        Type::Never.erase_narrowing_materialization(&db),
+        Type::Never
+    );
+}
+
+#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;

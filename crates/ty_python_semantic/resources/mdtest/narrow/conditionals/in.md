@@ -906,6 +906,11 @@ After the `isinstance` check, `values` has type `Iterable[Literal[1]] & tuple[ob
 semantics were checked: the `tuple` component establishes that membership compares against its
 elements, while the `Iterable` component constrains those elements to `Literal[1]`.
 
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
 ```py
 from collections.abc import Iterable
 from typing import Literal, final

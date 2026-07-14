@@ -27,7 +27,6 @@ pub use suppression::{
     SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
     suppress_single,
 };
-use ty_combine::Combine;
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
@@ -109,24 +108,8 @@ pub struct AnalysisSettings {
 
     pub replace_imports_with_any: ModuleGlobSet,
 
-    pub generic_narrowing: GenericNarrowing,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, get_size2::GetSize)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(rename_all = "kebab-case")
-)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum GenericNarrowing {
-    Strict,
-    #[default]
-    Relaxed,
-}
-
-impl Combine for GenericNarrowing {
-    fn combine_with(&mut self, _other: Self) {}
+    /// Whether unspecialized generic classes use their top materialization for narrowing.
+    pub strict_generic_narrowing: bool,
 }
 
 impl Default for AnalysisSettings {
@@ -136,7 +119,7 @@ impl Default for AnalysisSettings {
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),
-            generic_narrowing: GenericNarrowing::default(),
+            strict_generic_narrowing: false,
         }
     }
 }

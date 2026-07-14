@@ -173,7 +173,7 @@ Settings: Settings {
             regex_set: RegexSet([]),
             globs: [],
         },
-        generic_narrowing: Relaxed,
+        strict_generic_narrowing: false,
     },
     overrides: [],
 }
