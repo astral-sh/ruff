@@ -1121,9 +1121,9 @@ pub struct Specialization<'db> {
     /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
     /// with `Some(MaterializationKind::Bottom)`.
-    /// An ordinary `materialization_kind` may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions. A deferred materialization temporarily tags the
-    /// whole gradual specialization regardless of variance.
+    /// The `materialization_kind` field may be non-`None` if the specialization contains
+    /// dynamic types in invariant positions, or if a deferred materialization is being applied
+    /// to a generic type.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 

@@ -401,10 +401,12 @@ pub(crate) struct VisitSpecialization;
 pub enum MaterializationKind {
     Top,
     Bottom,
-    /// A top materialization whose application is deferred.
-    /// It retains the gradual specialization so the tag can be removed after a type relation.
+    /// A top materialization whose application is deferred. This is used for non-strict/unsound
+    /// `isinstance` checks with generic classes. For example, `isinstance(x, Sequence)` intersects
+    /// the type of `x` with `DeferredTop[Sequence[Unknown]]`, which is not eagerly evaluated to
+    /// `Sequence[object]`, so that it can be erased after the intersection has been computed.
     DeferredTop,
-    /// The contravariant counterpart of [`MaterializationKind::DeferredTop`].
+    /// The counterpart of [`MaterializationKind::DeferredTop`].
     DeferredBottom,
 }
 
