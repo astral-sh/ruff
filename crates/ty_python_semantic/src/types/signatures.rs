@@ -1876,13 +1876,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let relation = checker.with_signature_recursion_guard(source, target, || {
             target
-                .receiver_bindings_when_satisfied(&checker, db)
+                .receiver_constraints_when_satisfied(&checker, db)
                 .implies(db, self.constraints, || {
-                    source.receiver_bindings_when_satisfied(&checker, db).and(
-                        db,
-                        self.constraints,
-                        || checker.check_signature_pair_inner(db, source, target),
-                    )
+                    source
+                        .receiver_constraints_when_satisfied(&checker, db)
+                        .and(db, self.constraints, || {
+                            checker.check_signature_pair_inner(db, source, target)
+                        })
                 })
         });
         Some(relation.for_all(db, self.constraints, target_local))
