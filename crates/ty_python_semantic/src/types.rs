@@ -1336,6 +1336,7 @@ bitflags! {
         /// All other attributes use the `WithInstanceFallback` policy.
         ///
         /// If this flag is set - look up the attribute on the meta-type only.
+        /// This also selects method-like binding for concrete callable dunder declarations.
         const NO_INSTANCE_FALLBACK = 1 << 0;
 
         /// When looking up an attribute on a class, we sometimes need to avoid
@@ -4511,18 +4512,38 @@ impl<'db> Type<'db> {
             key
         };
 
-        if let Type::TypeVar(_) = ty {
-            if let Some(class) = ty.nominal_class(db, env) {
-                let name = key.name(db);
-                let policy = key.policy(db);
+        let member = if let Type::TypeVar(_) = ty
+            && let Some(class) = ty.nominal_class(db, env)
+        {
+            ty.to_meta_type(db, env)
+                .class_namespace_member(db, env, class, key.name(db), key.policy(db))
+        } else {
+            Self::class_member_with_policy_inner(db, key)
+        };
+        let name = key.name(db);
+        let is_dunder_lookup = key.policy(db).no_instance_fallback()
+            && name.starts_with("__") && name.ends_with("__");
+        let is_callable_dunder = is_dunder_lookup
+            && matches!(member.place, Place::Defined(place) if place
+                .provenance.definition().is_some_and(|definition| {
+                    matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                        && inferred_declaration(db, definition).declared().is_some_and(|declared| {
+                            let ty = declared.inner_type();
+                            ty.into_function_like_callable(db, env) != ty
+                        })
+                }));
 
-                return ty
-                    .to_meta_type(db, env)
-                    .class_namespace_member(db, env, class, name, policy);
-            }
+        // Inferred class-body callables, `ClassVar` callables, and concrete callable
+        // dunders behave as descriptors when read through an instance. Dunder lookup uses
+        // the unspecialized declaration so callable-bounded TypeVars and ParamSpecs keep
+        // their full signatures after specialization.
+        if member.is_class_var() || is_callable_dunder
+            || matches!(member.place, Place::Defined(DefinedPlace { origin: TypeOrigin::Inferred, .. }))
+        {
+            member.map_type(|ty| ty.into_function_like_callable(db, env))
+        } else {
+            member
         }
-
-        Self::class_member_with_policy_inner(db, key)
     }
 
     /// Look up attributes stored in the namespace of a class object.
