@@ -3315,7 +3315,7 @@ impl<'src> Parser<'src> {
         // recover well from `*args=(1, 2)`.
         let mut parameters = ast::Parameters::default();
         let parameters_snapshot = self.parameter_scratch.snapshot();
-        let mut args_snapshot = parameters_snapshot;
+        let mut args_snapshot = None;
         let mut kwonlyargs_snapshot = None;
         let mut seen_non_variadic_param = false;
 
@@ -3504,8 +3504,9 @@ impl<'src> Parser<'src> {
                     if !seen_positional_only_separator {
                         // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        args_snapshot = kwonlyargs_snapshot
-                            .unwrap_or_else(|| parser.parameter_scratch.snapshot());
+                        if kwonlyargs_snapshot.is_none() {
+                            args_snapshot = Some(parser.parameter_scratch.snapshot());
+                        }
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3580,8 +3581,14 @@ impl<'src> Parser<'src> {
         if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
             parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
         }
-        parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
-        parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        if let Some(args_snapshot) = args_snapshot {
+            parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else if seen_positional_only_separator {
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else {
+            parameters.args = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        }
 
         parameters.range = self.node_range(start);
 

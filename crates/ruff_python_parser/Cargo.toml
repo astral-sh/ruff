@@ -20,6 +20,7 @@ ruff_text_size = { workspace = true, features = ["get-size"] }
 bitflags = { workspace = true }
 bstr = { workspace = true }
 compact_str = { workspace = true }
+drop_bomb = { workspace = true }
 get-size2 = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
