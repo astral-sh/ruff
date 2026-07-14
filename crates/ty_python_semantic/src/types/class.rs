@@ -1038,6 +1038,22 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(crate) fn materialized_for_relation(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(alias) => {
+                let specialization = alias
+                    .specialization(db)
+                    .materialized_for_relation(db, visitor);
+                Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
+            }
+        }
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
