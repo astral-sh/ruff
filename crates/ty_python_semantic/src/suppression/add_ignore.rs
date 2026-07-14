@@ -8,6 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 
@@ -284,13 +285,15 @@ fn find_existing_suppression(
     source: &str,
     offset: TextSize,
 ) -> Option<ExistingSuppression> {
+    let line_start = source.line_start(offset);
     let existing = suppressions
         .inline_suppressions(TextRange::empty(offset))
         .find(|suppression| {
-            matches!(
-                suppression.target,
-                SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
-            )
+            source.line_start(suppression.comment_range.start()) == line_start
+                && matches!(
+                    suppression.target,
+                    SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
+                )
         })?;
     let comment_text = &source[existing.comment_range];
 

@@ -1105,7 +1105,7 @@ class B(A):
     }
 
     #[test]
-    fn add_ignore_updates_own_line_suppressions() {
+    fn add_ignore_does_not_update_preceding_own_line_suppressions() {
         assert_snapshot!(
             suppress_all_in(r#"
                 seen_code = True
@@ -1127,17 +1127,29 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[unresolved-reference]
-        value = missing
+        # ty: ignore[]
+        value = missing  # ty:ignore[unresolved-reference]
 
         def f(a: int, b: int) -> list[int]: return []
 
-        # ty: ignore[invalid-assignment, invalid-argument-type, unresolved-reference]
+        # ty: ignore[invalid-assignment]
         values: tuple[int] = f(
-            missing,
-            "bad",
+            missing,  # ty:ignore[unresolved-reference]
+            "bad",  # ty:ignore[invalid-argument-type]
         )
         ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:2:1
+          |
+        1 | seen_code = True
+        2 | # ty: ignore[]
+          | ^^^^^^^^^^^^^^
+        3 | value = missing  # ty:ignore[unresolved-reference]
+          |
+        help: Remove the unused suppression comment
         "#
         );
     }
