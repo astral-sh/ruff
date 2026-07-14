@@ -796,7 +796,7 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
 
     let is_inner_comment = is_inner_comment.unwrap_or(false);
     let mut is_blank_or_comment_only = true;
-    let mut seen_nonlogical_newline = false;
+    let mut past_suppression_line = false;
 
     for token in after {
         match token.kind() {
@@ -810,10 +810,10 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
                 // `values = [\n    # ty: ignore\n    value,\n]`: include the next
                 // non-comment physical line.
                 end = token.start();
-                if seen_nonlogical_newline && !is_blank_or_comment_only {
+                if past_suppression_line && !is_blank_or_comment_only {
                     break;
                 }
-                seen_nonlogical_newline = true;
+                past_suppression_line = true;
                 is_blank_or_comment_only = true;
             }
             _ => {
