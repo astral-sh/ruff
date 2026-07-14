@@ -454,6 +454,9 @@ impl<'db> Type<'db> {
 
     /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
     /// constraint-set assignable to `target`.
+    ///
+    /// Recursive relations are evaluated coinductively: a cycle is provisionally satisfied until
+    /// another part of the relation produces a contradiction.
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
@@ -461,7 +464,7 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::default(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(

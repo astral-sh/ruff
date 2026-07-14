@@ -27,6 +27,39 @@ def reduce[T](function: Callable[[T, T], T]) -> T:
 reduce(add)
 ```
 
+## Recursive relations between derived constraints
+
+Validating a derived constraint can require another relation check. If that relation recursively
+reaches the same pair of types, we assume that it holds until we find a contradiction elsewhere in
+the protocol. This lets the check terminate without accepting a protocol that has an incompatible
+non-recursive member.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, cast
+
+class Array(Protocol):
+    def __abs__(self) -> Array: ...
+    def __pos__(self) -> Array: ...
+    def marker(self) -> int: ...
+
+class Concrete[T]:
+    def __abs__[S](self: S) -> S:
+        return self
+
+    def __pos__[S](self: S) -> S:
+        return self
+
+    def marker(self) -> str:
+        return ""
+
+def convert[T](value: Concrete[T]) -> Array:
+    return cast(Array, value)
+
+invalid: Array = Concrete[int]()  # error: [invalid-assignment]
+```
+
 ## Independent nested substitutions can compose
 
 The repeat guard tracks substitution history separately for each derived constraint. This allows two

@@ -5442,10 +5442,13 @@ impl SequentMap {
     ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = builder.constraint_data(post);
-        let when = post_data
-            .bounds
-            .materialized_lower()
-            .when_constraint_set_assignable_to(db, post_data.bounds.materialized_upper(), builder);
+        let when = builder.load(
+            db,
+            &post_data
+                .bounds
+                .materialized_lower()
+                .when_constraint_set_assignable_to_owned(db, post_data.bounds.materialized_upper()),
+        );
         if when.is_never_satisfied(db) {
             self.add_pair_impossibility(db, builder, ante1, ante2);
             return;
@@ -5562,7 +5565,10 @@ impl SequentMap {
             return;
         }
 
-        let when = lower.when_constraint_set_assignable_to(db, upper, builder);
+        let when = builder.load(
+            db,
+            &lower.when_constraint_set_assignable_to_owned(db, upper),
+        );
 
         // If L is _never_ assignable to U, this constraint would violate transitivity, and should
         // never have been added.
