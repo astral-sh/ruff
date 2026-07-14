@@ -997,16 +997,6 @@
             }
           ]
         },
-        "invalid-type-guard-call": {
-          "title": "detects type guard function calls that has no narrowing effect",
-          "description": "## What it does\n\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\n\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeIs\n\n\ndef is_int(value: object = object()) -> TypeIs[int]:\n    return isinstance(value, int)\n\n\n# no positional narrowing target\nis_int()  # error\n\n# narrowing target passed by keyword\nis_int(value=1)  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-type-guard-definition": {
           "title": "detects malformed type guard functions",
           "description": "## What it does\n\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\n\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeIs\n\n\n# no parameter\ndef f() -> TypeIs[int]:  # error\n    return True\n\n\n# no positional arguments allowed\ndef f(*, v: object) -> TypeIs[int]:  # error\n    return True\n\n\n# expected variadic arguments\ndef f(*args: object) -> TypeIs[int]:  # error\n    return True\n\n\nclass C:\n    # only positional argument is `self`\n    def f(self) -> TypeIs[int]:  # error\n        return True\n```",
