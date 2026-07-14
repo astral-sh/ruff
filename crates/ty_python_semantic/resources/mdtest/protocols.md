@@ -5043,7 +5043,7 @@ def _(cls: type[DecoratedMethods]) -> None:
     reveal_type(cls.class_)  # revealed: (value: int) -> str
 ```
 
-`Self` in a class method is bound to the class object being checked.
+`Self` in a class method names the instance constructed by the class object being checked.
 
 ```py
 class SelfFactory(Protocol):
@@ -5140,6 +5140,115 @@ class HiddenMethod(metaclass=HidingMeta):
         return b"foo"
 
 static_assert(not is_assignable_to(TypeOf[HiddenMethod], type[Foo]))
+```
+
+## Meta-protocols satisfying instance-method protocols
+
+A value of type `type[P]` is itself a class object, so it can satisfy another protocol through its
+directly accessible methods. An ordinary method on `P` remains unbound when accessed through
+`type[P]`, while class and static methods are bound. Generic specialization and overloads are
+preserved in either case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Iterable, Iterator, Protocol, Self, overload
+
+class BoundMethod(Protocol):
+    def method(self, value: int) -> str: ...
+
+class InstanceMethodSource(Protocol):
+    def method(self, value: int) -> str: ...
+
+class UnboundMethod(Protocol):
+    def method(self, instance: InstanceMethodSource, /, value: int) -> str: ...
+
+class StaticMethodSource(Protocol):
+    @staticmethod
+    def method(value: int) -> str: ...
+
+class ClassMethodSource(Protocol):
+    @classmethod
+    def method(cls, value: int) -> str: ...
+
+def _(
+    instance_source: type[InstanceMethodSource],
+    static_source: type[StaticMethodSource],
+    class_source: type[ClassMethodSource],
+) -> None:
+    reveal_type(instance_source.method)  # revealed: (self, /, value: int) -> str
+    unbound: UnboundMethod = instance_source
+    bound: BoundMethod = instance_source  # error: [invalid-assignment]
+    reveal_type(static_source.method)  # revealed: (value: int) -> str
+    static_bound: BoundMethod = static_source
+    reveal_type(class_source.method)  # revealed: (value: int) -> str
+    class_bound: BoundMethod = class_source
+
+class GenericBoundMethod[T](Protocol):
+    def method(self, value: T) -> T: ...
+
+class GenericStaticMethodSource[T](Protocol):
+    @staticmethod
+    def method(value: T) -> T: ...
+
+def _(source: type[GenericStaticMethodSource[int]]) -> None:
+    reveal_type(source.method)  # revealed: (value: int) -> int
+    good: GenericBoundMethod[int] = source
+    bad: GenericBoundMethod[str] = source  # error: [invalid-assignment]
+
+class OverloadedBoundMethod(Protocol):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+
+class OverloadedStaticMethodSource(Protocol):
+    @overload
+    @staticmethod
+    def method(value: int) -> int: ...
+    @overload
+    @staticmethod
+    def method(value: str) -> str: ...
+
+def _(source: type[OverloadedStaticMethodSource]) -> None:
+    reveal_type(source.method)  # revealed: Overload[(value: int) -> int, (value: str) -> str]
+    overloaded: OverloadedBoundMethod = source
+
+class Copier(Protocol):
+    def copy(self) -> Self: ...
+
+class InstanceFactory(Protocol):
+    @classmethod
+    def copy(cls) -> Self: ...
+
+class ClassObjectFactory(Protocol):
+    @classmethod
+    def copy(cls) -> type[Self]: ...
+
+def _(instance_factory: type[InstanceFactory], class_object_factory: type[ClassObjectFactory]) -> None:
+    reveal_type(instance_factory.copy)  # revealed: () -> InstanceFactory
+    bad: Copier = instance_factory  # error: [invalid-assignment]
+    reveal_type(class_object_factory.copy)  # revealed: () -> type[ClassObjectFactory]
+    good: Copier = class_object_factory
+
+class IterableSource(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+class CustomSource(Protocol):
+    @classmethod
+    def __custom__(cls, value: int) -> str: ...
+
+class CustomConsumer(Protocol):
+    def __custom__(self, value: int) -> str: ...
+
+def _(iterable_source: type[IterableSource], custom_source: type[CustomSource]) -> None:
+    reveal_type(iterable_source.__iter__)  # revealed: (self, /) -> Iterator[int]
+    iterable: Iterable[int] = iterable_source  # error: [invalid-assignment]
+    reveal_type(custom_source.__custom__)  # revealed: (value: int) -> str
+    custom: CustomConsumer = custom_source
 ```
 
 ## Generic meta-protocols
