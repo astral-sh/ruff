@@ -86,7 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
-use std::cell::{Ref, RefCell};
+use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::iter;
@@ -95,7 +95,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use indexmap::map::Entry;
-use itertools::{EitherOrBoth, Itertools};
+use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -106,7 +106,8 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -830,6 +831,9 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
+    /// the many shallow bounds that are cheap to walk once.
+    constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache.
@@ -1172,6 +1176,52 @@ impl<'db> ConstraintSetBuilder<'db> {
         storage.constraints[constraint]
     }
 
+    fn cached_constraint_bound_depth(
+        &self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+    ) -> (u16, u16) {
+        if let Some(depth) = self
+            .storage
+            .borrow()
+            .constraint_bound_depth_cache
+            .get(&constraint)
+        {
+            return *depth;
+        }
+
+        let depth = self.constraint_data(constraint).bound_depth(db);
+        self.storage
+            .borrow_mut()
+            .constraint_bound_depth_cache
+            .insert(constraint, depth);
+        depth
+    }
+
+    /// Returns how much sequent fuel is needed to derive this constraint.
+    ///
+    /// This cost is driven by two factors.
+    ///
+    /// First, nested types containing typevars can produce increasingly complex families of
+    /// derived constraints. Charge more fuel for those constraints so that each additional level
+    /// of typevar depth shortens the remaining derivation chain.
+    ///
+    /// Second, even without considering typevars, the lower and upper bounds can become more
+    /// structurally complex. We consider a type to be more complex if it has deeper nesting of
+    /// type constructors. Each sequent is charged the _increase_ in that complexity between its
+    /// antecedents and its consequent. (Measuring growth rather than absolute depth avoids
+    /// penalizing a complex concrete bound that is merely propagated unchanged.)
+    fn sequent_fuel_cost(
+        &self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+        antecedent_constructor_depth: u16,
+    ) -> u16 {
+        let (constructor_depth, typevar_depth) = self.cached_constraint_bound_depth(db, constraint);
+        let constructor_growth = constructor_depth.saturating_sub(antecedent_constructor_depth);
+        typevar_depth.max(constructor_growth).saturating_add(1)
+    }
+
     fn cached_constraint_implies(
         &self,
         db: &'db dyn Db,
@@ -1267,94 +1317,6 @@ pub struct TypeVarId;
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ConstraintId;
-
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
-enum NestedSubstitutionSide {
-    Lower,
-    Upper,
-}
-
-/// Identifies one nested-typevar substitution shape.
-///
-/// We key this by the typevar of the constrained constraint (which stays the same across an
-/// entire chain of derivations against a single root constraint), the typevar that we substitute
-/// _for_, and the side. Each derived path assignment records the substitution shapes in its own
-/// derivation history. This lets independent derivations apply the same substitution while
-/// preventing one derivation chain from repeatedly unfolding the same recursive pattern.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
-struct NestedSubstitution {
-    constrained_typevar: TypeVarId,
-    substituted_typevar: TypeVarId,
-    side: NestedSubstitutionSide,
-}
-
-/// The nested substitution shapes used to derive one path assignment.
-///
-/// The substitutions are kept sorted so that histories with the same substitutions compare and
-/// hash equally regardless of the order in which the antecedents were combined.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-struct NestedSubstitutionHistory(SmallVec<[NestedSubstitution; 4]>);
-
-impl NestedSubstitutionHistory {
-    /// Merges two derivation histories and records `nested_substitution`. Returns `None` if either
-    /// history has already applied that substitution.
-    fn merged(
-        &self,
-        other: &Self,
-        nested_substitution: Option<NestedSubstitution>,
-    ) -> Option<Self> {
-        if let Some(substitution) = nested_substitution
-            && (self.contains(substitution) || other.contains(substitution))
-        {
-            return None;
-        }
-
-        Some(Self(
-            self.0
-                .iter()
-                .merge(other.0.iter())
-                .merge(nested_substitution.iter())
-                .dedup()
-                .copied()
-                .collect(),
-        ))
-    }
-
-    fn contains(&self, substitution: NestedSubstitution) -> bool {
-        self.0.binary_search(&substitution).is_ok()
-    }
-
-    fn is_subset_of(&self, other: &Self) -> bool {
-        self.0.len() <= other.0.len()
-            && self
-                .0
-                .iter()
-                .merge_join_by(other.0.iter(), Ord::cmp)
-                .all(|item| !matches!(item, EitherOrBoth::Left(_)))
-    }
-}
-
-/// A constraint derived from the sequent map, optionally annotated with the nested substitution
-/// step that produced it.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-struct DerivedConstraint {
-    constraint: ConstraintId,
-    nested_substitution: Option<NestedSubstitution>,
-}
-
-fn nested_substitution<'db>(
-    db: &'db dyn Db,
-    builder: &ConstraintSetBuilder<'db>,
-    constrained_typevar: BoundTypeVarInstance<'db>,
-    substituted_typevar: BoundTypeVarInstance<'db>,
-    side: NestedSubstitutionSide,
-) -> NestedSubstitution {
-    NestedSubstitution {
-        constrained_typevar: builder.typevar_id(db, constrained_typevar),
-        substituted_typevar: builder.typevar_id(db, substituted_typevar),
-        side,
-    }
-}
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
@@ -1565,7 +1527,101 @@ impl ConstraintId {
     }
 }
 
+/// Returns the maximum constructor depth of `ty` and the maximum nesting depth of any typevar that
+/// it contains.
+///
+/// Atomic types and bare typevars have constructor depth zero. The typevar depth is `0` if `ty`
+/// does not contain any typevars.
+fn max_constructor_and_typevar_depth<'db>(db: &'db dyn Db, ty: Type<'db>) -> (u16, u16) {
+    fn max_constructor_and_typevar_depth_impl<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        _dummy: (),
+    ) -> (u16, u16) {
+        struct TypeDepthVisitor<'db> {
+            active: RefCell<FxHashSet<Type<'db>>>,
+            current_depth: Cell<u16>,
+            max_constructor_depth: Cell<u16>,
+            max_typevar_depth: Cell<u16>,
+        }
+
+        impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if ty.is_type_var() {
+                    self.max_typevar_depth
+                        .set(self.max_typevar_depth.get().max(self.current_depth.get()));
+                    return;
+                }
+
+                let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
+                    return;
+                };
+                if !self.active.borrow_mut().insert(ty) {
+                    return;
+                }
+
+                let current_depth = self.current_depth.get();
+                let nested_depth = current_depth.saturating_add(1);
+                self.current_depth.set(nested_depth);
+                self.max_constructor_depth
+                    .set(self.max_constructor_depth.get().max(nested_depth));
+                walk_non_atomic_type(db, non_atomic, self);
+                self.current_depth.set(current_depth);
+                self.active.borrow_mut().remove(&ty);
+            }
+        }
+
+        let visitor = TypeDepthVisitor {
+            active: RefCell::default(),
+            current_depth: Cell::default(),
+            max_constructor_depth: Cell::default(),
+            max_typevar_depth: Cell::default(),
+        };
+        visitor.visit_type(db, ty);
+        (
+            visitor.max_constructor_depth.get(),
+            visitor.max_typevar_depth.get(),
+        )
+    }
+
+    max_constructor_and_typevar_depth_impl(db, ty, ())
+}
+
 impl<'db> Constraint<'db> {
+    fn bound_depth(self, db: &'db dyn Db) -> (u16, u16) {
+        let both_bounds = iter::chain(self.bounds.lower, self.bounds.upper);
+        both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
+            let (bound_constructor_depth, bound_typevar_depth) =
+                max_constructor_and_typevar_depth(db, bound);
+            (
+                constructor_depth.max(bound_constructor_depth),
+                typevar_depth.max(bound_typevar_depth),
+            )
+        })
+    }
+
+    /// Returns whether this constraint is produced by dropping exactly one bound from
+    /// `antecedent`, without changing its typevar or retained bound.
+    fn is_bound_projection_of(self, db: &'db dyn Db, antecedent: Self) -> bool {
+        if !self.typevar.is_same_typevar_as(db, antecedent.typevar) {
+            return false;
+        }
+
+        let keeps_lower = self.bounds.lower.is_some()
+            && self.bounds.lower == antecedent.bounds.lower
+            && self.bounds.upper.is_none()
+            && antecedent.bounds.upper.is_some();
+        let keeps_upper = self.bounds.upper.is_some()
+            && self.bounds.upper == antecedent.bounds.upper
+            && self.bounds.lower.is_none()
+            && antecedent.bounds.lower.is_some();
+        keeps_lower || keeps_upper
+    }
+
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -5239,7 +5295,7 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<DerivedConstraint>>,
+    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
     /// Sequents of the form `C → D`
     single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
 }
@@ -5384,18 +5440,6 @@ impl SequentMap {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
-        self.add_pair_implication_with_provenance(db, builder, ante1, ante2, post, None);
-    }
-
-    fn add_pair_implication_with_provenance<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-        post: ConstraintId,
-        nested_substitution: Option<NestedSubstitution>,
-    ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = builder.constraint_data(post);
         let when = post_data
@@ -5411,15 +5455,11 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
-        let derived = DerivedConstraint {
-            constraint: post,
-            nested_substitution,
-        };
         if self
             .pair_implications
             .entry(Self::pair_key(ante1, ante2))
             .or_default()
-            .insert(derived)
+            .insert(post)
         {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
@@ -5948,19 +5988,12 @@ impl SequentMap {
                             constrained_data.bounds.lower,
                             Some(new_upper),
                         );
-                        self.add_pair_implication_with_provenance(
+                        self.add_pair_implication(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
-                            Some(nested_substitution(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                bound_typevar,
-                                NestedSubstitutionSide::Upper,
-                            )),
                         );
                     }
                 }
@@ -6016,19 +6049,12 @@ impl SequentMap {
                             Some(new_lower),
                             constrained_data.bounds.upper,
                         );
-                        self.add_pair_implication_with_provenance(
+                        self.add_pair_implication(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
-                            Some(nested_substitution(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                bound_typevar,
-                                NestedSubstitutionSide::Lower,
-                            )),
                         );
                     }
                 }
@@ -6116,19 +6142,12 @@ impl SequentMap {
                                 constrained_data.bounds.lower,
                                 Some(new_upper),
                             );
-                            self.add_pair_implication_with_provenance(
+                            self.add_pair_implication(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
-                                Some(nested_substitution(
-                                    db,
-                                    builder,
-                                    constrained_typevar,
-                                    nested_typevar,
-                                    NestedSubstitutionSide::Upper,
-                                )),
                             );
                         }
                     }
@@ -6161,19 +6180,12 @@ impl SequentMap {
                                 Some(new_lower),
                                 constrained_data.bounds.upper,
                             );
-                            self.add_pair_implication_with_provenance(
+                            self.add_pair_implication(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
-                                Some(nested_substitution(
-                                    db,
-                                    builder,
-                                    constrained_typevar,
-                                    nested_typevar,
-                                    NestedSubstitutionSide::Lower,
-                                )),
                             );
                         }
                     }
@@ -6425,7 +6437,7 @@ impl SequentMap {
                             "{} ∧ {} → {}",
                             ante1.display(self.db, self.builder),
                             ante2.display(self.db, self.builder),
-                            post.constraint.display(self.db, self.builder),
+                            post.display(self.db, self.builder),
                         )?;
                     }
                 }
@@ -6460,17 +6472,42 @@ impl SequentMap {
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
+///
+/// An important part of this traversal is that not all of those constraints come directly from the
+/// BDD, since constraints are not independent. In particular, there can be "implications", which
+/// record e.g. when two constraints both being true imply another:
+/// `A ≤ list[B] ∧ B ≤ int → A ≤ list[int]`. If we see `A ≤ list[B]` and `B ≤ int` in a BDD path,
+/// we can _assume_ that `A ≤ list[int]` also holds, even if it doesn't actually appear in the BDD.
+///
+/// Unfortunately, there are certain implications that are technically true, but not helpful;
+/// for instance, because they cause us to endlessly expand a constraint by substituting a bound
+/// into itself.
+///
+/// We use a "fuel" mechanism to prevent these kinds of situations, without having to play
+/// whack-a-mole to implement detection patterns for all of the pathological patterns. Each
+/// derived constraint costs at least one unit of fuel. Nested typevars increase that cost according
+/// to their depth, as does any constructor depth introduced relative to the antecedents. Measuring
+/// structural growth instead of absolute depth ensures that propagating an existing complex
+/// concrete bound remains cheap, while repeatedly wrapping that bound continues to consume path
+/// fuel after no nested typevars remain.
+///
+/// We track this fuel in two ways: First, there is a global limit on the total amount of work we
+/// are willing to do for a particular BDD path traversal. Second, there is a more focused
+/// "per-path" limit, which records how far removed a derived constraint is from a constraint that
+/// actually appears in the BDD. If either of those limits are exceeded, we ignore the derived
+/// constraint that we are currently considering.
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     map: SequentMap,
-    /// Each assignment's source order and the first nested-substitution history that produced it.
-    /// (Most assignments have exactly one history, and so we save space and iteration overhead by
-    /// storing the first history here.)
-    assignments: FxIndexMap<ConstraintAssignment, (usize, NestedSubstitutionHistory)>,
-    /// Additional histories that can produce an assignment, keyed by its index in `assignments`.
-    /// These are stored separately so that branch-local additions can be rolled back by truncating
-    /// the set.
-    additional_substitution_histories: FxIndexSet<(usize, NestedSubstitutionHistory)>,
+    /// Each assignment's source order and the first per-path fuel value with which it was derived.
+    assignments: FxIndexMap<ConstraintAssignment, (usize, u16)>,
+    /// Additional per-path fuel values that can derive an assignment, keyed by its index in
+    /// `assignments`. These are stored separately so that branch-local additions can be rolled
+    /// back by truncating the set. Only the greatest fuel value participates in further
+    /// derivation.
+    additional_fuels: FxIndexSet<(usize, u16)>,
+    /// The amount of global fuel that remains across all assignments and paths.
+    remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -6479,6 +6516,10 @@ pub(crate) struct PathAssignments {
 
 impl PathAssignments {
     fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
+        /// The total amount of fuel that we are willing to spend for this path traversal. This was
+        /// chosen empirically, to balance performance with accurate ecosystem diagnostics.
+        const OVERALL_FUEL_BUDGET: u16 = 256;
+
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
@@ -6486,8 +6527,9 @@ impl PathAssignments {
         Self {
             map: SequentMap::default(),
             assignments: FxIndexMap::default(),
-            additional_substitution_histories: FxIndexSet::default(),
+            additional_fuels: FxIndexSet::default(),
             discovered,
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
         }
     }
 
@@ -6521,11 +6563,17 @@ impl PathAssignments {
         source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
+        /// The maximum number of "trips through the sequent map" that we are willing to take for a
+        /// derived constraint. This records how far removed we are from a constraint that comes
+        /// directly from the BDD.
+        const PATH_FUEL_BUDGET: u16 = 8;
+
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let additional_histories_start = self.additional_substitution_histories.len();
+        let additional_fuels_start = self.additional_fuels.len();
+        let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -6544,8 +6592,8 @@ impl PathAssignments {
             builder,
             assignment,
             source_order,
-            false,
-            NestedSubstitutionHistory::default(),
+            None,
+            PATH_FUEL_BUDGET,
         );
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
@@ -6574,8 +6622,8 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
-        self.additional_substitution_histories
-            .truncate(additional_histories_start);
+        self.additional_fuels.truncate(additional_fuels_start);
+        self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
 
@@ -6598,25 +6646,16 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
-    /// If `assignment` holds on this path, returns an iterator of its substitution histories.
-    /// Otherwise returns `None`.
-    fn histories_for(
-        &self,
-        assignment: ConstraintAssignment,
-    ) -> Option<impl Iterator<Item = &NestedSubstitutionHistory> + Clone> {
-        // This is complicated by the fact that we store each assignment's first history inline in
-        // the `assignments` field, and the others in `additional_substitution_histories`; and
-        // moreover that `additional_substitution_histories` interleaves histories from all
-        // assignments on this path. Assignments will typically have a single history, so it
-        // should™ be fine that we're scanning and filtering that entire list.
-        let (index, _, (_, history)) = self.assignments.get_full(&assignment)?;
-        let first = iter::once(history);
-        let rest = self
-            .additional_substitution_histories
+    /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
+    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
+        let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
+        let max_fuel = self
+            .additional_fuels
             .iter()
-            .filter(move |(history_index, _)| *history_index == index)
-            .map(|(_, history)| history);
-        Some(iter::chain(first, rest))
+            .filter(|(fuel_index, _)| *fuel_index == index)
+            .map(|(_, fuel)| *fuel)
+            .fold(*first_fuel, u16::max);
+        Some(max_fuel)
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -6656,8 +6695,8 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
-        derived: bool,
-        history: NestedSubstitutionHistory,
+        derived_fuel_cost: Option<u16>,
+        path_fuel: u16,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6671,7 +6710,8 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment, (source_order, history));
+            self.assignments
+                .insert(assignment, (source_order, path_fuel));
             return Ok(());
         }
 
@@ -6693,35 +6733,53 @@ impl PathAssignments {
 
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => {
-                entry.insert((source_order, history));
+                if let Some(fuel_cost) = derived_fuel_cost {
+                    self.remaining_overall_fuel =
+                        match self.remaining_overall_fuel.checked_sub(fuel_cost) {
+                            Some(updated_fuel) => updated_fuel,
+                            None => return Ok(()),
+                        };
+                }
+                entry.insert((source_order, path_fuel));
             }
+
             Entry::Occupied(mut entry) => {
                 let index = entry.index();
-                let (existing_source_order, existing_history) = entry.get_mut();
+                let (existing_source_order, existing_fuel) = entry.get_mut();
 
                 // If a constraint appears both as an "origin" constraint (it actually appears in
                 // the BDD structure) and as a "derived" constraint (we infer it from other
                 // constraints), we should prefer the origin source_order, regardless of which
                 // order we encounter the various constraints in the BDD.
-                if !derived {
+                if derived_fuel_cost.is_none() {
                     *existing_source_order = source_order;
                 }
 
-                // A smaller history blocks fewer future substitutions, so it preserves every
-                // derivation available from a larger history. If an existing history is a subset
-                // of this one, this one is redundant and does not need to be processed.
-                if existing_history.is_subset_of(&history)
-                    || self.additional_substitution_histories.iter().any(
-                        |(history_index, existing_history)| {
-                            *history_index == index && existing_history.is_subset_of(&history)
-                        },
-                    )
-                    || !self
-                        .additional_substitution_histories
-                        .insert((index, history))
+                // We've already seen this assignment, and in theory have already queried the
+                // sequent map for its consequents, which should let us return early.
+                //
+                // However, a new derivation chain can replenish the fuel for this assignment,
+                // giving it more chances to participate in multi-step sequent chains. That means
+                // there might be some consequents that were skipped previously due to a lack of
+                // fuel, that can be added now because of the replinished fuel budget.
+
+                // There is another derivation of this assignment that already provides at least as
+                // much fuel as this constraint. That means replenishing the fuel won't have any
+                // effect.
+                if *existing_fuel >= path_fuel
+                    || self
+                        .additional_fuels
+                        .iter()
+                        .any(|(fuel_index, existing_fuel)| {
+                            *fuel_index == index && *existing_fuel >= path_fuel
+                        })
                 {
                     return Ok(());
                 }
+
+                // Record the replenished fuel separately so that `walk_edge` can restore the
+                // parent branch by truncating `additional_fuels`.
+                self.additional_fuels.insert((index, path_fuel));
             }
         }
 
@@ -6787,54 +6845,66 @@ impl PathAssignments {
             }
         }
 
-        let mut new_constraints = FxIndexSet::default();
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
-            let Some(histories1) = self.histories_for(ante1.when_true()) else {
-                continue;
-            };
-            let Some(histories2) = self.histories_for(ante2.when_true()) else {
-                continue;
-            };
+        let mut new_constraints: FxIndexMap<ConstraintId, (u16, u16)> = FxIndexMap::default();
+        let mut add_new_constraint = |constraint, available_fuel: u16, fuel_cost: u16| {
+            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+                let new_fuel = (post_fuel, fuel_cost);
+                new_constraints
+                    .entry(constraint)
+                    .and_modify(|existing_fuel| {
+                        *existing_fuel = std::cmp::max_by_key(
+                            *existing_fuel,
+                            new_fuel,
+                            |&(post_fuel, fuel_cost)| (post_fuel, std::cmp::Reverse(fuel_cost)),
+                        );
+                    })
+                    .or_insert(new_fuel);
+            }
+        };
 
+        for ((ante1, ante2), posts) in &self.map.pair_implications {
+            let Some(ante1_fuel) = self.fuel_for(ante1.when_true()) else {
+                continue;
+            };
+            let Some(ante2_fuel) = self.fuel_for(ante2.when_true()) else {
+                continue;
+            };
+            let available_fuel = ante1_fuel.min(ante2_fuel);
+            let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante1);
+            let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante2);
+            let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
             for post in posts {
-                // The number of histories can grow combinatorially because we consider every pair
-                // of antecedent histories. `add_assignment` partially prunes this growth by
-                // discarding a new history if an existing history for the same assignment is its
-                // subset. We do not yet remove existing histories that are supersets of a new
-                // history, because those removals would have to be restored when we backtrack out
-                // of the current BDD branch.
-                //
-                // TODO: Retain only subset-minimal histories for each assignment by adding support
-                // for rolling back histories removed by dominance pruning.
-                for history1 in histories1.clone() {
-                    for history2 in histories2.clone() {
-                        if let Some(history) = history1.merged(history2, post.nested_substitution) {
-                            new_constraints.insert((post.constraint, history));
-                        }
-                    }
-                }
+                let fuel_cost = builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth);
+                add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
 
         for (ante, posts) in &self.map.single_implications {
-            let Some(histories) = self.histories_for(ante.when_true()) else {
+            let Some(available_fuel) = self.fuel_for(ante.when_true()) else {
                 continue;
             };
+            let ante_data = builder.constraint_data(*ante);
+            let (antecedent_constructor_depth, _) =
+                builder.cached_constraint_bound_depth(db, *ante);
             for post in posts {
-                for history in histories.clone() {
-                    new_constraints.insert((*post, history.clone()));
-                }
+                let post_data = builder.constraint_data(*post);
+                let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+                    1
+                } else {
+                    builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth)
+                };
+                add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
 
-        for (new_constraint, history) in new_constraints {
+        for (new_constraint, (available_fuel, fuel_cost)) in new_constraints {
             self.add_assignment(
                 db,
                 builder,
                 new_constraint.when_true(),
                 source_order,
-                true,
-                history,
+                Some(fuel_cost),
+                available_fuel,
             )?;
         }
 
