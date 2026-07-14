@@ -263,6 +263,25 @@ def _(x: int | None, outer: bool, inner: bool) -> None:
     reveal_type(x)  # revealed: None | int
 ```
 
+If every nested branch contains a call, their combined call constraint must be preserved:
+
+```py
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        if inner:
+            fail_nested_merge()
+        else:
+            fail_nested_merge()
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+```
+
 And for elif branches:
 
 ```py

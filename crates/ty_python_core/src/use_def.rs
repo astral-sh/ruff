@@ -1563,6 +1563,36 @@ impl PendingReachability {
         constraint
     }
 
+    /// Combines the call narrowing gates after `ancestor` through `target` into one constraint.
+    ///
+    /// `ancestor` must be an ancestor of `target`.
+    fn narrowing_constraint_between(
+        &self,
+        ancestor: PendingReachabilityId,
+        target: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) -> ScopedNarrowingConstraint {
+        let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+        let mut current = target;
+        while current != ancestor {
+            let event = &self.constraints[current];
+            if event.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                unapplied.push(event.narrowing_constraint);
+            }
+            assert_ne!(
+                current, event.parent,
+                "pending narrowing must be an ancestor"
+            );
+            current = event.parent;
+        }
+
+        let mut constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
+        for pending in unapplied.into_iter().rev() {
+            constraint = narrowing_constraints.add_and_constraint(constraint, pending);
+        }
+        constraint
+    }
+
     /// Returns the lowest common ancestor of two nodes in the pending-constraint tree.
     fn common_ancestor(
         &self,
@@ -1625,6 +1655,12 @@ impl PendingReachability {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
         let branch_ancestor = self.common_ancestor(self.current, branch);
+        let current_narrowing =
+            self.narrowing_constraint_between(branch_ancestor, self.current, narrowing_constraints);
+        let branch_narrowing =
+            self.narrowing_constraint_between(branch_ancestor, branch, narrowing_constraints);
+        let merged_narrowing =
+            narrowing_constraints.add_or_constraint(current_narrowing, branch_narrowing);
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
@@ -1653,9 +1689,14 @@ impl PendingReachability {
                     continue;
                 }
 
-                // Preserve call gates that precede the branch while discarding gates introduced
-                // inside either branch, which cannot be correlated with later narrowing.
+                // Preserve call gates that precede the branch, then merge gates introduced on the
+                // individual branch paths. If either path has no gate, the merged gate simplifies
+                // to `ALWAYS_TRUE` and can be discarded.
                 self.materialize_narrowing(current, branch_ancestor, narrowing_constraints);
+                if merged_narrowing != ScopedNarrowingConstraint::ALWAYS_TRUE {
+                    Rc::make_mut(&mut current.state)
+                        .record_narrowing_constraint(narrowing_constraints, merged_narrowing);
+                }
 
                 let current_constraint = self.constraint_between(
                     current.reachability,
