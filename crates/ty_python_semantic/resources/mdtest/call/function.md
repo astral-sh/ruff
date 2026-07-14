@@ -151,7 +151,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any
+from typing import Any, Callable
 from ty_extensions import Unknown
 
 def g[T](x: tuple[T]) -> T:
@@ -169,13 +169,23 @@ def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
 def g_union[T, U](x: tuple[T | U]) -> tuple[T, U]:
     raise NotImplementedError
 
-def _(x: Any):
+def consume[T](callback: Callable[[T], int], value: T) -> T:
+    return value
+
+def produce[T](callback: Callable[[], T], fallback: T) -> T:
+    return fallback
+
+def _(x: Any, callback: Any):
     reveal_type(g(x))  # revealed: Any
     reveal_type(f(g(x)))  # revealed: Any
     reveal_type(f_tuple(g(x)))  # revealed: Any
     # Gradual evidence combines with other argument-derived constraints.
     reveal_type(g_with_fallback(x, 1))  # revealed: Any | Literal[1]
     reveal_type(g_union(x))  # revealed: tuple[Any, Any]
+    # A gradual callable provides an upper bound for a type variable that only occurs in its
+    # parameter types, but a lower bound for a type variable in its return type.
+    reveal_type(consume(callback, 1))  # revealed: Literal[1]
+    reveal_type(produce(callback, 1))  # revealed: Any | Literal[1]
 
 def _(x: Unknown):
     reveal_type(g(x))  # revealed: Unknown
@@ -183,6 +193,10 @@ def _(x: Unknown):
     reveal_type(f_tuple(g(x)))  # revealed: Unknown
     reveal_type(g_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
     reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+
+def _(callback: Unknown):
+    reveal_type(consume(callback, 1))  # revealed: Literal[1]
+    reveal_type(produce(callback, 1))  # revealed: Unknown | Literal[1]
 ```
 
 ## Decorated

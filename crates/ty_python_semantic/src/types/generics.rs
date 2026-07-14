@@ -1536,6 +1536,46 @@ impl<'db> Specialization<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// A gradual type is assignable to every target regardless of its type arguments, so these
+    /// bounds are inference evidence rather than logical consequences of assignability. The
+    /// direction of each bound follows the variance of the type variable in the target.
+    pub(super) fn distribute_gradual_constraints(
+        &self,
+        db: &'db dyn Db,
+        gradual: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let mut variances: FxIndexMap<BoundTypeVarInstance<'db>, TypeVarVariance> =
+            FxIndexMap::default();
+        target.visit_specialization(db, |ty, variance| {
+            let Type::TypeVar(typevar) = ty else {
+                return;
+            };
+            variances
+                .entry(typevar)
+                .and_modify(|current| *current = current.join(variance))
+                .or_insert(variance);
+        });
+
+        variances
+            .into_iter()
+            .when_all(db, self.constraints, |(typevar, variance)| {
+                let (lower, upper) = match variance {
+                    TypeVarVariance::Covariant => (Some(gradual), None),
+                    TypeVarVariance::Contravariant => (None, Some(gradual)),
+                    TypeVarVariance::Invariant => (Some(gradual), Some(gradual)),
+                    TypeVarVariance::Bivariant => return self.always(),
+                };
+                ConstraintSet::constrain_typevar_with_bounds(
+                    db,
+                    self.constraints,
+                    typevar,
+                    lower,
+                    upper,
+                )
+            })
+    }
+
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,

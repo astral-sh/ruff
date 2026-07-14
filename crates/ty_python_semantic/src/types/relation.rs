@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
@@ -16,16 +15,14 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
-    UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db, FxOrderSet,
+    Db,
     types::{
         ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
         generics::InferableTypeVars,
@@ -905,52 +902,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
-    }
-
-    /// A gradual type is assignable to every target regardless of its type arguments, so these
-    /// bounds are inference evidence rather than logical consequences of assignability.
-    fn distribute_gradual_constraints(
-        &self,
-        db: &'db dyn Db,
-        gradual: Type<'db>,
-        target: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        struct CollectTypeVars<'db> {
-            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                _db: &'db dyn Db,
-                typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars.borrow_mut().insert(typevar);
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        let visitor = CollectTypeVars {
-            typevars: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
-        };
-        visitor.visit_type(db, target);
-
-        visitor
-            .typevars
-            .into_inner()
-            .into_iter()
-            .when_all(db, self.constraints, |typevar| {
-                ConstraintSet::constrain_typevar_lower_bound(db, self.constraints, typevar, gradual)
-            })
     }
 
     pub(super) fn never(&self) -> ConstraintSet<'db, 'c> {
