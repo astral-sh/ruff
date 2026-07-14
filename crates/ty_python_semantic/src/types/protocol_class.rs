@@ -384,7 +384,8 @@ impl<'db> ProtocolInterface<'db> {
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
     ///
     /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
-    /// Properties retain normal class-object lookup behavior through the protocol origin.
+    /// Properties are only required on the constructed instance, so they are undefined even when
+    /// the nominal protocol origin provides a property descriptor.
     pub(super) fn meta_member(
         self,
         db: &'db dyn Db,
@@ -1101,7 +1102,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 
     fn meta_access(&self, db: &'db dyn Db) -> Option<ProtocolMemberAccess<'db>> {
-        if self.is_property() || self.has_todo_type() {
+        if self.has_todo_type() {
             return None;
         }
         Some(self.capabilities(db).class)

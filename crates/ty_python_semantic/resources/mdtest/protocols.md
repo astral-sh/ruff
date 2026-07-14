@@ -4803,8 +4803,8 @@ class BadFactory(Baz, metaclass=BadFactoryMeta): ...
 static_assert(not is_assignable_to(TypeOf[BadFactory], type[Foo]))
 ```
 
-A property is required on the constructed instance, but not on the class object itself. Looking up
-the property on `type[PropertyProtocol]` follows normal class lookup.
+A property declaration requires a readable attribute on the constructed instance, but does not
+guarantee that the attribute exists on the class object.
 
 ```py
 class PropertyProtocol(Protocol):
@@ -4812,14 +4812,13 @@ class PropertyProtocol(Protocol):
     def value(self) -> int: ...
 
 class PropertyImpl:
-    @property
-    def value(self) -> int:
-        return 1
+    def __init__(self) -> None:
+        self.value = 1
 
 static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
 
 def _(cls: type[PropertyProtocol]) -> None:
-    reveal_type(cls.value)  # revealed: property
+    cls.value  # error: [unresolved-attribute]
 ```
 
 Even when construction returns a `Foo`, the class object itself must provide the required class
