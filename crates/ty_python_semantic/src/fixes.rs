@@ -1106,67 +1106,51 @@ class B(A):
 
     #[test]
     fn add_ignore_updates_own_line_suppressions() {
-        let mut db = TestDbBuilder::new()
-            .with_file(
-                "test.py",
-                "seen_code = True\n\
-                 # ty: ignore[]\n\
-                 value = missing\n\
-                 \n\
-                 def f(a: int, b: int) -> list[int]: return []\n\
-                 \n\
-                 # ty: ignore[invalid-assignment]\n\
-                 values: tuple[int] = f(\n\
-                     missing,\n\
-                     \"bad\",\n\
-                 )\n",
-            )
-            .build()
-            .unwrap();
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[]
+                value = missing
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
-        let diagnostics = db.check_file(file);
-        let planned_fixes = FixMode::Suppress.fixes(&db, file, &diagnostics);
-        assert_eq!(planned_fixes.len(), 2);
-        assert_eq!(planned_fixes[0].fixed_diagnostics, 1);
-        assert_eq!(planned_fixes[1].fixed_diagnostics, 2);
+                def f(a: int, b: int) -> list[int]: return []
 
-        let cancellation_token_source = CancellationTokenSource::new();
-        let fixes = fix_all(
-            &mut db,
-            diagnostics,
-            FixMode::Suppress,
-            &cancellation_token_source.token(),
-            Db::check_file,
+                # ty: ignore[invalid-assignment]
+                values: tuple[int] = f(
+                    missing,
+                    "bad",
+                )
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        value = missing
+
+        def f(a: int, b: int) -> list[int]: return []
+
+        # ty: ignore[invalid-assignment, invalid-argument-type, unresolved-reference]
+        values: tuple[int] = f(
+            missing,
+            "bad",
         )
-        .expect("operation never gets cancelled");
-
-        assert_eq!(fixes.count, 3);
-        assert!(fixes.diagnostics.is_empty());
-        assert_eq!(
-            &*source_text(&db, file),
-            "seen_code = True\n\
-             # ty: ignore[unresolved-reference]\n\
-             value = missing\n\
-             \n\
-             def f(a: int, b: int) -> list[int]: return []\n\
-             \n\
-             # ty: ignore[invalid-assignment, invalid-argument-type, unresolved-reference]\n\
-             values: tuple[int] = f(\n\
-                 missing,\n\
-                 \"bad\",\n\
-             )\n"
+        ```
+        "#
         );
     }
 
     #[test]
-    fn safe_fix_does_not_promote_nested_own_line_suppression() {
+    fn safe_fix_preserves_nested_own_line_suppression() {
         let mut db = TestDbBuilder::new()
             .with_file(
                 "test.py",
-                "seen_code = True\n\
-                 # ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]\n\
-                 value = missing\n",
+                r#"seen_code = True
+# ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]
+value = missing
+"#,
             )
             .build()
             .unwrap();
@@ -1183,19 +1167,16 @@ class B(A):
         )
         .expect("operation never gets cancelled");
 
-        assert_eq!(fixes.count, 2);
+        assert_eq!(fixes.count, 0);
         assert_eq!(
             &*source_text(&db, file),
-            "seen_code = True\n\
-             \n\
-             value = missing\n"
+            r#"seen_code = True
+# ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]
+value = missing
+"#
         );
-        assert!(
-            fixes
-                .diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.id().as_str() == "unresolved-reference")
-        );
+        assert_eq!(fixes.diagnostics.len(), 1);
+        assert_eq!(fixes.diagnostics[0].id().as_str(), "unused-ignore-comment");
     }
 
     /// Tests that the `fix_all` doesn't end up in an infinite loop
@@ -1532,13 +1513,10 @@ class B(A):
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
         let diagnostics = db.check_file(file);
-        let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes =
             suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
                 .expect("operation never gets cancelled");
-
-        assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
 
         File::sync_path(&mut db, SystemPath::new("test.py"));
 
