@@ -215,7 +215,8 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
         let edit = Edit::range_deletion(suppression.comment_range);
 
         if indentation_at_offset(comment_start, source).is_some() {
-            // Don't promote a following pragma to the primary own-line comment.
+            // Removing `# ty: ignore` from `# ty: ignore # fmt: off` would promote
+            // `# fmt: off` to the primary own-line comment.
             return Fix::unsafe_edit(edit);
         }
 
