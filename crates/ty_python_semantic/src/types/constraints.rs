@@ -6624,19 +6624,14 @@ impl PathAssignments {
                 // We've already seen this assignment, and in theory have already queried the
                 // sequent map for its consequents, which should let us return early.
                 //
-                // However, an origin constraint can replenish the fuel for this assignment, giving
-                // it more chances to participate in multi-step sequent chains. That means there
-                // might be some consequents that were skipped previously due to a lack of fuel,
-                // that can be added now because of the replinished fuel budget.
-
-                // Only origin constraints can replenish the fuel budget for this assignment.
-                if derived_fuel_cost.is_some() {
-                    return Ok(());
-                }
+                // However, a new derivation chain can replenish the fuel for this assignment,
+                // giving it more chances to participate in multi-step sequent chains. That means
+                // there might be some consequents that were skipped previously due to a lack of
+                // fuel, that can be added now because of the replinished fuel budget.
 
                 // There is another derivation of this assignment that already provides at least as
-                // much fuel as this origin constraint. That means replenishing the fuel won't have
-                // any effect.
+                // much fuel as this constraint. That means replenishing the fuel won't have any
+                // effect.
                 if *existing_fuel >= path_fuel
                     || self
                         .additional_fuels
