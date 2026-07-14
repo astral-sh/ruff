@@ -3055,7 +3055,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final, overload
+from typing import Any, final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3161,6 +3161,12 @@ class GenericReceiver:
     def f[T](self: T, input: T) -> T:
         return self
 
+class GradualReceiverProtocol(Protocol):
+    def method(self: list[Any]) -> None: ...
+
+class GradualReceiverImplementation(list[int]):
+    def method(self: list[Any]) -> None: ...
+
 class ExplicitReceiverProtocol(Protocol):
     def method(self: "ExplicitReceiverProtocol") -> None: ...
 
@@ -3222,6 +3228,11 @@ static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 # `T = int`, so the resulting bound method does not satisfy `ConcreteMethod.f`.
 static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
 static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
+
+# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
+# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
+# `list[Any]`.
+static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
 
 # Checking the receiver constraint requires the same protocol relation that is already in
 # progress. The recursive check should terminate and establish the structural relation.
