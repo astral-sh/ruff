@@ -3345,9 +3345,18 @@ class FactoryProtocol(Protocol):
     @classmethod
     def make(cls) -> Self: ...
 
+class ExplicitReceiverFactoryProtocol(Protocol):
+    @classmethod
+    def make(cls: type[Self]) -> Self: ...
+
 class Factory:
     @classmethod
     def make(cls) -> Self:
+        return cls()
+
+class ExplicitReceiverFactory:
+    @classmethod
+    def make(cls: type[Self]) -> Self:
         return cls()
 
 class BadFactory:
@@ -3356,6 +3365,7 @@ class BadFactory:
         return 1
 
 static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
+static_assert(is_assignable_to(TypeOf[ExplicitReceiverFactory], ExplicitReceiverFactoryProtocol))
 static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
 ```
 
