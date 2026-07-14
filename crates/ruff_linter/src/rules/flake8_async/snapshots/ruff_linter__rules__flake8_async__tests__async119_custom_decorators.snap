@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119_custom_decorators.py:21:9
+   |
+19 | async def unsafe_other_decorator():
+20 |     with open(""):
+21 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor

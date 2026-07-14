@@ -965,6 +965,23 @@
       },
       "additionalProperties": false
     },
+    "Flake8AsyncOptions": {
+      "description": "Options for the `flake8-async` plugin.",
+      "type": "object",
+      "properties": {
+        "safe-async-generator-decorators": {
+          "description": "Additional decorators that mark an async generator as safe to yield\ninside a context manager, suppressing the `yield-in-context-manager-in-async-generator`\nrule (`ASYNC119`).\n\nThe built-in safe decorators (`contextlib.asynccontextmanager`, `pytest.fixture`,\n`pytest_asyncio.fixture`, and `trio.as_safe_channel`) are always recognized.\nUse this setting to add framework-specific decorators that handle async generator\ncleanup safely.\n\nExpects to receive a list of fully-qualified names (e.g., `dishka.provide`, rather than\n`provide`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8BanditOptions": {
       "description": "Options for the `flake8-bandit` plugin.",
       "type": "object",
@@ -2254,6 +2271,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8AnnotationsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-async": {
+          "description": "Options for the `flake8-async` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8AsyncOptions"
             },
             {
               "type": "null"

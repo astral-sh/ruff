@@ -1,6 +1,7 @@
 //! Rules from [flake8-async](https://pypi.org/project/flake8-async/).
 mod helpers;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -53,6 +54,23 @@ mod tests {
             },
         )?;
         assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn async119_custom_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_async")
+                .join("ASYNC119_custom_decorators.py")
+                .as_path(),
+            &LinterSettings {
+                flake8_async: super::settings::Settings {
+                    safe_async_generator_decorators: vec!["dishka.provide".to_string()],
+                },
+                ..LinterSettings::for_rule(Rule::YieldInContextManagerInAsyncGenerator)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

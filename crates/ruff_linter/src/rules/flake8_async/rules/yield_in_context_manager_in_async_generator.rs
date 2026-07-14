@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -27,6 +28,9 @@ use crate::checkers::ast::Checker;
 /// The rule also suppresses diagnostics for functions decorated with
 /// `@pytest.fixture`, `@pytest_asyncio.fixture`, or `@trio.as_safe_channel`,
 /// as these handle async generator cleanup safely.
+///
+/// Additional safe decorators can be configured via the
+/// [`lint.flake8-async.safe-async-generator-decorators`] setting.
 ///
 /// ## Example
 ///
@@ -127,6 +131,11 @@ fn enclosing_async_function<'a>(checker: &Checker<'a>) -> Option<&'a ast::StmtFu
 /// `@pytest.fixture`, or `@trio.as_safe_channel`, which are known to handle
 /// async generator cleanup safely.
 fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) -> bool {
+    let safe_async_generator_decorators = &checker
+        .settings()
+        .flake8_async
+        .safe_async_generator_decorators;
+
     function_def.decorator_list.iter().any(|decorator| {
         checker
             .semantic()
@@ -137,7 +146,9 @@ fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) ->
                     ["contextlib", "asynccontextmanager"]
                         | ["pytest" | "pytest_asyncio", "fixture"]
                         | ["trio", "as_safe_channel"]
-                )
+                ) || safe_async_generator_decorators
+                    .iter()
+                    .any(|name| qualified_name == QualifiedName::from_dotted_name(name))
             })
     })
 }

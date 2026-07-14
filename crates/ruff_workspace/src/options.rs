@@ -528,6 +528,10 @@ pub struct LintOptions {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// Options for the `flake8-async` plugin.
+    #[option_group]
+    pub flake8_async: Option<Flake8AsyncOptions>,
+
     /// Options for the `pydoclint` plugin.
     #[option_group]
     pub pydoclint: Option<PydoclintOptions>,
@@ -1145,6 +1149,45 @@ impl Flake8AnnotationsOptions {
             suppress_none_returning: self.suppress_none_returning.unwrap_or(false),
             allow_star_arg_any: self.allow_star_arg_any.unwrap_or(false),
             ignore_fully_untyped: self.ignore_fully_untyped.unwrap_or(false),
+        }
+    }
+}
+
+/// Options for the `flake8-async` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8AsyncOptions {
+    /// Additional decorators that mark an async generator as safe to yield
+    /// inside a context manager, suppressing the `yield-in-context-manager-in-async-generator`
+    /// rule (`ASYNC119`).
+    ///
+    /// The built-in safe decorators (`contextlib.asynccontextmanager`, `pytest.fixture`,
+    /// `pytest_asyncio.fixture`, and `trio.as_safe_channel`) are always recognized.
+    /// Use this setting to add framework-specific decorators that handle async generator
+    /// cleanup safely.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `dishka.provide`, rather than
+    /// `provide`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Mark `dishka.provide` as a safe async generator decorator.
+            safe-async-generator-decorators = ["dishka.provide"]
+        "#
+    )]
+    pub safe_async_generator_decorators: Option<Vec<String>>,
+}
+
+impl Flake8AsyncOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_async::settings::Settings {
+        ruff_linter::rules::flake8_async::settings::Settings {
+            safe_async_generator_decorators: self
+                .safe_async_generator_decorators
+                .unwrap_or_default(),
         }
     }
 }
@@ -4271,6 +4314,7 @@ pub struct LintOptionsWire {
     extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     exclude: Option<Vec<String>>,
+    flake8_async: Option<Flake8AsyncOptions>,
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
@@ -4327,6 +4371,7 @@ impl From<LintOptionsWire> for LintOptions {
             per_file_ignores,
             extend_per_file_ignores,
             exclude,
+            flake8_async,
             pydoclint,
             ruff,
             preview,
@@ -4384,6 +4429,7 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_per_file_ignores,
             },
             exclude,
+            flake8_async,
             pydoclint,
             ruff,
             preview,

@@ -108,6 +108,7 @@ linter.flake8_annotations.suppress_dummy_args = false
 linter.flake8_annotations.suppress_none_returning = false
 linter.flake8_annotations.allow_star_arg_any = false
 linter.flake8_annotations.ignore_fully_untyped = false
+linter.flake8_async.safe_async_generator_decorators = []
 linter.flake8_bandit.hardcoded_tmp_directory = [
 	/tmp,
 	/var/tmp,

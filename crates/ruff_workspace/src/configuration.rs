@@ -47,9 +47,9 @@ use ruff_python_formatter::{
 };
 
 use crate::options::{
-    AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
-    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
-    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    AnalyzeOptions, Flake8AnnotationsOptions, Flake8AsyncOptions, Flake8BanditOptions,
+    Flake8BooleanTrapOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
+    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
@@ -491,6 +491,10 @@ impl Configuration {
                         ..pycodestyle::settings::Settings::default()
                     }
                 },
+                flake8_async: lint
+                    .flake8_async
+                    .map(Flake8AsyncOptions::into_settings)
+                    .unwrap_or_default(),
                 pydoclint: lint
                     .pydoclint
                     .map(PydoclintOptions::into_settings)
@@ -769,6 +773,7 @@ pub struct LintConfiguration {
     pub mccabe: Option<McCabeOptions>,
     pub pep8_naming: Option<Pep8NamingOptions>,
     pub pycodestyle: Option<PycodestyleOptions>,
+    pub flake8_async: Option<Flake8AsyncOptions>,
     pub pydoclint: Option<PydoclintOptions>,
     pub pydocstyle: Option<PydocstyleOptions>,
     pub pyflakes: Option<PyflakesOptions>,
@@ -886,6 +891,7 @@ impl LintConfiguration {
             mccabe: options.common.mccabe,
             pep8_naming: options.common.pep8_naming,
             pycodestyle: options.common.pycodestyle,
+            flake8_async: options.flake8_async,
             pydoclint: options.pydoclint,
             pydocstyle: options.common.pydocstyle,
             pyflakes: options.common.pyflakes,
@@ -1303,6 +1309,7 @@ impl LintConfiguration {
             mccabe: self.mccabe.combine(config.mccabe),
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
+            flake8_async: self.flake8_async.combine(config.flake8_async),
             pydoclint: self.pydoclint.combine(config.pydoclint),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
             pyflakes: self.pyflakes.combine(config.pyflakes),
