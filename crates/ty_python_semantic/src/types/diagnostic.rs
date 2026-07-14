@@ -686,10 +686,13 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-type-guard-call.md")]
+    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
-        summary: "detects type guard function calls that has no narrowing effect",
-        status: LintStatus::stable("0.0.1-alpha.11"),
+        summary: "detects type guard function calls that have no narrowing effect",
+        status: LintStatus::removed(
+            "0.0.60",
+            "Type guard calls without a narrowing target are valid and have no narrowing effect.",
+        ),
         default_level: Level::Error,
     }
 }
