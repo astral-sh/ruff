@@ -60,11 +60,11 @@ impl Db {
     pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
+                strict_generic_narrowing: strict_generic_narrowing_default,
                 strict_literal_narrowing: strict_literal_narrowing_default,
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
                 allowed_unresolved_imports: allowed_unresolved_imports_default,
                 replace_imports_with_any: replace_imports_with_any_default,
-                strict_generic_narrowing: strict_generic_narrowing_default,
             } = AnalysisSettings::default();
 
             let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
@@ -96,6 +96,9 @@ impl Db {
             };
 
             AnalysisSettings {
+                strict_generic_narrowing: options
+                    .strict_generic_narrowing
+                    .unwrap_or(strict_generic_narrowing_default),
                 strict_literal_narrowing: options
                     .strict_literal_narrowing
                     .unwrap_or(strict_literal_narrowing_default),
@@ -104,9 +107,6 @@ impl Db {
                     .unwrap_or(respect_type_ignore_comments_default),
                 allowed_unresolved_imports,
                 replace_imports_with_any,
-                strict_generic_narrowing: options
-                    .strict_generic_narrowing
-                    .unwrap_or(strict_generic_narrowing_default),
             }
         } else {
             AnalysisSettings::default()
