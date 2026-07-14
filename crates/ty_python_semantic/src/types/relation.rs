@@ -237,6 +237,24 @@ impl TypeRelation {
     }
 }
 
+fn constraint_set_assignable_to_owned<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+) -> OwnedConstraintSet<'db> {
+    let constraints = ConstraintSetBuilder::new();
+    constraints.into_owned(|constraints| {
+        source.has_relation_to_with_typevar_evaluation(
+            db,
+            target,
+            constraints,
+            InferableTypeVars::None,
+            TypeRelation::Assignability,
+            TypeVarEvaluation::Lazy,
+        )
+    })
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -472,17 +490,7 @@ impl<'db> Type<'db> {
             source: Type<'db>,
             target: Type<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let constraints = ConstraintSetBuilder::new();
-            constraints.into_owned(|constraints| {
-                source.has_relation_to_with_typevar_evaluation(
-                    db,
-                    target,
-                    constraints,
-                    InferableTypeVars::None,
-                    TypeRelation::Assignability,
-                    TypeVarEvaluation::Lazy,
-                )
-            })
+            constraint_set_assignable_to_owned(db, source, target)
         }
 
         if self.is_trivially_constraint_set_assignable_to(db, target) {
@@ -513,17 +521,7 @@ impl<'db> Type<'db> {
             source: Type<'db>,
             target: Type<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let constraints = ConstraintSetBuilder::new();
-            constraints.into_owned(|constraints| {
-                source.has_relation_to_with_typevar_evaluation(
-                    db,
-                    target,
-                    constraints,
-                    InferableTypeVars::None,
-                    TypeRelation::Assignability,
-                    TypeVarEvaluation::Lazy,
-                )
-            })
+            constraint_set_assignable_to_owned(db, source, target)
         }
 
         if self.is_trivially_constraint_set_assignable_to(db, target) {

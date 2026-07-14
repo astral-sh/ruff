@@ -319,21 +319,12 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
-                        receiver_constraints: self_signature
-                            .receiver_constraints
-                            .as_ref()
-                            .and_then(|constraints| {
-                                merge_receiver_constraints(
-                                    db,
-                                    None,
-                                    Some(constraints.apply_type_mapping(
-                                        db,
-                                        type_mapping,
-                                        tcx,
-                                        visitor,
-                                    )),
-                                )
-                            }),
+                        receiver_constraints: self_signature.map_receiver_constraints(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
@@ -359,17 +350,12 @@ impl<'db> CallableSignature<'db> {
                             receiver_constraints: merge_receiver_constraints(
                                 db,
                                 signature.receiver_constraints.clone(),
-                                self_signature
-                                    .receiver_constraints
-                                    .as_ref()
-                                    .map(|constraints| {
-                                        constraints.apply_type_mapping(
-                                            db,
-                                            type_mapping,
-                                            tcx,
-                                            visitor,
-                                        )
-                                    }),
+                                self_signature.map_receiver_constraints(
+                                    db,
+                                    type_mapping,
+                                    tcx,
+                                    visitor,
+                                ),
                             ),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
@@ -894,13 +880,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            receiver_constraints: self.receiver_constraints.as_ref().and_then(|constraints| {
-                merge_receiver_constraints(
-                    db,
-                    None,
-                    Some(constraints.apply_type_mapping(db, type_mapping, tcx, visitor)),
-                )
-            }),
+            receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -1194,18 +1174,8 @@ impl<'db> Signature<'db> {
         let binding_context = self.definition.map(BindingContext::Definition);
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
         let visitor = ApplyTypeMappingVisitor::default();
-        let receiver_constraints = self.receiver_constraints.as_ref().and_then(|constraints| {
-            merge_receiver_constraints(
-                db,
-                None,
-                Some(constraints.apply_type_mapping(
-                    db,
-                    &self_mapping,
-                    TypeContext::default(),
-                    &visitor,
-                )),
-            )
-        });
+        let receiver_constraints =
+            self.map_receiver_constraints(db, &self_mapping, TypeContext::default(), &visitor);
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_constraints,
@@ -1240,6 +1210,19 @@ impl<'db> Signature<'db> {
             return checker.always();
         };
         checker.constraints.load(db, constraints)
+    }
+
+    fn map_receiver_constraints(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Option<OwnedConstraintSet<'db>> {
+        self.receiver_constraints
+            .as_ref()
+            .map(|constraints| constraints.apply_type_mapping(db, type_mapping, tcx, visitor))
+            .filter(|constraints| !constraints.is_always())
     }
 
     fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
