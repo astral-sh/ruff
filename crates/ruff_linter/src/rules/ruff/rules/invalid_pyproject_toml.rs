@@ -1,11 +1,9 @@
 use pyproject_toml::PyProjectToml;
 
-use ruff_db::diagnostic::Diagnostic;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_source_file::SourceFile;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::{FixAvailability, Violation, codes::Rule, settings::LinterSettings};
+use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 
 /// ## What it does
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.
@@ -52,15 +50,12 @@ impl Violation for InvalidPyprojectToml {
 }
 
 /// RUF200
-pub(crate) fn invalid_pyproject_toml(
-    source_file: &SourceFile,
-    settings: &LinterSettings,
-) -> Vec<Diagnostic> {
-    let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
-        return Vec::default();
+pub(crate) fn invalid_pyproject_toml(context: &LintContext) {
+    let Some(err) = toml::from_str::<PyProjectToml>(context.source_file().source_text()).err()
+    else {
+        return;
     };
 
-    let mut messages = Vec::new();
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
         // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
@@ -71,12 +66,6 @@ pub(crate) fn invalid_pyproject_toml(
         ),
     };
 
-    if settings.rules.enabled(Rule::InvalidPyprojectToml) {
-        let toml_err = err.message().to_string();
-        let diagnostic =
-            InvalidPyprojectToml { message: toml_err }.into_diagnostic(range, source_file);
-        messages.push(diagnostic);
-    }
-
-    messages
+    let toml_err = err.message().to_string();
+    context.report_diagnostic(InvalidPyprojectToml { message: toml_err }, range);
 }

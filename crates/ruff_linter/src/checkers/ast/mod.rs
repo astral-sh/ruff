@@ -3549,6 +3549,11 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
+        self.diagnostics.into_inner()
+    }
+
+    #[inline]
     pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<Diagnostic> {
         self.diagnostics.get_mut()
     }
