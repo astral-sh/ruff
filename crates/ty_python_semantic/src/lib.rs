@@ -107,7 +107,7 @@ pub struct AnalysisSettings {
 
     pub replace_imports_with_any: ModuleGlobSet,
 
-    /// Whether unspecialized generic classes use their top materialization for narrowing.
+    /// Whether narrowing with generic classes uses the top materialization.
     pub strict_generic_narrowing: bool,
 }
 
