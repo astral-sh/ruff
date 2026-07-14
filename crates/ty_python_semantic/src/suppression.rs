@@ -356,36 +356,8 @@ impl<T: Interval> IntervalIndex<T> {
         root.subtree_max_end
     }
 
-    fn visit_intersecting<'a>(&'a self, query: TextRange, visit: &mut impl FnMut(&'a T)) {
-        Self::visit_intersecting_entries(&self.entries, query, visit);
-    }
-
-    fn visit_intersecting_entries<'a>(
-        entries: &'a [IntervalEntry<T>],
-        query: TextRange,
-        visit: &mut impl FnMut(&'a T),
-    ) {
-        let mid = entries.len() / 2;
-        let (left, root_and_right) = entries.split_at(mid);
-        let Some((root, right)) = root_and_right.split_first() else {
-            return;
-        };
-
-        if root.subtree_max_end < query.start() {
-            return;
-        }
-
-        Self::visit_intersecting_entries(left, query, visit);
-
-        if root.value.interval().start() > query.end() {
-            return;
-        }
-
-        if root.value.interval().end() >= query.start() {
-            visit(&root.value);
-        }
-
-        Self::visit_intersecting_entries(right, query, visit);
+    fn intersecting(&self, query: TextRange) -> Intersecting<'_, T> {
+        Intersecting::new(&self.entries, query)
     }
 
     fn iter(&self) -> IntervalValues<'_, T> {
@@ -394,6 +366,63 @@ impl<T: Interval> IntervalIndex<T> {
 
     fn len(&self) -> usize {
         self.entries.len()
+    }
+}
+
+struct Intersecting<'a, T> {
+    query: TextRange,
+    pending: SmallVec<[IntervalTraversal<'a, T>; 16]>,
+}
+
+impl<'a, T> Intersecting<'a, T> {
+    fn new(entries: &'a [IntervalEntry<T>], query: TextRange) -> Self {
+        let mut pending = SmallVec::new();
+        pending.push(IntervalTraversal::Subtree(entries));
+        Self { query, pending }
+    }
+}
+
+enum IntervalTraversal<'a, T> {
+    Subtree(&'a [IntervalEntry<T>]),
+    Entry(&'a IntervalEntry<T>),
+}
+
+impl<'a, T: Interval> Iterator for Intersecting<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(next) = self.pending.pop() {
+            match next {
+                IntervalTraversal::Subtree(entries) => {
+                    let mid = entries.len() / 2;
+                    let (left, root_and_right) = entries.split_at(mid);
+                    let Some((root, right)) = root_and_right.split_first() else {
+                        continue;
+                    };
+
+                    if root.subtree_max_end < self.query.start() {
+                        continue;
+                    }
+
+                    if root.value.interval().start() > self.query.end() {
+                        self.pending.push(IntervalTraversal::Subtree(left));
+                        continue;
+                    }
+
+                    // Push in reverse source order so the left subtree is visited first.
+                    self.pending.push(IntervalTraversal::Subtree(right));
+                    self.pending.push(IntervalTraversal::Entry(root));
+                    self.pending.push(IntervalTraversal::Subtree(left));
+                }
+                IntervalTraversal::Entry(entry) => {
+                    if entry.value.interval().end() >= self.query.start() {
+                        return Some(&entry.value);
+                    }
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -459,11 +488,7 @@ impl Suppressions {
     /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
     /// suppressions cover the following logical line.
     fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        let mut intersecting = SmallVec::<[&Suppression; 4]>::new();
-        self.line
-            .visit_intersecting(range, &mut |suppression| intersecting.push(suppression));
-
-        intersecting.into_iter().filter(move |suppression| {
+        self.line.intersecting(range).filter(move |suppression| {
             // Don't use intersect to avoid that suppressions on inner-expression
             // ignore errors for outer expressions
             suppression.suppressed_range.contains(range.start())
@@ -835,10 +860,10 @@ mod tests {
             NamedInterval::new("after", 110, 120),
         ]);
 
-        let mut names = Vec::new();
-        intervals.visit_intersecting(TextRange::empty(35.into()), &mut |interval| {
-            names.push(interval.name);
-        });
+        let names: Vec<_> = intervals
+            .intersecting(TextRange::empty(35.into()))
+            .map(|interval| interval.name)
+            .collect();
 
         assert_eq!(names, ["outer", "second inner"]);
     }
