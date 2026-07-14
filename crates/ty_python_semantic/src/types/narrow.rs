@@ -741,6 +741,9 @@ pub(crate) struct NarrowingConstraint<'db> {
     /// `TypeGuard` clobbers the previously-known type; within each replacement disjunct, however,
     /// we may eagerly intersect conjunctions with a later intersection narrowing.
     replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
+
+    /// Whether this constraint was built using a narrowing-only top materialization.
+    has_narrowing_materialization: bool,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -750,6 +753,15 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
+            has_narrowing_materialization: false,
+        }
+    }
+
+    fn class_info(constraint: Type<'db>, has_narrowing_materialization: bool) -> Self {
+        Self {
+            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            replacement_disjuncts: smallvec![],
+            has_narrowing_materialization,
         }
     }
 
@@ -759,6 +771,7 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec![],
             replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            has_narrowing_materialization: false,
         }
     }
 
@@ -780,6 +793,9 @@ impl<'db> NarrowingConstraint<'db> {
         if other.intersection_disjuncts.is_empty() {
             return other;
         }
+
+        let has_narrowing_materialization =
+            self.has_narrowing_materialization || other.has_narrowing_materialization;
 
         let mut new_intersection_disjuncts = smallvec![];
         for intersection_disjunct in &self.intersection_disjuncts {
@@ -812,11 +828,13 @@ impl<'db> NarrowingConstraint<'db> {
         NarrowingConstraint {
             intersection_disjuncts: new_intersection_disjuncts,
             replacement_disjuncts: new_replacement_disjuncts,
+            has_narrowing_materialization,
         }
     }
 
     /// Merge two constraints with OR semantics (union/disjunction).
     fn merge_constraint_or(&mut self, other: Self) {
+        self.has_narrowing_materialization |= other.has_narrowing_materialization;
         self.intersection_disjuncts
             .extend(other.intersection_disjuncts);
         self.replacement_disjuncts
@@ -839,7 +857,12 @@ impl<'db> NarrowingConstraint<'db> {
         {
             union.add_in_place(conjunctions.evaluate_constraint_type(db, env));
         }
-        union.build().erase_narrowing_materialization(db)
+        let ty = union.build();
+        if has_narrowing_materialization {
+            ty.erase_narrowing_materialization(db)
+        } else {
+            ty
+        }
     }
 }
 
