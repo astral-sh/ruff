@@ -2881,7 +2881,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if !db
                     .analysis_settings(nominal.class(db).class_literal(db).file(db))
                     .strict_subclass_narrowing
-                    && nominal.is_builtin_instance(db)
                     && protocol.is_typing_protocol(db)
                     && !Type::ProtocolInstance(protocol).has_dynamic(db)
                     && !Type::ProtocolInstance(protocol).has_typevar_or_typevar_instance(db) =>

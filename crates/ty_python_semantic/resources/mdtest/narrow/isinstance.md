@@ -2,18 +2,26 @@
 
 Narrowing for `isinstance(object, classinfo)` expressions.
 
-## Builtins and typing protocols
+## Nominal classes and typing protocols
 
-Builtin classes are treated as disjoint from typing protocols they do not already satisfy.
+Nominal classes are treated as disjoint from typing protocols they do not already satisfy.
 
 ```py
 from typing import Awaitable
+
+class UserDefined: ...
 
 def _(value: int | Awaitable[str]) -> None:
     if isinstance(value, Awaitable):
         reveal_type(value)  # revealed: Awaitable[str]
     else:
         reveal_type(value)  # revealed: int
+
+def _(value: UserDefined | Awaitable[str]) -> None:
+    if isinstance(value, Awaitable):
+        reveal_type(value)  # revealed: Awaitable[str]
+    else:
+        reveal_type(value)  # revealed: UserDefined
 ```
 
 ## `classinfo` is a single type

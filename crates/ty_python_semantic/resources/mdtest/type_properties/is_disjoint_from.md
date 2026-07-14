@@ -335,11 +335,10 @@ static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))
 ```
 
-## Builtin classes, typing ABCs, and protocols
+## Classes defined in `typing` as disjoint bases
 
-Builtin classes are treated as disjoint from typing ABCs they do not already inherit from and typing
-protocols they do not already satisfy. This avoids retaining intersections that would require an
-unusual subclass.
+Classes defined in `typing` are treated as disjoint bases. They are disjoint from unrelated nominal
+classes and from nominal classes that do not satisfy them when they are protocols.
 
 ```py
 from collections.abc import Mapping, Sequence
@@ -352,10 +351,19 @@ static_assert(not is_disjoint_from(str, Sequence[str]))
 static_assert(is_disjoint_from(int, Awaitable[object]))
 static_assert(not is_disjoint_from(str, Iterable[str]))
 
+class Unrelated: ...
+class MappingSubclass(Mapping[str, object]): ...
+class AwaitableSubclass(Awaitable[object]): ...
+
+static_assert(is_disjoint_from(Unrelated, Mapping[str, object]))
+static_assert(not is_disjoint_from(MappingSubclass, Mapping[str, object]))
+static_assert(is_disjoint_from(Unrelated, Awaitable[object]))
+static_assert(not is_disjoint_from(AwaitableSubclass, Awaitable[object]))
+
 class CustomProtocol(Protocol):
     def custom(self) -> None: ...
 
-static_assert(not is_disjoint_from(int, CustomProtocol))
+static_assert(not is_disjoint_from(Unrelated, CustomProtocol))
 ```
 
 ## Strict subclass narrowing

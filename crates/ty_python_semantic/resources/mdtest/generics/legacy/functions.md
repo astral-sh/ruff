@@ -1189,14 +1189,18 @@ reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal[
 ## Inferring typevars in intersections (formal type position)
 
 ```py
-from typing import TypeVar, Iterable
+from collections.abc import Iterator
+from typing import Protocol, TypeVar
 from ty_extensions import Intersection
 
 T = TypeVar("T")
 
+class IterableProtocol(Protocol[T]):
+    def __iter__(self) -> Iterator[T]: ...
+
 class Foo: ...
 
-def foo(x: Intersection[Iterable[T], Foo]) -> T:
+def foo(x: Intersection[IterableProtocol[T], Foo]) -> T:
     return next(iter(x))
 
 class Bar(list[int], Foo): ...
