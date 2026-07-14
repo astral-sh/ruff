@@ -123,6 +123,77 @@ fn nested_call_keywords() {
 }
 
 #[test]
+fn nested_parameters() {
+    let suite = parse_module(
+        r"
+def outer(
+    before,
+    annotated: (lambda left, /, *, right, **rest: right),
+    /,
+    middle=(lambda nested, /, value=(lambda deep, /, *, kw, **tail: kw), *, only, **more: only),
+    *,
+    final=(lambda last, /, *, named, **extra: named),
+    **remaining,
+):
+    pass
+",
+    )
+    .unwrap()
+    .into_suite();
+    let Stmt::FunctionDef(outer) = &suite[0] else {
+        panic!("expected function definition");
+    };
+
+    assert_eq!(outer.parameters.posonlyargs.len(), 2);
+    assert_eq!(outer.parameters.args.len(), 1);
+    assert_eq!(outer.parameters.kwonlyargs.len(), 1);
+    assert!(outer.parameters.kwarg.is_some());
+    assert_eq!(outer.parameters.posonlyargs[0].name().as_str(), "before");
+    assert_eq!(outer.parameters.posonlyargs[1].name().as_str(), "annotated");
+    assert_eq!(outer.parameters.args[0].name().as_str(), "middle");
+    assert_eq!(outer.parameters.kwonlyargs[0].name().as_str(), "final");
+
+    let Some(Expr::Lambda(annotation)) = outer.parameters.posonlyargs[1]
+        .parameter
+        .annotation
+        .as_deref()
+    else {
+        panic!("expected lambda annotation");
+    };
+    let Some(annotation_parameters) = annotation.parameters.as_ref() else {
+        panic!("expected annotation parameters");
+    };
+    assert_eq!(annotation_parameters.posonlyargs.len(), 1);
+    assert_eq!(annotation_parameters.kwonlyargs.len(), 1);
+    assert!(annotation_parameters.kwarg.is_some());
+    assert_eq!(annotation_parameters.posonlyargs[0].name().as_str(), "left");
+    assert_eq!(annotation_parameters.kwonlyargs[0].name().as_str(), "right");
+
+    let Some(Expr::Lambda(default)) = outer.parameters.args[0].default.as_deref() else {
+        panic!("expected lambda default");
+    };
+    let Some(default_parameters) = default.parameters.as_ref() else {
+        panic!("expected default parameters");
+    };
+    assert_eq!(default_parameters.posonlyargs.len(), 1);
+    assert_eq!(default_parameters.args.len(), 1);
+    assert_eq!(default_parameters.kwonlyargs.len(), 1);
+    assert!(default_parameters.kwarg.is_some());
+    assert_eq!(default_parameters.posonlyargs[0].name().as_str(), "nested");
+    assert_eq!(default_parameters.args[0].name().as_str(), "value");
+    assert_eq!(default_parameters.kwonlyargs[0].name().as_str(), "only");
+
+    let Some(Expr::Lambda(deep)) = default_parameters.args[0].default.as_deref() else {
+        panic!("expected nested lambda default");
+    };
+    let Some(deep_parameters) = deep.parameters.as_ref() else {
+        panic!("expected nested default parameters");
+    };
+    assert_eq!(deep_parameters.posonlyargs[0].name().as_str(), "deep");
+    assert_eq!(deep_parameters.kwonlyargs[0].name().as_str(), "kw");
+}
+
+#[test]
 fn nested_statement_lists() {
     let suite = parse_module(
         r"

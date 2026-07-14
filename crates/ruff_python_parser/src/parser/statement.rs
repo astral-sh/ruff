@@ -3314,6 +3314,10 @@ impl<'src> Parser<'src> {
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
         let mut parameters = ast::Parameters::default();
+        let parameters_snapshot = self.parameter_scratch.snapshot();
+        let mut args_snapshot = parameters_snapshot;
+        let mut kwonlyargs_snapshot = None;
+        let mut seen_non_variadic_param = false;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3339,6 +3343,10 @@ impl<'src> Parser<'src> {
                 TokenKind::Star => {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
+
+                    if kwonlyargs_snapshot.is_none() {
+                        kwonlyargs_snapshot = Some(parser.parameter_scratch.snapshot());
+                    }
 
                     if parser.at_name_or_soft_keyword() {
                         let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
@@ -3451,7 +3459,10 @@ impl<'src> Parser<'src> {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parameters.is_empty() {
+                    if !seen_non_variadic_param
+                        && parameters.vararg.is_none()
+                        && parameters.kwarg.is_none()
+                    {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
                         // def foo(/, a): ...
@@ -3491,9 +3502,10 @@ impl<'src> Parser<'src> {
                     }
 
                     if !seen_positional_only_separator {
-                        // We should only swap if we're seeing the separator for the
+                        // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        args_snapshot = kwonlyargs_snapshot
+                            .unwrap_or_else(|| parser.parameter_scratch.snapshot());
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3540,11 +3552,8 @@ impl<'src> Parser<'src> {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
-                        parameters.kwonlyargs.push(param);
-                    } else {
-                        parameters.args.push(param);
-                    }
+                    parser.parameter_scratch.push(param);
+                    seen_non_variadic_param = true;
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3568,9 +3577,11 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        parameters.args.shrink_to_fit();
-        parameters.kwonlyargs.shrink_to_fit();
-        parameters.posonlyargs.shrink_to_fit();
+        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
+            parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
+        }
+        parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
+        parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
 
         parameters.range = self.node_range(start);
 
