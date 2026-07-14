@@ -10,7 +10,7 @@ name or an incorrect assumption about the model's schema.
 
 ## Example
 
-```ignore
+```python {data-mdtest="ignore"}
 from pydantic import BaseModel
 
 

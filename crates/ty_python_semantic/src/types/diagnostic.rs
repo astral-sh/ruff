@@ -1056,6 +1056,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pydantic-discarded-extra-argument.md")]
     pub(crate) static PYDANTIC_DISCARDED_EXTRA_ARGUMENT = {
         summary: "detects extra constructor arguments that Pydantic silently discards",
