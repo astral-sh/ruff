@@ -19,8 +19,8 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
-use super::Parenthesized;
 use super::expression::ExpressionContext;
+use super::{Parenthesized, ScratchBufferExt};
 
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -3138,16 +3138,13 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_block_statements(&mut self) -> Suite {
-        let start = self.stmt_scratch.len();
+        let snapshot = self.stmt_scratch.snapshot();
         self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
             let statement = parser.parse_statement();
             parser.stmt_scratch.push(statement);
         });
 
-        let len = self.stmt_scratch.len() - start;
-        let mut statements = Suite::with_capacity(len);
-        statements.extend(self.stmt_scratch.drain(start..));
-        statements
+        self.stmt_scratch.take_thin_vec(snapshot)
     }
 
     /// Parses a single parameter for the given function kind.

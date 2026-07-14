@@ -17,6 +17,7 @@ use unicode_normalization::UnicodeNormalization;
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::parser::scratch_buffer::ScratchBufferExt;
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -31,6 +32,7 @@ mod options;
 mod pattern;
 mod progress;
 mod recovery;
+mod scratch_buffer;
 mod statement;
 #[cfg(test)]
 mod tests;

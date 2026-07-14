@@ -28,7 +28,7 @@ use crate::{
     UnsupportedSyntaxErrorKind,
 };
 
-use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
+use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind, ScratchBufferExt};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -815,8 +815,8 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let args_start = self.expr_scratch.len();
-        let keywords_start = self.keyword_scratch.len();
+        let args_snapshot = self.expr_scratch.snapshot();
+        let keywords_snapshot = self.keyword_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -943,14 +943,11 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
-        let keywords_len = self.keyword_scratch.len() - keywords_start;
-        let mut keywords = ThinVec::with_capacity(keywords_len);
-        keywords.extend(self.keyword_scratch.drain(keywords_start..));
-
+        let keywords = self.keyword_scratch.take_thin_vec(keywords_snapshot);
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.drain(args_start..).collect(),
+            args: self.expr_scratch.take(args_snapshot),
             keywords,
         };
 
@@ -1004,7 +1001,7 @@ impl<'src> Parser<'src> {
         // If there are more than one element in the slice, we need to create a tuple
         // expression to represent it.
         if self.eat(TokenKind::Comma) {
-            let slices_start = self.expr_scratch.len();
+            let slices_snapshot = self.expr_scratch.snapshot();
             self.expr_scratch.push(slice);
 
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
@@ -1013,7 +1010,7 @@ impl<'src> Parser<'src> {
             });
 
             slice = Expr::Tuple(ast::ExprTuple {
-                elts: self.expr_scratch.drain(slices_start..).collect(),
+                elts: self.expr_scratch.take(slices_snapshot),
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
@@ -1251,7 +1248,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
-        let values_start = self.expr_scratch.len();
+        let values_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(lhs);
         let mut progress = ParserProgress::default();
 
@@ -1270,7 +1267,7 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprBoolOp {
-            values: self.expr_scratch.drain(values_start..).collect(),
+            values: self.expr_scratch.take(values_snapshot),
             op,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -1319,7 +1316,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let comparators_start = self.expr_scratch.len();
+        let comparators_snapshot = self.expr_scratch.snapshot();
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1353,7 +1350,7 @@ impl<'src> Parser<'src> {
         ast::ExprCompare {
             left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: self.expr_scratch.drain(comparators_start..).collect(),
+            comparators: self.expr_scratch.take(comparators_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2452,7 +2449,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let elts_start = self.expr_scratch.len();
+        let elts_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
@@ -2465,7 +2462,7 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprTuple {
-            elts: self.expr_scratch.drain(elts_start..).collect(),
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2481,7 +2478,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let elts_start = self.expr_scratch.len();
+        let elts_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
@@ -2494,7 +2491,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Rsqb);
 
         ast::ExprList {
-            elts: self.expr_scratch.drain(elts_start..).collect(),
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2524,7 +2521,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let elts_start = self.expr_scratch.len();
+        let elts_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(first_element.expr);
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
@@ -2548,7 +2545,7 @@ impl<'src> Parser<'src> {
         ast::ExprSet {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            elts: self.expr_scratch.drain(elts_start..).collect(),
+            elts: self.expr_scratch.take(elts_snapshot),
         }
     }
 
@@ -2649,7 +2646,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
 
-        let ifs_start = self.expr_scratch.len();
+        let ifs_snapshot = self.expr_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
@@ -2665,7 +2662,7 @@ impl<'src> Parser<'src> {
             node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
-            ifs: self.expr_scratch.drain(ifs_start..).collect(),
+            ifs: self.expr_scratch.take(ifs_snapshot),
             is_async,
         }
     }
