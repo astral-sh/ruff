@@ -4824,7 +4824,7 @@ def _(cls: type[PropertyProtocol]) -> None:
 ```
 
 Even when construction returns a `Foo`, the class object itself must provide the required class
-variable and method.
+variable and method (the instance attribute is not required).
 
 ```py
 class MissingClassVar(metaclass=FactoryMeta):
