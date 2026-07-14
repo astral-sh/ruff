@@ -1,5 +1,3 @@
-use pyproject_toml::PyProjectToml;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -50,12 +48,7 @@ impl Violation for InvalidPyprojectToml {
 }
 
 /// RUF200
-pub(crate) fn invalid_pyproject_toml(context: &LintContext) {
-    let Some(err) = toml::from_str::<PyProjectToml>(context.source_file().source_text()).err()
-    else {
-        return;
-    };
-
+pub(crate) fn invalid_pyproject_toml(context: &LintContext, err: &toml::de::Error) {
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
         // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
