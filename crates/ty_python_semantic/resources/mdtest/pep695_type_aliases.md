@@ -326,6 +326,7 @@ the aliases occur inside a larger type.
 ```py
 from enum import Enum
 from typing import Literal
+from ty_extensions import Intersection, Not
 
 class Choice(Enum):
     A = "A"
@@ -335,6 +336,8 @@ type A = Literal[Choice.A]
 type B = Literal[Choice.B]
 type Either = A | B
 type Selector = A | B | tuple[A, B]
+type NotA = Intersection[Choice, Not[A]]
+type Partition = NotA | A
 
 def accept_either(value: Either) -> None: ...
 def accept_optional_either(value: Either | None) -> None: ...
@@ -350,6 +353,7 @@ def _(choice: Choice, config: Config) -> None:
     accept_optional_either(config.either)
     values: list[Selector] = []
     accept_selector(config.selector)
+    partition: Partition = choice
 
 class ExtendedChoice(Enum):
     A = "A"
