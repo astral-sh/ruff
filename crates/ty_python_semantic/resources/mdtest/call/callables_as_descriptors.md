@@ -102,9 +102,50 @@ This would be equally unsound, because now we would allow a call to `C3().callab
 also fail at runtime.
 
 There is no perfect solution here, but for compatibility with other type checkers we treat inferred
-class-body callables and `ClassVar`-annotated callables with concrete signatures as bound-method
+class-body callables and `ClassVar`-annotated callables with a positional receiver as bound-method
 descriptors. Wholly gradual signatures have no known receiver to bind, and explicit non-`ClassVar`
 callable annotations remain regular callables.
+
+## Callable descriptor lookup modes
+
+Promotion to a bound-method descriptor only affects instance reads. Class reads and writes retain
+the declared callable signature. This also applies when the callable is hidden behind a PEP 695 type
+alias or has a gradual `Concatenate` tail:
+
+```py
+from collections.abc import Callable
+from typing import Any, ClassVar, Concatenate, cast
+
+def method(value: object, argument: str) -> int:
+    return len(argument)
+
+def gradual_method(value: object, *args: Any, **kwargs: Any) -> int:
+    return 1
+
+type Method = Callable[[object, str], int]
+type GradualMethod = Callable[Concatenate[object, ...], int]
+
+class C:
+    inferred = cast(Method, method)
+    inferred_gradual = cast(GradualMethod, gradual_method)
+    classvar: ClassVar[Method] = method
+    classvar_gradual: ClassVar[GradualMethod] = gradual_method
+    explicit: Method = method
+
+reveal_type(C.inferred)  # revealed: (object, str, /) -> int
+reveal_type(C().inferred)  # revealed: (str, /) -> int
+reveal_type(C.classvar)  # revealed: (object, str, /) -> int
+reveal_type(C().classvar)  # revealed: (str, /) -> int
+reveal_type(C().explicit)  # revealed: (object, str, /) -> int
+
+C.inferred = method
+C.classvar = method
+
+reveal_type(C().inferred("value"))  # revealed: int
+reveal_type(C().classvar("value"))  # revealed: int
+reveal_type(C().inferred_gradual())  # revealed: int
+reveal_type(C().classvar_gradual())  # revealed: int
+```
 
 ## Use case: Decorating a method with a `Callable`-typed decorator
 
@@ -207,7 +248,8 @@ def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
 
 This is necessarily unsound: a function call can return a `Callable` unrelated to the argument. The
 following program is valid at runtime, but we reject it because the inferred class-body callable is
-treated as a descriptor:
+treated as a descriptor. This heuristic does not check whether the first parameter can accept the
+instance:
 
 ```py
 class SquareCalculator:
@@ -273,7 +315,7 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-The same rule applies to other explicitly annotated dunder attributes:
+By contrast, explicitly annotated non-`ClassVar` dunder attributes remain regular callables:
 
 ```py
 class Thunk:
@@ -372,11 +414,12 @@ C().f2(1)
 python-version = "3.14"
 ```
 
-The callable type of a type object is not function-like.
+The callable type of a type object is not function-like. Once that type is extracted into a regular
+callable signature, the `ClassVar` descriptor heuristic applies on instance reads.
 
 ```py
 from typing import ClassVar
-from ty_extensions._internal import TypeOf
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -389,11 +432,19 @@ class WithInit:
 class C:
     with_new: ClassVar[TypeOf[WithNew]]
     with_init: ClassVar[TypeOf[WithInit]]
+    extracted_new: ClassVar[RegularCallableTypeOf[WithNew]]
+    extracted_init: ClassVar[RegularCallableTypeOf[WithInit]]
 
 C.with_new(1)
 C().with_new(1)
 C.with_init(1)
 C().with_init(1)
+C.extracted_new(1)
+# error: [too-many-positional-arguments]
+C().extracted_new(1)
+C.extracted_init(1)
+# error: [too-many-positional-arguments]
+C().extracted_init(1)
 ```
 
 ## Decorators returning PEP 695 type aliases

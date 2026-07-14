@@ -23,8 +23,8 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypedDictModule, UnionBuilder, UnionType,
+        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeTransformer,
+        TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -1135,27 +1135,13 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters()
-                        // A wholly gradual signature has no receiver to bind. Keeping it regular
-                        // also preserves its gradual assignability for method overrides.
-                        && !callable_ty.signatures(db).is_gradual() =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                Type::Union(union) => {
-                    union.map(db, |element| into_function_like_callable(db, *element))
-                }
-                Type::Intersection(intersection) => intersection
-                    .map_positive(db, |element| into_function_like_callable(db, *element)),
-                _ => ty,
-            }
-        }
+        struct IntoRegularCallable;
 
-        fn into_regular_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+        fn into_regular_callable<'d>(
+            db: &'d dyn Db,
+            ty: Type<'d>,
+            visitor: &TypeTransformer<'d, IntoRegularCallable>,
+        ) -> Type<'d> {
             match ty {
                 Type::Callable(callable_ty) => Type::Callable(callable_ty.into_regular(db)),
                 // A TypeVar annotation can specialize to a function literal. Erase that runtime
@@ -1163,10 +1149,14 @@ impl<'db> StaticClassLiteral<'db> {
                 Type::FunctionLiteral(function) => {
                     Type::Callable(function.into_callable_type(db).into_regular(db))
                 }
-                Type::Union(union) => union.map(db, |element| into_regular_callable(db, *element)),
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, |element| into_regular_callable(db, *element))
+                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+                    into_regular_callable(db, alias.value_type(db), visitor)
+                }),
+                Type::Union(union) => {
+                    union.map(db, |element| into_regular_callable(db, *element, visitor))
                 }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_regular_callable(db, *element, visitor)),
                 _ => ty,
             }
         }
@@ -1178,40 +1168,25 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        let mut member = match result {
+        let member = match result {
             ClassMemberResult::Done(result) => result.finalize(db),
             ClassMemberResult::TypedDict(module) => {
                 typed_dict_class_member(db, self.identity_specialization(db), module, policy, name)
             }
         };
 
-        // Callable values inferred from class-body assignments are generally functions at runtime,
-        // so we treat concrete signatures as function-like descriptors. `ClassVar` annotations
-        // make the same assertion explicitly. Other annotated callable attributes remain regular
-        // callables: their annotation does not tell us whether the runtime value implements the
-        // descriptor protocol.
-        let is_annotated_assignment = match member.place {
-            Place::Defined(place) => place.provenance.definition().is_some_and(|definition| {
+        // An annotated callable does not tell us whether the runtime value implements the
+        // descriptor protocol. Preserve its regular callable behavior for all lookup modes.
+        if !member.is_class_var()
+            && let Place::Defined(place) = member.place
+            && place.provenance.definition().is_some_and(|definition| {
                 matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-            }),
-            Place::Undefined => false,
-        };
-        member = match member.place {
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Inferred,
-                ..
-            }) => member.map_type(|ty| into_function_like_callable(db, ty)),
-            Place::Defined(_) if member.is_class_var() => {
-                member.map_type(|ty| into_function_like_callable(db, ty))
-            }
-            Place::Defined(_) if is_annotated_assignment => {
-                member.map_type(|ty| into_regular_callable(db, ty))
-            }
-            Place::Defined(_) => member,
-            Place::Undefined => member,
-        };
-
-        member
+            })
+        {
+            member.map_type(|ty| into_regular_callable(db, ty, &TypeTransformer::default()))
+        } else {
+            member
+        }
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members

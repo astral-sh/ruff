@@ -398,16 +398,13 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn has_parameters(&self) -> bool {
-        self.overloads
-            .iter()
-            .any(|signature| !signature.parameters().as_slice().is_empty())
-    }
-
-    pub(crate) fn is_gradual(&self) -> bool {
-        self.overloads
-            .iter()
-            .all(|signature| signature.parameters().is_gradual())
+    pub(crate) fn has_bindable_receiver(&self) -> bool {
+        self.overloads.iter().any(|signature| {
+            signature
+                .parameters()
+                .get(0)
+                .is_some_and(Parameter::is_positional)
+        })
     }
 
     /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the

@@ -138,8 +138,8 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
-after the `ParamSpec` is specialized:
+An explicitly annotated callable parameterized by a `ParamSpec` remains regular, even after the
+`ParamSpec` is specialized:
 
 ```py
 from collections.abc import Callable

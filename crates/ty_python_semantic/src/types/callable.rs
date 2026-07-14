@@ -9,7 +9,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeTransformer,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -30,6 +31,36 @@ impl<'db> Type<'db> {
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
     pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
+    }
+
+    /// Promote regular callables with a positional receiver to function-like callables.
+    pub(crate) fn into_function_like_callable(self, db: &'db dyn Db) -> Type<'db> {
+        struct IntoFunctionLikeCallable;
+
+        fn transform<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
+        ) -> Type<'db> {
+            match ty {
+                Type::Callable(callable)
+                    if callable.is_regular(db)
+                        && callable.signatures(db).has_bindable_receiver() =>
+                {
+                    Type::Callable(callable.into_function_like(db))
+                }
+                Type::TypeAlias(alias) => {
+                    visitor.visit_type(db, ty, || transform(db, alias.value_type(db), visitor))
+                }
+                Type::Union(union) => union.map(db, |element| transform(db, *element, visitor)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, |element| transform(db, *element, visitor))
+                }
+                _ => ty,
+            }
+        }
+
+        transform(db, self, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`

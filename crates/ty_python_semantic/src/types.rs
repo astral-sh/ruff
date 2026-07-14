@@ -2839,13 +2839,48 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Type::TypeVar(_) = self
-            && let Some(class) = self.nominal_class(db)
-        {
-            self.to_meta_type(db)
-                .class_namespace_member(db, class, name.as_str(), policy)
-        } else {
-            self.class_member_with_policy(db, name, policy)
+        match self {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |element| {
+                element.instance_lookup_class_member_with_policy(db, name.clone(), policy)
+            }),
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness_and_qualifiers(db, |element| {
+                    element.instance_lookup_class_member_with_policy(db, name.clone(), policy)
+                })
+            }
+            // Synthesized protocol members are already instance reads, so their method callables
+            // have already been bound.
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(_),
+                ..
+            }) => self.instance_member(db, &name),
+            _ => {
+                let member = if let Type::TypeVar(_) = self
+                    && let Some(class) = self.nominal_class(db)
+                {
+                    self.to_meta_type(db)
+                        .class_namespace_member(db, class, name.as_str(), policy)
+                } else {
+                    self.class_member_with_policy(db, name, policy)
+                };
+
+                // Inferred class-body callables and `ClassVar` callables behave as descriptors
+                // only when read through an instance. Keep their declared signatures intact for
+                // writes and protocol compatibility checks.
+                if member.is_class_var()
+                    || matches!(
+                        member.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Inferred,
+                            ..
+                        })
+                    )
+                {
+                    member.map_type(|ty| ty.into_function_like_callable(db))
+                } else {
+                    member
+                }
+            }
         }
     }
 
