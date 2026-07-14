@@ -1289,7 +1289,7 @@
         },
         "pydantic-discarded-extra-argument": {
           "title": "detects extra constructor arguments that Pydantic silently discards",
-          "description": "## What it does\n\nChecks for extra keyword arguments that Pydantic silently discards when a model uses\n`extra=\"ignore\"`, either implicitly or explicitly.\n\n## Why is this bad?\n\nA discarded argument has no effect on the constructed model, but it may indicate a misspelled field\nname or an incorrect assumption about the model's schema.\n\n## Example\n\n```ignore\nfrom pydantic import BaseModel\n\n\nclass User(BaseModel):\n    name: str\n    admin: bool = False\n\n\nuser = User(name=\"Alice\", admni=True)  # error: [pydantic-discarded-extra-argument]\n```\n\nIf the field name has been misspelled, fix the typo. Otherwise, consider removing the extra argument,\nor explicitly configure the model with `extra=\"allow\"`.",
+          "description": "## What it does\n\nChecks for extra keyword arguments that Pydantic silently discards when a model uses\n`extra=\"ignore\"`, either implicitly or explicitly.\n\n## Why is this bad?\n\nA discarded argument has no effect on the constructed model, but it may indicate a misspelled field\nname or an incorrect assumption about the model's schema.\n\n## Example\n\n```python {data-mdtest=\"ignore\"}\nfrom pydantic import BaseModel\n\n\nclass User(BaseModel):\n    name: str\n    admin: bool = False\n\n\nuser = User(name=\"Alice\", admni=True)  # error: [pydantic-discarded-extra-argument]\n```\n\nIf the field name has been misspelled, fix the typo. Otherwise, consider removing the extra argument,\nor explicitly configure the model with `extra=\"allow\"`.",
           "default": "warn",
           "oneOf": [
             {

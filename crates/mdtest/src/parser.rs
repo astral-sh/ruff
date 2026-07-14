@@ -690,11 +690,28 @@ where
 
                         self.skip_non_newline_whitespace();
 
+                        let metadata = self.consume_until(|c| c == '\n').unwrap_or_default().trim();
+
                         if !self.cursor.eat_char('\n') {
                             bail!(
                                 "Trailing code-block metadata is not supported. Only the code block language can be specified."
                             );
                         }
+
+                        let ignore = if metadata.is_empty() {
+                            false
+                        } else if let Some(attributes) = metadata
+                            .strip_prefix('{')
+                            .and_then(|metadata| metadata.strip_suffix('}'))
+                        {
+                            attributes
+                                .split_ascii_whitespace()
+                                .any(|attribute| attribute == r#"data-mdtest="ignore""#)
+                        } else {
+                            bail!(
+                                "Trailing code-block metadata must use the `{{...}}` attribute-list syntax."
+                            );
+                        };
 
                         if let Some(position) =
                             memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
@@ -711,6 +728,7 @@ where
                             self.process_code_block(
                                 lang,
                                 code,
+                                ignore,
                                 BacktickOffsets(TextRange::new(
                                     backtick_offset_start,
                                     backtick_offset_end,
@@ -801,11 +819,16 @@ where
         &mut self,
         lang: &'s str,
         code: &'s str,
+        ignore: bool,
         backtick_offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
         let test_name = self.sections[section].title;
+
+        if ignore {
+            return Ok(());
+        }
 
         if lang == "toml" && self.explicit_path.is_none() {
             return self.process_config_block(code);
@@ -1679,6 +1702,33 @@ mod tests {
     }
 
     #[test]
+    fn ignores_python_blocks_with_ignore_metadata() {
+        let source = dedent(
+            r#"
+            # Example
+
+            ```python {.example data-mdtest="ignore" title="Ignored example"}
+            x: int = "wrong, but not checked"
+            ```
+
+            ```py
+            x = 1
+            ```
+            "#,
+        );
+
+        let mf = parse("file.md", &source).unwrap();
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
     fn mismatching_lang() {
         let source = dedent(
             "
@@ -2181,7 +2231,7 @@ mod tests {
     }
 
     #[test]
-    fn config_no_longer_allowed() {
+    fn unbraced_metadata_not_allowed() {
         let source = dedent(
             "
             ```py foo=bar
@@ -2192,7 +2242,7 @@ mod tests {
         let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "Trailing code-block metadata is not supported. Only the code block language can be specified."
+            "Trailing code-block metadata must use the `{...}` attribute-list syntax."
         );
     }
 
