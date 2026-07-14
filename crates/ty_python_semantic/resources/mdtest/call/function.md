@@ -169,6 +169,12 @@ def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
 def g_union[T, U](x: tuple[T | U]) -> tuple[T, U]:
     raise NotImplementedError
 
+class Invariant[T]:
+    value: T
+
+def invariant[T](x: Invariant[T]) -> T:
+    raise NotImplementedError
+
 def consume[T](callback: Callable[[T], int], value: T) -> T:
     return value
 
@@ -181,7 +187,10 @@ def _(x: Any, callback: Any):
     reveal_type(f_tuple(g(x)))  # revealed: Any
     # Gradual evidence combines with other argument-derived constraints.
     reveal_type(g_with_fallback(x, 1))  # revealed: Any | Literal[1]
-    reveal_type(g_union(x))  # revealed: tuple[Any, Any]
+    # `Any | Any` normalizes to `Any`, so there is no longer a unique mapping for `T` and `U`.
+    reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+    # Invariant type parameters are handled by ordinary specialization assignability.
+    reveal_type(invariant(x))  # revealed: Any
     # A gradual callable provides an upper bound for a type variable that only occurs in its
     # parameter types, but a lower bound for a type variable in its return type.
     reveal_type(consume(callback, 1))  # revealed: Literal[1]
@@ -193,10 +202,19 @@ def _(x: Unknown):
     reveal_type(f_tuple(g(x)))  # revealed: Unknown
     reveal_type(g_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
     reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(invariant(x))  # revealed: Unknown
 
 def _(callback: Unknown):
     reveal_type(consume(callback, 1))  # revealed: Literal[1]
     reveal_type(produce(callback, 1))  # revealed: Unknown | Literal[1]
+
+def outer[S](callback: Any, value: S):
+    def inner[T](callback: Callable[[T], S], value: T) -> tuple[T, S]:
+        raise NotImplementedError
+
+    # Only `T` is inferable for the inner call. The synthetic specialization must preserve `S`,
+    # and lazy type-variable constraints must preserve the relationship `S <: T`.
+    reveal_type(inner(callback, value))  # revealed: tuple[S@outer, S@outer]
 ```
 
 ## Decorated

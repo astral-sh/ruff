@@ -1536,44 +1536,39 @@ impl<'db> Specialization<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
-    /// A gradual type is assignable to every target regardless of its type arguments, so these
-    /// bounds are inference evidence rather than logical consequences of assignability. The
-    /// direction of each bound follows the variance of the type variable in the target.
+    /// A gradual type is assignable to every target regardless of its type arguments. To use that
+    /// fact as inference evidence, specialize the target's inferable type variables to the gradual
+    /// type and compare that specialization to the original target.
     pub(super) fn distribute_gradual_constraints(
         &self,
         db: &'db dyn Db,
         gradual: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let mut variances: FxIndexMap<BoundTypeVarInstance<'db>, TypeVarVariance> =
-            FxIndexMap::default();
-        target.visit_specialization(db, |ty, variance| {
-            let Type::TypeVar(typevar) = ty else {
-                return;
-            };
-            variances
-                .entry(typevar)
-                .and_modify(|current| *current = current.join(variance))
-                .or_insert(variance);
-        });
+        debug_assert_eq!(self.relation, TypeRelation::Assignability);
+        debug_assert_eq!(self.typevar_evaluation, TypeVarEvaluation::Lazy);
 
-        variances
-            .into_iter()
-            .when_all(db, self.constraints, |(typevar, variance)| {
-                let (lower, upper) = match variance {
-                    TypeVarVariance::Covariant => (Some(gradual), None),
-                    TypeVarVariance::Contravariant => (None, Some(gradual)),
-                    TypeVarVariance::Invariant => (Some(gradual), Some(gradual)),
-                    TypeVarVariance::Bivariant => return self.always(),
-                };
-                ConstraintSet::constrain_typevar_with_bounds(
-                    db,
-                    self.constraints,
-                    typevar,
-                    lower,
-                    upper,
-                )
-            })
+        let source = target.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Inferable(
+                InferableTypeVarSpecialization::new(self.inferable, gradual),
+            )),
+            TypeContext::default(),
+        );
+
+        // Disable distribution for the recursive relation. In particular, specializing a type
+        // such as `T | U` can normalize back to the original gradual type; distributing again
+        // would recurse on the same pair. Lazy type-variable handling remains enabled, so the
+        // ordinary relation produces the lower and upper bounds implied by variance.
+        source.has_relation_to_with_options(
+            db,
+            target,
+            self.constraints,
+            self.inferable,
+            self.relation,
+            self.typevar_evaluation,
+            GradualConstraints::Collapse,
+        )
     }
 
     pub(super) fn check_specialization_pair(
@@ -1902,6 +1897,28 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     }
 }
 
+/// Replaces every type variable in an inference domain with the same type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub struct InferableTypeVarSpecialization<'db> {
+    inferable: InferableTypeVars<'db>,
+    replacement: Type<'db>,
+}
+
+impl<'db> InferableTypeVarSpecialization<'db> {
+    fn new(inferable: InferableTypeVars<'db>, replacement: Type<'db>) -> Self {
+        Self {
+            inferable,
+            replacement,
+        }
+    }
+
+    fn get(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> Option<Type<'db>> {
+        bound_typevar
+            .is_inferable(db, self.inferable)
+            .then_some(self.replacement)
+    }
+}
+
 /// A mapping between type variables and types.
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
@@ -1918,6 +1935,8 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    /// Maps every type variable in the current inference domain to the same type.
+    Inferable(InferableTypeVarSpecialization<'db>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
@@ -1952,6 +1971,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::Inferable(specialization) => specialization.get(db, bound_typevar),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
@@ -1991,7 +2011,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::Inferable(_)
+            | ApplySpecialization::Single(_, _) => None,
         }
     }
 }
