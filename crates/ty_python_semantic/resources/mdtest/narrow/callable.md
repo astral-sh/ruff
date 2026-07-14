@@ -54,16 +54,25 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-With relaxed generic narrowing, `isinstance(x, Callable)` produces the gradual type
-`Callable[..., Unknown]`. Any arguments can be passed to a gradual callable, and its return type is
-`Unknown`:
+### Strict generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+In strict generic narrowing mode, an `isinstance(.., Callable)` check intersects the type with
+`Top[Callable[..., object]]`. This type represents the set of all possible callable types
+(including, e.g., functions that take no arguments and functions that require arguments). While such
+objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
+be valid.
 
 ```py
 import typing as t
 
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: (...) -> Unknown
+        # error: [call-top-callable]
         return y(a, b)
     return None
 ```
@@ -77,6 +86,28 @@ def resolve(value: str):
         reveal_type(value)  # revealed: str & Top[(...) -> object]
         # error: [call-top-callable]
         reveal_type(value())  # revealed: object
+```
+
+### Relaxed generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+In relaxed generic narrowing mode, an `isinstance(.., Callable)` check narrows the type to
+`Callable[..., Unknown]` which is callable with any arguments and returns an unknown type:
+
+```py
+from typing import Callable
+
+def call_with_args(y: object):
+    if isinstance(y, Callable):
+        reveal_type(y)  # revealed: (...) -> Unknown
+
+        y()
+        y(1, "foo")
+        y(1, "foo", keyword_arg="bar")
 ```
 
 ## Narrowing with named expressions (walrus operator)
@@ -141,14 +172,11 @@ def f(x: object):
         reveal_type(x)  # revealed: (...) -> Unknown
     else:
         reveal_type(x)  # revealed: ~Top[(...) -> object]
+
     if isinstance(x, collections.abc.Callable):
         reveal_type(x)  # revealed: (...) -> Unknown
-
-def g(x: typing.Callable[[int], str] | None):
-    if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: (int, /) -> str
     else:
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
 ```
 
 ## `Callable` special-form identity
@@ -242,25 +270,4 @@ def _(subj: None | typing.Callable[..., str]) -> None:
         # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
         case typing.Callable(): ...
         case _: ...
-```
-
-## Strict generic narrowing
-
-With strict generic narrowing, `isinstance(x, Callable)` retains the fully static top
-materialization. No particular argument list is known to be valid for this type:
-
-```toml
-[analysis]
-strict-generic-narrowing = true
-```
-
-```py
-from typing import Callable
-
-def call_with_args(y: object, a: int, b: str) -> object:
-    if isinstance(y, Callable):
-        reveal_type(y)  # revealed: Top[(...) -> object]
-        # error: [call-top-callable]
-        return y(a, b)
-    return None
 ```

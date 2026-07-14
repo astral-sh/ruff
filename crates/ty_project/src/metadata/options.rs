@@ -1465,6 +1465,29 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Whether ty should use strict narrowing for unspecialized generic classes in
+    /// `isinstance()` and `issubclass()` checks.
+    ///
+    /// When enabled, ty narrows to the top materialization of the class. For example,
+    /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+    /// representing the (infinite) union of all possible `list` specializations. Iterating
+    /// over the list would yield values of type `object`.
+    ///
+    /// When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
+    /// check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
+    /// yields values of type `Unknown`, which is more permissive than `object`.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            # Use the top materialization when narrowing to an unspecialized generic class
+            strict-generic-narrowing = true
+        "#
+    )]
+    pub strict_generic_narrowing: Option<bool>,
+
     /// Whether equality-based checks should preserve broad builtin types rather than narrow them to
     /// literal types.
     ///
@@ -1596,29 +1619,6 @@ pub struct AnalysisOptions {
         "#
     )]
     pub replace_imports_with_any: Option<Vec<RangedValue<String>>>,
-
-    /// Whether ty should use strict narrowing for unspecialized generic classes in
-    /// `isinstance()` and `issubclass()` checks.
-    ///
-    /// When enabled, ty narrows to the top materialization of the class. For example,
-    /// `isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
-    /// representing the (infinite) union of all possible `list` specializations. Iterating
-    /// over the list would yield values of type `object`.
-    ///
-    /// When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
-    /// check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
-    /// yields values of type `Unknown`, which is more permissive than `object`.
-    ///
-    /// Defaults to `false`.
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-            # Use the top materialization when narrowing to an unspecialized generic class
-            strict-generic-narrowing = true
-        "#
-    )]
-    pub strict_generic_narrowing: Option<bool>,
 }
 
 impl AnalysisOptions {
@@ -1628,19 +1628,19 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            strict_generic_narrowing,
             strict_literal_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
-            strict_generic_narrowing,
         } = self;
 
         let AnalysisSettings {
+            strict_generic_narrowing: strict_generic_narrowing_default,
             strict_literal_narrowing: strict_literal_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
-            strict_generic_narrowing: strict_generic_narrowing_default,
         } = AnalysisSettings::default();
 
         let allowed_unresolved_imports =
@@ -1666,14 +1666,14 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            strict_generic_narrowing: strict_generic_narrowing
+                .unwrap_or(strict_generic_narrowing_default),
             strict_literal_narrowing: strict_literal_narrowing
                 .unwrap_or(strict_literal_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
             replace_imports_with_any,
-            strict_generic_narrowing: strict_generic_narrowing
-                .unwrap_or(strict_generic_narrowing_default),
         }
     }
 }
