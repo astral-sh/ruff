@@ -2594,6 +2594,16 @@ fn protocol_member_read_type<'db>(
         .unwrap_or_else(|error| error.fallback_member(db))
         .member(db)
         .place
+    } else if access == ProtocolMemberAccessMode::Instance
+        && member.qualifiers().contains(TypeQualifiers::CLASS_VAR)
+    {
+        receiver_ty
+            .class_member_with_policy(
+                db,
+                member.name.into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
     } else {
         receiver_ty.member(db, env, member.name).place
     };
