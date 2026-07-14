@@ -456,6 +456,17 @@ pub(crate) struct Suppressions {
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
     /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
+    /// Their range ends aren't necessarily sorted because own-line suppressions can be nested:
+    ///
+    /// ```py
+    /// # ty: ignore
+    /// value = (
+    ///     # ty: ignore
+    ///     missing
+    /// )
+    /// ```
+    ///
+    /// The outer suppression starts before the inner suppression but ends after it.
     inline: IntervalIndex<Suppression>,
 
     /// Suppressions with lint codes that are unknown.
