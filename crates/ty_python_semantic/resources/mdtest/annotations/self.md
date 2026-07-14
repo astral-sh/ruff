@@ -1067,7 +1067,7 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-from typing import final
+from typing import Any, Callable, final
 
 @final
 class Disjoint: ...
@@ -1080,10 +1080,20 @@ class Explicit:
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
+    def nested_dynamic(self: tuple[Any]) -> None: ...
+    def nested_generic[T](self: tuple[T]) -> None: ...
+    def class_object_generic[T](self: type[T]) -> None: ...
+    def compatible_generic[T](self: T) -> None: ...
+
 # error: [invalid-argument-type] "Argument to bound method `Explicit.bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()
+
+invalid_dynamic_callback: Callable[[], None] = Explicit().nested_dynamic  # error: [invalid-assignment]
+invalid_generic_callback: Callable[[], None] = Explicit().nested_generic  # error: [invalid-assignment]
+invalid_class_object_callback: Callable[[], None] = Explicit().class_object_generic  # error: [invalid-assignment]
+compatible_generic_callback: Callable[[], None] = Explicit().compatible_generic
 
 class ExplicitGeneric[T]:
     def special(self: ExplicitGeneric[int]) -> None:
@@ -1093,6 +1103,14 @@ ExplicitGeneric[int]().special()
 
 # TODO: this should be an `invalid-argument-type` error
 ExplicitGeneric[str]().special()
+
+class InvariantExplicitGeneric[T]:
+    value: T
+
+    def special(self: InvariantExplicitGeneric[int]) -> None: ...
+
+valid_callback: Callable[[], None] = InvariantExplicitGeneric[int]().special
+invalid_callback: Callable[[], None] = InvariantExplicitGeneric[str]().special  # error: [invalid-assignment]
 ```
 
 ## Binding a method fixes `Self`
