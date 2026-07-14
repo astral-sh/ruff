@@ -46,6 +46,13 @@ a = missing
 b = missing
 ```
 
+The suppression covers every statement on the following logical line.
+
+```py
+# ty: ignore[unresolved-reference]
+first = 1; second = missing  # fmt: skip
+```
+
 ## Multiline statements
 
 An ignore before a multiline statement applies to the entire logical line. Suppression ranges can
