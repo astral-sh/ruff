@@ -170,8 +170,8 @@ impl<'src> Lexer<'src> {
         // Avoid `Option::take` here: this check runs for every token, and `take` writes `None`
         // even when there is no pending indentation.
         else if let Some(indentation) = self.pending_indentation {
-            self.cursor.start_token();
             self.pending_indentation = None;
+            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
