@@ -184,6 +184,79 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Nested non-recursive generic aliases
+
+Reusing a non-recursive type alias definition in a nested specialization must not be treated as a
+recursive expansion.
+
+```py
+import typing as typing_module
+from typing import Annotated as TypeAnnotated, Literal
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type NonRecursiveId[T] = T
+
+static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
+static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
+static_assert(truth)
+
+one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
+reveal_type(one + 1)  # revealed: Literal[2]
+reveal_type(one == 1)  # revealed: Literal[True]
+
+type NonRecursiveLiteral[T] = typing_module.Literal["NonRecursiveLiteral"]
+
+static_assert(is_subtype_of(NonRecursiveLiteral[NonRecursiveLiteral[int]], Literal["NonRecursiveLiteral"]))
+static_assert(not is_subtype_of(NonRecursiveLiteral[NonRecursiveLiteral[int]], Literal["other"]))
+
+type NonRecursiveAnnotated[T] = TypeAnnotated[int, "NonRecursiveAnnotated"]
+
+static_assert(is_subtype_of(NonRecursiveAnnotated[NonRecursiveAnnotated[int]], int))
+static_assert(not is_subtype_of(NonRecursiveAnnotated[NonRecursiveAnnotated[int]], str))
+
+AliasAnnotated = TypeAnnotated
+type NonRecursiveAssignedAnnotated[T] = AliasAnnotated[T, "NonRecursiveAssignedAnnotated"]
+
+assigned_annotated_one: NonRecursiveAssignedAnnotated[NonRecursiveAssignedAnnotated[Literal[1]]] = 1
+reveal_type(assigned_annotated_one + 1)  # revealed: Literal[2]
+```
+
+## Re-exported special forms
+
+Special forms re-exported through an assignment remain special forms when determining whether an
+alias is recursive.
+
+`helpers.py`:
+
+```py
+from typing import Annotated
+from typing_extensions import TypeAliasType
+
+AliasAnnotated = Annotated
+AliasConstructor = TypeAliasType
+```
+
+`main.py`:
+
+```py
+from helpers import AliasAnnotated, AliasConstructor
+from typing import Literal
+
+type NonRecursiveReexportedAnnotated[T] = AliasAnnotated[T, "NonRecursiveReexportedAnnotated"]
+
+reexported_annotated_one: NonRecursiveReexportedAnnotated[NonRecursiveReexportedAnnotated[Literal[1]]] = 1
+reveal_type(reexported_annotated_one + 1)  # revealed: Literal[2]
+
+RecursiveReexportedConstructor = AliasConstructor("RecursiveReexportedConstructor", list["RecursiveReexportedConstructor"])
+
+def reexported_constructor(x: RecursiveReexportedConstructor):
+    reveal_type(x)  # revealed: list[RecursiveReexportedConstructor]
+```
+
 ## Stringified values
 
 Stringifying the right-hand side of a type alias is redundant, but allowed:
@@ -446,10 +519,10 @@ Mutually recursive type aliases created via the `TypeAliasType` constructor shou
 type checker to hang. The value type is computed lazily to break cycles.
 
 ```py
-from typing_extensions import TypeAliasType, Union
+from typing_extensions import TypeAliasType as AliasConstructor, Union
 
-A = TypeAliasType("A", Union[str, "B"])
-B = TypeAliasType("B", list[A])
+A = AliasConstructor("A", Union[str, "B"])
+B = AliasConstructor("B", list[A])
 
 def f(x: A) -> None:
     reveal_type(x)  # revealed: str | list[A]
@@ -574,6 +647,172 @@ def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
 ```
 
+### Generic specializations
+
+Mutual recursion must remain finite even when each round changes a specialization argument.
+
+```py
+type MutualGenericA[T] = list[MutualGenericB[list[T]]]
+type MutualGenericB[T] = dict[str, MutualGenericA[T]]
+
+def mutual_generic_specializations(x: MutualGenericA[int]):
+    reveal_type(x)  # revealed: list[MutualGenericB[list[int]]]
+    reveal_type(x[0])  # revealed: dict[str, MutualGenericA[list[int]]]
+    reveal_type(x[0][""])  # revealed: list[MutualGenericB[list[list[int]]]]
+```
+
+### Class-scoped generic specializations
+
+Class-scoped aliases can recurse through a class attribute while changing a specialization.
+
+```py
+class ClassScopedAliases:
+    type Recursive[T] = list[ClassScopedAliases.Recursive[list[T]]]
+
+def class_scoped_specializations(x: ClassScopedAliases.Recursive[int]):
+    reveal_type(x)  # revealed: list[Recursive[list[int]]]
+    reveal_type(x[0])  # revealed: list[Recursive[list[list[int]]]]
+```
+
+### Cross-module generic specializations
+
+The same recursion detection must follow aliases imported from another module.
+
+`mutual_a.py`:
+
+```py
+from mutual_b import MutualImportedB
+
+type MutualImportedA[T] = list[MutualImportedB[list[T]]]
+```
+
+`mutual_b.py`:
+
+```py
+from mutual_a import MutualImportedA
+
+type MutualImportedB[T] = dict[str, MutualImportedA[T]]
+```
+
+`main.py`:
+
+```py
+from mutual_a import MutualImportedA
+
+def cross_module_mutual_specializations(x: MutualImportedA[int]):
+    reveal_type(x)  # revealed: list[MutualImportedB[list[int]]]
+    reveal_type(x[0])  # revealed: dict[str, MutualImportedA[list[int]]]
+    reveal_type(x[0][""])  # revealed: list[MutualImportedB[list[list[int]]]]
+```
+
+### Module-import generic specializations
+
+Alias references through module attributes must also participate in recursion detection.
+
+`mutual_module_a.py`:
+
+```py
+import mutual_module_b
+
+type MutualModuleA[T] = list[mutual_module_b.MutualModuleB[list[T]]]
+```
+
+`mutual_module_b.py`:
+
+```py
+import mutual_module_a
+
+type MutualModuleB[T] = dict[str, mutual_module_a.MutualModuleA[T]]
+```
+
+`main.py`:
+
+```py
+from mutual_module_a import MutualModuleA
+
+def module_import_mutual_specializations(x: MutualModuleA[int]):
+    reveal_type(x)  # revealed: list[MutualModuleB[list[int]]]
+    reveal_type(x[0])  # revealed: dict[str, MutualModuleA[list[int]]]
+    reveal_type(x[0][""])  # revealed: list[MutualModuleB[list[list[int]]]]
+```
+
+### Package-import generic specializations
+
+Module paths imported without an alias must consume their path components before resolving the type
+alias attribute.
+
+`pkg/__init__.py`:
+
+```py
+# Package marker.
+```
+
+`pkg/mutual_a.py`:
+
+```py
+import pkg.mutual_b
+
+type MutualPackageA[T] = list[pkg.mutual_b.MutualPackageB[list[T]]]
+```
+
+`pkg/mutual_b.py`:
+
+```py
+import pkg.mutual_a
+
+type MutualPackageB[T] = dict[str, pkg.mutual_a.MutualPackageA[T]]
+```
+
+`main.py`:
+
+```py
+from pkg.mutual_a import MutualPackageA
+
+def package_import_mutual_specializations(x: MutualPackageA[int]):
+    reveal_type(x)  # revealed: list[MutualPackageB[list[int]]]
+    reveal_type(x[0])  # revealed: dict[str, MutualPackageA[list[int]]]
+    reveal_type(x[0][""])  # revealed: list[MutualPackageB[list[list[int]]]]
+```
+
+### Package-import aliases
+
+An alias for a package preserves submodules explicitly imported in the same module.
+
+`pkg/__init__.py`:
+
+```py
+# Package marker.
+```
+
+`pkg/short_alias_a.py`:
+
+```py
+import pkg as package_alias
+import pkg.short_alias_b
+
+type ShortAliasA[T] = list[package_alias.short_alias_b.ShortAliasB[list[T]]]
+```
+
+`pkg/short_alias_b.py`:
+
+```py
+import pkg as package_alias
+import pkg.short_alias_a
+
+type ShortAliasB[T] = dict[str, package_alias.short_alias_a.ShortAliasA[T]]
+```
+
+`main.py`:
+
+```py
+from pkg.short_alias_a import ShortAliasA
+
+def package_alias_specializations(x: ShortAliasA[int]):
+    reveal_type(x)  # revealed: list[ShortAliasB[list[int]]]
+    reveal_type(x[0])  # revealed: dict[str, ShortAliasA[list[int]]]
+    reveal_type(x[0][""])  # revealed: list[ShortAliasB[list[list[int]]]]
+```
+
 ### Self-recursive callable type
 
 ```py
@@ -621,6 +860,20 @@ def top_bottom_growing[T](x: Top[GrowingList[T]], y: Bottom[GrowingList[T]]):
     reveal_type(x)  # revealed: list[GrowingList[T@top_bottom_growing | GrowingList[T@top_bottom_growing]]]
     reveal_type(y)  # revealed: list[GrowingList[T@top_bottom_growing | GrowingList[T@top_bottom_growing]]]
 ```
+
+### Stringified generic recursion
+
+Stringified forward references have the same recursive-expansion behavior as direct references.
+
+```py
+type StringRecursiveList[T] = list["StringRecursiveList[list[T]]"]
+
+def string_recursive_list(x: StringRecursiveList[int]):
+    reveal_type(x)  # revealed: list[StringRecursiveList[list[int]]]
+    reveal_type(x[0])  # revealed: list[StringRecursiveList[list[list[int]]]]
+```
+
+### Non-growing generic recursion
 
 Non-growing recursive aliases should continue to preserve distinct specializations.
 

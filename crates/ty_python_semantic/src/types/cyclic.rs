@@ -38,16 +38,16 @@ use crate::types::visitor::any_over_type;
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
-    FunctionLiteral(FunctionLiteral<'db>),
-    NewTypeInstance(Definition<'db>),
-    TypeAlias(Definition<'db>),
-    Other(Type<'db>),
+    RecursiveFunctionLiteral(FunctionLiteral<'db>),
+    RecursiveNewTypeInstance(Definition<'db>),
+    RecursiveTypeAlias(Definition<'db>),
+    NonRecursive(Type<'db>),
 }
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
-            .unwrap_or(TypeIdentity::Other(self))
+            .unwrap_or(TypeIdentity::NonRecursive(self))
     }
 
     pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
@@ -55,23 +55,23 @@ impl<'db> Type<'db> {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
             Type::FunctionLiteral(function) => {
-                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
+                Some(TypeIdentity::RecursiveFunctionLiteral(function.literal(db)))
             }
             // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
-            Type::NewTypeInstance(newtype) => {
-                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
+            Type::NewTypeInstance(newtype) => Some(TypeIdentity::RecursiveNewTypeInstance(
+                newtype.definition(db),
+            )),
+            // Type aliases need an identity only when their own definition is reachable again.
+            // An alias that merely expands to another recursive alias remains on the exact-type path.
+            Type::TypeAlias(alias) if alias.is_recursively_defined(db) => {
+                Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
-            // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
             _ => None,
         }
     }
 
-    const fn needs_recursive_identity(self) -> bool {
-        matches!(
-            self,
-            Type::FunctionLiteral(_) | Type::NewTypeInstance(_) | Type::TypeAlias(_)
-        )
+    fn needs_recursive_identity(self, db: &'db dyn Db) -> bool {
+        self.recursive_identity(db).is_some()
     }
 }
 
@@ -81,7 +81,7 @@ pub trait HasIdentity<'db> {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 
     /// Return `true` if an in-progress item with the same identity should be treated as a cycle.
-    fn needs_recursive_identity(&self) -> bool {
+    fn needs_recursive_identity(&self, _db: &'db dyn Db) -> bool {
         true
     }
 }
@@ -93,8 +93,8 @@ impl<'db> HasIdentity<'db> for Type<'db> {
         self.to_type_identity(db)
     }
 
-    fn needs_recursive_identity(&self) -> bool {
-        Type::needs_recursive_identity(*self)
+    fn needs_recursive_identity(&self, db: &'db dyn Db) -> bool {
+        Type::needs_recursive_identity(*self, db)
     }
 }
 
@@ -107,8 +107,8 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
         (self.0.to_identity(db), self.1.to_identity(db))
     }
 
-    fn needs_recursive_identity(&self) -> bool {
-        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
+    fn needs_recursive_identity(&self, db: &'db dyn Db) -> bool {
+        self.0.needs_recursive_identity(db) || self.1.needs_recursive_identity(db)
     }
 }
 
@@ -170,10 +170,10 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        if item.needs_recursive_identity() {
+        if item.needs_recursive_identity(db) {
             let identity = item.to_identity(db);
             if seen.iter().any(|active| {
-                active.needs_recursive_identity() && active.to_identity(db) == identity
+                active.needs_recursive_identity(db) && active.to_identity(db) == identity
             }) {
                 return CycleDetectorVisit::Cycle(item);
             }
@@ -265,16 +265,16 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     }
 
     fn needs_recursive_fallback(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
+        let Some(identity) = ty.recursive_identity(db) else {
+            return false;
+        };
+
         let Type::TypeAlias(alias) = ty else {
-            let Some(identity) = ty.recursive_identity(db) else {
-                return false;
-            };
             return seen
                 .iter()
                 .any(|active| active.recursive_identity(db) == Some(identity));
         };
 
-        let identity = TypeIdentity::TypeAlias(alias.definition(db));
         if !seen
             .iter()
             .any(|active| active.recursive_identity(db) == Some(identity))
@@ -542,7 +542,7 @@ mod tests {
             self.identity
         }
 
-        fn needs_recursive_identity(&self) -> bool {
+        fn needs_recursive_identity(&self, _db: &'db dyn Db) -> bool {
             self.recursive_identity
         }
     }

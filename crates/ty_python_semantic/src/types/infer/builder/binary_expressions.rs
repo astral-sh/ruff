@@ -31,6 +31,10 @@ impl<'db> HasIdentity<'db> for (Type<'db>, ast::Operator, Type<'db>) {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_identity(db), self.1, self.2.to_identity(db))
     }
+
+    fn needs_recursive_identity(&self, db: &'db dyn Db) -> bool {
+        self.0.needs_recursive_identity(db) || self.2.needs_recursive_identity(db)
+    }
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {

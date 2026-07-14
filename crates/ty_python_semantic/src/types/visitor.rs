@@ -348,16 +348,7 @@ pub(crate) struct RecursionGuard<'db> {
 impl<'db> RecursionGuard<'db> {
     /// Reduce costs by tracking only recursive types.
     fn active_identity(db: &'db dyn Db, ty: Type<'db>) -> Option<TypeIdentity<'db>> {
-        match ty {
-            Type::FunctionLiteral(function) => {
-                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
-            }
-            Type::NewTypeInstance(newtype) => {
-                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
-            }
-            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
-            _ => None,
-        }
+        ty.recursive_identity(db)
     }
 
     fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {

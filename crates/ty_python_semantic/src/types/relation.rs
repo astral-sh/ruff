@@ -735,8 +735,8 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
         )
     }
 
-    fn needs_recursive_identity(&self) -> bool {
-        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
+    fn needs_recursive_identity(&self, db: &'db dyn Db) -> bool {
+        self.0.needs_recursive_identity(db) || self.1.needs_recursive_identity(db)
     }
 }
 
