@@ -21,65 +21,29 @@
 //! case where a file or directory is already ignored by an ignore file at the
 //! project walk root.
 
-use ignore::gitignore;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ::ignore::gitignore;
 use rustc_hash::FxHashMap;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) enum Ignored {
-    /// A root ignore file proves that the project walker would skip this path.
-    Yes,
+use crate::system::walk_directory::{IgnoreIncremental, Ignored};
+use crate::system::{SystemPath, SystemPathBuf};
 
-    /// The file might be ignored, but we need to use the ignore walker to know for sure.
-    Uncertain,
-}
-
-impl Ignored {
-    pub(super) const fn is_uncertain(self) -> bool {
-        matches!(self, Self::Uncertain)
-    }
-}
-
-pub(super) struct IgnoreFiles<'a> {
-    walk_roots: &'a [SystemPathBuf],
-    system: Box<dyn System>,
+pub(super) struct IgnoreFiles {
+    walk_roots: Box<[SystemPathBuf]>,
     roots: FxHashMap<SystemPathBuf, RootIgnoreFiles>,
 }
 
-impl<'a> IgnoreFiles<'a> {
-    pub(super) fn new(system: Box<dyn System>, walk_roots: &'a [SystemPathBuf]) -> Self {
+impl IgnoreFiles {
+    pub(super) fn new(walk_roots: Vec<SystemPathBuf>) -> Self {
         Self {
-            walk_roots,
-            system,
+            walk_roots: walk_roots.into_boxed_slice(),
             roots: FxHashMap::default(),
-        }
-    }
-
-    /// Returns `Yes` only when the matching walk root can prune `path`
-    /// from its own ignore files. In all other cases, return uncertain.
-    pub(super) fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
-        // A nested explicit walk root gets its own depth-0 walk, so an ancestor
-        // root cannot prove that the nested root's descendants are ignored.
-        let Some(root) = self
-            .walk_roots
-            .iter()
-            .filter(|root| path.starts_with(root))
-            .max_by_key(|root| root.as_str().len())
-        else {
-            return Ignored::Uncertain;
-        };
-
-        if self.root_ignore_prunes_path(root, path, is_directory) {
-            Ignored::Yes
-        } else {
-            Ignored::Uncertain
         }
     }
 
     /// Answers the question whether the ignore file in the `root` directory
     /// ignores `path`.
     fn root_ignore_prunes_path(
-        &mut self,
+        roots: &mut FxHashMap<SystemPathBuf, RootIgnoreFiles>,
         root: &SystemPath,
         path: &SystemPath,
         is_directory: bool,
@@ -97,14 +61,40 @@ impl<'a> IgnoreFiles<'a> {
 
         let first_child_is_directory = !first_child_is_target || is_directory;
 
-        self.root_ignore_files(root)
-            .is_ignored(&first_child, first_child_is_directory)
+        Self::root_ignore_files(roots, root).is_ignored(&first_child, first_child_is_directory)
     }
 
-    fn root_ignore_files(&mut self, root: &SystemPath) -> &RootIgnoreFiles {
-        self.roots
+    fn root_ignore_files<'a>(
+        roots: &'a mut FxHashMap<SystemPathBuf, RootIgnoreFiles>,
+        root: &SystemPath,
+    ) -> &'a RootIgnoreFiles {
+        roots
             .entry(root.to_path_buf())
-            .or_insert_with(|| RootIgnoreFiles::read(self.system.as_ref(), root))
+            .or_insert_with(|| RootIgnoreFiles::read(root))
+    }
+}
+
+impl IgnoreIncremental for IgnoreFiles {
+    /// Returns `Yes` only when the matching walk root can prune `path`
+    /// from its own ignore files. In all other cases, return uncertain.
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
+        let Self { walk_roots, roots } = self;
+
+        // A nested explicit walk root gets its own depth-0 walk, so an ancestor
+        // root cannot prove that the nested root's descendants are ignored.
+        let Some(root) = walk_roots
+            .iter()
+            .filter(|root| path.starts_with(root))
+            .max_by_key(|root| root.as_str().len())
+        else {
+            return Ignored::Uncertain;
+        };
+
+        if Self::root_ignore_prunes_path(roots, root, path, is_directory) {
+            Ignored::Yes
+        } else {
+            Ignored::Uncertain
+        }
     }
 }
 
@@ -115,22 +105,26 @@ struct RootIgnoreFiles {
 }
 
 impl RootIgnoreFiles {
-    fn read(system: &dyn System, root: &SystemPath) -> Self {
-        let canonical_root = system.canonicalize_path(root).ok();
+    fn read(root: &SystemPath) -> Self {
+        let canonical_root = root.as_utf8_path().canonicalize_utf8().ok().map(|path| {
+            SystemPathBuf::from_utf8_path_buf(path)
+                .simplified()
+                .to_path_buf()
+        });
 
         let gitignore = if let Some(canonical_root) = canonical_root.as_deref()
-            && in_git_repository(system, canonical_root)
+            && in_git_repository(canonical_root)
             // A parent `.ignore` allowlist takes precedence over a matching
             // `.gitignore` at the walk root. Let the walker resolve that case.
-            && !has_parent_ignore_file(system, canonical_root)
+            && !has_parent_ignore_file(canonical_root)
         {
-            IgnoreFile::read(system, root, ".gitignore")
+            IgnoreFile::read(root, ".gitignore")
         } else {
             None
         };
 
         Self {
-            ignore: IgnoreFile::read(system, root, ".ignore"),
+            ignore: IgnoreFile::read(root, ".ignore"),
             gitignore,
         }
     }
@@ -155,9 +149,9 @@ enum IgnoreFile {
 }
 
 impl IgnoreFile {
-    fn read(system: &dyn System, root: &SystemPath, file_name: &str) -> Option<Self> {
+    fn read(root: &SystemPath, file_name: &str) -> Option<Self> {
         let ignore_path = root.join(file_name);
-        let contents = match system.read_to_string(&ignore_path) {
+        let contents = match std::fs::read_to_string(ignore_path.as_std_path()) {
             Ok(contents) => contents,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
             Err(_) => return Some(Self::Error),
@@ -176,9 +170,9 @@ impl IgnoreFile {
         };
 
         Ok(match matcher.matched(path.as_std_path(), is_directory) {
-            ignore::Match::None => None,
-            ignore::Match::Ignore(_) => Some(true),
-            ignore::Match::Whitelist(_) => Some(false),
+            ::ignore::Match::None => None,
+            ::ignore::Match::Ignore(_) => Some(true),
+            ::ignore::Match::Whitelist(_) => Some(false),
         })
     }
 }
@@ -203,41 +197,51 @@ fn build_matcher(
     builder.build().ok()
 }
 
-fn in_git_repository(system: &dyn System, canonical_root: &SystemPath) -> bool {
+fn in_git_repository(canonical_root: &SystemPath) -> bool {
     canonical_root.ancestors().any(|directory| {
-        system.path_exists(&directory.join(".git")) || system.path_exists(&directory.join(".jj"))
+        directory.join(".git").as_std_path().exists()
+            || directory.join(".jj").as_std_path().exists()
     })
 }
 
-fn has_parent_ignore_file(system: &dyn System, canonical_root: &SystemPath) -> bool {
+fn has_parent_ignore_file(canonical_root: &SystemPath) -> bool {
     canonical_root
         .parent()
         .into_iter()
         .flat_map(SystemPath::ancestors)
-        .any(|directory| system.path_exists(&directory.join(".ignore")))
+        .any(|directory| directory.join(".ignore").as_std_path().exists())
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{InMemorySystem, System, SystemPath, SystemPathBuf};
+    use tempfile::TempDir;
 
-    use super::{IgnoreFiles, Ignored};
+    use crate::system::walk_directory::Ignored;
+    use crate::system::{OsSystem, System, SystemPath, SystemPathBuf};
 
     struct TestProject {
-        system: InMemorySystem,
+        _temp_dir: TempDir,
+        system: OsSystem,
         root: SystemPathBuf,
     }
 
     impl TestProject {
         fn new() -> Self {
-            Self::with_root("/project")
+            Self::with_root("project")
         }
 
         fn with_root(root: &str) -> Self {
-            let system = InMemorySystem::new(root.into());
-            let root = system.current_directory().to_path_buf();
+            let temp_dir = TempDir::new().unwrap();
+            let temp_dir_path = SystemPath::from_std_path(temp_dir.path()).unwrap();
+            let root = temp_dir_path.join(root);
+            std::fs::create_dir_all(root.as_std_path()).unwrap();
+            let system = OsSystem::new(&root);
 
-            Self { system, root }
+            Self {
+                _temp_dir: temp_dir,
+                system,
+                root,
+            }
         }
 
         fn path(&self, relative_path: &str) -> SystemPathBuf {
@@ -245,11 +249,14 @@ mod tests {
         }
 
         fn write_files<'a>(&self, files: impl IntoIterator<Item = (SystemPathBuf, &'a str)>) {
-            self.system.fs().write_files_all(files).unwrap();
+            for (path, contents) in files {
+                std::fs::create_dir_all(path.parent().unwrap().as_std_path()).unwrap();
+                std::fs::write(path.as_std_path(), contents).unwrap();
+            }
         }
 
         fn create_directory(&self, path: impl AsRef<SystemPath>) {
-            self.system.fs().create_directory_all(path).unwrap();
+            std::fs::create_dir_all(path.as_ref().as_std_path()).unwrap();
         }
 
         fn is_ignored(&self, path: &SystemPath) -> Ignored {
@@ -257,7 +264,14 @@ mod tests {
         }
 
         fn is_ignored_from(&self, walk_roots: &[SystemPathBuf], path: &SystemPath) -> Ignored {
-            IgnoreFiles::new(self.system.dyn_clone(), walk_roots).is_ignored(path, false)
+            let (first, additional) = walk_roots.split_first().unwrap();
+            let mut builder = self.system.walk_directory(first);
+
+            for root in additional {
+                builder = builder.add(root);
+            }
+
+            builder.incremental_matcher().is_ignored(path, false)
         }
     }
 
@@ -276,6 +290,7 @@ mod tests {
     #[test]
     fn root_gitignore_file_requires_repository() {
         let project = TestProject::new();
+
         let path = project.path("build/keep.py");
         project.write_files([(project.path(".gitignore"), "build/\n")]);
 
@@ -306,7 +321,7 @@ mod tests {
 
     #[test]
     fn parent_ignore_file_disables_root_gitignore_pruning() {
-        let project = TestProject::with_root("/workspace/project");
+        let project = TestProject::with_root("workspace/project");
         let path = project.path("build/keep.py");
         project.write_files([
             (project.path(".git/HEAD"), "ref: refs/heads/main\n"),
