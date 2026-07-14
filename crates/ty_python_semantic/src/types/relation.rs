@@ -1034,6 +1034,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair_impl(db, source, target, true)
+    }
+
+    pub(super) fn check_type_pair_without_protocol_class_access(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair_impl(db, source, target, false)
+    }
+
+    fn check_type_pair_impl(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        check_protocol_class_access: bool,
+    ) -> ConstraintSet<'db, 'c> {
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
         }
@@ -1908,7 +1927,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(source, target, || {
-                    self.check_type_satisfies_protocol(db, source, target_proto)
+                    self.check_type_satisfies_protocol(
+                        db,
+                        source,
+                        target_proto,
+                        check_protocol_class_access,
+                    )
                 })
             }
 

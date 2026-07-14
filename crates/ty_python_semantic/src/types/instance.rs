@@ -500,6 +500,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
+        check_class_access: bool,
     ) -> ConstraintSet<'db, 'c> {
         // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `ty` has the protocol class in its MRO. This is a much cheaper check than the
@@ -565,7 +566,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .interface(db)
                 .members(db)
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
+                    self.type_satisfies_protocol_member(db, ty, &member, check_class_access)
                 })
         };
         if let Some(context) = self.report_context()
@@ -600,10 +601,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ));
 
         let constructed_ty = meta_ty.bindings(db).return_type(db);
-        self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
-            .and(db, self.constraints, || {
-                self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
-            })
+        self.check_type_pair_without_protocol_class_access(
+            db,
+            constructed_ty,
+            Type::ProtocolInstance(protocol),
+        )
+        .and(db, self.constraints, || {
+            self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
+        })
     }
 
     pub(super) fn check_nominal_instance_pair(
@@ -901,7 +906,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, Type::object(), protocol)
+                .check_type_satisfies_protocol(db, Type::object(), protocol, true)
                 .is_always_satisfied(db)
         }
 

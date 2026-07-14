@@ -1913,14 +1913,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         })
     }
 
-    /// Return `true` if `ty` provides every access required by this protocol member.
+    /// Return `true` if `ty` provides every requested access for this protocol member.
     pub(super) fn type_satisfies_protocol_member(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
+        check_class_access: bool,
     ) -> ConstraintSet<'db, 'c> {
-        let capabilities = member.implementation_capabilities(db, ty);
+        let mut capabilities = member.implementation_capabilities(db, ty);
+        if !check_class_access {
+            capabilities.class = ProtocolMemberAccess::NONE;
+        }
         if let Some(context) = self.report_context() {
             let instance_read_missing = capabilities.instance.read.is_some()
                 && protocol_member_read_type(
