@@ -315,7 +315,8 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-By contrast, explicitly annotated non-`ClassVar` dunder attributes remain regular callables:
+By contrast, explicitly annotated non-`ClassVar` dunder attributes remain regular callables during
+ordinary attribute access:
 
 ```py
 class Thunk:
@@ -327,8 +328,8 @@ class Thunk:
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
 ```
 
-In particular, the dunder name alone does not cause a concrete callable annotation to bind its first
-parameter:
+In particular, a dunder name alone does not cause a concrete callable annotation to bind its first
+parameter during ordinary attribute access:
 
 ```py
 def descriptor_candidate(value: str) -> int:

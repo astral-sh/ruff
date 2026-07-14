@@ -1176,7 +1176,8 @@ impl<'db> StaticClassLiteral<'db> {
         };
 
         // An annotated callable does not tell us whether the runtime value implements the
-        // descriptor protocol. Preserve its regular callable behavior for all lookup modes.
+        // descriptor protocol. Preserve its regular callable behavior for raw MRO lookup; implicit
+        // dunder calls can promote it before descriptor access if the signature needs a receiver.
         if !member.is_class_var()
             && let Place::Defined(place) = member.place
             && place.provenance.definition().is_some_and(|definition| {

@@ -49,9 +49,15 @@ impl<'db> Type<'db> {
                 {
                     Type::Callable(callable.into_function_like(db))
                 }
-                Type::TypeAlias(alias) => {
-                    visitor.visit_type(db, ty, || transform(db, alias.value_type(db), visitor))
-                }
+                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+                    let value_type = alias.value_type(db);
+                    let transformed = transform(db, value_type, visitor);
+                    if transformed == value_type {
+                        ty
+                    } else {
+                        transformed
+                    }
+                }),
                 Type::Union(union) => union.map(db, |element| transform(db, *element, visitor)),
                 Type::Intersection(intersection) => {
                     intersection.map_positive(db, |element| transform(db, *element, visitor))
