@@ -505,7 +505,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let protocol = protocol.materialized_for_relation(db, self.materialization_visitor);
+        let protocol = protocol.apply_deferred_materialization(db, self.materialization_visitor);
 
         // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `ty` has the protocol class in its MRO. This is a much cheaper check than the
@@ -979,7 +979,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    fn materialized_for_relation(
+    fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -987,7 +987,7 @@ impl<'db> ProtocolInstanceType<'db> {
         let Protocol::FromClass(class) = self.inner else {
             return self;
         };
-        let materialized = (*class).materialized_for_relation(db, visitor);
+        let materialized = (*class).apply_deferred_materialization(db, visitor);
         materialized
             .into_protocol_class(db)
             .map_or(self, Self::from_class)

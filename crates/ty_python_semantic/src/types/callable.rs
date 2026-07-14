@@ -675,7 +675,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    fn materialized_for_relation(
+    fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -845,8 +845,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.materialized_for_relation(db, self.materialization_visitor);
-        let target = target.materialized_for_relation(db, self.materialization_visitor);
+        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
+        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }

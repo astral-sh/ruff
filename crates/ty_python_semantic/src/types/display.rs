@@ -1770,6 +1770,7 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                // The following two are not user-facing, but we distinguish them here from Top/Bottom for debugging purposes.
                 Some(MaterializationKind::DeferredTop) => Some(("Top*", SpecialFormType::Top)),
                 Some(MaterializationKind::DeferredBottom) => {
                     Some(("Bottom*", SpecialFormType::Bottom))

@@ -1576,7 +1576,7 @@ impl<'db> Specialization<'db> {
         }
     }
 
-    pub(crate) fn materialized_for_relation(
+    pub(crate) fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -1641,8 +1641,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: Specialization<'db>,
         target: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.materialized_for_relation(db, self.materialization_visitor);
-        let target = target.materialized_for_relation(db, self.materialization_visitor);
+        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
+        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1917,8 +1917,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let left = left.materialized_for_relation(db, &materialization_visitor);
-        let right = right.materialized_for_relation(db, &materialization_visitor);
+        let left = left.apply_deferred_materialization(db, &materialization_visitor);
+        let right = right.apply_deferred_materialization(db, &materialization_visitor);
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();

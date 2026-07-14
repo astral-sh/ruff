@@ -317,7 +317,7 @@ impl<'db> TupleType<'db> {
             .map(|tuple| TupleType::new_internal(db, tuple.tuple(db), deferred_top_materialization))
     }
 
-    fn materialized_for_relation(
+    fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -358,8 +358,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.materialized_for_relation(db, self.materialization_visitor);
-        let target = target.materialized_for_relation(db, self.materialization_visitor);
+        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
+        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
         let (Some(source), Some(target)) = (source, target) else {
             return ConstraintSet::from_bool(self.constraints, source.is_none());
         };
@@ -714,10 +714,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let visitor = ApplyTypeMappingVisitor::default();
-        let Some(left) = left.materialized_for_relation(db, &visitor) else {
+        let Some(left) = left.apply_deferred_materialization(db, &visitor) else {
             return self.always();
         };
-        let Some(right) = right.materialized_for_relation(db, &visitor) else {
+        let Some(right) = right.apply_deferred_materialization(db, &visitor) else {
             return self.always();
         };
         self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
