@@ -4013,12 +4013,13 @@ impl<'db> Parameters<'db> {
             )
         {
             match materialization_kind {
-                MaterializationKind::Bottom => {
-                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
-                    // which accepts any call and is thus a subtype of all other parameters.
+                MaterializationKind::Bottom | MaterializationKind::BottomForNarrowing => {
+                    // The bottom materialization of the `...` parameters is
+                    // `(*object, **object)`, which accepts any call and is thus a subtype of all
+                    // other parameters.
                     return Parameters::bottom();
                 }
-                MaterializationKind::Top => {
+                MaterializationKind::Top | MaterializationKind::TopForNarrowing => {
                     return Parameters::top();
                 }
             }

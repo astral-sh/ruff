@@ -4886,7 +4886,6 @@ dependencies = [
  "test-case",
  "thiserror 2.0.18",
  "tracing",
- "ty_combine",
  "ty_module_resolver",
  "ty_python_core",
  "ty_site_packages",

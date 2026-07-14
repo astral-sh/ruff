@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
@@ -8,8 +10,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        LiteralValueTypeKind, MaterializationKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -414,7 +417,7 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
@@ -436,6 +439,11 @@ pub struct CallableType<'db> {
     /// ```
     #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
+
+    /// Whether this callable is a specially marked top materialization used temporarily while
+    /// applying a relaxed narrowing constraint.
+    #[returns(copy)]
+    pub(crate) top_materialization_for_narrowing: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -452,6 +460,19 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
+    pub(crate) fn new<S>(
+        db: &'db dyn Db,
+        signatures: S,
+        kind: CallableTypeKind,
+        provenance: CallableFunctionProvenance,
+    ) -> CallableType<'db>
+    where
+        S: salsa::plumbing::Lookup<CallableSignature<'db>> + Hash,
+        CallableSignature<'db>: salsa::plumbing::HashEqLike<S>,
+    {
+        CallableType::new_internal(db, signatures, kind, provenance, false)
+    }
+
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
@@ -518,11 +539,12 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db),
             CallableTypeKind::Regular,
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         )
     }
 
@@ -565,29 +587,32 @@ impl<'db> CallableType<'db> {
             return self.into_regular(db);
         }
 
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db),
             CallableTypeKind::FunctionLike,
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         )
     }
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db),
             CallableTypeKind::DunderParamSpec,
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         )
     }
 
@@ -601,12 +626,13 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db)
                 .apply_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         )
     }
 
@@ -629,13 +655,50 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(CallableType::new(
+        Some(CallableType::new_internal(
             db,
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
             self.provenance(db),
+            self.top_materialization_for_narrowing(db),
         ))
+    }
+
+    fn with_top_materialization_for_narrowing(
+        self,
+        db: &'db dyn Db,
+        top_materialization_for_narrowing: bool,
+    ) -> Self {
+        if self.top_materialization_for_narrowing(db) == top_materialization_for_narrowing {
+            self
+        } else {
+            Self::new_internal(
+                db,
+                self.signatures(db),
+                self.kind(db),
+                self.provenance(db),
+                top_materialization_for_narrowing,
+            )
+        }
+    }
+
+    fn materialized_for_relation(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        if !self.top_materialization_for_narrowing(db) {
+            return self;
+        }
+
+        self.with_top_materialization_for_narrowing(db, false)
+            .apply_type_mapping_impl(
+                db,
+                &TypeMapping::Materialize(MaterializationKind::Top),
+                TypeContext::default(),
+                visitor,
+            )
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -645,16 +708,31 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if matches!(
+            type_mapping,
+            TypeMapping::Materialize(MaterializationKind::TopForNarrowing)
+        ) {
+            return self.with_top_materialization_for_narrowing(db, true);
+        }
+
+        if self.top_materialization_for_narrowing(db)
+            && matches!(type_mapping, TypeMapping::Materialize(_))
+        {
+            return self;
+        }
+
         if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new(
+        CallableType::new_internal(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
             self.provenance(db),
+            self.top_materialization_for_narrowing(db)
+                && !matches!(type_mapping, TypeMapping::EraseNarrowingMaterialization),
         )
     }
 
@@ -774,6 +852,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let source = source.materialized_for_relation(db, self.materialization_visitor);
+        let target = target.materialized_for_relation(db, self.materialization_visitor);
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
