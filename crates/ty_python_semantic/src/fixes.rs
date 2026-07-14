@@ -1104,6 +1104,100 @@ class B(A):
         "#);
     }
 
+    #[test]
+    fn add_ignore_updates_own_line_suppressions() {
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "test.py",
+                "seen_code = True\n\
+                 # ty: ignore[]\n\
+                 value = missing\n\
+                 \n\
+                 def f(a: int, b: int) -> list[int]: return []\n\
+                 \n\
+                 # ty: ignore[invalid-assignment]\n\
+                 values: tuple[int] = f(\n\
+                     missing,\n\
+                     \"bad\",\n\
+                 )\n",
+            )
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let diagnostics = db.check_file(file);
+        let planned_fixes = FixMode::Suppress.fixes(&db, file, &diagnostics);
+        assert_eq!(planned_fixes.len(), 2);
+        assert_eq!(planned_fixes[0].fixed_diagnostics, 1);
+        assert_eq!(planned_fixes[1].fixed_diagnostics, 2);
+
+        let cancellation_token_source = CancellationTokenSource::new();
+        let fixes = fix_all(
+            &mut db,
+            diagnostics,
+            FixMode::Suppress,
+            &cancellation_token_source.token(),
+            Db::check_file,
+        )
+        .expect("operation never gets cancelled");
+
+        assert_eq!(fixes.count, 3);
+        assert!(fixes.diagnostics.is_empty());
+        assert_eq!(
+            &*source_text(&db, file),
+            "seen_code = True\n\
+             # ty: ignore[unresolved-reference]\n\
+             value = missing\n\
+             \n\
+             def f(a: int, b: int) -> list[int]: return []\n\
+             \n\
+             # ty: ignore[invalid-assignment, invalid-argument-type, unresolved-reference]\n\
+             values: tuple[int] = f(\n\
+                 missing,\n\
+                 \"bad\",\n\
+             )\n"
+        );
+    }
+
+    #[test]
+    fn safe_fix_does_not_promote_nested_own_line_suppression() {
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "test.py",
+                "seen_code = True\n\
+                 # ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]\n\
+                 value = missing\n",
+            )
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let diagnostics = db.check_file(file);
+        let cancellation_token_source = CancellationTokenSource::new();
+        let fixes = fix_all(
+            &mut db,
+            diagnostics,
+            FixMode::ApplyFixes(Applicability::Safe),
+            &cancellation_token_source.token(),
+            Db::check_file,
+        )
+        .expect("operation never gets cancelled");
+
+        assert_eq!(fixes.count, 2);
+        assert_eq!(
+            &*source_text(&db, file),
+            "seen_code = True\n\
+             \n\
+             value = missing\n"
+        );
+        assert!(
+            fixes
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.id().as_str() == "unresolved-reference")
+        );
+    }
+
     /// Tests that the `fix_all` doesn't end up in an infinite loop
     /// if the fixes never converge and that it emits a diagnostic in that case.
     #[test]

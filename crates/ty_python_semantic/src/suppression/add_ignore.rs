@@ -55,16 +55,6 @@ pub fn suppress_all(
     // but also the diagnostic with the wider range (because the suppression is on its start line).
     ids_full_range.sort_unstable_by_key(|(_, range)| (range.start(), range.end()));
 
-    // 1. Group the diagnostics by their line-start position and try to add
-    //    the suppression to an existing `ty: ignore` comment on that line.
-    let mut by_start: BTreeMap<_, (BTreeSet<LintName>, usize)> = BTreeMap::new();
-
-    for &(id, range) in &ids_full_range {
-        let (lints, suppressed_diagnostics) = by_start.entry(range.start()).or_default();
-        lints.insert(id);
-        *suppressed_diagnostics += 1;
-    }
-
     let mut fixes = Vec::with_capacity(ids_full_range.len());
 
     // Tracks which lints get inserted by line. The offset is the line's start offset.
@@ -75,22 +65,36 @@ pub fn suppress_all(
     // (see the example with the wider range above).
     let mut by_line = BTreeMap::<TextSize, BTreeMap<LintName, SuppressionPosition>>::new();
 
-    for (start_offset, (lints, suppressed_diagnostics)) in by_start {
-        let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
-        if let Some(add_to_start) =
-            add_to_existing_suppression(suppressions, &source, &codes, start_offset)
-        {
-            by_line.entry(start_offset).or_default().extend(
-                codes
-                    .iter()
-                    .copied()
-                    .map(|code| (code, SuppressionPosition::StartLine)),
-            );
-            fixes.push(SuppressFix {
-                fix: add_to_start,
-                suppressed_diagnostics,
-            });
+    let mut by_suppression = BTreeMap::<TextSize, ExistingSuppressionGroup>::new();
+
+    // 1. Try to add each diagnostic to an existing applicable `ty: ignore` comment, grouping
+    //    diagnostics that resolve to the same comment into a single fix.
+    for &(id, range) in &ids_full_range {
+        let start_offset = range.start();
+        if let Some(existing) = find_existing_suppression(suppressions, &source, start_offset) {
+            by_line
+                .entry(start_offset)
+                .or_default()
+                .insert(id, SuppressionPosition::StartLine);
+
+            let group = by_suppression
+                .entry(existing.insertion_offset)
+                .or_insert_with(|| ExistingSuppressionGroup {
+                    existing,
+                    codes: BTreeSet::new(),
+                    suppressed_diagnostics: 0,
+                });
+            group.codes.insert(id);
+            group.suppressed_diagnostics += 1;
         }
+    }
+
+    for group in by_suppression.into_values() {
+        let codes: SmallVec<[LintName; 2]> = group.codes.into_iter().collect();
+        fixes.push(SuppressFix {
+            fix: add_to_existing_suppression(group.existing, &codes),
+            suppressed_diagnostics: group.suppressed_diagnostics,
+        });
     }
 
     // 2. Group the diagnostics by their end position and try to add the code to an
@@ -152,6 +156,16 @@ enum SuppressionPosition {
     EndLine(TextSize),
 }
 
+/// Diagnostics that can be suppressed by a single edit to an existing suppression.
+///
+/// `codes` is deduplicated for insertion, while `suppressed_diagnostics` counts every diagnostic,
+/// including multiple diagnostics with the same lint code.
+struct ExistingSuppressionGroup {
+    existing: ExistingSuppression,
+    codes: BTreeSet<LintName>,
+    suppressed_diagnostics: usize,
+}
+
 /// Fix to suppress one or more diagnostics.
 pub struct SuppressFix {
     pub fix: Fix,
@@ -167,10 +181,10 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     let source = source_text(db, file);
     let codes = &[id.name()];
 
-    if let Some(add_fix) =
-        add_to_existing_suppression(suppressions, &source, codes, suppression_range.start())
+    if let Some(existing) =
+        find_existing_suppression(suppressions, &source, suppression_range.start())
     {
-        return add_fix;
+        return add_to_existing_suppression(existing, codes);
     }
 
     append_to_existing_or_add_end_of_line_suppression(
@@ -240,8 +254,8 @@ fn append_to_existing_or_add_end_of_line_suppression(
     codes: &[LintName],
     line_end: TextSize,
 ) -> Fix {
-    if let Some(add_fix) = add_to_existing_suppression(suppressions, source, codes, line_end) {
-        return add_fix;
+    if let Some(existing) = find_existing_suppression(suppressions, source, line_end) {
+        return add_to_existing_suppression(existing, codes);
     }
 
     let up_to_line_end = &source[..line_end.to_usize()];
@@ -265,41 +279,63 @@ fn append_to_existing_or_add_end_of_line_suppression(
     })
 }
 
-fn add_to_existing_suppression(
+fn find_existing_suppression(
     suppressions: &Suppressions,
     source: &str,
-    codes: &[LintName],
     offset: TextSize,
-) -> Option<Fix> {
-    let mut existing_suppressions = suppressions
+) -> Option<ExistingSuppression> {
+    let existing = suppressions
         .inline_suppressions(TextRange::empty(offset))
-        .filter(|suppression| {
+        .find(|suppression| {
             matches!(
                 suppression.target,
                 SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
             )
-        });
-
-    // If there's an existing `ty: ignore[]` comment, append the code to it instead of creating a new suppression comment.
-    let existing = existing_suppressions.next()?;
+        })?;
     let comment_text = &source[existing.comment_range];
 
     // Only add to the existing ignore comment if it has no reason.
-    let before_closing_paren = comment_text.trim_end().strip_suffix(']')?;
-    let up_to_last_code = before_closing_paren.trim_end();
-
-    let insertion = if up_to_last_code.ends_with(',') {
-        format!(" {codes}", codes = Codes(existing.kind, codes))
+    let before_closing_bracket = comment_text.trim_end().strip_suffix(']')?;
+    let up_to_last_code = before_closing_bracket.trim_end();
+    let separator = if up_to_last_code.ends_with('[') {
+        ""
+    } else if up_to_last_code.ends_with(',') {
+        " "
     } else {
-        format!(", {codes}", codes = Codes(existing.kind, codes))
+        ", "
     };
-
     let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
 
-    Some(Fix::safe_edit(Edit::insertion(
-        insertion,
-        existing.comment_range.end() - relative_offset_from_end,
-    )))
+    Some(ExistingSuppression {
+        insertion_offset: existing.comment_range.end() - relative_offset_from_end,
+        kind: existing.kind,
+        separator,
+    })
+}
+
+/// Appends `codes` to an existing suppression comment.
+fn add_to_existing_suppression(existing: ExistingSuppression, codes: &[LintName]) -> Fix {
+    let separator = existing.separator;
+    let insertion = format!("{separator}{codes}", codes = Codes(existing.kind, codes));
+
+    Fix::safe_edit(Edit::insertion(insertion, existing.insertion_offset))
+}
+
+/// The location and formatting required to append lint codes to an existing suppression comment.
+///
+/// `kind` determines how codes are rendered, while `separator` preserves the syntax around the
+/// existing final code. For example:
+///
+/// ```python
+/// # ty: ignore[division-by-zero]
+/// ```
+///
+/// has an insertion offset before `]` and uses `", "` as the separator.
+#[derive(Copy, Clone)]
+struct ExistingSuppression {
+    insertion_offset: TextSize,
+    kind: SuppressionKind,
+    separator: &'static str,
 }
 
 struct Codes<'a>(SuppressionKind, &'a [LintName]);
