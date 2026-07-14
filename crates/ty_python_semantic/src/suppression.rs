@@ -302,6 +302,117 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     }
 }
 
+trait Interval {
+    fn interval(&self) -> TextRange;
+}
+
+/// A start-sorted interval index.
+///
+/// The entries form an implicit balanced binary tree. Each entry stores the maximum interval end
+/// in its subtree, which allows intersection queries to skip subtrees that end before the query.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalIndex<T> {
+    entries: Box<[IntervalEntry<T>]>,
+}
+
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalEntry<T> {
+    value: T,
+    subtree_max_end: TextSize,
+}
+
+impl<T: Interval> IntervalIndex<T> {
+    /// Builds an index from values sorted by interval start.
+    fn from_sorted(values: Vec<T>) -> Self {
+        let mut entries: Box<[_]> = values
+            .into_iter()
+            .map(|value| IntervalEntry {
+                subtree_max_end: value.interval().end(),
+                value,
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+
+        Self::set_subtree_max_ends(&mut entries);
+
+        Self { entries }
+    }
+
+    fn set_subtree_max_ends(entries: &mut [IntervalEntry<T>]) -> TextSize {
+        let mid = entries.len() / 2;
+        let (left, root_and_right) = entries.split_at_mut(mid);
+        let Some((root, right)) = root_and_right.split_first_mut() else {
+            return TextSize::default();
+        };
+
+        let left_max_end = Self::set_subtree_max_ends(left);
+        let right_max_end = Self::set_subtree_max_ends(right);
+        root.subtree_max_end = root
+            .value
+            .interval()
+            .end()
+            .max(left_max_end)
+            .max(right_max_end);
+        root.subtree_max_end
+    }
+
+    fn visit_intersecting<'a>(&'a self, query: TextRange, visit: &mut impl FnMut(&'a T)) {
+        Self::visit_intersecting_entries(&self.entries, query, visit);
+    }
+
+    fn visit_intersecting_entries<'a>(
+        entries: &'a [IntervalEntry<T>],
+        query: TextRange,
+        visit: &mut impl FnMut(&'a T),
+    ) {
+        let mid = entries.len() / 2;
+        let (left, root_and_right) = entries.split_at(mid);
+        let Some((root, right)) = root_and_right.split_first() else {
+            return;
+        };
+
+        if root.subtree_max_end < query.start() {
+            return;
+        }
+
+        Self::visit_intersecting_entries(left, query, visit);
+
+        if root.value.interval().start() > query.end() {
+            return;
+        }
+
+        if root.value.interval().end() >= query.start() {
+            visit(&root.value);
+        }
+
+        Self::visit_intersecting_entries(right, query, visit);
+    }
+
+    fn iter(&self) -> IntervalValues<'_, T> {
+        IntervalValues(self.entries.iter())
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+pub(crate) struct IntervalValues<'a, T>(std::slice::Iter<'a, IntervalEntry<T>>);
+
+impl<'a, T> Iterator for IntervalValues<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|entry| &entry.value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<T> ExactSizeIterator for IntervalValues<'_, T> {}
+
 /// The suppressions of a single file.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppressions {
@@ -315,16 +426,8 @@ pub(crate) struct Suppressions {
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
-    /// The suppressions are sorted by [`Suppression::range`] (which implies
-    /// [`Suppression::comment_range`]) and [`Suppression::suppressed_range`] start.
-    line: Vec<Suppression>,
-
-    /// The maximum [`Suppression::suppressed_range`] end up to and including each suppression in
-    /// [`Self::line`].
-    ///
-    /// This allows queries to skip preceding suppressions even when own-line suppression ranges
-    /// are nested and their ends aren't sorted.
-    line_prefix_max_end: Box<[TextSize]>,
+    /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
+    line: IntervalIndex<Suppression>,
 
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
@@ -356,21 +459,11 @@ impl Suppressions {
     /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
     /// suppressions cover the following logical line.
     fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        // Find the earliest suppression that may contain either boundary of the diagnostic range.
-        // The prefix maximum is sorted even though individual suppression range ends may not be.
-        let start = self
-            .line_prefix_max_end
-            .partition_point(|&max_end| max_end < range.start());
+        let mut intersecting = SmallVec::<[&Suppression; 4]>::new();
+        self.line
+            .visit_intersecting(range, &mut |suppression| intersecting.push(suppression));
 
-        // Suppression ranges are ordered by their start, so suppressions after this index cannot
-        // contain either boundary of the diagnostic range.
-        let end = self
-            .line
-            .partition_point(|suppression| suppression.suppressed_range.start() <= range.end());
-
-        // Search the potentially overlapping suppression comments for one that contains the
-        // range's start or end offset.
-        self.line[start..end].iter().filter(move |suppression| {
+        intersecting.into_iter().filter(move |suppression| {
             // Don't use intersect to avoid that suppressions on inner-expression
             // ignore errors for outer expressions
             suppression.suppressed_range.contains(range.start())
@@ -379,12 +472,12 @@ impl Suppressions {
     }
 
     fn iter(&self) -> SuppressionsIter<'_> {
-        self.file.iter().chain(&self.line)
+        self.file.iter().chain(self.line.iter())
     }
 }
 
 pub(crate) type SuppressionsIter<'a> =
-    std::iter::Chain<std::slice::Iter<'a, Suppression>, std::slice::Iter<'a, Suppression>>;
+    std::iter::Chain<std::slice::Iter<'a, Suppression>, IntervalValues<'a, Suppression>>;
 
 impl<'a> IntoIterator for &'a Suppressions {
     type Item = &'a Suppression;
@@ -444,6 +537,12 @@ impl Suppression {
 
     pub(crate) fn id(&self) -> FileSuppressionId {
         FileSuppressionId(self.range)
+    }
+}
+
+impl Interval for Suppression {
+    fn interval(&self) -> TextRange {
+        self.suppressed_range
     }
 }
 
@@ -534,25 +633,13 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 
     fn finish(mut self) -> Suppressions {
-        self.line.shrink_to_fit();
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
 
-        let mut max_end = TextSize::default();
-        let line_prefix_max_end = self
-            .line
-            .iter()
-            .map(|suppression| {
-                max_end = max_end.max(suppression.suppressed_range.end());
-                max_end
-            })
-            .collect();
-
         Suppressions {
             file: self.file,
-            line: self.line,
-            line_prefix_max_end,
+            line: IntervalIndex::from_sorted(self.line),
             unknown: self.unknown,
             invalid: self.invalid,
         }
@@ -710,4 +797,49 @@ struct UnknownSuppression {
 struct InvalidSuppression {
     kind: SuppressionKind,
     error: ParseError,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Interval, IntervalIndex};
+    use ruff_text_size::TextRange;
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct NamedInterval {
+        name: &'static str,
+        range: TextRange,
+    }
+
+    impl NamedInterval {
+        fn new(name: &'static str, start: u32, end: u32) -> Self {
+            Self {
+                name,
+                range: TextRange::new(start.into(), end.into()),
+            }
+        }
+    }
+
+    impl Interval for NamedInterval {
+        fn interval(&self) -> TextRange {
+            self.range
+        }
+    }
+
+    #[test]
+    fn interval_index_finds_nested_intersections_in_source_order() {
+        let intervals = IntervalIndex::from_sorted(vec![
+            NamedInterval::new("outer", 0, 100),
+            NamedInterval::new("first inner", 10, 20),
+            NamedInterval::new("second inner", 30, 40),
+            NamedInterval::new("third inner", 50, 60),
+            NamedInterval::new("after", 110, 120),
+        ]);
+
+        let mut names = Vec::new();
+        intervals.visit_intersecting(TextRange::empty(35.into()), &mut |interval| {
+            names.push(interval.name);
+        });
+
+        assert_eq!(names, ["outer", "second inner"]);
+    }
 }
