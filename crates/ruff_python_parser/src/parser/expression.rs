@@ -816,7 +816,7 @@ impl<'src> Parser<'src> {
         }
 
         let args_start = self.expr_scratch.len();
-        let mut keywords = vec![];
+        let keywords_start = self.keyword_scratch.len();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -826,7 +826,7 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
-                    keywords.push(ast::Keyword {
+                    parser.keyword_scratch.push(ast::Keyword {
                         arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
@@ -916,7 +916,7 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
-                        keywords.push(ast::Keyword {
+                        parser.keyword_scratch.push(ast::Keyword {
                             arg: Some(arg),
                             value: value.expr,
                             range: parser.node_range(argument_start),
@@ -943,11 +943,15 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
+        let keywords_len = self.keyword_scratch.len() - keywords_start;
+        let mut keywords = ThinVec::with_capacity(keywords_len);
+        keywords.extend(self.keyword_scratch.drain(keywords_start..));
+
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             args: self.expr_scratch.drain(args_start..).collect(),
-            keywords: keywords.into(),
+            keywords,
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);

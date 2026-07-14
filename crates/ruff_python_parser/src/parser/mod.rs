@@ -6,7 +6,8 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Expr, Int, IpyEscapeKind, Mod, ModExpression, ModModule, Stmt, StringFlags,
+    AtomicNodeIndex, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression, ModModule, Stmt,
+    StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -72,6 +73,9 @@ pub(crate) struct Parser<'src> {
     /// Reusable, nesting-safe scratch storage for expression lists.
     expr_scratch: Vec<Expr>,
 
+    /// Reusable, nesting-safe scratch storage for call keywords.
+    keyword_scratch: Vec<Keyword>,
+
     /// Reusable, nesting-safe scratch storage for statement lists.
     stmt_scratch: Vec<Stmt>,
 }
@@ -105,6 +109,7 @@ impl<'src> Parser<'src> {
             depth_remaining,
             max_nesting_depth,
             expr_scratch: Vec::new(),
+            keyword_scratch: Vec::new(),
             stmt_scratch: Vec::new(),
         }
     }

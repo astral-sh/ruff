@@ -101,6 +101,28 @@ fn nested_expression_lists() {
 }
 
 #[test]
+fn nested_call_keywords() {
+    let parsed = parse_expression(
+        "outer(alpha=first, beta=inner(gamma=value, delta=nested(epsilon=value), **mapping), zeta=last, **tail)",
+    )
+    .unwrap();
+    let Expr::Call(outer) = parsed.expr() else {
+        panic!("expected call expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(outer.arguments.args.len(), 0);
+    assert_eq!(outer.arguments.keywords.len(), 4);
+    let Expr::Call(inner) = &outer.arguments.keywords[1].value else {
+        panic!("expected nested call expression");
+    };
+    assert_eq!(inner.arguments.keywords.len(), 3);
+    let Expr::Call(nested) = &inner.arguments.keywords[1].value else {
+        panic!("expected doubly nested call expression");
+    };
+    assert_eq!(nested.arguments.keywords.len(), 1);
+}
+
+#[test]
 fn nested_statement_lists() {
     let suite = parse_module(
         r"
