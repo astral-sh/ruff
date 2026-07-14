@@ -2909,14 +2909,14 @@ static_assert(not is_assignable_to(Foo, SupportsFooMethod))
 static_assert(is_assignable_to(Foo, SupportsFooAttr))
 ```
 
-The reason for this is that some methods, such as dunder methods, are always looked up on the class
-directly. If a class with an `__iter__` instance attribute satisfied the `Iterable` protocol, for
-example, the `Iterable` protocol would not accurately describe the requirements Python has for a
-class to be iterable at runtime. Allowing callable instance attributes to satisfy method members of
-protocols would also make `issubclass()` narrowing of runtime-checkable protocols unsound, as the
-`issubclass()` mechanism at runtime for protocols only checks whether a method is accessible on the
-class object, not the instance. (Protocols with non-method members cannot be passed to
-`issubclass()` at all at runtime.)
+The reason for this is that some methods, such as Python's special methods, are always looked up on
+the class directly. If a class with an `__iter__` instance attribute satisfied the `Iterable`
+protocol, for example, the `Iterable` protocol would not accurately describe the requirements Python
+has for a class to be iterable at runtime. Allowing callable instance attributes to satisfy method
+members of protocols would also make `issubclass()` narrowing of runtime-checkable protocols
+unsound, as the `issubclass()` mechanism at runtime for protocols only checks whether a method is
+accessible on the class object, not the instance. (Protocols with non-method members cannot be
+passed to `issubclass()` at all at runtime.)
 
 ```py
 from typing import Iterable, Any
@@ -2928,26 +2928,6 @@ class Foo:
         self.__iter__: Callable[..., object] = lambda *args, **kwargs: None
 
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
-```
-
-Because method members are always looked up on the meta-type of an object when testing assignability
-and subtyping, we understand that `IterableClass` here is a subtype of `Iterable[int]` even though
-`IterableClass.__iter__` has the wrong signature:
-
-```py
-from typing import Iterator, Iterable
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_subtype_of
-
-class Meta(type):
-    def __iter__(self) -> Iterator[int]:
-        yield from range(42)
-
-class IterableClass(metaclass=Meta):
-    def __iter__(self) -> Iterator[str]:
-        yield from "abc"
-
-static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
 ```
 
 Enforcing that members must always be available on the class also means that it is safe to access a
@@ -3278,10 +3258,12 @@ parser: Parser = IntParser
 ## Class objects and `Self`-returning class-method protocol members
 
 When a class object is checked against a class-method protocol member, `Self` in the protocol
-signature is bound to instances of the class object rather than to the class object itself:
+signature names the class object. A class method that returns `Self` returns an instance and cannot
+satisfy that requirement; a class method that returns `type[Self]` can satisfy a `type[C]`
+candidate:
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to
@@ -3300,8 +3282,168 @@ class BadFactory:
     def make(cls) -> int:
         return 1
 
-static_assert(is_assignable_to(TypeOf[Factory], FactoryProtocol))
+class ClassObjectFactory:
+    @classmethod
+    def make(cls) -> type[Self]:
+        return cls
+
+static_assert(not is_assignable_to(TypeOf[Factory], FactoryProtocol))
 static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
+static_assert(is_assignable_to(type[ClassObjectFactory], FactoryProtocol))
+
+T = TypeVar("T", bound=FactoryProtocol)
+
+def exact_factory(value: T) -> T:
+    return value.make()
+
+exact_factory(Factory)  # error: [invalid-argument-type]
+exact_factory(ClassObjectFactory)  # error: [invalid-argument-type]
+
+def _(factory: type[ClassObjectFactory]) -> None:
+    exact_factory(factory)
+```
+
+## Class objects and `Self`-returning instance-method protocol members
+
+A class object can satisfy a protocol with a regular instance-method member if the class object's
+directly accessible member has a compatible bound signature. Class and static methods therefore
+work, but a regular instance method does not: accessing it through the class produces an unbound
+function rather than a method bound to the class object. If the protocol method returns `Self`, the
+implementation must return the class object, not an instance of the class.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class CopierProtocol(Protocol):
+    def copy(self) -> Self: ...
+
+class PlainCopierProtocol(Protocol):
+    def copy(self) -> str: ...
+
+class Copier:
+    def copy(self) -> Self:
+        return self
+
+class ClassCopier:
+    @classmethod
+    def copy(cls) -> Self:
+        return cls()
+
+class StaticCopier:
+    @staticmethod
+    def copy() -> "StaticCopier":
+        return StaticCopier()
+
+class ClassObjectCopier:
+    @classmethod
+    def copy(cls) -> type[Self]:
+        return cls
+
+class PlainClassCopier:
+    @classmethod
+    def copy(cls) -> str:
+        return "copy"
+
+class PlainStaticCopier:
+    @staticmethod
+    def copy() -> str:
+        return "copy"
+
+class CopierMeta(type):
+    def copy(cls) -> "BadDirectCopier":
+        return BadDirectCopier()
+
+class BadDirectCopier(metaclass=CopierMeta):
+    def copy(self, value: int) -> Self:
+        return self
+
+static_assert(is_assignable_to(Copier, CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[Copier], CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[ClassCopier], CopierProtocol))
+static_assert(not is_assignable_to(TypeOf[StaticCopier], CopierProtocol))
+static_assert(is_assignable_to(type[ClassObjectCopier], CopierProtocol))
+static_assert(is_assignable_to(TypeOf[PlainClassCopier], PlainCopierProtocol))
+static_assert(is_assignable_to(TypeOf[PlainStaticCopier], PlainCopierProtocol))
+# The metaclass method is compatible, but ordinary protocol methods describe direct access on the
+# class object, where `BadDirectCopier.copy` is an incompatible unbound function.
+static_assert(not is_assignable_to(TypeOf[BadDirectCopier], CopierProtocol))
+
+T = TypeVar("T", bound=CopierProtocol)
+
+def exact_copy(value: T) -> T:
+    return value.copy()
+
+exact_copy(ClassCopier)  # error: [invalid-argument-type]
+exact_copy(StaticCopier)  # error: [invalid-argument-type]
+exact_copy(ClassObjectCopier)  # error: [invalid-argument-type]
+
+def _(copier: type[ClassObjectCopier]) -> None:
+    exact_copy(copier)
+```
+
+## Class objects and dunder instance-method protocol members
+
+Special methods are looked up on the meta-type of an object when testing assignability and
+subtyping, matching Python's special-method lookup. We therefore understand that `IterableClass`
+here is a subtype of `Iterable[int]` even though `IterableClass.__iter__` has the wrong signature:
+
+```py
+from typing import Iterable, Iterator
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+
+class DirectIterable:
+    @classmethod
+    def __iter__(cls) -> Iterator[int]:
+        yield from range(42)
+
+iterable: Iterable[int] = DirectIterable  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
+  --> src/mdtest_snippet.py:20:11
+   |
+20 | iterable: Iterable[int] = DirectIterable  # snapshot
+   |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`
+   |           |
+   |           Declared type
+   |
+info: type `<class 'DirectIterable'>` is not assignable to protocol `Iterable[int]`
+info: └── protocol member `__iter__` is not defined on type `<class 'DirectIterable'>`
+info:     └── special methods must be defined on the meta-type when matching a protocol
+```
+
+A custom dunder such as `__custom__` is an ordinary method: it is accessed directly on the class
+object and does not use Python's special-method lookup.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class CustomProtocol(Protocol):
+    def __custom__(self, value: int) -> str: ...
+
+class Custom:
+    @classmethod
+    def __custom__(cls, value: int) -> str:
+        return str(value)
+
+static_assert(is_assignable_to(TypeOf[Custom], CustomProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -4901,7 +5043,7 @@ def _(cls: type[DecoratedMethods]) -> None:
     reveal_type(cls.class_)  # revealed: (value: int) -> str
 ```
 
-`Self` in a class method is bound to the class object being checked.
+`Self` in a class method names the instance constructed by the class object being checked.
 
 ```py
 class SelfFactory(Protocol):
@@ -4998,6 +5140,115 @@ class HiddenMethod(metaclass=HidingMeta):
         return b"foo"
 
 static_assert(not is_assignable_to(TypeOf[HiddenMethod], type[Foo]))
+```
+
+## Meta-protocols satisfying instance-method protocols
+
+A value of type `type[P]` is itself a class object, so it can satisfy another protocol through its
+directly accessible methods. An ordinary method on `P` remains unbound when accessed through
+`type[P]`, while class and static methods are bound. Generic specialization and overloads are
+preserved in either case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Iterable, Iterator, Protocol, Self, overload
+
+class BoundMethod(Protocol):
+    def method(self, value: int) -> str: ...
+
+class InstanceMethodSource(Protocol):
+    def method(self, value: int) -> str: ...
+
+class UnboundMethod(Protocol):
+    def method(self, instance: InstanceMethodSource, /, value: int) -> str: ...
+
+class StaticMethodSource(Protocol):
+    @staticmethod
+    def method(value: int) -> str: ...
+
+class ClassMethodSource(Protocol):
+    @classmethod
+    def method(cls, value: int) -> str: ...
+
+def _(
+    instance_source: type[InstanceMethodSource],
+    static_source: type[StaticMethodSource],
+    class_source: type[ClassMethodSource],
+) -> None:
+    reveal_type(instance_source.method)  # revealed: (self, /, value: int) -> str
+    unbound: UnboundMethod = instance_source
+    bound: BoundMethod = instance_source  # error: [invalid-assignment]
+    reveal_type(static_source.method)  # revealed: (value: int) -> str
+    static_bound: BoundMethod = static_source
+    reveal_type(class_source.method)  # revealed: (value: int) -> str
+    class_bound: BoundMethod = class_source
+
+class GenericBoundMethod[T](Protocol):
+    def method(self, value: T) -> T: ...
+
+class GenericStaticMethodSource[T](Protocol):
+    @staticmethod
+    def method(value: T) -> T: ...
+
+def _(source: type[GenericStaticMethodSource[int]]) -> None:
+    reveal_type(source.method)  # revealed: (value: int) -> int
+    good: GenericBoundMethod[int] = source
+    bad: GenericBoundMethod[str] = source  # error: [invalid-assignment]
+
+class OverloadedBoundMethod(Protocol):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+
+class OverloadedStaticMethodSource(Protocol):
+    @overload
+    @staticmethod
+    def method(value: int) -> int: ...
+    @overload
+    @staticmethod
+    def method(value: str) -> str: ...
+
+def _(source: type[OverloadedStaticMethodSource]) -> None:
+    reveal_type(source.method)  # revealed: Overload[(value: int) -> int, (value: str) -> str]
+    overloaded: OverloadedBoundMethod = source
+
+class Copier(Protocol):
+    def copy(self) -> Self: ...
+
+class InstanceFactory(Protocol):
+    @classmethod
+    def copy(cls) -> Self: ...
+
+class ClassObjectFactory(Protocol):
+    @classmethod
+    def copy(cls) -> type[Self]: ...
+
+def _(instance_factory: type[InstanceFactory], class_object_factory: type[ClassObjectFactory]) -> None:
+    reveal_type(instance_factory.copy)  # revealed: () -> InstanceFactory
+    bad: Copier = instance_factory  # error: [invalid-assignment]
+    reveal_type(class_object_factory.copy)  # revealed: () -> type[ClassObjectFactory]
+    good: Copier = class_object_factory
+
+class IterableSource(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+class CustomSource(Protocol):
+    @classmethod
+    def __custom__(cls, value: int) -> str: ...
+
+class CustomConsumer(Protocol):
+    def __custom__(self, value: int) -> str: ...
+
+def _(iterable_source: type[IterableSource], custom_source: type[CustomSource]) -> None:
+    reveal_type(iterable_source.__iter__)  # revealed: (self, /) -> Iterator[int]
+    iterable: Iterable[int] = iterable_source  # error: [invalid-assignment]
+    reveal_type(custom_source.__custom__)  # revealed: (value: int) -> str
+    custom: CustomConsumer = custom_source
 ```
 
 ## Generic meta-protocols

@@ -1053,6 +1053,121 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         )
     }
 
+    /// Returns whether this member is dispatched through special-method lookup on the type.
+    ///
+    /// The names are the methods registered in CPython's `slotdefs` table or explicitly looked
+    /// up on the type by Python or its standard library.
+    fn uses_special_method_lookup(&self) -> bool {
+        matches!(
+            self.name,
+            "__abs__"
+                | "__add__"
+                | "__aenter__"
+                | "__aexit__"
+                | "__aiter__"
+                | "__and__"
+                | "__anext__"
+                | "__await__"
+                | "__bool__"
+                | "__buffer__"
+                | "__bytes__"
+                | "__call__"
+                | "__ceil__"
+                | "__complex__"
+                | "__contains__"
+                | "__copy__"
+                | "__del__"
+                | "__delattr__"
+                | "__delete__"
+                | "__delitem__"
+                | "__dir__"
+                | "__divmod__"
+                | "__enter__"
+                | "__eq__"
+                | "__exit__"
+                | "__float__"
+                | "__floor__"
+                | "__floordiv__"
+                | "__format__"
+                | "__fspath__"
+                | "__ge__"
+                | "__get__"
+                | "__getattr__"
+                | "__getattribute__"
+                | "__getitem__"
+                | "__getnewargs__"
+                | "__getnewargs_ex__"
+                | "__gt__"
+                | "__hash__"
+                | "__iadd__"
+                | "__iand__"
+                | "__ifloordiv__"
+                | "__ilshift__"
+                | "__imatmul__"
+                | "__imod__"
+                | "__imul__"
+                | "__index__"
+                | "__init__"
+                | "__instancecheck__"
+                | "__int__"
+                | "__invert__"
+                | "__ior__"
+                | "__ipow__"
+                | "__irshift__"
+                | "__isub__"
+                | "__iter__"
+                | "__itruediv__"
+                | "__ixor__"
+                | "__le__"
+                | "__len__"
+                | "__length_hint__"
+                | "__lshift__"
+                | "__lt__"
+                | "__matmul__"
+                | "__missing__"
+                | "__mod__"
+                | "__mul__"
+                | "__ne__"
+                | "__neg__"
+                | "__new__"
+                | "__next__"
+                | "__or__"
+                | "__pos__"
+                | "__pow__"
+                | "__radd__"
+                | "__rand__"
+                | "__rdivmod__"
+                | "__release_buffer__"
+                | "__replace__"
+                | "__repr__"
+                | "__reversed__"
+                | "__rfloordiv__"
+                | "__rlshift__"
+                | "__rmatmul__"
+                | "__rmod__"
+                | "__rmul__"
+                | "__ror__"
+                | "__round__"
+                | "__rpow__"
+                | "__rrshift__"
+                | "__rshift__"
+                | "__rsub__"
+                | "__rtruediv__"
+                | "__rxor__"
+                | "__set__"
+                | "__set_name__"
+                | "__setattr__"
+                | "__setitem__"
+                | "__sizeof__"
+                | "__str__"
+                | "__sub__"
+                | "__subclasscheck__"
+                | "__truediv__"
+                | "__trunc__"
+                | "__xor__"
+        )
+    }
+
     fn is_property(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Property { .. })
     }
@@ -1068,8 +1183,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// Returns the accesses that a candidate value must provide for this member.
     ///
     /// A module-level callable can satisfy an ordinary or static method through direct member
-    /// access. A class object can likewise satisfy a class or static method. The member does not
-    /// also need to exist on the value's meta-type.
+    /// access. A class object can likewise satisfy a class, static, or ordinary instance method;
+    /// special instance methods instead use special-method lookup through the meta-type. Neither
+    /// case needs a separate class-side check for the same member.
     fn implementation_capabilities(
         &self,
         db: &'db dyn Db,
@@ -1084,14 +1200,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     _,
                     ProtocolMethodKind::Instance | ProtocolMethodKind::Static
                 )
-            ) | (
-                Type::ClassLiteral(_),
-                ProtocolMemberKind::Method(
-                    _,
-                    ProtocolMethodKind::Class | ProtocolMethodKind::Static
-                )
             )
-        ) {
+        ) || (is_class_object_type(ty) && self.is_method())
+        {
             ProtocolMemberCapabilities {
                 class: ProtocolMemberAccess::NONE,
                 ..capabilities
@@ -1263,6 +1374,13 @@ fn property_set_type<'db>(
     property_set_member_type(db, property.setter(db)?)?.bind_self(db, receiver_ty)
 }
 
+fn is_class_object_type(ty: Type<'_>) -> bool {
+    matches!(
+        ty,
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+    )
+}
+
 fn protocol_member_read_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1279,10 +1397,12 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
-    // PEP 544 matches module-level functions directly, without descriptor binding on `ModuleType`.
+    // Module-level functions and ordinary methods on class objects are matched through direct
+    // member access. Special instance methods still use special-method lookup on the meta-type.
     let place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
+        && (!is_class_object_type(ty) || member.uses_special_method_lookup())
     {
         ty.invoke_descriptor_protocol(
             db,
@@ -1625,12 +1745,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
 
-        // For a method on a class object, `Self` names instances of that class: a
-        // `@classmethod` returning `Self` returns `Factory`, not `type[Factory]`. For a
-        // non-method member, `Self` names the object whose attribute is being checked, so a
-        // class object must stay a class object.
-        let non_method_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
-        let method_self_binding_ty = ty
+        // `Self` in a protocol member names the value satisfying the protocol. `Self` in a
+        // method on a class object names instances of that class: a `@classmethod` returning
+        // `Self` returns `Factory`, not `type[Factory]`. Keep the bindings separate so a method
+        // that returns an instance cannot satisfy a protocol that promises the class object.
+        let protocol_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
+        let implementation_self_binding_ty = ty
             .to_instance(db)
             .or_else(|| ty.literal_fallback_instance(db))
             .unwrap_or(ty);
@@ -1656,8 +1776,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
-                        &callables.map(|callable| callable.apply_self(db, method_self_binding_ty)),
-                        required_callable.apply_self(db, method_self_binding_ty),
+                        &callables.map(|callable| {
+                            callable.apply_self(db, implementation_self_binding_ty)
+                        }),
+                        required_callable.apply_self(db, protocol_self_binding_ty),
                     )
                 })
         } else if member.is_instance_method() {
@@ -1674,11 +1796,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if callable.is_function_like(db) {
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, Some(method_self_binding_ty)),
+                                callable.bind_self(db, Some(implementation_self_binding_ty)),
                                 protocol_bind_self(
                                     db,
                                     required_callable,
-                                    Some(method_self_binding_ty),
+                                    Some(protocol_self_binding_ty),
                                 ),
                             )
                         } else {
@@ -1696,11 +1818,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(required_callable.apply_self(db, method_self_binding_ty)),
+                Type::Callable(required_callable.apply_self(db, protocol_self_binding_ty)),
             )
         } else {
             required_ty
-                .bind_self(db, non_method_self_binding_ty)
+                .bind_self(db, protocol_self_binding_ty)
                 .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
@@ -1820,6 +1942,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
                 .is_none();
             if instance_read_missing || class_read_missing {
+                if instance_read_missing
+                    && is_class_object_type(ty)
+                    && member.is_instance_method()
+                    && member.uses_special_method_lookup()
+                {
+                    context.push(ErrorContext::ProtocolSpecialMethodNotDefinedOnMetaType);
+                }
                 context.push(ErrorContext::ProtocolMemberNotDefined {
                     member_name: member.name.into(),
                     ty,
