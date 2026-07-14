@@ -151,8 +151,12 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Callable
+from collections.abc import Iterable
+from typing import Any, Callable, Protocol
+from typing_extensions import TypeVar
 from ty_extensions import Unknown
+
+DefaultFloat = TypeVar("DefaultFloat", bound=float, default=float)
 
 def g[T](x: tuple[T]) -> T:
     raise NotImplementedError
@@ -167,6 +171,24 @@ def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
     return fallback
 
 def g_union[T, U](x: tuple[T | U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def g_union_arms[T, U](x: T | tuple[U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def g_default(x: DefaultFloat | tuple[DefaultFloat]) -> DefaultFloat:
+    raise NotImplementedError
+
+def g_optional(x: DefaultFloat | None) -> DefaultFloat:
+    raise NotImplementedError
+
+def g_iterable[T](x: T | Iterable[T]) -> T:
+    raise NotImplementedError
+
+class RecursiveProtocol[T](Protocol):
+    def item(self) -> T | "RecursiveProtocol[T]": ...
+
+def recursive_protocol[T](value: RecursiveProtocol[T]) -> T:
     raise NotImplementedError
 
 class Invariant[T]:
@@ -187,8 +209,15 @@ def _(x: Any, callback: Any):
     reveal_type(f_tuple(g(x)))  # revealed: Any
     # Gradual evidence combines with other argument-derived constraints.
     reveal_type(g_with_fallback(x, 1))  # revealed: Any | Literal[1]
-    # `Any | Any` normalizes to `Any`, so there is no longer a unique mapping for `T` and `U`.
-    reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+    # Distribution recurses through generic types before splitting nested unions.
+    reveal_type(g_union(x))  # revealed: tuple[Any, Any]
+    # Gradual constraints from each viable union arm are combined.
+    reveal_type(g_union_arms(x))  # revealed: tuple[Any, Any]
+    reveal_type(g_default(x))  # revealed: Any
+    reveal_type(g_optional(x))  # revealed: Any
+    reveal_type(g_iterable(x))  # revealed: Any
+    # Recursive structural checks reuse the active relation's cycle detector.
+    reveal_type(recursive_protocol(x))  # revealed: Any
     # Invariant type parameters are handled by ordinary specialization assignability.
     reveal_type(invariant(x))  # revealed: Any
     # A gradual callable provides an upper bound for a type variable that only occurs in its
@@ -202,6 +231,11 @@ def _(x: Unknown):
     reveal_type(f_tuple(g(x)))  # revealed: Unknown
     reveal_type(g_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
     reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(g_union_arms(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(g_default(x))  # revealed: Unknown
+    reveal_type(g_optional(x))  # revealed: Unknown
+    reveal_type(g_iterable(x))  # revealed: Unknown
+    reveal_type(recursive_protocol(x))  # revealed: Unknown
     reveal_type(invariant(x))  # revealed: Unknown
 
 def _(callback: Unknown):

@@ -1548,6 +1548,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         debug_assert_eq!(self.relation, TypeRelation::Assignability);
         debug_assert_eq!(self.typevar_evaluation, TypeVarEvaluation::Lazy);
 
+        if let Type::Union(union) = target {
+            // Specialize union elements independently so that the gradual replacement cannot
+            // absorb the other elements before we extract their constraints. An unconditionally
+            // satisfied element contains no inference evidence; including its `true` result in
+            // the disjunction would erase the evidence from other elements.
+            let constraints = union
+                .elements(db)
+                .iter()
+                .map(|&element| self.distribute_gradual_constraints(db, gradual, element))
+                .filter(|constraints| !constraints.is_always_satisfied(db))
+                .when_any(db, self.constraints, |constraints| constraints);
+
+            // The retained gradual specializations are satisfiable, so `never` is only the
+            // identity produced by `when_any` when every element was filtered out.
+            return if constraints.is_never_satisfied(db) {
+                self.always()
+            } else {
+                constraints
+            };
+        }
+
         let source = target.apply_type_mapping(
             db,
             &TypeMapping::ApplySpecialization(ApplySpecialization::Inferable(
@@ -1556,19 +1577,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             TypeContext::default(),
         );
 
-        // Disable distribution for the recursive relation. In particular, specializing a type
-        // such as `T | U` can normalize back to the original gradual type; distributing again
-        // would recurse on the same pair. Lazy type-variable handling remains enabled, so the
-        // ordinary relation produces the lower and upper bounds implied by variance.
-        source.has_relation_to_with_options(
-            db,
-            target,
-            self.constraints,
-            self.inferable,
-            self.relation,
-            self.typevar_evaluation,
-            GradualConstraints::Collapse,
-        )
+        // Reuse this checker so recursive structural relations share its cycle detector. Starting
+        // a new relation here would let a recursive protocol repeatedly compare the same
+        // specialized pair without observing the active comparison.
+        self.check_type_pair(db, source, target)
     }
 
     pub(super) fn check_specialization_pair(
