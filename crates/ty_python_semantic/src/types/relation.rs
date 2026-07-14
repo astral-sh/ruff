@@ -2129,15 +2129,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
             (Type::ClassLiteral(source_cls), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, source_cls.default_specialization(db), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
+                match target_subclass_ty.subclass_of() {
+                    SubclassOfInner::Protocol(target_protocol) => self
+                        .check_meta_type_satisfies_protocol(
+                            db,
+                            Type::ClassLiteral(source_cls),
+                            target_protocol,
+                        ),
+                    target => target
+                        .into_class(db)
+                        .map(|target_cls| {
+                            self.check_class_pair(
+                                db,
+                                source_cls.default_specialization(db),
+                                target_cls,
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.is_eager_assignability(),
+                            )
+                        }),
+                }
             }
 
             // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
@@ -2160,15 +2174,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ),
 
             (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
+                match target_subclass_ty.subclass_of() {
+                    SubclassOfInner::Protocol(target_protocol) => self
+                        .check_meta_type_satisfies_protocol(
+                            db,
+                            Type::GenericAlias(source_alias),
+                            target_protocol,
+                        ),
+                    target => target
+                        .into_class(db)
+                        .map(|target_cls| {
+                            self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
+                        })
+                        .unwrap_or_else(|| {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.is_eager_assignability(),
+                            )
+                        }),
+                }
             }
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
@@ -2947,6 +2971,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
+                    SubclassOfInner::Protocol(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
                         !class_a.could_exist_in_mro_of_with_disjointness_checker(
@@ -2963,6 +2988,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
+                    SubclassOfInner::Protocol(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
                         !class_a.could_exist_in_mro_of_with_disjointness_checker(
@@ -2988,6 +3014,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
                 SubclassOfInner::Class(class) => {
                     self.check_type_pair(db, class.metaclass_instance_type(db), other)
+                }
+                SubclassOfInner::Protocol(_) => {
+                    self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
                 }
                 SubclassOfInner::TypeVar(_) => unreachable!(),
             },

@@ -451,7 +451,7 @@ var: type[C[int]] = C[int]
 var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
 ```
 
-However, generic `Protocol` classes are still TODO:
+Generic protocol meta-types preserve their specialization and use structural assignability:
 
 ```py
 from typing import Protocol
@@ -459,11 +459,10 @@ from typing import Protocol
 class Proto[U](Protocol):
     def some_method(self): ...
 
-# TODO: should be error: [invalid-assignment]
-var: type[Proto[int]] = C[int]
+var: type[Proto[int]] = C[int]  # error: [invalid-assignment]
 
 def _(p: type[Proto[int]]):
-    reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
+    reveal_type(p)  # revealed: type[Proto[int]]
 ```
 
 ## Generic `@final` classes

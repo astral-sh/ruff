@@ -1,14 +1,13 @@
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
-use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
     DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    TypedDictType, UnionType, todo_type,
+    ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
@@ -52,10 +51,17 @@ impl<'db> SubclassOfType<'db> {
                     Type::SubclassOf(Self { subclass_of })
                 }
             }
-            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
-                Type::SubclassOf(Self { subclass_of })
-            }
+            SubclassOfInner::Dynamic(_)
+            | SubclassOfInner::Protocol(_)
+            | SubclassOfInner::TypeVar(_) => Type::SubclassOf(Self { subclass_of }),
         }
+    }
+
+    /// Construct the meta-type of a class-backed protocol.
+    pub(super) const fn from_protocol(protocol: ProtocolInstanceType<'db>) -> Type<'db> {
+        Type::SubclassOf(Self {
+            subclass_of: SubclassOfInner::Protocol(protocol),
+        })
     }
 
     /// Given the class object `T`, returns a [`Type`] instance representing `type[T]`.
@@ -120,6 +126,25 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of
     }
 
+    /// Returns the effective write requirement exposed by `type[Protocol]` attribute lookup.
+    pub(super) fn meta_write_requirement(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
+        let SubclassOfInner::Protocol(protocol) = self.subclass_of else {
+            return None;
+        };
+        protocol
+            .interface(db)
+            .meta_write_requirement(db, Type::ProtocolInstance(protocol), name)
+            .map(|(write_ty, mut qualifiers)| {
+                // `ClassVar` prohibits instance writes, not writes through the class object.
+                qualifiers.remove(TypeQualifiers::CLASS_VAR);
+                (write_ty, qualifiers)
+            })
+    }
+
     pub(crate) const fn is_dynamic(self) -> bool {
         // Unpack `self` so that we're forced to update this method if any more fields are added in the future.
         let Self { subclass_of } = self;
@@ -163,6 +188,9 @@ impl<'db> SubclassOfType<'db> {
                     visitor,
                 )),
             }),
+            SubclassOfInner::Protocol(protocol) => protocol
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                .to_meta_type(db),
             SubclassOfInner::Dynamic(_) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => KnownClass::Type.to_instance(db),
@@ -172,7 +200,7 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                mapped.to_meta_type(db)
+                Self::try_from_instance(db, mapped).unwrap_or_else(|| mapped.to_meta_type(db))
             }
         }
     }
@@ -188,6 +216,9 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(_) => {}
             SubclassOfInner::Class(class) => {
                 class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
+            SubclassOfInner::Protocol(protocol) => {
+                protocol.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             SubclassOfInner::TypeVar(typevar) => {
                 Type::TypeVar(typevar).find_legacy_typevars_impl(
@@ -206,9 +237,16 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
+        if let SubclassOfInner::Protocol(protocol) = self.subclass_of
+            && let Some(member) = protocol.interface(db).meta_member(db, name)
+        {
+            return Some(member);
+        }
+
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin()?),
             SubclassOfInner::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
@@ -240,6 +278,7 @@ impl<'db> SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, class),
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
+            SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
     }
@@ -268,6 +307,9 @@ impl<'db> SubclassOfType<'db> {
             }
             SubclassOfInner::Class(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
                 .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            // Structural implementations of a protocol can have arbitrary metaclasses. The only
+            // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
+            SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db),
             // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
             // the bounds from instance types to `type[]` types. For example, `type[T]` where
             // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
@@ -296,6 +338,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
     fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarIdentity<'_>) -> TypeVarVariance {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, typevar),
+            SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, typevar),
             SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
         }
     }
@@ -309,6 +352,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: SubclassOfType<'db>,
         target: SubclassOfType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let SubclassOfInner::Protocol(target_protocol) = target.subclass_of {
+            return self.check_meta_type_satisfies_protocol(
+                db,
+                Type::SubclassOf(source),
+                target_protocol,
+            );
+        }
+        if let SubclassOfInner::Protocol(source_protocol) = source.subclass_of {
+            return self.check_type_pair(
+                db,
+                Type::ProtocolInstance(source_protocol),
+                target.to_instance(db),
+            );
+        }
+
         match (source.subclass_of, target.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
                 ConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
@@ -333,6 +391,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()
             }
+            (SubclassOfInner::Protocol(_), _) | (_, SubclassOfInner::Protocol(_)) => {
+                unreachable!("protocol meta-types are handled above")
+            }
         }
     }
 }
@@ -347,6 +408,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: SubclassOfType<'db>,
         right: SubclassOfType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if matches!(left.subclass_of, SubclassOfInner::Protocol(_))
+            || matches!(right.subclass_of, SubclassOfInner::Protocol(_))
+        {
+            // Protocols are open structural types, so their meta-types can generally overlap with
+            // concrete class-object types and with other protocol meta-types.
+            return ConstraintSet::from_bool(self.constraints, false);
+        }
+
         match (left.subclass_of, right.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
                 ConstraintSet::from_bool(self.constraints, false)
@@ -360,6 +429,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()
             }
+            (SubclassOfInner::Protocol(_), _) | (_, SubclassOfInner::Protocol(_)) => {
+                unreachable!("protocol meta-types are handled above")
+            }
         }
     }
 }
@@ -368,7 +440,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 ///
 /// 1. A "subclass of a class": `type[C]` for any class object `C`
 /// 2. A "subclass of a dynamic type": `type[Any]`, `type[Unknown]` and `type[@Todo]`
-/// 3. A "subclass of a type variable": `type[T]` for any type variable `T`
+/// 3. A protocol meta-type: `type[P]` for a class-backed protocol `P`
+/// 4. A "subclass of a type variable": `type[T]` for any type variable `T`
 ///
 /// In the long term, we may want to implement <https://github.com/astral-sh/ruff/issues/15381>.
 /// Doing this would allow us to get rid of this enum,
@@ -376,13 +449,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// rather than using the [`Type::SubclassOf`] variant at all;
 /// [`SubclassOfType`] would then be a simple wrapper around [`ClassType`].
 ///
-/// Note that this enum is similar to the [`super::ClassBase`] enum,
-/// but does not include the `ClassBase::Protocol` and `ClassBase::Generic` variants
-/// (`type[Protocol]` and `type[Generic]` are not valid types).
+/// Note that this enum is similar to the [`super::ClassBase`] enum, but does not include the
+/// `ClassBase::Protocol` and `ClassBase::Generic` special-form variants (`type[Protocol]` and
+/// `type[Generic]` are not valid types).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
     Dynamic(DynamicType<'db>),
+    Protocol(ProtocolInstanceType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
 }
 
@@ -401,7 +475,7 @@ impl<'db> SubclassOfInner<'db> {
 
     pub(crate) fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Self::Dynamic(_) => None,
+            Self::Dynamic(_) | Self::Protocol(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -419,14 +493,14 @@ impl<'db> SubclassOfInner<'db> {
 
     pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
-            Self::Class(_) | Self::TypeVar(_) => None,
+            Self::Class(_) | Self::Protocol(_) | Self::TypeVar(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
         }
     }
 
     pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
-            Self::Class(_) | Self::Dynamic(_) => None,
+            Self::Class(_) | Self::Dynamic(_) | Self::Protocol(_) => None,
             Self::TypeVar(bound_typevar) => Some(bound_typevar),
         }
     }
@@ -499,6 +573,9 @@ impl<'db> SubclassOfInner<'db> {
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
+            Self::Protocol(protocol) => Some(Self::Protocol(
+                protocol.recursive_type_normalized_impl(db, div, nested)?,
+            )),
             Self::TypeVar(_) => Some(self),
         }
     }
@@ -516,12 +593,6 @@ impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl<'db> From<ProtocolClass<'db>> for SubclassOfInner<'db> {
-    fn from(value: ProtocolClass<'db>) -> Self {
-        SubclassOfInner::Class(*value)
-    }
-}
-
 impl<'db> From<BoundTypeVarInstance<'db>> for SubclassOfInner<'db> {
     fn from(value: BoundTypeVarInstance<'db>) -> Self {
         SubclassOfInner::TypeVar(value)
@@ -533,6 +604,7 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
         match value.subclass_of {
             SubclassOfInner::Class(class) => class.into(),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
     }

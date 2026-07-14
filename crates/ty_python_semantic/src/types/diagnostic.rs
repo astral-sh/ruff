@@ -2815,6 +2815,7 @@ pub(crate) fn report_undeclared_protocol_member(
             }) => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Protocol(_) => return true,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },

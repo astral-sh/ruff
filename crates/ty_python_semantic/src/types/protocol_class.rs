@@ -320,6 +320,27 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    /// Returns the write requirement exposed through `type[Protocol]` lookup.
+    ///
+    /// Only members required on every class object that satisfies the meta-protocol are available.
+    /// Ordinary instance attributes are required on the constructed object instead.
+    pub(super) fn meta_write_requirement(
+        self,
+        db: &'db dyn Db,
+        receiver_ty: Type<'db>,
+        name: &str,
+    ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
+        self.member_by_name(db, name).and_then(|member| {
+            Some((
+                member
+                    .meta_access(db)?
+                    .write
+                    .and_then(|write| write.bind_self(db, receiver_ty)),
+                member.qualifiers(),
+            ))
+        })
+    }
+
     /// Returns the callable signature exposed by instance access to a protocol's `__call__`
     /// method.
     ///
@@ -358,6 +379,29 @@ impl<'db> ProtocolInterface<'db> {
                 }
             })
             .unwrap_or_else(|| Type::object().member(db, name))
+    }
+
+    /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
+    ///
+    /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
+    /// Properties are only required on the constructed instance, so they are undefined even when
+    /// the nominal protocol origin provides a property descriptor.
+    pub(super) fn meta_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        self.member_by_name(db, name).and_then(|member| {
+            let read = member.meta_access(db)?.read;
+            Some(PlaceAndQualifiers {
+                place: read
+                    .and_then(|read| read.resolve(db))
+                    .map(|read| Place::bound(read.ty()))
+                    .unwrap_or(Place::Undefined)
+                    .with_provenance(Provenance::from_definition(member.definition())),
+                qualifiers: member.qualifiers(),
+            })
+        })
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1055,6 +1099,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         } else {
             capabilities
         }
+    }
+
+    fn meta_access(&self, db: &'db dyn Db) -> Option<ProtocolMemberAccess<'db>> {
+        if self.has_todo_type() {
+            return None;
+        }
+        Some(self.capabilities(db).class)
     }
 
     fn has_todo_type(&self) -> bool {
@@ -1804,6 +1855,64 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result
+    }
+
+    /// Checks the members that a class object must provide to inhabit `type[Protocol]`.
+    ///
+    /// Ordinary instance attributes and properties are deliberately absent from this check. They
+    /// are requirements on the object produced by constructing the class, not on the class object
+    /// itself. `ClassVar`s and methods are checked through class access; unlike ordinary protocol
+    /// matching, method access compares the unbound signature instead of checking only presence.
+    pub(super) fn check_meta_protocol_members(
+        &self,
+        db: &'db dyn Db,
+        instance_ty: Type<'db>,
+        meta_ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        protocol
+            .interface(db)
+            .members(db)
+            .when_all(db, self.constraints, |member| {
+                let required = member.capabilities(db).class;
+                if required.read.is_none() && required.write.is_none() {
+                    return self.always();
+                }
+
+                let result = if member.is_method() {
+                    required.read.map_or_else(
+                        || self.always(),
+                        |required_ty| {
+                            self.check_protocol_member_read(
+                                db,
+                                instance_ty,
+                                meta_ty,
+                                &member,
+                                required_ty,
+                                ProtocolMemberAccessMode::Class,
+                            )
+                        },
+                    )
+                } else {
+                    self.type_satisfies_protocol_member_access(
+                        db,
+                        instance_ty,
+                        meta_ty,
+                        &member,
+                        required,
+                        ProtocolMemberAccessMode::Class,
+                    )
+                };
+
+                if let Some(context) = self.report_context()
+                    && result.is_never_satisfied(db)
+                {
+                    context.push(ErrorContext::ProtocolMemberIncompatible {
+                        member_name: member.name.into(),
+                    });
+                }
+                result
+            })
     }
 
     /// Compares either instance access or class access when relating two protocol members.

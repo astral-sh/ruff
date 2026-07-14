@@ -664,6 +664,16 @@ reveal_type(super(B, object))
 super(object, object()).__class__
 ```
 
+An inhabitant of `type[Protocol]` may be either a nominal subclass of the protocol or a structural
+implementation, so the protocol's presence in the class's MRO is unknown:
+
+```py
+class StructuralProtocol(typing.Protocol): ...
+
+def protocol_super(cls: type[StructuralProtocol]):
+    reveal_type(super(StructuralProtocol, cls))  # revealed: <super: <class 'StructuralProtocol'>, Unknown>
+```
+
 Not all objects valid in a class's bases list are valid as the first argument to `super()`. For
 example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to
 `super()`.
