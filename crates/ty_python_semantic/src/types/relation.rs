@@ -1107,8 +1107,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
-        let bound_or_constraints;
-
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1395,14 +1393,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // And vice versa. (No special metaclass handling is needed in this direction, since
             // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var() && source.to_instance(db).is_some() =>
+                if let Some(type_var) = subclass_of.into_type_var()
+                    && let Some(instance) = source.to_instance(db) =>
             {
-                subclass_of
-                    .into_type_var()
-                    .zip(source.to_instance(db))
-                    .when_some_and(db, self.constraints, |(target_i, source_i)| {
-                        self.check_type_pair(db, source_i, Type::TypeVar(target_i))
-                    })
+                self.check_type_pair(db, instance, Type::TypeVar(type_var))
             }
 
             // A gradual `ParamSpec` value (`...`) is assignability-consistent with any concrete
@@ -1433,23 +1427,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable) && {
-                    bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db);
-                    bound_or_constraints.is_some()
-                } =>
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && let Some(bound_or_constraints) =
+                        bound_typevar.typevar(db).bound_or_constraints(db) =>
             {
                 match bound_or_constraints {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         self.check_type_pair(db, bound, target)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
                         typevar_constraints.elements(db).iter().when_all(
                             db,
                             self.constraints,
                             |constraint| self.check_type_pair(db, *constraint, target),
                         )
                     }
-                    None => unreachable!(),
                 }
             }
 
@@ -1458,7 +1450,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
-                    && !bound_typevar
+                    && let constraints = bound_typevar
                         .typevar(db)
                         .constraints(db)
                         .when_some_and(db, self.constraints, |constraints| {
@@ -1466,21 +1458,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.check_type_pair(db, source, *c)
                             })
                         })
-                        .is_never_satisfied(db) =>
+                    && !constraints.is_never_satisfied(db) =>
             {
-                // TODO: The repetition here isn't great, but we really need the fallthrough logic,
-                // where this arm only engages if it returns true (or in the world of constraints,
-                // not false). Once we're using real constraint sets instead of bool, we should be
-                // able to simplify the typevar logic.
-                bound_typevar.typevar(db).constraints(db).when_some_and(
-                    db,
-                    self.constraints,
-                    |constraints| {
-                        constraints.iter().when_all(db, self.constraints, |c| {
-                            self.check_type_pair(db, source, *c)
-                        })
-                    },
-                )
+                constraints
             }
 
             (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, self.inferable) => {
@@ -1953,9 +1933,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // A string literal `Literal["abc"]` is assignable to `str` *and* to
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_string() =>
+                if let Some(value) = literal.as_string() =>
             {
-                let value = literal.as_string().unwrap();
                 let target_class = instance.class(db);
 
                 if target_class.is_known(db, KnownClass::Str) {
@@ -2001,9 +1980,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // A bytes literal `Literal[b"abc"]` is assignable to `bytes` *and* to
             // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_bytes() =>
+                if let Some(value) = literal.as_bytes() =>
             {
-                let value = literal.as_bytes().unwrap();
                 let target_class = instance.class(db);
 
                 if target_class.is_known(db, KnownClass::Bytes) {
@@ -2047,8 +2025,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
-            (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum() => {
-                let target_enum_literal = literal.as_enum().unwrap();
+            (Type::NominalInstance(_), Type::LiteralValue(literal))
+                if let Some(target_enum_literal) = literal.as_enum() =>
+            {
                 if target_enum_literal.enum_class_instance(db) != source {
                     self.never()
                 } else {
@@ -2625,26 +2604,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
                 Type::SubclassOf(subclass_of),
-            ) if subclass_of.is_type_var() => {
-                let type_var = subclass_of
-                    .subclass_of()
-                    .with_transposed_type_var(db)
-                    .into_type_var()
-                    .unwrap();
-
+            ) if let Some(type_var) = subclass_of
+                .subclass_of()
+                .with_transposed_type_var(db)
+                .into_type_var() =>
+            {
                 self.check_type_pair(db, Type::TypeVar(type_var), other)
             }
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var() && other.to_instance(db).is_some() =>
+                if let Some(type_var) = subclass_of.into_type_var()
+                    && let Some(instance) = other.to_instance(db) =>
             {
-                subclass_of
-                    .into_type_var()
-                    .zip(other.to_instance(db))
-                    .when_none_or(db, self.constraints, |(this_instance, other_instance)| {
-                        self.check_type_pair(db, Type::TypeVar(this_instance), other_instance)
-                    })
+                self.check_type_pair(db, Type::TypeVar(type_var), instance)
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must

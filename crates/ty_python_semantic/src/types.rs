@@ -3931,8 +3931,10 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Type::LiteralValue(literal) if literal.is_string() && name == "startswith" => {
-                    let string_literal = literal.as_string().unwrap();
+                Type::LiteralValue(literal)
+                    if name == "startswith"
+                        && let Some(string_literal) = literal.as_string() =>
+                {
                     Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(
                         string_literal,
                     )))
@@ -4114,9 +4116,9 @@ impl<'db> Type<'db> {
                 }
 
                 Type::LiteralValue(literal)
-                    if literal.is_bool() && matches!(name_str, "real" | "numerator") =>
+                    if matches!(name_str, "real" | "numerator")
+                        && let Some(bool_value) = literal.as_bool() =>
                 {
-                    let bool_value = literal.as_bool().unwrap();
                     Place::bound(Type::int_literal(i64::from(bool_value))).into()
                 }
 
@@ -4171,15 +4173,13 @@ impl<'db> Type<'db> {
 
                 Type::LiteralValue(literal)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                        && literal.as_enum().is_some_and(|enum_literal| {
-                            !enums::class_defines_property(
-                                db,
-                                enum_literal.enum_class(db),
-                                name_str,
-                            )
-                        }) =>
+                        && let Some(enum_literal) = literal.as_enum()
+                        && !enums::class_defines_property(
+                            db,
+                            enum_literal.enum_class(db),
+                            name_str,
+                        ) =>
                 {
-                    let enum_literal = literal.as_enum().unwrap();
                     let enum_class = enum_literal.enum_class_literal(db);
                     let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
