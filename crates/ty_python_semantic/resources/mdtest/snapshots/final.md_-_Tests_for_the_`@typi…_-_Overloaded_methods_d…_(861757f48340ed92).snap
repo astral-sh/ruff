@@ -188,7 +188,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/stub.pyi:26:5
+  --> src/stub.pyi:31:9
    |
 26 | /     @overload
 27 | |     def bar(self, x: str) -> str: ...
@@ -204,7 +204,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/stub.pyi:32:5
+  --> src/stub.pyi:37:9
    |
 32 | /     @overload
 33 | |     def baz(self, x: str) -> str: ...
@@ -304,7 +304,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:23:5
+  --> src/main.py:25:9
    |
 23 |     @overload
    |     ---------
@@ -321,7 +321,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:31:5
+  --> src/main.py:33:9
    |
 31 |     @final
    |     ------
@@ -338,7 +338,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:41:5
+  --> src/main.py:43:9
    |
 41 |     @overload
    |     ---------
@@ -353,7 +353,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/main.py:49:5
+  --> src/main.py:51:9
    |
 49 |     @final
    |     ------

@@ -704,7 +704,7 @@ type Alias1[*Ts, T = int] = tuple[*Ts, T]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:2:13
+ --> src/mdtest_snippet.py:2:18
   |
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
   |             ---  ^^^^^^^ `T` has a default
@@ -720,7 +720,7 @@ type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:4:17
+ --> src/mdtest_snippet.py:4:22
   |
 4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
   |                 ---  ^^^^^^^^ `T2` has a default
@@ -736,7 +736,7 @@ type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:6:13
+ --> src/mdtest_snippet.py:6:18
   |
 6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
   |             ---  ^^^^^^^^  -------- `T2` also has a default
@@ -755,7 +755,7 @@ type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:10:13
+  --> src/mdtest_snippet.py:10:18
    |
 10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
    |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default

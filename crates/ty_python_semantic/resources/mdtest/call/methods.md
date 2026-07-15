@@ -696,7 +696,7 @@ class Bad(NotCallableInitSubclass):
 
 ```snapshot
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:36:5
+  --> src/mdtest_snippet.py:39:7
    |
 36 |     __init_subclass__ = None
    |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable

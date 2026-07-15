@@ -66,7 +66,7 @@ info: See https://docs.python.org/3/glossary.html#term-generator for more detail
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:22:30
+  --> src/mdtest_snippet.py:24:12
    |
 22 | def invalid_return_type() -> typing.Generator[None, None, None]:
    |                              ---------------------------------- Expected `None` because of return type
@@ -78,7 +78,7 @@ error[invalid-return-type]: Return type does not match returned value
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:25:23
+  --> src/mdtest_snippet.py:27:12
    |
 25 | def wrong_return() -> typing.Generator[int, int, int]:
    |                       ------------------------------- Expected `int` because of return type
@@ -100,7 +100,7 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:33:35
+  --> src/mdtest_snippet.py:36:12
    |
 33 | def iterator_must_not_return() -> typing.Iterator[int]:
    |                                   -------------------- Expected `None` because of return type

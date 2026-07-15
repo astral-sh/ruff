@@ -59,7 +59,7 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 
 ```
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:5:12
+ --> src/mdtest_snippet.py:7:12
   |
 5 | def f() -> str:
   |            --- Expected `str` because of return type
@@ -71,7 +71,7 @@ error[invalid-return-type]: Return type does not match returned value
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:9:12
+  --> src/mdtest_snippet.py:11:5
    |
  9 | def f() -> int:
    |            --- Expected `int` because of return type
@@ -98,7 +98,7 @@ info:  - or as `@abstractmethod`-decorated methods on abstract classes
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:22:12
+  --> src/mdtest_snippet.py:24:12
    |
 22 | def f() -> A[int]:
    |            ------ Expected `mdtest_snippet.A[int]` because of return type
@@ -110,7 +110,7 @@ error[invalid-return-type]: Return type does not match returned value
 
 ```
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:28:12
+  --> src/mdtest_snippet.py:30:12
    |
 28 | def g() -> B:
    |            - Expected `mdtest_snippet.B` because of return type

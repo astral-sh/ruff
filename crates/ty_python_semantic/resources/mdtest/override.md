@@ -584,7 +584,7 @@ class ExplicitChild(Parent):
 
 ```snapshot
 error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
- --> src/mdtest_snippet.py:4:9
+ --> src/mdtest_snippet.py:7:9
   |
 4 |     def method(self) -> None: ...
   |         ------ `Parent.method` defined here
@@ -621,7 +621,7 @@ class ExplicitChild(Parent):
 
 ```snapshot
 error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
- --> src/mdtest_snippet.py:4:9
+ --> src/mdtest_snippet.py:7:9
   |
 4 |     def method(self) -> None: ...
   |         ------ `Parent.method` defined here

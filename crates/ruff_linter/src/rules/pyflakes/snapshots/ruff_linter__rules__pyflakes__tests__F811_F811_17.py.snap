@@ -23,7 +23,7 @@ help: Remove definition: `fu`
   |
 
 F811 Redefinition of unused `fu` from line 6
-  --> F811_17.py:6:12
+  --> F811_17.py:9:13
    |
  5 | def bar():
  6 |     import fu

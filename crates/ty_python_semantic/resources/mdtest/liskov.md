@@ -250,7 +250,7 @@ class Sub16(Super2):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method2`
-  --> src/mdtest_snippet.pyi:43:9
+  --> src/mdtest_snippet.pyi:46:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
@@ -271,7 +271,7 @@ class Sub17(Super2):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method2`
-  --> src/mdtest_snippet.pyi:43:9
+  --> src/mdtest_snippet.pyi:48:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
@@ -304,7 +304,7 @@ class Sub19(Super3):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method3`
-  --> src/mdtest_snippet.pyi:50:9
+  --> src/mdtest_snippet.pyi:55:9
    |
 50 |     def method3(self, *, x): ...
    |         ------------------- `Super3.method3` defined here
@@ -336,7 +336,7 @@ class Sub21(Super4):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/mdtest_snippet.pyi:57:9
+  --> src/mdtest_snippet.pyi:62:9
    |
 57 |     def method(self, *args: int, **kwargs: str): ...
    |         --------------------------------------- `Super4.method` defined here
@@ -650,7 +650,7 @@ class Compatible(ReturnsBool, ReturnsInt): ...
 
 ```snapshot
 error[invalid-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
-  --> src/mdtest_snippet.pyi:2:9
+  --> src/mdtest_snippet.pyi:10:7
    |
  2 |     def method(self) -> str: ...
    |         ------ `ReturnsStr.method` defined here
@@ -902,7 +902,7 @@ class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-met
 
 ```snapshot
 error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
-  --> src/mdtest_snippet.pyi:10:9
+  --> src/mdtest_snippet.pyi:13:7
    |
 10 |     def kind(cls, value: int) -> int: ...
    |         ---- `ClassMethod.kind` defined here
@@ -1142,7 +1142,7 @@ class ThirdChild(GradualParent):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `method`
- --> src/stub.pyi:4:9
+ --> src/stub.pyi:7:9
   |
 4 |     def method(self, x: int) -> None: ...
   |         ---------------------------- `Grandparent.method` defined here
@@ -1183,7 +1183,7 @@ info: This violates the Liskov Substitution Principle
 
 
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/stub.pyi:25:9
+  --> src/stub.pyi:28:9
    |
 25 |     def method(self) -> int: ...
    |         ------------------- `GrandparentWithReturnType.method` defined here
@@ -1196,7 +1196,7 @@ info: This violates the Liskov Substitution Principle
 
 
 error[invalid-method-override]: Invalid override of method `method`
-  --> src/stub.pyi:28:9
+  --> src/stub.pyi:33:9
    |
 28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
    |         ------------------- `ParentWithReturnType.method` defined here
@@ -1248,7 +1248,7 @@ class D(C):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `get`
- --> src/other_stub.pyi:2:9
+ --> src/other_stub.pyi:5:9
   |
 2 |     def get(self, default): ...
   |         ------------------ `A.get` defined here
@@ -1683,7 +1683,7 @@ class D(C):
 
 ```snapshot
 error[invalid-method-override]: Invalid override of method `x`
- --> src/bar.pyi:4:9
+ --> src/bar.pyi:7:5
   |
 4 |     def x(self, y: int): ...
   |         --------------- `A.x` defined here
@@ -1701,7 +1701,7 @@ info: This violates the Liskov Substitution Principle
 
 
 error[invalid-method-override]: Invalid override of method `x`
-  --> src/bar.pyi:10:5
+  --> src/bar.pyi:13:9
    |
 10 |     x = foo.x
    |     --------- `C.x` defined here

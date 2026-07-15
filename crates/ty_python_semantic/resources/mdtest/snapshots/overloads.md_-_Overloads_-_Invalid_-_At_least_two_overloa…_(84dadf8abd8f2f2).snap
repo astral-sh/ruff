@@ -36,7 +36,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `func` requires at least two overloads
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:5:5
   |
 3 | @overload
   | ---------
@@ -48,7 +48,7 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 
 ```
 error[invalid-overload]: Overloaded function `func` requires at least two overloads
- --> src/mdtest_snippet.pyi:3:1
+ --> src/mdtest_snippet.pyi:5:5
   |
 3 | @overload
   | ---------

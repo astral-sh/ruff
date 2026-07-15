@@ -31,7 +31,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Invalid use of type variable `U`
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:7:12
   |
 4 | U = TypeVar("U", default=T)
   | --------------------------- `U` defined here

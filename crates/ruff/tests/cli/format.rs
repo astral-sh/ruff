@@ -56,14 +56,14 @@ fn default_files() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> bar.py:1:1
+     --> bar.py:1:7
       |
       - bar =     "needs formatting"
     1 + bar = "needs formatting"
       |
 
     unformatted: File would be reformatted
-     --> foo.py:1:1
+     --> foo.py:1:7
       |
       - foo =     "needs formatting"
     1 + foo = "needs formatting"
@@ -520,7 +520,7 @@ exclude = ["format_excluded.py"]
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:3
       |
       - x    = 1
     1 + x = 1
@@ -548,7 +548,7 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:3
       |
       - x   = 1
     1 + x = 1
@@ -699,7 +699,7 @@ fn output_format_notebook() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:2:1
      ::: cell 1
       |
     1 | import numpy
@@ -834,7 +834,7 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:5
       |
       - def     foo():
       -                 pass
@@ -858,7 +858,7 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
+     --> main.py:1:5
       |
       - def     foo():
       -                 pass
@@ -2555,7 +2555,7 @@ fn markdown_formatting() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:4:7
        |
     3  | ```py
        - print( "hello" )
@@ -2692,7 +2692,7 @@ print( 'hello' )
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> test.bar:1:1
+     --> test.bar:5:7
       |
     4 | ```py
       - print( 'hello' )

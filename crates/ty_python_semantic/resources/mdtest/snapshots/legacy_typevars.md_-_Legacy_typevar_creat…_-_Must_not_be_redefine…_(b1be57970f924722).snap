@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 
 ```
 error[invalid-legacy-type-variable]: Cannot redefine `T` as a type variable
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:6:1
   |
 3 | T = TypeVar("T")
   | - Previously defined here

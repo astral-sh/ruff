@@ -93,7 +93,7 @@ class C:
 
 ```snapshot
 error[invalid-assignment]: Object of type `None` is not assignable to `str`
- --> src/mdtest_snippet.py:3:20
+ --> src/mdtest_snippet.py:3:26
   |
 3 |         self.attr: str = None  # snapshot: invalid-assignment
   |                    ---   ^^^^ Incompatible value of type `None`
@@ -102,7 +102,7 @@ error[invalid-assignment]: Object of type `None` is not assignable to `str`
 
 
 error[invalid-assignment]: Object of type `None` is not assignable to `str`
- --> src/mdtest_snippet.py:8:26
+ --> src/mdtest_snippet.py:8:32
   |
 8 |         cls.class_attr1: str = None  # snapshot: invalid-assignment
   |                          ---   ^^^^ Incompatible value of type `None`

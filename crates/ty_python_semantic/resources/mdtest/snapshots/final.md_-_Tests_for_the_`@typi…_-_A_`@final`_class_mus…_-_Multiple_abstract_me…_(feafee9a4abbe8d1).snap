@@ -41,7 +41,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `MissingAll` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:12:1
+  --> src/mdtest_snippet.py:13:7
    |
 12 |   @final
    |   ------
@@ -58,7 +58,7 @@ error[abstract-method-in-final-class]: Final class `MissingAll` has unimplemente
 
 ```
 error[abstract-method-in-final-class]: Final class `PartiallyImplemented` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:16:1
+  --> src/mdtest_snippet.py:17:7
    |
 16 |   @final
    |   ------
