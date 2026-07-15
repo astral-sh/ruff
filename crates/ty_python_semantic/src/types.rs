@@ -2722,14 +2722,11 @@ impl<'db> Type<'db> {
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
         {
-            let interface = protocol.interface(db);
-            return if !interface.includes_member(db, name)
-                || origin.interface(db).member_has_todo_type(db, name)
-            {
-                Type::instance(db, *origin).class_member_with_policy(db, name, policy)
-            } else {
-                ty.instance_member(db, name)
-            };
+            return protocol
+                .materialized_interface_member(db, name)
+                .unwrap_or_else(|| {
+                    Type::instance(db, *origin).class_member_with_policy(db, name, policy)
+                });
         }
 
         match ty {
