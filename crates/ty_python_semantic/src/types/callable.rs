@@ -171,7 +171,7 @@ impl<'db> Type<'db> {
                                 CallableSignature::from_overloads(signatures),
                                 callable.kind(db),
                                 callable.provenance(db),
-                                callable.deferred_top_materialization(db),
+                                callable.transient_top_materialization(db),
                             )
                         }))
                     }
@@ -193,7 +193,7 @@ impl<'db> Type<'db> {
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
                                     callable.provenance(db),
-                                    callable.deferred_top_materialization(db),
+                                    callable.transient_top_materialization(db),
                                 ));
                             }
                         }
@@ -442,9 +442,9 @@ pub struct CallableType<'db> {
     #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
 
-    /// Whether this callable is a deferred top materialization.
+    /// Whether this callable is a transient top materialization.
     #[returns(copy)]
-    pub(crate) deferred_top_materialization: bool,
+    pub(crate) transient_top_materialization: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -535,7 +535,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::Regular,
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         )
     }
 
@@ -584,7 +584,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         )
     }
 
@@ -594,7 +594,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::FunctionLike,
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         )
     }
 
@@ -604,7 +604,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::DunderParamSpec,
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         )
     }
 
@@ -624,7 +624,7 @@ impl<'db> CallableType<'db> {
                 .apply_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         )
     }
 
@@ -654,16 +654,16 @@ impl<'db> CallableType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         ))
     }
 
-    fn with_deferred_top_materialization(
+    fn with_transient_top_materialization(
         self,
         db: &'db dyn Db,
-        deferred_top_materialization: bool,
+        transient_top_materialization: bool,
     ) -> Self {
-        if self.deferred_top_materialization(db) == deferred_top_materialization {
+        if self.transient_top_materialization(db) == transient_top_materialization {
             self
         } else {
             Self::new(
@@ -671,22 +671,22 @@ impl<'db> CallableType<'db> {
                 self.signatures(db),
                 self.kind(db),
                 self.provenance(db),
-                deferred_top_materialization,
+                transient_top_materialization,
             )
         }
     }
 
-    /// Top-materializes the callable and removes the deferred-materialization marker.
-    fn apply_deferred_materialization(
+    /// Top-materializes the callable and removes the transient-materialization marker.
+    fn apply_transient_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if !self.deferred_top_materialization(db) {
+        if !self.transient_top_materialization(db) {
             return self;
         }
 
-        self.with_deferred_top_materialization(db, false)
+        self.with_transient_top_materialization(db, false)
             .apply_type_mapping_impl(
                 db,
                 &TypeMapping::Materialize(Materialization::new(MaterializationKind::Top)),
@@ -706,13 +706,13 @@ impl<'db> CallableType<'db> {
             type_mapping,
             TypeMapping::Materialize(Materialization {
                 kind: MaterializationKind::Top,
-                deferred: true,
+                transient: true,
             })
         ) {
-            return self.with_deferred_top_materialization(db, true);
+            return self.with_transient_top_materialization(db, true);
         }
 
-        if self.deferred_top_materialization(db)
+        if self.transient_top_materialization(db)
             && matches!(type_mapping, TypeMapping::Materialize(_))
         {
             return self;
@@ -728,8 +728,8 @@ impl<'db> CallableType<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db)
-                && !matches!(type_mapping, TypeMapping::EraseDeferredMaterialization),
+            self.transient_top_materialization(db)
+                && !matches!(type_mapping, TypeMapping::EraseTransientMaterialization),
         )
     }
 
@@ -850,8 +850,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
-        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
+        let source = source.apply_transient_materialization(db, self.materialization_visitor);
+        let target = target.apply_transient_materialization(db, self.materialization_visitor);
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }

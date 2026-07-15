@@ -1748,22 +1748,22 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 None => None,
                 Some(Materialization {
                     kind: MaterializationKind::Top,
-                    deferred: false,
+                    transient: false,
                 }) => Some(("Top", SpecialFormType::Top)),
                 Some(Materialization {
                     kind: MaterializationKind::Bottom,
-                    deferred: false,
+                    transient: false,
                 }) => Some(("Bottom", SpecialFormType::Bottom)),
                 // The following two are not user-facing, but we distinguish them here from
                 // Top/Bottom for debugging purposes.
                 Some(Materialization {
                     kind: MaterializationKind::Top,
-                    deferred: true,
-                }) => Some(("DeferredTop", SpecialFormType::Top)),
+                    transient: true,
+                }) => Some(("TransientTop", SpecialFormType::Top)),
                 Some(Materialization {
                     kind: MaterializationKind::Bottom,
-                    deferred: true,
-                }) => Some(("DeferredBottom", SpecialFormType::Bottom)),
+                    transient: true,
+                }) => Some(("TransientBottom", SpecialFormType::Bottom)),
             };
             let suffix = match self.specialization.materialization(self.db) {
                 None => "",
@@ -2059,7 +2059,7 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            deferred_top_materialization: self.deferred_top_materialization(db),
+            transient_top_materialization: self.transient_top_materialization(db),
             db,
             settings,
         }
@@ -2069,15 +2069,15 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    deferred_top_materialization: bool,
+    transient_top_materialization: bool,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if self.deferred_top_materialization {
-            f.write_str("DeferredTop[")?;
+        if self.transient_top_materialization {
+            f.write_str("TransientTop[")?;
         }
 
         match self.signatures.overloads.as_slice() {
@@ -2119,7 +2119,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
             }
         }
 
-        if self.deferred_top_materialization {
+        if self.transient_top_materialization {
             f.write_char(']')?;
         }
 

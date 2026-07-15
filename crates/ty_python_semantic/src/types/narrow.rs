@@ -438,7 +438,7 @@ impl ClassInfoConstraintFunction {
         strict_generic_narrowing: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let (specialization, is_deferred_materialization) = if is_positive
+            let (specialization, is_transient_materialization) = if is_positive
                 && !strict_generic_narrowing
                 && class.generic_context(db).is_some()
             {
@@ -453,8 +453,8 @@ impl ClassInfoConstraintFunction {
                 ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, specialization),
             };
 
-            if is_deferred_materialization {
-                constraint.deferred_top_materialization(db)
+            if is_transient_materialization {
+                constraint.transient_top_materialization(db)
             } else {
                 constraint
             }
@@ -618,7 +618,7 @@ impl ClassInfoConstraintFunction {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
                         let callable = Type::Callable(CallableType::unknown(db));
                         if is_positive && !strict_generic_narrowing {
-                            callable.deferred_top_materialization(db)
+                            callable.transient_top_materialization(db)
                         } else {
                             callable.top_materialization(db)
                         }
@@ -731,8 +731,8 @@ pub(crate) struct NarrowingConstraint<'db> {
     /// we may eagerly intersect conjunctions with a later intersection narrowing.
     replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
 
-    /// Whether this constraint was built using a deferred top materialization.
-    has_deferred_materialization: bool,
+    /// Whether this constraint was built using a transient top materialization.
+    has_transient_materialization: bool,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -742,15 +742,15 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
-            has_deferred_materialization: false,
+            has_transient_materialization: false,
         }
     }
 
-    fn class_info(constraint: Type<'db>, has_deferred_materialization: bool) -> Self {
+    fn class_info(constraint: Type<'db>, has_transient_materialization: bool) -> Self {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
-            has_deferred_materialization,
+            has_transient_materialization,
         }
     }
 
@@ -760,7 +760,7 @@ impl<'db> NarrowingConstraint<'db> {
         Self {
             intersection_disjuncts: smallvec![],
             replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
-            has_deferred_materialization: false,
+            has_transient_materialization: false,
         }
     }
 
@@ -783,8 +783,8 @@ impl<'db> NarrowingConstraint<'db> {
             return other;
         }
 
-        let has_deferred_materialization =
-            self.has_deferred_materialization || other.has_deferred_materialization;
+        let has_transient_materialization =
+            self.has_transient_materialization || other.has_transient_materialization;
 
         let mut new_intersection_disjuncts = smallvec![];
         for intersection_disjunct in &self.intersection_disjuncts {
@@ -817,13 +817,13 @@ impl<'db> NarrowingConstraint<'db> {
         NarrowingConstraint {
             intersection_disjuncts: new_intersection_disjuncts,
             replacement_disjuncts: new_replacement_disjuncts,
-            has_deferred_materialization,
+            has_transient_materialization,
         }
     }
 
     /// Merge two constraints with OR semantics (union/disjunction).
     fn merge_constraint_or(&mut self, other: Self) {
-        self.has_deferred_materialization |= other.has_deferred_materialization;
+        self.has_transient_materialization |= other.has_transient_materialization;
         self.intersection_disjuncts
             .extend(other.intersection_disjuncts);
         self.replacement_disjuncts
@@ -834,7 +834,7 @@ impl<'db> NarrowingConstraint<'db> {
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
     pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        let has_deferred_materialization = self.has_deferred_materialization;
+        let has_transient_materialization = self.has_transient_materialization;
         let mut union = UnionBuilder::new(db);
         for conjunctions in self
             .replacement_disjuncts
@@ -844,8 +844,8 @@ impl<'db> NarrowingConstraint<'db> {
             union = union.add(conjunctions.evaluate_constraint_type(db));
         }
         let ty = union.build();
-        if has_deferred_materialization {
-            ty.erase_deferred_materialization(db)
+        if has_transient_materialization {
+            ty.erase_transient_materialization(db)
         } else {
             ty
         }
@@ -3703,7 +3703,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     .db
                     .analysis_settings(self.scope().file(self.db))
                     .strict_generic_narrowing;
-                let has_deferred_materialization = is_positive
+                let has_transient_materialization = is_positive
                     && !strict_generic_narrowing
                     && !matches!(
                         class_info_ty,
@@ -3722,7 +3722,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                             place,
                             NarrowingConstraint::class_info(
                                 constraint.negate_if(self.db, !is_positive),
-                                has_deferred_materialization,
+                                has_transient_materialization,
                             ),
                         )])
                     })

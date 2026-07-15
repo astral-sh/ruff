@@ -135,9 +135,9 @@ impl TupleLength {
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
-    /// Whether this tuple is a deferred top materialization.
+    /// Whether this tuple is a transient top materialization.
     #[returns(copy)]
-    pub(crate) deferred_top_materialization: bool,
+    pub(crate) transient_top_materialization: bool,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -223,8 +223,8 @@ impl<'db> TupleType<'db> {
                     .specialize_tuple(db, element_type, self)
                     .with_materialization(
                         db,
-                        self.deferred_top_materialization(db)
-                            .then_some(Materialization::deferred(MaterializationKind::Top)),
+                        self.transient_top_materialization(db)
+                            .then_some(Materialization::transient(MaterializationKind::Top)),
                     )
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -242,7 +242,7 @@ impl<'db> TupleType<'db> {
             db,
             self.tuple(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
-            self.deferred_top_materialization(db),
+            self.transient_top_materialization(db),
         ))
     }
 
@@ -257,38 +257,39 @@ impl<'db> TupleType<'db> {
             type_mapping,
             TypeMapping::Materialize(Materialization {
                 kind: MaterializationKind::Top,
-                deferred: true,
+                transient: true,
             })
         ) {
-            return Some(if self.deferred_top_materialization(db) {
+            return Some(if self.transient_top_materialization(db) {
                 self
             } else {
                 TupleType::new_internal(db, self.tuple(db), true)
             });
         }
 
-        if self.deferred_top_materialization(db)
+        if self.transient_top_materialization(db)
             && matches!(type_mapping, TypeMapping::Materialize(_))
         {
             return Some(self);
         }
 
-        let deferred_top_materialization = self.deferred_top_materialization(db)
-            && !matches!(type_mapping, TypeMapping::EraseDeferredMaterialization);
+        let transient_top_materialization = self.transient_top_materialization(db)
+            && !matches!(type_mapping, TypeMapping::EraseTransientMaterialization);
         let tuple = self
             .tuple(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        TupleType::new(db, &tuple)
-            .map(|tuple| TupleType::new_internal(db, tuple.tuple(db), deferred_top_materialization))
+        TupleType::new(db, &tuple).map(|tuple| {
+            TupleType::new_internal(db, tuple.tuple(db), transient_top_materialization)
+        })
     }
 
-    /// Applies the tuple's deferred top materialization: `DeferredTop[..]` becomes `Top[..]`.
-    fn apply_deferred_materialization(
+    /// Applies the tuple's transient top materialization: `TransientTop[..]` becomes `Top[..]`.
+    fn apply_transient_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        if !self.deferred_top_materialization(db) {
+        if !self.transient_top_materialization(db) {
             return Some(self);
         }
 
@@ -324,8 +325,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
-        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
+        let source = source.apply_transient_materialization(db, self.materialization_visitor);
+        let target = target.apply_transient_materialization(db, self.materialization_visitor);
         let (Some(source), Some(target)) = (source, target) else {
             return ConstraintSet::from_bool(self.constraints, source.is_none());
         };
@@ -593,10 +594,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let visitor = ApplyTypeMappingVisitor::default();
-        let Some(left) = left.apply_deferred_materialization(db, &visitor) else {
+        let Some(left) = left.apply_transient_materialization(db, &visitor) else {
             return self.always();
         };
-        let Some(right) = right.apply_deferred_materialization(db, &visitor) else {
+        let Some(right) = right.apply_transient_materialization(db, &visitor) else {
             return self.always();
         };
         self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
@@ -677,8 +678,8 @@ fn to_class_type_cycle_initial<'db>(
                 .with_materialization(
                     db,
                     self_
-                        .deferred_top_materialization(db)
-                        .then_some(Materialization::deferred(MaterializationKind::Top)),
+                        .transient_top_materialization(db)
+                        .then_some(Materialization::transient(MaterializationKind::Top)),
                 )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))

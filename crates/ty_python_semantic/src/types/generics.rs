@@ -724,7 +724,7 @@ impl<'db> GenericContext<'db> {
                             signatures,
                             callable.kind(db),
                             callable.provenance(db),
-                            callable.deferred_top_materialization(db),
+                            callable.transient_top_materialization(db),
                         );
 
                         Some((callable, replacement))
@@ -1342,8 +1342,8 @@ impl<'db> Specialization<'db> {
 
         // Keep this check in sync with every field that can be transformed above.
         let original_materialization = self.materialization(db);
-        if matches!(type_mapping, TypeMapping::EraseDeferredMaterialization)
-            && new_materialization.is_some_and(Materialization::is_deferred)
+        if matches!(type_mapping, TypeMapping::EraseTransientMaterialization)
+            && new_materialization.is_some_and(Materialization::is_transient)
         {
             new_materialization = None;
         }
@@ -1443,13 +1443,13 @@ impl<'db> Specialization<'db> {
         materialization: Materialization,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // A deferred materialization retains the gradual arguments and marks the specialization as
+        // A transient materialization retains the gradual arguments and marks the specialization as
         // a whole. Relations materialize a temporary copy to the corresponding ordinary top or
         // bottom materialization, while the stored type can later be restored by removing the tag.
         //
-        // For example, `Sequence[Unknown]` becomes `DeferredTop[Sequence[Unknown]]` when deferred,
-        // and `Sequence[object]` when non-deferred.
-        if materialization.is_deferred() {
+        // For example, `Sequence[Unknown]` becomes `TransientTop[Sequence[Unknown]]` when transient,
+        // and `Sequence[object]` when non-transient.
+        if materialization.is_transient() {
             if self.materialization(db).is_none() {
                 return self.with_materialization(db, Some(materialization));
             }
@@ -1518,14 +1518,14 @@ impl<'db> Specialization<'db> {
         }
     }
 
-    /// Applies the specialization's deferred materialization: `DeferredTop[..]` becomes
-    /// `Top[..]`, and `DeferredBottom[..]` becomes `Bottom[..]`.
-    pub(crate) fn apply_deferred_materialization(
+    /// Applies the specialization's transient materialization: `TransientTop[..]` becomes
+    /// `Top[..]`, and `TransientBottom[..]` becomes `Bottom[..]`.
+    pub(crate) fn apply_transient_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let Some(materialization) = self.materialization(db).filter(|kind| kind.is_deferred())
+        let Some(materialization) = self.materialization(db).filter(|kind| kind.is_transient())
         else {
             return self;
         };
@@ -1583,8 +1583,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: Specialization<'db>,
         target: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
-        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
+        let source = source.apply_transient_materialization(db, self.materialization_visitor);
+        let target = target.apply_transient_materialization(db, self.materialization_visitor);
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1865,8 +1865,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         right: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let materialization_visitor = ApplyTypeMappingVisitor::default();
-        let left = left.apply_deferred_materialization(db, &materialization_visitor);
-        let right = right.apply_deferred_materialization(db, &materialization_visitor);
+        let left = left.apply_transient_materialization(db, &materialization_visitor);
+        let right = right.apply_transient_materialization(db, &materialization_visitor);
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();

@@ -1030,9 +1030,9 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Applies a generic class's deferred materialization: `DeferredTop[..]` becomes `Top[..]`,
-    /// and `DeferredBottom[..]` becomes `Bottom[..]`.
-    pub(crate) fn apply_deferred_materialization(
+    /// Applies a generic class's transient materialization: `TransientTop[..]` becomes `Top[..]`,
+    /// and `TransientBottom[..]` becomes `Bottom[..]`.
+    pub(crate) fn apply_transient_materialization(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -1042,7 +1042,7 @@ impl<'db> ClassType<'db> {
             Self::Generic(alias) => {
                 let original_specialization = alias.specialization(db);
                 let specialization =
-                    original_specialization.apply_deferred_materialization(db, visitor);
+                    original_specialization.apply_transient_materialization(db, visitor);
                 if specialization == original_specialization {
                     self
                 } else {

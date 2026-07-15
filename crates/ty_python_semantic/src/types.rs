@@ -329,13 +329,15 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         let type_transformer = match type_mapping {
             TypeMapping::Materialize(Materialization {
                 kind: MaterializationKind::Top,
-                deferred: false,
+                transient: false,
             }) => &self.top_materialization,
             TypeMapping::Materialize(Materialization {
                 kind: MaterializationKind::Bottom,
-                deferred: false,
+                transient: false,
             }) => &self.bottom_materialization,
-            TypeMapping::Materialize(Materialization { deferred: true, .. }) => &self.default,
+            TypeMapping::Materialize(Materialization {
+                transient: true, ..
+            }) => &self.default,
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization:
                     Materialization {
@@ -413,29 +415,29 @@ pub enum MaterializationKind {
     Bottom,
 }
 
-/// A top or bottom materialization, optionally deferred until a type relation is evaluated.
+/// A top or bottom materialization, optionally transient until a type relation is evaluated.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct Materialization {
     kind: MaterializationKind,
-    /// Whether application is deferred. This is used for non-strict/unsound
-    /// `isinstance` checks with generic classes. For example, `isinstance(x, Sequence)` intersects
-    /// the type of `x` with `DeferredTop[Sequence[Unknown]]`, which is not eagerly evaluated to
-    /// `Sequence[object]`, so that it can be erased after the intersection has been computed.
-    deferred: bool,
+    /// Whether application is transient. This is used for non-strict/unsound `isinstance` checks
+    /// with generic classes. For example, `isinstance(x, Sequence)` intersects the type of `x`
+    /// with `TransientTop[Sequence[Unknown]]`, which is not eagerly evaluated to `Sequence[object]`,
+    /// so that it can be erased after the intersection has been computed.
+    transient: bool,
 }
 
 impl Materialization {
     const fn new(kind: MaterializationKind) -> Self {
         Self {
             kind,
-            deferred: false,
+            transient: false,
         }
     }
 
-    const fn deferred(kind: MaterializationKind) -> Self {
+    const fn transient(kind: MaterializationKind) -> Self {
         Self {
             kind,
-            deferred: true,
+            transient: true,
         }
     }
 
@@ -447,12 +449,12 @@ impl Materialization {
                 MaterializationKind::Top => MaterializationKind::Bottom,
                 MaterializationKind::Bottom => MaterializationKind::Top,
             },
-            deferred: self.deferred,
+            transient: self.transient,
         }
     }
 
-    const fn is_deferred(self) -> bool {
-        self.deferred
+    const fn is_transient(self) -> bool {
+        self.transient
     }
 
     const fn is_top(self) -> bool {
@@ -1507,25 +1509,25 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, MaterializationKind::Top)
     }
 
-    /// Returns a specially marked top materialization whose application is deferred.
+    /// Returns a specially marked top materialization whose application is transient.
     /// The tag survives set-theoretic simplification and can be removed by
-    /// [`Type::erase_deferred_materialization`] immediately afterwards.
+    /// [`Type::erase_transient_materialization`] immediately afterwards.
     #[must_use]
-    pub(crate) fn deferred_top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn transient_top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
         self.materialize(
             db,
-            Materialization::deferred(MaterializationKind::Top),
+            Materialization::transient(MaterializationKind::Top),
             &ApplyTypeMappingVisitor::default(),
         )
     }
 
     /// Erases only the materialization tag introduced by
-    /// [`Type::deferred_top_materialization`].
+    /// [`Type::transient_top_materialization`].
     #[must_use]
-    pub(crate) fn erase_deferred_materialization(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn erase_transient_materialization(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::EraseDeferredMaterialization,
+            &TypeMapping::EraseTransientMaterialization,
             TypeContext::default(),
         )
     }
@@ -6560,7 +6562,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => match type_mapping {
-                TypeMapping::EraseDeferredMaterialization => self,
+                TypeMapping::EraseTransientMaterialization => self,
                 _ => visitor.visit(db, self, type_mapping, || match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -6797,7 +6799,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::EraseDeferredMaterialization |
+                TypeMapping::EraseTransientMaterialization |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
@@ -6824,7 +6826,7 @@ impl<'db> Type<'db> {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
                 },
-                TypeMapping::EraseDeferredMaterialization => self,
+                TypeMapping::EraseTransientMaterialization => self,
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
@@ -7884,8 +7886,8 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(Materialization),
-    /// Remove a deferred materialization tag, restoring its gradual specialization.
-    EraseDeferredMaterialization,
+    /// Remove a transient materialization tag, restoring its gradual specialization.
+    EraseTransientMaterialization,
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -7937,7 +7939,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
-            | TypeMapping::EraseDeferredMaterialization
+            | TypeMapping::EraseTransientMaterialization
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -7984,7 +7986,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::EraseDeferredMaterialization
+            | TypeMapping::EraseTransientMaterialization
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
