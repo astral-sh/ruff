@@ -11,7 +11,9 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    KnownClass, SubclassOfType, Type, TypeContext, UnionType, definition_expression_type,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
@@ -173,12 +175,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (Box::new([]), true)
             };
 
-        if !matches!(namespace_type, Type::TypedDict(_))
-            && !namespace_type.is_assignable_to(
-                db,
-                KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-            )
+        let namespace_target = UnionType::from_two_elements(
+            db,
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            Type::open_empty_typed_dict(db),
+        );
+
+        if !namespace_type.is_assignable_to(db, namespace_target)
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
