@@ -933,7 +933,7 @@ def mutable_attributes(top: Top[MutableAny], bottom: Bottom[MutableAny]) -> None
     top.value = 1  # error: [invalid-assignment]
     reveal_type(bottom)  # revealed: Bottom[MutableAny]
     reveal_type(bottom.value)  # revealed: Never
-    bottom.value = 1
+    bottom.value = object()
 ```
 
 A property setter is already a write, so its parameter is mapped only once:
@@ -949,7 +949,7 @@ def writable_properties(top: Top[WritableAny], bottom: Bottom[WritableAny]) -> N
     reveal_type(top.value)  # revealed: object
     top.value = 1  # error: [invalid-assignment]
     reveal_type(bottom.value)  # revealed: Never
-    bottom.value = 1
+    bottom.value = object()
 ```
 
 ### Relations between a protocol and its materializations
@@ -1029,8 +1029,8 @@ def instance_only_class_access(
     type(bottom).value = 1  # error: [invalid-assignment]
 ```
 
-Class variables have separate read and write types. `Top` permits every read and no writes, while
-`Bottom` permits every write and no reads:
+Class variables have separate read and write types. `Top` reads `object` and writes `Never`, while
+`Bottom` reads `Never` and writes `object`:
 
 ```py
 from typing import Any, ClassVar, Protocol
@@ -1042,7 +1042,7 @@ class ClassVarAny(Protocol):
 
 def class_writes(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
     type(top).value = 1  # error: [invalid-assignment]
-    type(bottom).value = 1
+    type(bottom).value = object()
 
 def class_reads(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
     reveal_type(type(top).value)  # revealed: object
@@ -1070,11 +1070,12 @@ def class_union_order(
     reveal_type(top_first.value)  # revealed: object
 ```
 
-Static and class methods are available through the class object and use the materialized callable
-signature:
+Ordinary, static, and class methods are available through the class object and use the materialized
+callable signature. Ordinary methods remain unbound:
 
 ```py
 class DecoratedAny(Protocol):
+    def transform(self, value: Any) -> Any: ...
     @staticmethod
     def parse(value: Any) -> Any: ...
     @classmethod
@@ -1084,8 +1085,10 @@ def decorated_class_access(
     top: Top[DecoratedAny],
     bottom: Bottom[DecoratedAny],
 ) -> None:
+    reveal_type(type(top).transform)  # revealed: (self, /, value: Never) -> object
     reveal_type(type(top).parse)  # revealed: (value: Never) -> object
     reveal_type(type(top).create)  # revealed: (value: Never) -> object
+    reveal_type(type(bottom).transform)  # revealed: (self, /, value: object) -> Never
     reveal_type(type(bottom).parse)  # revealed: (value: object) -> Never
     reveal_type(type(bottom).create)  # revealed: (value: object) -> Never
 ```
@@ -1135,7 +1138,7 @@ def descriptor_methods(
 
 ### Properties
 
-Materializing a property must not discard whether it can be deleted:
+Materializing a read-only property must not make it deletable:
 
 ```py
 from typing import Any, Protocol
@@ -1280,6 +1283,18 @@ def generator_delegation(
     reveal_type(nested.__next__())  # revealed: object
     nested_result = yield from nested
     reveal_type(nested_result)  # revealed: object
+
+def top_generator_send(
+    generator: Top[MaterializedGenerator],
+) -> Generator[object, object, object]:
+    result = yield from generator  # error: [invalid-yield]
+    return result
+
+def bottom_generator_send(
+    generator: Bottom[MaterializedGenerator],
+) -> Generator[object, object, object]:
+    result = yield from generator
+    return result
 ```
 
 ### `Self` and legacy type variables
@@ -1335,7 +1350,7 @@ def alias_writes(
     bottom: Bottom[MutableAlias[Any]],
 ) -> None:
     top.value = 1  # error: [invalid-assignment]
-    bottom.value = 1
+    bottom.value = object()
 ```
 
 Read and write mappings use separate transformation caches when a materialized specialization is
@@ -1393,9 +1408,7 @@ class ReadAny(Protocol):
 
 def _(top: Top[ReadAny], bottom: Bottom[ReadAny]) -> None:
     reveal_type(top)  # revealed: Top[ReadAny]
-    reveal_type(top.value)  # revealed: object
     reveal_type(bottom)  # revealed: Bottom[ReadAny]
-    reveal_type(bottom.value)  # revealed: Never
 ```
 
 Alias specializations also preserve the materialization polarity in contravariant positions.

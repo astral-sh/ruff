@@ -463,8 +463,8 @@ especially when using various functions from typeshed that are annotated as retu
 `TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
 purposes, it would usually lead to more intuitive results if `object` was used as the specialization
 for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`.
+For a nominal covariant generic, this simplifies to `TypeIs[SomeCovariantGeneric[object]]`.
 
 ```py
 class Unrelated: ...
