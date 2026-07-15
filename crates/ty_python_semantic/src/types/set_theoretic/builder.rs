@@ -67,8 +67,9 @@ fn split_truthiness_guarded_intersection<'db>(
     let falsy = Type::AlwaysTruthy.negate(db);
     let truthy = Type::AlwaysFalsy.negate(db);
 
-    let has_not_truthy = intersection.negative(db).contains(&Type::AlwaysTruthy);
-    let has_not_falsy = intersection.negative(db).contains(&Type::AlwaysFalsy);
+    let negative = intersection.negative(db);
+    let has_not_truthy = negative.contains(&Type::AlwaysTruthy);
+    let has_not_falsy = negative.contains(&Type::AlwaysFalsy);
     let guard = match (has_not_truthy, has_not_falsy) {
         (true, false) => falsy,
         (false, true) => truthy,
@@ -79,7 +80,7 @@ fn split_truthiness_guarded_intersection<'db>(
     for positive in intersection.positive(db) {
         core = core.add_positive(*positive);
     }
-    for negative in intersection.negative(db) {
+    for negative in negative {
         if (guard == falsy && *negative == Type::AlwaysTruthy)
             || (guard == truthy && *negative == Type::AlwaysFalsy)
         {
@@ -274,7 +275,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
             {
                 builder = builder.add_negative(Type::enum_literal(EnumLiteralType::new(
                     db,
-                    complement.enum_class_literal(db),
+                    enum_class_literal,
                     name,
                 )));
             }

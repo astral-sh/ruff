@@ -152,14 +152,14 @@ impl ProjectFilesWalker {
                 return (Vec::new(), Vec::new());
             }
 
-            create_walker(
+            create_walker_builder(
                 db,
                 root_paths.iter().filter(|root| {
                     should_visit_incremental_path(root.as_path(), incremental_paths)
                 }),
             )
         } else {
-            create_walker(db, root_paths)
+            create_walker_builder(db, root_paths)
         };
 
         let Some(walker) = walker else {
@@ -307,24 +307,24 @@ impl ProjectFilesWalker {
     }
 }
 
-fn create_walker<I, T>(db: &dyn Db, paths: I) -> Option<WalkDirectoryBuilder>
+pub(crate) fn create_walker_builder<I, T>(db: &dyn Db, paths: I) -> Option<WalkDirectoryBuilder>
 where
     I: IntoIterator<Item = T>,
     T: AsRef<SystemPath>,
 {
     let mut paths = paths.into_iter();
 
-    let mut walker = db
+    let mut builder = db
         .system()
         .walk_directory(paths.next()?.as_ref())
         .standard_filters(db.project().settings(db).src().respect_ignore_files)
         .ignore_hidden(false);
 
     for path in paths {
-        walker = walker.add(path);
+        builder = builder.add(path);
     }
 
-    Some(walker)
+    Some(builder)
 }
 
 fn should_visit_incremental_path(

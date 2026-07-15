@@ -150,6 +150,21 @@ fn freshen_generic_contexts_in_type<'db>(
         })
 }
 
+fn inferable_typevars_from_tuple<'db>(
+    db: &'db dyn Db,
+    instance: &NominalInstanceType<'db>,
+) -> Option<InferableTypeVars<'db>> {
+    let typevars: Option<FxOrderSet<_>> = instance
+        .tuple_spec(db)?
+        .fixed_elements()
+        .map(|ty| {
+            ty.as_typevar()
+                .map(|bound_typevar| bound_typevar.identity(db))
+        })
+        .collect();
+    typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
+}
+
 /// Priority levels for call errors in intersection types.
 /// Higher values indicate more specific errors that should take precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -759,6 +774,16 @@ impl<'db> Bindings<'db> {
     fn iter_constructor_items_mut(&mut self) -> impl Iterator<Item = &mut ConstructorBinding<'db>> {
         self.iter_callable_items_mut()
             .filter_map(CallableItem::as_constructor_mut)
+    }
+
+    /// Return `true` if `argument_index` is matched to the keyword-variadic parameter of an
+    /// `__init__` constructor.
+    pub(crate) fn constructor_init_argument_matches_keyword_variadic(
+        &self,
+        argument_index: usize,
+    ) -> bool {
+        self.iter_constructor_items()
+            .any(|constructor| constructor.init_argument_matches_keyword_variadic(argument_index))
     }
 
     fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
@@ -2648,6 +2673,31 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetForAll(tracked)) => {
+                        let [Some(typevars)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(instance) = typevars.project_type_form(db) else {
+                            continue;
+                        };
+                        let Some(typevars) = inferable_typevars_from_tuple(db, &instance) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            constraints.load(db, tracked.constraints(db)).for_all(
+                                db,
+                                constraints,
+                                typevars,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
@@ -2656,15 +2706,7 @@ impl<'db> Bindings<'db> {
                                 // Caller explicitly passed None, so no typevars are inferable.
                                 return Some(InferableTypeVars::None);
                             }
-                            let typevars: Option<FxOrderSet<_>> = instance
-                                .tuple_spec(db)?
-                                .fixed_elements()
-                                .map(|ty| {
-                                    ty.as_typevar()
-                                        .map(|bound_typevar| bound_typevar.identity(db))
-                                })
-                                .collect();
-                            typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
+                            inferable_typevars_from_tuple(db, instance)
                         };
 
                         let inferable = match overload.parameter_types() {
@@ -3143,6 +3185,20 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
+    }
+
+    pub(super) fn argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
+        let argument_index = argument_index + usize::from(self.bound_type.is_some());
+        self.matching_overloads().any(|(_, overload)| {
+            overload
+                .argument_matches()
+                .get(argument_index)
+                .is_some_and(|argument| {
+                    argument.parameters.iter().any(|parameter| {
+                        overload.signature.parameters()[parameter.index].is_keyword_variadic()
+                    })
+                })
+        })
     }
 
     /// Returns the source overload indexes that should be shown in diagnostics.

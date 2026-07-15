@@ -186,7 +186,7 @@ fn check_class_declaration<'db>(
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot overwrite NamedTuple attribute `{}`",
-                    &member.name
+                    member.name
                 ));
                 diagnostic.info("This will cause the class creation to fail at runtime");
             }
@@ -300,7 +300,7 @@ fn check_class_declaration<'db>(
                         ) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Enum member `{}` value is not assignable to expected type",
-                                &member.name
+                                member.name
                             ));
                             diagnostic.info(format_args!(
                                 "Expected `{}`, got `{}`",
@@ -894,11 +894,12 @@ fn symbol_definition<'db>(
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> Option<Definition<'db>> {
-    use_def_map(db, scope)
+    let use_def_map = use_def_map(db, scope);
+    use_def_map
         .end_of_scope_symbol_declarations(symbol)
         .find_map(|declaration| declaration.declaration.definition())
         .or_else(|| {
-            use_def_map(db, scope)
+            use_def_map
                 .end_of_scope_symbol_bindings(symbol)
                 .find_map(|binding| binding.binding.definition())
         })
@@ -1090,7 +1091,7 @@ fn check_explicit_overrides<'db>(
     }
     diagnostic.info(format_args!(
         "No `{member}` definitions were found on any superclasses of `{class}`",
-        member = &member.name,
+        member = member.name,
         class = class.name(db)
     ));
 }

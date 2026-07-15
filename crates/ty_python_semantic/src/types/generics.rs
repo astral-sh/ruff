@@ -31,9 +31,9 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
-    infer_definition_types, inferred_declaration,
+    MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2997,6 +2997,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (
+                Type::SubclassOf(formal_subclass),
+                actual @ (Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::Union(_)),
+            ) if matches!(formal_subclass.subclass_of(), SubclassOfInner::Protocol(_)) => {
+                let SubclassOfInner::Protocol(protocol) = formal_subclass.subclass_of() else {
+                    return Ok(());
+                };
+                let formal_protocol = Type::ProtocolInstance(protocol);
+                if let Type::Union(union) = actual {
+                    for element in union.elements(self.db) {
+                        self.infer_map_impl(
+                            formal_protocol,
+                            element.bindings(self.db).return_type(self.db),
+                            polarity,
+                            seen,
+                        )?;
+                    }
+                    return Ok(());
+                }
+                return self.infer_map_impl(
+                    formal_protocol,
+                    actual.bindings(self.db).return_type(self.db),
+                    polarity,
+                    seen,
+                );
+            }
+
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
                 if subclass_of.is_type_var() =>
             {
@@ -3176,9 +3206,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return Ok(());
                 };
 
-                // The `__call__` method is bound to `self`, so we need to bind it to get the
-                // callable signature that the actual type needs to match.
-                let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
+                // The protocol interface exposes the callable signature already bound for
+                // instance access.
+                let formal_signature = call_method.signatures(self.db);
 
                 // For callable-signature inference, keep unsatisfiable constraint-set
                 // comparisons non-fatal for now. The hybrid inference/checking pipeline still

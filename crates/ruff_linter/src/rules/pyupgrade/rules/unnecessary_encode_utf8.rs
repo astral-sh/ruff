@@ -133,7 +133,7 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
                 let _ = write!(
                     &mut replacement,
                     "b{}",
-                    &string.trim_start_matches('u').trim_start_matches('U')
+                    string.trim_start_matches('u').trim_start_matches('U')
                 );
             }
             _ => {

@@ -268,6 +268,7 @@ impl<'db> Type<'db> {
                     SubclassOfInner::Class(class) => {
                         Type::from(class).try_bool_impl(db, allow_short_circuit, visitor)?
                     }
+                    SubclassOfInner::Protocol(_) => Truthiness::Ambiguous,
                     SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar)
                         .try_bool_impl(db, allow_short_circuit, visitor)?,
                 }

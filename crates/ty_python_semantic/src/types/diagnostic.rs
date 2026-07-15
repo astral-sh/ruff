@@ -142,6 +142,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
@@ -685,10 +686,13 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-type-guard-call.md")]
+    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
-        summary: "detects type guard function calls that has no narrowing effect",
-        status: LintStatus::stable("0.0.1-alpha.11"),
+        summary: "detects type guard function calls that have no narrowing effect",
+        status: LintStatus::removed(
+            "0.0.60",
+            "Type guard calls without a narrowing target are valid and have no narrowing effect.",
+        ),
         default_level: Level::Error,
     }
 }
@@ -1051,6 +1055,19 @@ declare_lint! {
         summary: "detects unknown keyword arguments in calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pydantic-discarded-extra-argument.md")]
+    pub(crate) static PYDANTIC_DISCARDED_EXTRA_ARGUMENT = {
+        summary: "detects extra constructor arguments that Pydantic silently discards",
+        status: LintStatus::stable("0.0.60"),
+        default_level: Level::Warn,
     }
 }
 
@@ -2798,6 +2815,7 @@ pub(crate) fn report_undeclared_protocol_member(
             }) => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Protocol(_) => return true,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },

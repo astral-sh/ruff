@@ -262,6 +262,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
@@ -453,6 +454,9 @@ impl<'db> Type<'db> {
 
     /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
     /// constraint-set assignable to `target`.
+    ///
+    /// Recursive relations are evaluated coinductively: a cycle is provisionally satisfied until
+    /// another part of the relation produces a contradiction.
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
@@ -460,7 +464,7 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::default(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(
@@ -1103,6 +1107,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
+        let bound_or_constraints;
+
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1427,11 +1433,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
+                if !bound_typevar.is_inferable(db, self.inferable) && {
+                    bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db);
+                    bound_or_constraints.is_some()
+                } =>
             {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => unreachable!(),
+                match bound_or_constraints {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         self.check_type_pair(db, bound, target)
                     }
@@ -1442,6 +1449,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             |constraint| self.check_type_pair(db, *constraint, target),
                         )
                     }
+                    None => unreachable!(),
                 }
             }
 
@@ -2124,15 +2132,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
             (Type::ClassLiteral(source_cls), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, source_cls.default_specialization(db), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
+                match target_subclass_ty.subclass_of() {
+                    SubclassOfInner::Protocol(target_protocol) => self
+                        .check_meta_type_satisfies_protocol(
+                            db,
+                            Type::ClassLiteral(source_cls),
+                            target_protocol,
+                        ),
+                    target => target
+                        .into_class(db)
+                        .map(|target_cls| {
+                            self.check_class_pair(
+                                db,
+                                source_cls.default_specialization(db),
+                                target_cls,
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.is_eager_assignability(),
+                            )
+                        }),
+                }
             }
 
             // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
@@ -2155,15 +2177,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ),
 
             (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
+                match target_subclass_ty.subclass_of() {
+                    SubclassOfInner::Protocol(target_protocol) => self
+                        .check_meta_type_satisfies_protocol(
+                            db,
+                            Type::GenericAlias(source_alias),
+                            target_protocol,
+                        ),
+                    target => target
+                        .into_class(db)
+                        .map(|target_cls| {
+                            self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
+                        })
+                        .unwrap_or_else(|| {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                self.is_eager_assignability(),
+                            )
+                        }),
+                }
             }
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
@@ -2942,6 +2974,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
+                    SubclassOfInner::Protocol(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
                         !class_a.could_exist_in_mro_of_with_disjointness_checker(
@@ -2958,6 +2991,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
+                    SubclassOfInner::Protocol(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                         self.constraints,
                         !class_a.could_exist_in_mro_of_with_disjointness_checker(
@@ -2983,6 +3017,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
                 SubclassOfInner::Class(class) => {
                     self.check_type_pair(db, class.metaclass_instance_type(db), other)
+                }
+                SubclassOfInner::Protocol(_) => {
+                    self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
                 }
                 SubclassOfInner::TypeVar(_) => unreachable!(),
             },
@@ -3079,18 +3116,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
-                if a.function(db).name(db) != b.function(db).name(db) {
+                let a_function = a.function(db);
+                let b_function = b.function(db);
+                if a_function.name(db) != b_function.name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same
                     // method name would show up on both sides of this check. However for
                     // completeness, if we're ever comparing `BoundMethod` types with different
                     // method names, then they're clearly disjoint.
                     self.always()
-                } else if a.function(db) != b.function(db)
-                    && a.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
-                    && b.function(db)
-                        .has_known_decorator(db, FunctionDecorators::FINAL)
+                } else if a_function != b_function
+                    && a_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                    && b_function.has_known_decorator(db, FunctionDecorators::FINAL)
                 {
                     // If *both* methods are `@final` (and they're not literally the same
                     // definition), they must be disjoint.

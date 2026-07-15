@@ -3,8 +3,7 @@ use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
-use super::ignore::IgnoreFiles;
-use crate::walk::ProjectFilesWalker;
+use crate::walk::{ProjectFilesWalker, create_walker_builder};
 use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -55,12 +54,15 @@ impl ProjectDatabase {
         let mut removed_paths = BTreeSet::default();
         let mut reload_project = false;
         let mut reload_project_files = false;
+        // TODO: This should be removed once the incremental checker is ported
+        // over to the `ignore` crate, since the `ignore` crate will respect
+        // the settings provided in `create_walker`. ---AG
         let respect_ignore_files = project.settings(self).src().respect_ignore_files;
         let ignore_walk_roots =
             respect_ignore_files.then(|| project.included_paths_or_root(self).to_vec());
-        let mut ignore_files = ignore_walk_roots
-            .as_deref()
-            .map(|walk_roots| IgnoreFiles::new(self.system().dyn_clone(), walk_roots));
+        let mut ignore_files = ignore_walk_roots.as_deref().and_then(|walk_roots| {
+            Some(create_walker_builder(self, walk_roots)?.incremental_matcher())
+        });
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);

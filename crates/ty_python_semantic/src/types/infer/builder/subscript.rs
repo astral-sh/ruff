@@ -1786,8 +1786,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Intersection(intersection) => {
                 // Check if any positive element supports deletion
+                let positive = intersection.positive(db);
                 let mut any_valid = false;
-                for element_ty in intersection.positive(db) {
+                for element_ty in positive {
                     if self.can_delete_subscript(*element_ty, slice_ty) {
                         any_valid = true;
                         break;
@@ -1795,7 +1796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 // If none are valid, emit a diagnostic for the first failing element
-                if !any_valid && let Some(element_ty) = intersection.positive(db).first() {
+                if !any_valid && let Some(element_ty) = positive.first() {
                     self.validate_subscript_deletion_impl(
                         target,
                         full_object_ty.or(Some(object_ty)),

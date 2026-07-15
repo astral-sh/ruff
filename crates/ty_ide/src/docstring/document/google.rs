@@ -9,8 +9,9 @@
 //! - `Other Args`, `Other Arguments`, and `Other Parameters`
 //!
 //! It accepts comma-separated Python names with optional parenthesized types, preserves
-//! continuation text, and skips section-like text inside preformatted or container blocks. Other
-//! known headings only delimit parameter sections; their contents are not parsed here.
+//! continuation text, and skips section-like text inside preformatted or container blocks.
+//! Supported section bodies are parsed into prose and named-item fragments; other known headings
+//! only delimit sections.
 //!
 //! Example:
 //!
@@ -28,17 +29,16 @@
 //!     retries: Number of retries.
 //! ```
 
-use std::cmp::Ordering;
-
 use indexmap::IndexMap;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_trivia::Cursor;
 use ruff_text_size::{TextRange, TextSize};
 
 use super::SectionKind;
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
-    ParsedLine, container_block_end, parse_parenthesized_type, parsed_lines,
-    split_once_unbracketed_colon,
+    ParsedLine, consume_quoted_string, container_block_end, indentation, parsed_lines,
+    split_once_at_top_level_colon, split_trailing_parenthetical,
 };
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
@@ -46,14 +46,18 @@ use super::syntax::{
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
 pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
-    let lines = parsed_lines(normalized_source);
     let mut parameters = Parameters::default();
-    for section in sections(&lines) {
+    for section in sections(normalized_source) {
+        let Section {
+            kind,
+            fragments,
+            range: _,
+        } = section;
         if matches!(
-            section.kind,
+            kind,
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters
         ) {
-            extend_parameter_documentation(&mut parameters, section.body);
+            parameters.extend_fragments(fragments);
         }
     }
     parameters.into_inner()
@@ -61,107 +65,79 @@ pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<Strin
 
 /// Returns recognized Google-style sections in source order.
 ///
-/// `lines` must come from source that has already undergone PEP-257 trimming and universal
+/// `source` must have already undergone PEP-257 trimming and universal
 /// newline normalization (typically via `docstring::documentation_trim`).
-pub(in crate::docstring) fn sections<'a>(
-    lines: &'a [ParsedLine<'a>],
-) -> impl Iterator<Item = Section<'a>> + 'a {
-    let mut preformatted_blocks = PreformattedBlockScanner::default();
-    let mut index = 0;
-
-    std::iter::from_fn(move || {
-        while index < lines.len() {
-            // Skip blocks that "own" all internal content (in which we should not
-            // recognize content that might otherwise look like a Google section header)
-            if preformatted_blocks.consume_preformatted_line(lines[index].text) {
-                index += 1;
-                continue;
-            }
-            if let Some(end) = container_block_end(lines, index) {
-                index = end;
-                continue;
-            }
-
-            let Some(header) = parse_section_header(lines, index) else {
-                preformatted_blocks.observe_line_outside_preformatted_block(lines[index].text);
-                index += 1;
-                continue;
-            };
-
-            let (range, body_end_line_index) = section_body_end(lines, header);
-            index = body_end_line_index;
-            if let HeaderKind::Structured(kind) = header.kind {
-                return Some(Section {
-                    kind,
-                    body: &lines[header.body_start_line_index..body_end_line_index],
-                    range,
-                    header_indent: header.indent,
-                });
-            }
-        }
-
-        None
-    })
+pub(in crate::docstring) fn sections(source: &str) -> impl Iterator<Item = Section> {
+    Parser::new(parsed_lines(source)).parse().into_iter()
 }
 
 /// A recognized Google-style docstring section.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::docstring) struct Section<'a> {
-    /// The recognized section kind.
-    pub(in crate::docstring) kind: SectionKind,
-    /// The lines in the section body.
-    pub(in crate::docstring) body: &'a [ParsedLine<'a>],
-    /// The section's source range, including its header.
-    pub(in crate::docstring) range: TextRange,
-    /// The indentation of the section header.
-    pub(in crate::docstring) header_indent: TextSize,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::docstring) struct Section {
+    kind: SectionKind,
+    range: TextRange,
+    fragments: Vec<BodyFragment>,
 }
 
-/// Extends `parameters` with the documented items in one parameter section body.
-fn extend_parameter_documentation(parameters: &mut Parameters, lines: &[ParsedLine<'_>]) {
-    let mut current: Option<(String, String)> = None;
-    let mut item_indent = None;
+/// One parsed fragment in a Google section body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum BodyFragment {
+    /// Section-level prose that is not attached to a named item.
+    Prose(String),
+    /// A named item and its description.
+    Item(Item),
+}
 
-    for line in lines {
-        let trimmed = line.text.trim();
+/// A named item in a Google section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Item {
+    display_name: String,
+    ty: Option<String>,
+    description: String,
+}
 
-        // The first recognized item establishes the sibling indentation.
-        // Each item at that indentation starts a new sibling and completes its predecessor.
-        if item_indent.is_none_or(|indent| line.indent == indent)
-            && let Some((names, description)) = parse_parameter(trimmed)
-        {
-            parameters.insert_documentation(
-                current.replace((names.to_string(), description.to_string())),
-            );
-            item_indent = Some(line.indent);
-            continue;
+/// Splits a display name from a trailing parenthesized type.
+///
+/// For example, `"value (str)"` yields `("value", Some("str"))`.
+fn split_name_and_type(value: &str) -> (&str, Option<&str>) {
+    let Some((name, ty)) = split_trailing_parenthetical(value) else {
+        return (value, None);
+    };
+
+    if name.is_empty() || ty.is_empty() {
+        (value, None)
+    } else {
+        (name, Some(ty))
+    }
+}
+
+/// Implements a simple heuristic to recover a parameter name and description
+/// from a line with a malformed type.
+///
+/// This assumes the first `" ("` begins the type and the first unquoted `")"` followed by
+/// optional whitespace and `":"` ends it.
+///
+/// For example, `"value (list[str) : description"` yields the name `"value"` and description
+/// `" description"`.
+fn recover_parameter_without_type(line: &str) -> Option<(&str, &str)> {
+    let (display_name, remainder) = line.split_once(" (")?;
+    let mut cursor = Cursor::new(remainder);
+
+    while let Some(character) = cursor.bump() {
+        match character {
+            '\'' | '"' => consume_quoted_string(&mut cursor, character),
+            ')' => {
+                let mut delimiter = cursor.clone();
+                delimiter.eat_while(char::is_whitespace);
+                if delimiter.eat_char(':') {
+                    return Some((display_name.trim(), delimiter.as_str()));
+                }
+            }
+            _ => {}
         }
-
-        // Ignore prose until the first item has started.
-        let Some((_, description)) = &mut current else {
-            continue;
-        };
-
-        // Lines that are not sibling items extend the current description.
-        // Empty lines preserve paragraph breaks.
-        if !description.is_empty() && !description.ends_with('\n') {
-            description.push('\n');
-        }
-        description.push_str(if trimmed.is_empty() { "\n" } else { trimmed });
     }
 
-    // A following item completes its predecessor in the loop, so complete the final item here.
-    parameters.insert_documentation(current);
-}
-
-/// Parses a parameter item into its display name and description.
-fn parse_parameter(line: &str) -> Option<(&str, &str)> {
-    let (name, description) = split_once_unbracketed_colon(line)?;
-    let (display_name, _) = parse_parenthesized_type(name.trim());
-
-    google_parameter_names(display_name)
-        .is_some()
-        .then_some((display_name, description.trim()))
+    None
 }
 
 /// Returns whether `name` is a valid Python parameter name, including variadic prefixes.
@@ -175,17 +151,21 @@ fn is_parameter_name(name: &str) -> bool {
 struct Parameters(IndexMap<String, String>);
 
 impl Parameters {
-    /// Inserts a completed parameter item under each of its comma-separated names.
-    fn insert_documentation(&mut self, parameter: Option<(String, String)>) {
-        let Some((names, description)) = parameter else {
-            return;
-        };
-        let description = description.trim();
-        if !description.is_empty()
-            && let Some(names) = google_parameter_names(&names)
-        {
-            for name in names {
-                self.0.insert(name.to_string(), description.to_string());
+    fn extend_fragments(&mut self, fragments: Vec<BodyFragment>) {
+        for fragment in fragments {
+            let BodyFragment::Item(item) = fragment else {
+                continue;
+            };
+            let Item {
+                display_name,
+                description,
+                ty: _,
+            } = item;
+            if description.is_empty() {
+                continue;
+            }
+            for name in display_name.split(',').map(str::trim) {
+                self.0.insert(name.to_string(), description.clone());
             }
         }
     }
@@ -195,210 +175,275 @@ impl Parameters {
     }
 }
 
-fn google_parameter_names(display_name: &str) -> Option<impl Iterator<Item = &str>> {
-    let names = display_name.split(',').map(str::trim);
-    names.clone().all(is_parameter_name).then_some(names)
+struct Parser<'a> {
+    lines: Vec<ParsedLine<'a>>,
+    current_line: usize,
+    sections: Vec<Section>,
+    current: Option<SectionBuilder<'a>>,
+    scanner: PreformattedBlockScanner<'a>,
 }
 
-/// Parses a recognized Google-style section header at `index`.
-fn parse_section_header(lines: &[ParsedLine<'_>], index: usize) -> Option<SectionHeader> {
-    let line = lines[index];
-    let kind = section_kind(line.text)?;
+impl<'a> Parser<'a> {
+    fn new(lines: Vec<ParsedLine<'a>>) -> Self {
+        Self {
+            lines,
+            current_line: 0,
+            sections: Vec::new(),
+            current: None,
+            scanner: PreformattedBlockScanner::default(),
+        }
+    }
 
-    Some(SectionHeader {
-        kind,
-        indent: line.indent,
-        body_start_line_index: index + 1,
-        range: line.range,
-    })
-}
+    fn parse(mut self) -> Vec<Section> {
+        while self.current_line < self.lines.len() {
+            self.push_line();
+        }
 
-fn section_kind(line: &str) -> Option<HeaderKind> {
-    let name = line.trim().strip_suffix(':')?.trim();
-    HeaderKind::from_name(name)
-}
+        if let Some(section) = self.current.take() {
+            self.finish_section(section);
+        }
 
-/// Returns the section's source range and the index of the first line outside its body.
-fn section_body_end(lines: &[ParsedLine<'_>], header: SectionHeader) -> (TextRange, usize) {
-    let mut body_end_index = header.body_start_line_index;
-    let mut preformatted_blocks = PreformattedBlockScanner::default();
-    let mut item_indent = None;
+        self.sections
+    }
 
-    while let Some(line) = lines.get(body_end_index) {
-        // Once a preformatted block begins, its contents cannot end the section.
-        if preformatted_blocks.is_active()
-            && preformatted_blocks.consume_preformatted_line(line.text)
+    fn push_line(&mut self) {
+        let index = self.current_line;
+        let line = self.lines[index];
+        self.current_line += 1;
+        let line_header = (!line.text.trim().is_empty())
+            .then(|| Self::parse_header(line))
+            .flatten();
+
+        // First, attempt to add the current line to the current section.
+        if let Some(mut section) = self.current.take() {
+            // If the line is accepted by the current section, then continue parsing that section.
+            if section.push_line(line, line_header) {
+                self.current = Some(section);
+                return;
+            }
+
+            // If the line is rejected by the current section, then finalize it.
+            self.finish_section(section);
+        }
+
+        // Second, skip content owned by a preformatted or container block, where nested headers
+        // are inert.
+        if self.scanner.consume_preformatted_line(line.text) {
+            return;
+        }
+        if let Some(end) = container_block_end(&self.lines, index) {
+            self.current_line = end;
+            return;
+        }
+
+        // Finally, start a new section from a standalone header, or observe syntax that may
+        // introduce a preformatted block.
+        if let Some(header) = line_header
+            && header.form == HeaderForm::Section
         {
-            body_end_index += 1;
-            continue;
+            self.current = Some(SectionBuilder::new(header));
+        } else {
+            self.scanner
+                .observe_line_outside_preformatted_block(line.text);
+        }
+    }
+
+    fn parse_header(line: ParsedLine<'_>) -> Option<Header> {
+        let trimmed = line.text.trim();
+        if trimmed.ends_with("::") {
+            // A trailing double colon introduces a reST literal block rather than a section.
+            return None;
         }
 
-        let Some((leading_blank_lines, line)) =
-            section_body_continuation(&lines[body_end_index..], header, item_indent)
-        else {
-            break;
+        let (name, description) = split_once_at_top_level_colon(trimmed)?;
+        let form = if description.is_empty() {
+            HeaderForm::Section
+        } else if name.chars().next().is_some_and(char::is_uppercase) {
+            HeaderForm::Inline
+        } else {
+            // Lowercase inline labels are more likely field-like content than section headers.
+            return None;
         };
-        body_end_index += leading_blank_lines;
+        let kind = HeaderKind::from_name(name)?;
 
-        item_indent = item_indent.or_else(|| section_item_indent(header, line));
-
-        if !preformatted_blocks.consume_preformatted_line(line.text) {
-            preformatted_blocks.observe_line_outside_preformatted_block(line.text);
-        }
-        body_end_index += 1;
+        Some(Header {
+            kind,
+            form,
+            indent: line.indent,
+            range: line.range,
+        })
     }
 
-    let body = &lines[header.body_start_line_index..body_end_index];
-    let range = match body.last() {
-        Some(last) => header.range.cover(last.range),
-        None => header.range,
-    };
-    (range, body_end_index)
+    fn finish_section(&mut self, section: SectionBuilder<'a>) {
+        if let Some(section) = section.finish() {
+            self.sections.push(section);
+        }
+    }
 }
 
-/// Returns the number of leading blank lines and first nonblank line that continue
-/// `header`'s body.
-fn section_body_continuation<'a>(
-    lines: &[ParsedLine<'a>],
-    header: SectionHeader,
-    item_indent: Option<TextSize>,
-) -> Option<(usize, ParsedLine<'a>)> {
-    let (leading_blank_lines, next_line) = lines
-        .iter()
-        .enumerate()
-        .find(|(_, line)| !line.text.trim().is_empty())?;
+struct SectionBuilder<'a> {
+    section_header: Header,
+    range: TextRange,
+    /// Blank lines whose ownership depends on the next nonblank line.
+    pending_blank_lines: Vec<ParsedLine<'a>>,
+    /// Prevents code examples from participating in section-boundary detection.
+    preformatted: PreformattedBlockScanner<'a>,
+    /// Indentation established by the first item-like line.
+    ///
+    /// This controls section boundaries and may come from a line that cannot be represented as a
+    /// structured item.
+    boundary_item_indent: Option<TextSize>,
+    body: BodyBuilder<'a>,
+}
 
-    if leading_blank_lines == 0 && section_header_ends_body(lines, 0, header) {
-        return None;
+impl<'a> SectionBuilder<'a> {
+    fn new(section_header: Header) -> Self {
+        Self {
+            range: section_header.range,
+            pending_blank_lines: Vec::new(),
+            preformatted: PreformattedBlockScanner::default(),
+            boundary_item_indent: None,
+            body: BodyBuilder::new(section_header.kind),
+            section_header,
+        }
     }
 
-    if leading_blank_lines > 0
-        && next_line.indent <= header.indent
-        && (parse_section_header(lines, leading_blank_lines).is_some()
-            || is_inline_section_header(next_line.text))
-    {
-        return None;
+    /// Returns `false` when `line` belongs outside this section.
+    fn push_line(&mut self, line: ParsedLine<'a>, line_header: Option<Header>) -> bool {
+        // First, let an active preformatted block consume the line before interpreting it.
+        let preformatted_block_is_active = self.preformatted.is_active();
+        let line_is_preformatted = self.preformatted.consume_preformatted_line(line.text);
+        if preformatted_block_is_active && line_is_preformatted {
+            self.commit_pending_blank_lines();
+            self.push_content_line(line, ItemLine::default());
+            return true;
+        }
+
+        // Second, defer blank lines until the next content line determines their ownership.
+        if line.text.trim().is_empty() {
+            self.pending_blank_lines.push(line);
+            return true;
+        }
+
+        // Third, classify a nonblank line and stop if it begins content outside
+        // this section.
+        let item_line = ItemLine::classify(self.section_header.kind, line);
+        let has_leading_blank_lines = !self.pending_blank_lines.is_empty();
+        if self.should_end_before(
+            line,
+            line_header,
+            item_line.boundary_item,
+            has_leading_blank_lines,
+        ) {
+            return false;
+        }
+
+        // Finally, commit the accepted line and update the state used to
+        // classify later lines.
+        let boundary_item = item_line.boundary_item;
+        self.commit_pending_blank_lines();
+        self.push_content_line(line, item_line);
+        if boundary_item {
+            self.boundary_item_indent.get_or_insert(line.indent);
+        }
+        if !line_is_preformatted {
+            self.preformatted
+                .observe_line_outside_preformatted_block(line.text);
+        }
+
+        true
     }
 
-    // Returns and yields have no item syntax that distinguishes an aligned body from prose
-    // following an empty section.
-    if leading_blank_lines > 0
-        && next_line.indent <= header.indent
-        && item_indent.is_none()
-        && matches!(
-            header.kind,
+    fn should_end_before(
+        &self,
+        line: ParsedLine<'_>,
+        line_header: Option<Header>,
+        boundary_item: bool,
+        has_leading_blank_lines: bool,
+    ) -> bool {
+        // A sibling-level recognized header starts a new section.
+        if line_header.is_some_and(|header| header.indent <= self.section_header.indent) {
+            return true;
+        }
+
+        // Returns and yields sections end before blank-separated sibling-level or dedented prose
+        // when no item indentation has been established.
+        if matches!(
+            self.section_header.kind,
             HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields)
-        )
-    {
-        return None;
-    }
+        ) && has_leading_blank_lines
+            && line.indent <= self.section_header.indent
+            && self.boundary_item_indent.is_none()
+        {
+            return true;
+        }
 
-    // A blank line ends a parameter section when the following aligned text is
-    // not another parameter item.
-    if leading_blank_lines > 0
-        && matches!(
-            header.kind,
-            HeaderKind::Structured(
-                SectionKind::Parameters
-                    | SectionKind::KeywordArguments
-                    | SectionKind::OtherParameters
-            )
-        )
-        && item_indent == Some(next_line.indent)
-        && section_item_indent(header, *next_line).is_none()
-    {
-        return None;
-    }
+        // Blank-separated aligned prose ends a parameter section unless it starts another item.
+        if has_leading_blank_lines
+            && self.section_header.kind.is_parameter_section()
+            && self.boundary_item_indent == Some(line.indent)
+            && !boundary_item
+        {
+            return true;
+        }
 
-    line_belongs_to_body(header, *next_line, item_indent)
-        .then_some((leading_blank_lines, *next_line))
-}
-
-/// Returns whether a recognized header at `index` ends the current section body.
-fn section_header_ends_body(lines: &[ParsedLine<'_>], index: usize, header: SectionHeader) -> bool {
-    let Some(line) = lines.get(index) else {
-        return false;
-    };
-    if line.indent <= header.indent && is_inline_section_header(line.text) {
-        return true;
-    }
-
-    parse_section_header(lines, index).is_some_and(|next| next.indent <= header.indent)
-}
-
-/// Returns whether `line` belongs to `header` under Google-style indentation rules.
-fn line_belongs_to_body(
-    header: SectionHeader,
-    line: ParsedLine<'_>,
-    item_indent: Option<TextSize>,
-) -> bool {
-    match line.indent.cmp(&header.indent) {
-        Ordering::Less => false,
-        Ordering::Greater => true,
-        Ordering::Equal => {
-            let item_indent_matches_line = item_indent.is_none_or(|indent| indent == line.indent);
-            let is_parameter_section = matches!(
-                header.kind,
-                HeaderKind::Structured(
-                    SectionKind::Parameters
-                        | SectionKind::KeywordArguments
-                        | SectionKind::OtherParameters
-                )
-            );
-
-            // Parameter sections can start with aligned prose before an item establishes the
-            // sibling indentation. Once established, aligned lines must match that indentation.
-            item_indent_matches_line
-                && (is_parameter_section || section_item_indent(header, line).is_some())
+        match line.indent.cmp(&self.section_header.indent) {
+            std::cmp::Ordering::Less => true,
+            std::cmp::Ordering::Greater => false,
+            std::cmp::Ordering::Equal => {
+                // Parameter sections can start with aligned prose before an item establishes the
+                // sibling indentation. Once established, aligned lines must match that indentation.
+                let item_indent_matches = self
+                    .boundary_item_indent
+                    .is_none_or(|indent| indent == line.indent);
+                !item_indent_matches
+                    || (!self.section_header.kind.is_parameter_section() && !boundary_item)
+            }
         }
     }
-}
 
-/// Returns the indentation of an item recognized in the current section.
-///
-/// The first recognized item establishes the indentation for sibling items.
-/// Item-like lines at a different indentation within the section are treated as
-/// continuation text.
-fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<TextSize> {
-    let trimmed = line.text.trim();
-    let is_item = match header.kind {
-        HeaderKind::Structured(
-            SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
-        ) => parse_parameter(trimmed).is_some(),
-        HeaderKind::Structured(SectionKind::Attributes | SectionKind::Raises) => {
-            split_once_unbracketed_colon(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
+    fn commit_pending_blank_lines(&mut self) {
+        for line in self.pending_blank_lines.drain(..) {
+            self.range = self.range.cover(line.range);
+            self.body.push_blank_line();
         }
-        HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
-        HeaderKind::Opaque => false,
-    };
-    is_item.then_some(line.indent)
-}
-
-/// Returns whether `line` is a recognized section header followed by inline content.
-fn is_inline_section_header(line: &str) -> bool {
-    let line = line.trim();
-    // A trailing double colon introduces a reST literal block, not an inline section.
-    if line.ends_with("::") {
-        return false;
     }
 
-    let Some((name, description)) = split_once_unbracketed_colon(line) else {
-        return false;
-    };
+    fn push_content_line(&mut self, line: ParsedLine<'a>, item_line: ItemLine<'a>) {
+        self.range = self.range.cover(line.range);
+        self.body.push_line(line, item_line);
+    }
 
-    let name = name.trim();
-    let description = description.trim();
-    !description.is_empty()
-        && name.chars().next().is_some_and(char::is_uppercase)
-        && HeaderKind::from_name(name).is_some()
+    fn finish(self) -> Option<Section> {
+        let HeaderKind::Structured(kind) = self.section_header.kind else {
+            return None;
+        };
+        let fragments = self.body.finish();
+        Some(Section {
+            kind,
+            range: self.range,
+            fragments,
+        })
+    }
+}
+
+/// Returns whether every component of `name` is a Python identifier.
+fn is_dotted_identifier(name: &str) -> bool {
+    !name.is_empty() && name.split('.').all(is_identifier)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SectionHeader {
+struct Header {
     kind: HeaderKind,
+    form: HeaderForm,
     indent: TextSize,
-    body_start_line_index: usize,
     range: TextRange,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeaderForm {
+    Section,
+    Inline,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -414,6 +459,14 @@ impl HeaderKind {
             .collect::<Vec<_>>()
             .join(" ")
             .to_ascii_lowercase();
+
+        // Google specifies the core sections for functions and classes:
+        // https://google.github.io/styleguide/pyguide.html#383-functions-and-methods
+        // https://google.github.io/styleguide/pyguide.html#384-classes
+        //
+        // Recognize additional headings and aliases for compatibility with Sphinx Napoleon and
+        // existing docstrings:
+        // https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html#docstring-sections
         Some(match normalized.as_str() {
             "args" | "arguments" | "parameters" => Self::Structured(SectionKind::Parameters),
             "keyword args" | "keyword arguments" => Self::Structured(SectionKind::KeywordArguments),
@@ -424,11 +477,420 @@ impl HeaderKind {
             "return" | "returns" => Self::Structured(SectionKind::Returns),
             "yield" | "yields" => Self::Structured(SectionKind::Yields),
             "raise" | "raises" => Self::Structured(SectionKind::Raises),
+
+            // Recognized headings without a structured representation still delimit sections.
             "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
             | "important" | "methods" | "note" | "notes" | "references" | "see also" | "tip"
             | "todo" | "todos" | "warning" | "warnings" | "warns" => Self::Opaque,
+
+            // Unrecognized headings remain ordinary content rather than creating a new section.
             _ => return None,
         })
+    }
+}
+
+enum BodyBuilder<'a> {
+    /// A section whose body consists of named items and their descriptions.
+    ItemList(ItemListBuilder<'a>),
+    /// A section whose entire body is semantic prose (e.g., returns or yields).
+    Prose(DescriptionBuilder<'a>),
+    /// A recognized section that participates in boundary detection but is not rendered.
+    Opaque,
+}
+
+impl<'a> BodyBuilder<'a> {
+    fn new(kind: HeaderKind) -> Self {
+        match kind {
+            HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => {
+                Self::Prose(DescriptionBuilder::default())
+            }
+            HeaderKind::Structured(_) => Self::ItemList(ItemListBuilder::default()),
+            HeaderKind::Opaque => Self::Opaque,
+        }
+    }
+
+    fn push_blank_line(&mut self) {
+        match self {
+            Self::ItemList(builder) => builder.push_blank_line(),
+            Self::Prose(builder) => builder.push_continuation(""),
+            Self::Opaque => {}
+        }
+    }
+
+    fn push_line(&mut self, line: ParsedLine<'a>, item_line: ItemLine<'a>) {
+        match self {
+            Self::ItemList(body) => body.push_line(line, item_line),
+            Self::Prose(builder) => builder.push_line(line.text),
+            Self::Opaque => {}
+        }
+    }
+
+    fn finish(self) -> Vec<BodyFragment> {
+        match self {
+            Self::ItemList(body) => body.finish(),
+            Self::Prose(description) => {
+                let prose = description.finish();
+                (!prose.is_empty())
+                    .then_some(BodyFragment::Prose(prose))
+                    .into_iter()
+                    .collect()
+            }
+            Self::Opaque => Vec::new(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ItemListBuilder<'a> {
+    fragments: Vec<BodyFragment>,
+    current_item: Option<ItemBuilder<'a>>,
+    /// Content encountered before the first recognized item.
+    leading_prose: DescriptionBuilder<'a>,
+    /// Indentation established by the first renderable item.
+    item_indent: Option<TextSize>,
+}
+
+impl<'a> ItemListBuilder<'a> {
+    fn push_blank_line(&mut self) {
+        if let Some(item) = &mut self.current_item {
+            item.description.push_continuation("");
+        } else {
+            self.leading_prose.push_continuation("");
+        }
+    }
+
+    fn push_line(&mut self, line: ParsedLine<'a>, item_line: ItemLine<'a>) {
+        let line_indent = indentation(line.text);
+        if self
+            .item_indent
+            .is_none_or(|item_indent| line_indent == item_indent)
+            && let Some(item_header) = item_line.item_header
+        {
+            self.finish_leading_prose();
+            self.finish_current_item();
+            self.current_item = Some(ItemBuilder::new(&item_header));
+            self.item_indent.get_or_insert(line_indent);
+            return;
+        }
+
+        if let Some(item) = &mut self.current_item {
+            item.description.push_continuation(line.text);
+        } else {
+            self.leading_prose.push_line(line.text);
+        }
+    }
+
+    fn finish_leading_prose(&mut self) {
+        let prose = std::mem::take(&mut self.leading_prose).finish();
+        if !prose.is_empty() {
+            self.fragments.push(BodyFragment::Prose(prose));
+        }
+    }
+
+    fn finish_current_item(&mut self) {
+        if let Some(item) = self.current_item.take() {
+            self.fragments.push(BodyFragment::Item(item.finish()));
+        }
+    }
+
+    fn finish(mut self) -> Vec<BodyFragment> {
+        self.finish_leading_prose();
+        self.finish_current_item();
+        self.fragments
+    }
+}
+
+struct ItemBuilder<'a> {
+    display_name: &'a str,
+    ty: Option<&'a str>,
+    description: DescriptionBuilder<'a>,
+}
+
+impl<'a> ItemBuilder<'a> {
+    fn new(item_header: &ItemHeader<'a>) -> Self {
+        Self {
+            display_name: item_header.display_name,
+            ty: item_header.ty,
+            description: DescriptionBuilder::with_inline(item_header.inline_description),
+        }
+    }
+
+    fn finish(self) -> Item {
+        Item {
+            display_name: self.display_name.to_string(),
+            ty: self.ty.map(str::to_string),
+            description: self.description.finish(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct DescriptionBuilder<'a> {
+    inline: Option<&'a str>,
+    continuation_lines: Vec<&'a str>,
+}
+
+impl<'a> DescriptionBuilder<'a> {
+    fn with_inline(inline: &'a str) -> Self {
+        let inline = inline.trim();
+        Self {
+            inline: (!inline.is_empty()).then_some(inline),
+            continuation_lines: Vec::new(),
+        }
+    }
+
+    fn push_line(&mut self, line: &'a str) {
+        if self.inline.is_none() && self.continuation_lines.is_empty() {
+            self.inline = Some(line.trim());
+        } else {
+            self.push_continuation(line);
+        }
+    }
+
+    fn push_continuation(&mut self, line: &'a str) {
+        self.continuation_lines.push(line);
+    }
+
+    fn finish(mut self) -> String {
+        if self.continuation_lines.is_empty() {
+            return self.inline.map_or_else(String::new, str::to_string);
+        }
+
+        let continuation_indent = self
+            .continuation_lines
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| indentation(line))
+            .min()
+            .unwrap_or_default();
+        for line in &mut self.continuation_lines {
+            *line = if line.trim().is_empty() {
+                ""
+            } else {
+                strip_indentation(line, continuation_indent).trim_end()
+            };
+        }
+
+        if let Some(inline) = self.inline {
+            self.continuation_lines.insert(0, inline);
+        }
+        let lines = self.continuation_lines;
+
+        let Some(start) = lines.iter().position(|line| !line.is_empty()) else {
+            return String::new();
+        };
+        let end = lines
+            .iter()
+            .rposition(|line| !line.is_empty())
+            .map_or(start, |index| index + 1);
+        lines[start..end].join("\n")
+    }
+}
+
+#[derive(Default)]
+struct ItemLine<'a> {
+    /// Whether this line establishes item indentation for section-boundary detection.
+    boundary_item: bool,
+    item_header: Option<ItemHeader<'a>>,
+}
+
+impl<'a> ItemLine<'a> {
+    fn classify(section_kind: HeaderKind, line: ParsedLine<'a>) -> Self {
+        let HeaderKind::Structured(kind) = section_kind else {
+            return Self::default();
+        };
+        if matches!(kind, SectionKind::Returns | SectionKind::Yields) {
+            return Self {
+                boundary_item: true,
+                ..Self::default()
+            };
+        }
+
+        let line_text = line.text.trim();
+        let split = split_once_at_field_delimiter(line_text).or_else(|| {
+            if matches!(
+                kind,
+                SectionKind::Parameters
+                    | SectionKind::KeywordArguments
+                    | SectionKind::OtherParameters
+            ) {
+                // If malformed type syntax hides the delimiter, recover the conventional field
+                // shape and discard the type.
+                recover_parameter_without_type(line_text)
+            } else {
+                None
+            }
+        });
+        split
+            .map(|split| Self::from_split(kind, split))
+            .unwrap_or_default()
+    }
+
+    fn from_split(kind: SectionKind, (raw_name, inline_description): (&'a str, &'a str)) -> Self {
+        let name = raw_name.trim();
+        if name.is_empty() {
+            return Self::default();
+        }
+
+        let (display_name, ty) = match kind {
+            SectionKind::Parameters
+            | SectionKind::KeywordArguments
+            | SectionKind::OtherParameters => {
+                let (display_name, ty) = split_name_and_type(name);
+                if !is_parameter_display_name(display_name) {
+                    return Self::default();
+                }
+                (display_name, ty)
+            }
+            SectionKind::Attributes => {
+                let (display_name, ty) = split_name_and_type(name);
+                if !is_attribute_display_name(display_name) {
+                    return Self {
+                        boundary_item: true,
+                        ..Self::default()
+                    };
+                }
+                (display_name, ty)
+            }
+            SectionKind::Raises => {
+                if !is_dotted_identifier(name) {
+                    return Self {
+                        boundary_item: true,
+                        ..Self::default()
+                    };
+                }
+                (name, None)
+            }
+            SectionKind::Returns | SectionKind::Yields => return Self::default(),
+        };
+
+        Self {
+            boundary_item: true,
+            item_header: Some(ItemHeader {
+                display_name,
+                ty,
+                inline_description,
+            }),
+        }
+    }
+}
+
+struct ItemHeader<'a> {
+    display_name: &'a str,
+    ty: Option<&'a str>,
+    inline_description: &'a str,
+}
+
+/// Splits at the field delimiter, skipping top-level colons in reST roles.
+///
+/// For example, ``:exc:`ValueError`: description`` returns
+/// ``(":exc:`ValueError`", " description")``.
+fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
+    let mut cursor = Cursor::new(line);
+    loop {
+        let (before_colon, after_colon) = split_once_at_top_level_colon(cursor.as_str())?;
+        cursor.skip_bytes(before_colon.len());
+
+        if consume_rest_prefix_role(&mut cursor) {
+            continue;
+        }
+
+        return Some((&line[..cursor.offset().to_usize()], after_colon));
+    }
+}
+
+/// Consumes the prefix-role pattern recognized by the field parser, leaving the cursor unchanged
+/// otherwise.
+///
+/// For example, this consumes the entire input:
+///
+/// ```text
+/// :exc:`ValueError`
+/// ```
+fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
+    let mut role = cursor.clone();
+
+    // First, require the candidate delimiter to be the opening colon of a role.
+    if !role.eat_char(':') {
+        return false;
+    }
+
+    // Role names start with a Unicode alphanumeric run. Rejecting punctuation here preserves the
+    // first colon in `value::class:` as the field delimiter.
+    if !role.eat_if(char::is_alphanumeric) {
+        return false;
+    }
+
+    // Next, scan the rest of the role name until its closing colon and the opening content
+    // backtick.
+    loop {
+        role.eat_while(char::is_alphanumeric);
+        if role.eat_char2(':', '`') {
+            break;
+        }
+
+        // `-._+:` separators are allowed, but only internally to alphanumeric characters.
+        if !role.eat_if(|character| matches!(character, '-' | '.' | '_' | '+' | ':'))
+            || !role.eat_if(char::is_alphanumeric)
+        {
+            return false;
+        }
+    }
+
+    // Finally, skip the role content so delimiter scanning resumes after its closing backtick.
+    role.eat_while(|character| character != '`');
+    if !role.eat_char('`') {
+        return false;
+    }
+
+    *cursor = role;
+    true
+}
+
+fn is_parameter_display_name(display_name: &str) -> bool {
+    display_name
+        .split(',')
+        .all(|name| is_parameter_name(name.trim()))
+}
+
+fn is_attribute_display_name(display_name: &str) -> bool {
+    display_name
+        .split(',')
+        .all(|name| is_dotted_identifier(name.trim()))
+}
+
+fn strip_indentation(line: &str, width: TextSize) -> &str {
+    let mut indentation_width = TextSize::default();
+    for (index, char) in line.char_indices() {
+        let next_indentation_width = match char {
+            ' ' => indentation_width + TextSize::new(1),
+            '\t' => TextSize::new((indentation_width.to_u32() / 8 + 1) * 8),
+            _ => return &line[index..],
+        };
+
+        if next_indentation_width > width {
+            return &line[index..];
+        }
+
+        indentation_width = next_indentation_width;
+        if indentation_width == width {
+            return &line[index + char.len_utf8()..];
+        }
+    }
+
+    ""
+}
+
+impl HeaderKind {
+    fn is_parameter_section(self) -> bool {
+        matches!(
+            self,
+            Self::Structured(
+                SectionKind::Parameters
+                    | SectionKind::KeywordArguments
+                    | SectionKind::OtherParameters
+            )
+        )
     }
 }
 
@@ -436,9 +898,11 @@ impl HeaderKind {
 mod tests {
     use insta::assert_snapshot;
     use itertools::Itertools;
-    use ruff_text_size::TextSize;
 
-    use super::{SectionKind, parameter_documentation, parsed_lines, sections};
+    use super::{
+        BodyFragment, Item, SectionKind, parameter_documentation, sections,
+        split_once_at_field_delimiter,
+    };
 
     #[test]
     fn extracts_aligned_parameter_items() {
@@ -502,7 +966,7 @@ Partition into non-overlapping windows with padding if needed.
     }
 
     #[test]
-    fn extracts_parameter_with_unbalanced_type_brackets() {
+    fn extracts_parameter_despite_unbalanced_type_brackets() {
         let raw = "\
 Args:
     query_embeddings (`Union[torch.Tensor, list[torch.Tensor]`): Query embeddings.";
@@ -510,6 +974,30 @@ Args:
         assert_snapshot!(display_parameters(raw), @"
         query_embeddings:
           │ Query embeddings.
+        ");
+    }
+
+    #[test]
+    fn recovers_parameter_after_quoted_delimiter_in_malformed_type() {
+        let raw = "\
+Args:
+    value (Literal['):'], list[str): Actual description.";
+
+        assert_snapshot!(display_parameters(raw), @"
+        value:
+          │ Actual description.
+        ");
+    }
+
+    #[test]
+    fn recovers_parameter_after_spaced_delimiter_in_malformed_type() {
+        let raw = "\
+Args:
+    value (list[str) : Description.";
+
+        assert_snapshot!(display_parameters(raw), @"
+        value:
+          │ Description.
         ");
     }
 
@@ -781,7 +1269,7 @@ Args:
     }
 
     #[test]
-    fn keeps_rest_literal_blocks_in_parameter_documentation() {
+    fn preserves_rest_literal_block_indentation_in_parameter_documentation() {
         assert_parameter_documentation(
             "\
 Args:
@@ -793,7 +1281,7 @@ Args:
             &[
                 (
                     "value",
-                    "Documentation.\nExample::\nArgs:\nnested: Not parameter documentation.",
+                    "Documentation.\nExample::\n    Args:\n        nested: Not parameter documentation.",
                 ),
                 ("other", "Other documentation."),
             ],
@@ -1020,8 +1508,7 @@ Other Parameters:
     other: Other.
 Returns:
     bool: Result.";
-        let lines = parsed_lines(raw);
-        let kinds = sections(&lines)
+        let kinds = sections(raw)
             .map(|section| section.kind)
             .collect::<Vec<_>>();
 
@@ -1037,34 +1524,25 @@ Returns:
     }
 
     #[test]
-    fn returns_section_body_range_and_header_indent() {
+    fn returns_section_fragments_and_range() {
         let raw = "    Args:
         value: Documentation.
 Methods:
     helper: Method documentation.";
-        let lines = parsed_lines(raw);
-        let sections = sections(&lines)
-            .map(|section| {
-                (
-                    section.kind,
-                    section
-                        .body
-                        .iter()
-                        .map(|line| line.text)
-                        .collect::<Vec<_>>(),
-                    &raw[section.range],
-                    section.header_indent,
-                )
-            })
+        let sections = sections(raw)
+            .map(|section| (section.kind, section.fragments, &raw[section.range]))
             .collect::<Vec<_>>();
 
         assert_eq!(
             sections,
             vec![(
                 SectionKind::Parameters,
-                vec!["        value: Documentation."],
+                vec![BodyFragment::Item(Item {
+                    display_name: "value".to_string(),
+                    ty: None,
+                    description: "Documentation.".to_string(),
+                })],
                 "    Args:\n        value: Documentation.",
-                TextSize::new(4),
             )]
         );
     }
@@ -1075,8 +1553,7 @@ Methods:
 Returns:
     bool: Result.
 Additional details.";
-        let lines = parsed_lines(raw);
-        let sections = sections(&lines)
+        let sections = sections(raw)
             .map(|section| (section.kind, &raw[section.range]))
             .collect::<Vec<_>>();
 
@@ -1088,6 +1565,52 @@ Additional details.";
 Returns:
     bool: Result.",
             )]
+        );
+    }
+
+    #[test]
+    fn skips_rest_roles_before_field_delimiter() {
+        assert_eq!(
+            split_once_at_field_delimiter(":py:class:`ValueError`: Invalid value."),
+            Some((":py:class:`ValueError`", " Invalid value."))
+        );
+        assert_eq!(
+            split_once_at_field_delimiter(":external+python:py:class:`ValueError`: Invalid value."),
+            Some((":external+python:py:class:`ValueError`", " Invalid value."))
+        );
+        assert_eq!(
+            split_once_at_field_delimiter(":étiquette:`valeur`: Description."),
+            Some((":étiquette:`valeur`", " Description."))
+        );
+    }
+
+    #[test]
+    fn does_not_skip_invalid_rest_roles() {
+        for (line, description) in [
+            ("value:foo..bar:`X`", "foo..bar:`X`"),
+            ("value:foo-:`X`", "foo-:`X`"),
+        ] {
+            assert_eq!(
+                split_once_at_field_delimiter(line),
+                Some(("value", description)),
+                "{line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn splits_before_rest_role_adjacent_to_field_delimiter() {
+        assert_eq!(
+            split_once_at_field_delimiter("value::class:`Widget` description."),
+            Some(("value", ":class:`Widget` description."))
+        );
+    }
+
+    #[test]
+    fn does_not_split_at_rest_roles_in_prose() {
+        assert_eq!(
+            split_once_at_field_delimiter("Typically :class:`Intermediate` or a subclass is used."),
+            None
         );
     }
 

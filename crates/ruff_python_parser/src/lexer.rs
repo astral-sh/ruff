@@ -144,7 +144,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        self.cursor.start_token();
+        // `lex_token` marks the start on the path that lexes each token.
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -157,6 +157,7 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(interpolated_string) = self.interpolated_strings.current() {
             if !interpolated_string.is_in_interpolation(self.nesting) {
+                self.cursor.start_token();
                 if let Some(token) = self.lex_interpolated_string_middle_or_end() {
                     if token.is_interpolated_string_end() {
                         self.interpolated_strings.pop();
@@ -166,7 +167,11 @@ impl<'src> Lexer<'src> {
             }
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        else if let Some(indentation) = self.pending_indentation.take() {
+        // Avoid `Option::take` here: this check runs for every token, and `take` writes `None`
+        // even when there is no pending indentation.
+        else if let Some(indentation) = self.pending_indentation {
+            self.pending_indentation = None;
+            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
@@ -189,6 +194,8 @@ impl<'src> Lexer<'src> {
         }
 
         if self.state.is_after_newline() {
+            // Indent and dedent tokens include leading whitespace in their ranges.
+            self.cursor.start_token();
             if let Some(indentation) = self.eat_indentation() {
                 return indentation;
             }
@@ -198,7 +205,7 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        // The lexer might've skipped whitespaces, so update the start offset
+        // Whitespace between tokens is not part of the next token's range.
         self.cursor.start_token();
 
         if let Some(c) = self.cursor.bump() {
@@ -347,6 +354,12 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        let whitespace_start = if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
+            self.offset()
+        } else {
+            return Ok(());
+        };
+
         loop {
             match self.cursor.first() {
                 ' ' => {
@@ -366,7 +379,10 @@ impl<'src> Lexer<'src> {
                         ));
                     }
                     if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+                        return Err(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            TextRange::new(whitespace_start, self.offset()),
+                        ));
                     }
                 }
                 // Form feed

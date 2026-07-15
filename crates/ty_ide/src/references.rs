@@ -745,8 +745,8 @@ impl<'a> LocalReferencesFinder<'a> {
 
             // The target's nearest enclosing class must be the one declaring the `__slots__`, so an
             // attribute of a nested class doesn't rename an outer class's slot.
-            let Some(owning_class_scope) = nearest_enclosing_class_scope(definition.file_scope(db))
-            else {
+            let definition_scope = definition.file_scope(db);
+            let Some(owning_class_scope) = nearest_enclosing_class_scope(definition_scope) else {
                 return false;
             };
             match index.scope(owning_class_scope).node() {
@@ -757,8 +757,9 @@ impl<'a> LocalReferencesFinder<'a> {
             // Accept only a member access (`self.value = ...`) or a class-body attribute declaration
             // (`value: int` or `value: int = ...` in a stub), so a parameter or local sharing the
             // name is not treated as the slot.
-            let is_class_attribute_declaration = definition.file_scope(db) == owning_class_scope
-                && definition.place(db).is_symbol()
+            let place = definition.place(db);
+            let is_class_attribute_declaration = definition_scope == owning_class_scope
+                && place.is_symbol()
                 && matches!(
                     definition.kind(db),
                     DefinitionKind::AnnotatedAssignment(assignment)
@@ -766,7 +767,7 @@ impl<'a> LocalReferencesFinder<'a> {
                             file.is_stub(db) && value.is_ellipsis_literal_expr()
                         })
                 );
-            definition.place(db).is_member() || is_class_attribute_declaration
+            place.is_member() || is_class_attribute_declaration
         })
     }
 

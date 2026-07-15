@@ -48,7 +48,7 @@ pub(crate) fn check_no_default_after_typevar_tuple_pep695(
 
         diagnostic.set_concise_message(format_args!(
             "Type parameter `{single_name}` with a default follows TypeVarTuple `{}`",
-            &typevar_tuple.name
+            typevar_tuple.name
         ));
 
         diagnostic.set_primary_message(format_args!("`{single_name}` has a default"));
@@ -57,7 +57,7 @@ pub(crate) fn check_no_default_after_typevar_tuple_pep695(
 
         diagnostic.set_concise_message(format_args!(
             "Type parameters {names} with defaults follow TypeVarTuple `{}`",
-            &typevar_tuple.name
+            typevar_tuple.name
         ));
 
         diagnostic.set_primary_message(format_args!(
@@ -77,7 +77,7 @@ pub(crate) fn check_no_default_after_typevar_tuple_pep695(
     diagnostic.annotate(
         context
             .secondary(typevar_tuple)
-            .message(format_args!("`{}` is a TypeVarTuple", &typevar_tuple.name)),
+            .message(format_args!("`{}` is a TypeVarTuple", typevar_tuple.name)),
     );
 
     diagnostic.info("See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple");

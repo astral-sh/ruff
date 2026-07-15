@@ -626,6 +626,9 @@ impl<'db> BoundSuperType<'db> {
                         None,
                     )?)
                 }
+                // `type[Protocol]` is structural: an inhabitant need not inherit from the protocol
+                // class, so its MRO cannot be recovered from the protocol's nominal origin.
+                SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let typevar = bound_typevar.typevar(db);

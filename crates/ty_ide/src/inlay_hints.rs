@@ -89,7 +89,8 @@ impl InlayHint {
                         }
 
                         // Don't try to import symbols in scope
-                        if definition.file(db) == file {
+                        let definition_file = definition.file(db);
+                        if definition_file == file {
                             return None;
                         }
 
@@ -100,7 +101,7 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition.file(db))?;
+                        let module = file_to_module(db, definition_file)?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -7148,20 +7149,24 @@ Source with applied edits:
     }
 
     #[test]
-    fn hover_narrowed_type_with_top_materialization() {
+    fn hover_type_with_top_materialization() {
         let mut test = inlay_hint_test(
             r#"
-                def f(xyxy: object):
-                    if isinstance(xyxy, list):
-                        x = xyxy
+                from typing import Any
+                from ty_extensions import Top
+
+                def f(xyxy: Top[list[Any]]):
+                    x = xyxy
                 "#,
         );
 
         assert_snapshot!(test.inlay_hints(), @"
 
-        def f(xyxy: object):
-            if isinstance(xyxy, list):
-                x[: Top[list[Unknown]]] = xyxy
+        from typing import Any
+        from ty_extensions import Top
+
+        def f(xyxy: Top[list[Any]]):
+            x[: Top[list[Any]]] = xyxy
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -7171,10 +7176,10 @@ Source with applied edits:
            | ^^^
            |
         info: Source
-          --> main2.py:LL:13
+          --> main2.py:LL:9
            |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |             ^^^
+        LL |     x[: Top[list[Any]]] = xyxy
+           |         ^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -7184,36 +7189,32 @@ Source with applied edits:
            |       ^^^^
            |
         info: Source
-          --> main2.py:LL:17
+          --> main2.py:LL:13
            |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |                 ^^^^
+        LL |     x[: Top[list[Any]]] = xyxy
+           |             ^^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/typing.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | ^^^^^^^
+        LL | class Any:
+           |       ^^^
            |
         info: Source
-          --> main2.py:LL:22
+          --> main2.py:LL:18
            |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |                      ^^^^^^^
+        LL |     x[: Top[list[Any]]] = xyxy
+           |                  ^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        1 + from ty_extensions import Top
-        2 + from ty_extensions import Unknown
-        3 |
-        4 | def f(xyxy: object):
-        5 |     if isinstance(xyxy, list):
-          -         x = xyxy
-        6 +         x: Top[list[Unknown]] = xyxy
+        5 | def f(xyxy: Top[list[Any]]):
+          -     x = xyxy
+        6 +     x: Top[list[Any]] = xyxy
           |
         ");
     }

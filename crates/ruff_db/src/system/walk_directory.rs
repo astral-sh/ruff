@@ -4,6 +4,29 @@ use std::path::PathBuf;
 
 use super::{FileType, SystemPath};
 
+/// Whether a path is known to be ignored by a directory walker.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Ignored {
+    /// An ignore file proves that the directory walker would skip this path.
+    Yes,
+
+    /// The path might be ignored, but a directory walk is required to know for sure.
+    Uncertain,
+}
+
+impl Ignored {
+    /// Returns `true` if a directory walk is required to determine whether the path is ignored.
+    pub const fn is_uncertain(self) -> bool {
+        matches!(self, Self::Uncertain)
+    }
+}
+
+/// A matcher for determining whether paths are ignored during incremental directory walking.
+pub trait IgnoreIncremental {
+    /// Returns whether the directory walker is known to ignore `path`.
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored;
+}
+
 /// A builder for constructing a directory recursive traversal.
 pub struct WalkDirectoryBuilder {
     /// The implementation that does the directory walking.
@@ -65,6 +88,16 @@ impl WalkDirectoryBuilder {
         self
     }
 
+    /// Creates a matcher for determining whether paths are ignored during incremental walking.
+    pub fn incremental_matcher(self) -> Box<dyn IgnoreIncremental> {
+        let configuration = WalkDirectoryConfiguration {
+            paths: self.paths,
+            ignore_hidden: self.ignore_hidden,
+            standard_filters: self.standard_filters,
+        };
+        self.walker.incremental_matcher(configuration)
+    }
+
     /// Runs the directory traversal and calls the passed `builder` to create visitors
     /// that do the visiting. The walker may run multiple threads to visit the directories.
     pub fn run<'s, F>(self, builder: F)
@@ -94,6 +127,12 @@ pub trait DirectoryWalker {
         builder: &mut dyn WalkDirectoryVisitorBuilder,
         configuration: WalkDirectoryConfiguration,
     );
+
+    /// Creates a matcher for determining whether paths are ignored during incremental walking.
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental>;
 }
 
 /// Creates a visitor for each thread that does the visiting.

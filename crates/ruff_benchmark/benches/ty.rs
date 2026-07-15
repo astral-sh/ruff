@@ -1642,6 +1642,43 @@ consume(ALIASES.items())
     });
 }
 
+fn benchmark_many_invariant_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3989.
+    let code = r#"
+class Invariant[T]:
+    x: T
+
+def f[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](
+    box1: Invariant[T1],
+    box2: Invariant[T2],
+    box3: Invariant[T3],
+    box4: Invariant[T4],
+    box5: Invariant[T5],
+    box6: Invariant[T6],
+    box7: Invariant[T7],
+    box8: Invariant[T8],
+    box9: Invariant[T9],
+    box10: Invariant[T10],
+) -> None: ...
+
+x = Invariant[int]()
+f(x, x, x, x, x, x, x, x, x, x)
+"#;
+
+    criterion.bench_function("ty_micro[many_invariant_typevars]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
 fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
 
@@ -1819,7 +1856,7 @@ fn attrs(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        102,
+        103,
     );
 
     bench_project(&benchmark, criterion);
@@ -1898,6 +1935,7 @@ criterion_group!(
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
     benchmark_invariant_generic_union_bound,
+    benchmark_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

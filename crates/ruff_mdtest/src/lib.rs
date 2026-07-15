@@ -10,8 +10,10 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
+use ruff_linter::pyproject_toml::lint_toml;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
+use ruff_python_ast::SourceType;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
@@ -68,8 +70,8 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb"),
-                "Supported file types are: py (or python), pyi, ipynb, and ignore"
+                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb" | "toml"),
+                "Supported file types are: py (or python), pyi, ipynb, toml, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
@@ -80,7 +82,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                code_blocks: embedded.python_code_blocks.clone(),
+                code_blocks: embedded.code_blocks.clone(),
             })
         })
         .collect();
@@ -107,20 +109,28 @@ fn run_test(
             let mdtest_result = attempt_test(
                 |file| {
                     let source = source_text(db, file);
-                    let source_kind = if let Some(notebook) = source.as_notebook() {
-                        SourceKind::ipy_notebook(notebook.clone())
-                    } else {
-                        SourceKind::Python {
-                            code: source.as_str().to_string(),
-                            is_stub: file.is_stub(db),
-                        }
-                    };
                     let path = file
                         .path(db)
                         .as_system_path()
                         .expect("mdtest files are on the system")
                         .as_std_path();
-                    test_contents(&source_kind, path, &settings.linter).0
+                    match SourceType::from(path) {
+                        SourceType::Python(_) => {
+                            let source_kind = if let Some(notebook) = source.as_notebook() {
+                                SourceKind::ipy_notebook(notebook.clone())
+                            } else {
+                                SourceKind::Python {
+                                    code: source.as_str().to_string(),
+                                    is_stub: file.is_stub(db),
+                                }
+                            };
+                            test_contents(&source_kind, path, &settings.linter).0
+                        }
+                        SourceType::Toml(source_type) => {
+                            lint_toml(path, source.as_str(), &settings.linter, source_type)
+                        }
+                        SourceType::Markdown => Vec::new(),
+                    }
                 },
                 test_file,
             );

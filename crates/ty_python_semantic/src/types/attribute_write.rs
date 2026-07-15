@@ -272,7 +272,17 @@ pub(super) fn attribute_write_requirement<'db>(
             instance_attribute_write_requirement(db, object_ty, attribute)
         }
 
-        Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+        Type::SubclassOf(subclass_of) => subclass_of
+            .meta_write_requirement(db, attribute)
+            .map_or_else(
+                || class_attribute_write_requirement(db, object_ty, attribute),
+                |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
+                    write_ty,
+                    qualifiers,
+                },
+            ),
+
+        Type::ClassLiteral(..) | Type::GenericAlias(..) => {
             class_attribute_write_requirement(db, object_ty, attribute)
         }
 

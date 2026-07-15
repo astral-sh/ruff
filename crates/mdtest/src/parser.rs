@@ -373,14 +373,13 @@ impl EmbeddedFilePath<'_> {
 /// A single file embedded in a [`Section`] as a fenced code block.
 ///
 /// Currently must be a Python file (`py` language), a type stub (`pyi`), a Jupyter notebook
-/// (`ipynb`) or a [typeshed `VERSIONS`] file.
+/// (`ipynb`), an explicitly named TOML file, or a [typeshed `VERSIONS`] file.
 ///
-/// TOML configuration blocks are also supported, but are not stored as `EmbeddedFile`s. In the
-/// future we plan to support `pth` files as well.
+/// Unnamed TOML blocks configure the test and are not stored as `EmbeddedFile`s. In the future we
+/// plan to support `pth` files as well.
 ///
-/// A Python embedded file makes its containing [`Section`] into a [`MarkdownTest`], and will be
-/// type-checked and searched for inline-comment assertions to match against the diagnostics from
-/// type checking.
+/// A checkable embedded file makes its containing [`Section`] into a [`MarkdownTest`] and is
+/// searched for inline-comment assertions to match against diagnostics.
 ///
 /// [typeshed `VERSIONS`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18
 #[derive(Debug)]
@@ -390,7 +389,7 @@ pub struct EmbeddedFile<'s> {
     pub lang: &'s str,
     pub code: Cow<'s, str>,
     /// The checkable code blocks
-    pub python_code_blocks: Vec<CodeBlock<'s>>,
+    pub code_blocks: Vec<CodeBlock<'s>>,
 }
 
 impl EmbeddedFile<'_> {
@@ -406,7 +405,7 @@ impl EmbeddedFile<'_> {
         let start_offset = existing_code.text_len();
         existing_code.push_str(new_code);
 
-        self.python_code_blocks.push(CodeBlock {
+        self.code_blocks.push(CodeBlock {
             backticks: backtick_offsets,
             embedded_start_offset: start_offset,
             inline_snapshot_block: None,
@@ -430,7 +429,7 @@ impl EmbeddedFile<'_> {
     }
 
     pub(crate) fn is_checkable(&self) -> bool {
-        matches!(self.lang, "py" | "python" | "pyi" | "ipynb")
+        matches!(self.lang, "py" | "python" | "pyi" | "ipynb" | "toml")
     }
 }
 
@@ -691,11 +690,28 @@ where
 
                         self.skip_non_newline_whitespace();
 
+                        let metadata = self.consume_until(|c| c == '\n').unwrap_or_default().trim();
+
                         if !self.cursor.eat_char('\n') {
                             bail!(
                                 "Trailing code-block metadata is not supported. Only the code block language can be specified."
                             );
                         }
+
+                        let ignore = if metadata.is_empty() {
+                            false
+                        } else if let Some(attributes) = metadata
+                            .strip_prefix('{')
+                            .and_then(|metadata| metadata.strip_suffix('}'))
+                        {
+                            attributes
+                                .split_ascii_whitespace()
+                                .any(|attribute| attribute == r#"data-mdtest="ignore""#)
+                        } else {
+                            bail!(
+                                "Trailing code-block metadata must use the `{{...}}` attribute-list syntax."
+                            );
+                        };
 
                         if let Some(position) =
                             memchr::memmem::find(self.cursor.as_bytes(), CODE_BLOCK_END)
@@ -712,6 +728,7 @@ where
                             self.process_code_block(
                                 lang,
                                 code,
+                                ignore,
                                 BacktickOffsets(TextRange::new(
                                     backtick_offset_start,
                                     backtick_offset_end,
@@ -802,13 +819,18 @@ where
         &mut self,
         lang: &'s str,
         code: &'s str,
+        ignore: bool,
         backtick_offsets: BacktickOffsets,
     ) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
         let test_name = self.sections[section].title;
 
-        if lang == "toml" {
+        if ignore {
+            return Ok(());
+        }
+
+        if lang == "toml" && self.explicit_path.is_none() {
             return self.process_config_block(code);
         }
 
@@ -879,7 +901,7 @@ where
                     section,
                     lang,
                     code: Cow::Borrowed(code),
-                    python_code_blocks: vec![CodeBlock {
+                    code_blocks: vec![CodeBlock {
                         backticks: backtick_offsets,
                         embedded_start_offset: TextSize::new(0),
                         inline_snapshot_block: None,
@@ -919,7 +941,7 @@ where
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
             .values()
-            .any(|id| self.files[*id].python_code_blocks.len() > 1)
+            .any(|id| self.files[*id].code_blocks.len() > 1)
     }
 
     fn process_config_block(&mut self, code: &str) -> anyhow::Result<()> {
@@ -948,7 +970,7 @@ where
             let backtick_start = line_number(offsets.start(), self.source);
 
             bail!(
-                "`snapshot` code block on line {backtick_start} must follow a Python code block, but section has no files."
+                "`snapshot` code block on line {backtick_start} must follow a checkable code block, but section has no files."
             );
         };
 
@@ -958,12 +980,12 @@ where
             let backtick_start = line_number(offsets.start(), self.source);
 
             bail!(
-                "`snapshot` code block on line {backtick_start} must follow a `python` code block in the same section but it follows a `{}` block.",
+                "`snapshot` code block on line {backtick_start} must follow a checkable code block in the same section but it follows a `{}` block.",
                 file.lang
             );
         }
 
-        let code_block = file.python_code_blocks.last_mut().unwrap();
+        let code_block = file.code_blocks.last_mut().unwrap();
 
         if let Some(existing_block) = &code_block.inline_snapshot_block {
             let code_block_start = line_number(code_block.embedded_start_offset(), self.source);
@@ -971,7 +993,7 @@ where
             let existing_start = line_number(existing_block.range.start(), self.source);
 
             bail!(
-                "Python code block on line `{code_block_start}` has more than one `snapshot` block: first on line {existing_start} and another on line {backtick_start}.",
+                "Code block on line `{code_block_start}` has more than one `snapshot` block: first on line {existing_start} and another on line {backtick_start}.",
             );
         }
 
@@ -1241,6 +1263,32 @@ mod tests {
         );
         assert_eq!(file.lang, "ipynb");
         assert_eq!(file.code, "{}");
+    }
+
+    #[test]
+    fn explicitly_named_toml_file() {
+        let source = dedent(
+            r#"
+            `ruff.toml`:
+
+            ```toml
+            lint.select = ["F401"]
+            ```
+            "#,
+        );
+        let mf = parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, EmbeddedFilePath::Explicit("ruff.toml"));
+        assert_eq!(file.lang, "toml");
+        assert_eq!(file.code, r#"lint.select = ["F401"]"#);
     }
 
     #[test]
@@ -1640,6 +1688,33 @@ mod tests {
             x = 1
             ```
             ",
+        );
+
+        let mf = parse("file.md", &source).unwrap();
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn ignores_python_blocks_with_ignore_metadata() {
+        let source = dedent(
+            r#"
+            # Example
+
+            ```python {.example data-mdtest="ignore" title="Ignored example"}
+            x: int = "wrong, but not checked"
+            ```
+
+            ```py
+            x = 1
+            ```
+            "#,
         );
 
         let mf = parse("file.md", &source).unwrap();
@@ -2156,7 +2231,7 @@ mod tests {
     }
 
     #[test]
-    fn config_no_longer_allowed() {
+    fn unbraced_metadata_not_allowed() {
         let source = dedent(
             "
             ```py foo=bar
@@ -2167,7 +2242,7 @@ mod tests {
         let err = parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "Trailing code-block metadata is not supported. Only the code block language can be specified."
+            "Trailing code-block metadata must use the `{...}` attribute-list syntax."
         );
     }
 

@@ -1,6 +1,7 @@
 use std::iter::repeat;
 use std::ops::Range;
 
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use toml::Spanned;
@@ -11,8 +12,7 @@ use ruff_python_ast::TomlSourceType;
 
 use crate::{
     AlwaysFixableViolation, checkers::ast::LintContext, codes::Rule,
-    preview::is_human_readable_names_enabled, pyproject_toml::text_range_from_std,
-    rule_redirects::get_redirect_target,
+    preview::is_human_readable_names_enabled, rule_redirects::get_redirect_target,
 };
 
 /// ## What it does
@@ -81,11 +81,10 @@ pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSo
             continue;
         };
 
-        // This can only fail if the file is larger than 4GB, so abort analysis of the entire file
-        // rather than continuing to the next selector.
-        let Some(range) = text_range_from_std(content_range, context) else {
-            return;
-        };
+        let range = TextRange::new(
+            TextSize::try_from(content_range.start).unwrap(),
+            TextSize::try_from(content_range.end).unwrap(),
+        );
 
         context
             .report_diagnostic(RuleCodesInSelectors { selector }, range)

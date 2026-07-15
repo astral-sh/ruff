@@ -140,11 +140,11 @@ Methods narrow the first positional argument after `self` or `cls`
 from typing import TypeGuard
 
 class C:
-    def f(self, x: object) -> TypeGuard[str]:
+    def f(self, x: object, other: object = object()) -> TypeGuard[str]:
         return True
 
     @classmethod
-    def g(cls, x: object) -> TypeGuard[int]:
+    def g(cls, x: object, other: object = object()) -> TypeGuard[int]:
         return True
 
     def h(
@@ -156,7 +156,7 @@ class C:
     def j(cls) -> TypeGuard[int]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
         return True
 
-def _(x: object):
+def _(x: object, other: object):
     if C().f(x):
         reveal_type(x)  # revealed: str
     if C.f(C(), x):
@@ -165,9 +165,18 @@ def _(x: object):
         reveal_type(x)  # revealed: int
     if C().g(x):
         reveal_type(x)  # revealed: int
-    if C().h():  # error: [invalid-type-guard-call] "Type guard call does not have a target"
+    if C().f(other=other, x=x):
+        reveal_type(x)  # revealed: str
+        reveal_type(other)  # revealed: object
+    if C.f(C(), other=other, x=x):
+        reveal_type(x)  # revealed: str
+        reveal_type(other)  # revealed: object
+    if C.g(other=other, x=x):
+        reveal_type(x)  # revealed: int
+        reveal_type(other)  # revealed: object
+    if C().h():
         pass
-    if C.j():  # error: [invalid-type-guard-call] "Type guard call does not have a target"
+    if C.j():
         pass
 ```
 
@@ -250,30 +259,53 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
     return False
 ```
 
-## Invalid calls
+## Calls
 
 ```py
-from typing import Any
+from typing import Any, Literal, overload
 from typing_extensions import TypeGuard, TypeIs
 
-def f(a: object) -> TypeGuard[str]:
+def f(a: object, other: object = object()) -> TypeGuard[str]:
     return True
 
-def g(a: object) -> TypeIs[int]:
+def g(a: object, other: object = object()) -> TypeIs[int]:
     return True
 
-def _(d: Any):
+def defaulted(a: object = object(), other: object = object()) -> TypeIs[int]:
+    return True
+
+@overload
+def overloaded(a: object, mode: Literal[True]) -> TypeIs[int]: ...
+@overload
+def overloaded(a: object, mode: Literal[False]) -> TypeIs[int]: ...
+def overloaded(a: object, mode: bool) -> TypeIs[int]:
+    return True
+
+def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
     if f():  # error: [missing-argument] "No argument provided for required parameter `a` of function `f`"
         ...
 
     if g(*d):
         pass
 
-    if f("foo"):  # TODO: error: [invalid-type-guard-call]
-        ...
+    if f("foo"): ...
 
-    if g(a=d):  # error: [invalid-type-guard-call] "Type guard call does not have a target"
-        ...
+    if f(other=other, a=guarded):
+        reveal_type(guarded)  # revealed: str
+        reveal_type(other)  # revealed: object
+
+    if g(other=other, a=narrowed):
+        reveal_type(narrowed)  # revealed: int
+        reveal_type(other)  # revealed: object
+
+    if defaulted(other=other):
+        reveal_type(other)  # revealed: object
+
+    if defaulted():
+        pass
+
+    if overloaded(mode=mode, a=narrowed):
+        reveal_type(narrowed)  # revealed: int
 ```
 
 ## Narrowing

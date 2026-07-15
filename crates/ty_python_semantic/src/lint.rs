@@ -247,6 +247,7 @@ impl LintStatus {
 macro_rules! declare_lint {
     (
         $(#[expect($($expect:tt)*)])?
+        $(#[allow($($allow:tt)*)])?
         $(#[doc = $doc:expr])+
         $vis: vis static $name: ident = {
             summary: $summary: literal,
@@ -256,6 +257,7 @@ macro_rules! declare_lint {
         }
     ) => {
         $(#[expect($($expect)*)])?
+        $(#[allow($($allow)*)])?
         $( #[doc = $doc] )+
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
             name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),

@@ -1,4 +1,4 @@
-//! Parse type and type-error assertions in Python comment form.
+//! Parse inline diagnostic assertions from comments.
 //!
 //! Parses comments of the form `# revealed: SomeType` and `# error: 8 [rule-code] "message text"`.
 //! In the latter case, the `8` is a column number, and `"message text"` asserts that the full
@@ -35,14 +35,20 @@
 //! ```
 
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::token::Token;
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::str::FromStr;
+use toml_parser::lexer::TokenKind;
 
 use crate::RunOptions;
+
+#[derive(Clone, Copy)]
+pub(crate) enum AssertionSource<'a> {
+    Python(&'a ParsedModuleRef),
+    Toml,
+}
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
@@ -53,15 +59,49 @@ pub(crate) struct InlineFileAssertions<'s> {
 impl<'s> InlineFileAssertions<'s> {
     pub(crate) fn from_file(
         source: &'s str,
-        parsed: &ParsedModuleRef,
+        assertion_source: AssertionSource<'_>,
+        file_index: &LineIndex,
+    ) -> Self {
+        match assertion_source {
+            AssertionSource::Python(parsed) => Self::from_comment_ranges(
+                source,
+                parsed
+                    .tokens()
+                    .iter()
+                    .filter(|token| token.kind().is_comment())
+                    .map(Ranged::range),
+                file_index,
+            ),
+            AssertionSource::Toml => Self::from_comment_ranges(
+                source,
+                toml_parser::Source::new(source)
+                    .lex()
+                    .filter(|token| token.kind() == TokenKind::Comment)
+                    .map(|token| {
+                        let span = token.span();
+                        TextRange::new(
+                            TextSize::try_from(span.start()).unwrap(),
+                            TextSize::try_from(span.end()).unwrap(),
+                        )
+                    }),
+                file_index,
+            ),
+        }
+    }
+
+    fn from_comment_ranges(
+        source: &'s str,
+        comment_ranges: impl Iterator<Item = TextRange>,
         file_index: &LineIndex,
     ) -> Self {
         let mut by_line = Vec::new();
-        let mut file_assertions = UnparsedAssertionsIter {
-            tokens: parsed.tokens().iter(),
-            source,
-        }
-        .peekable();
+        let mut file_assertions = comment_ranges
+            .filter_map(|range| {
+                let comment_text = &source[range];
+                UnparsedAssertion::from_comment(comment_text)
+                    .map(|assertion| AssertionWithRange(assertion, range))
+            })
+            .peekable();
 
         while let Some(ranged_assertion) = file_assertions.next() {
             let mut collector = AssertionVec::new();
@@ -147,29 +187,6 @@ impl<'s> IntoIterator for InlineFileAssertions<'s> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.by_line.into_iter()
-    }
-}
-
-struct UnparsedAssertionsIter<'a, 's> {
-    source: &'s str,
-    tokens: std::slice::Iter<'a, Token>,
-}
-
-impl<'s> Iterator for UnparsedAssertionsIter<'_, 's> {
-    type Item = AssertionWithRange<'s>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let token = self.tokens.next()?;
-            if !token.kind().is_comment() {
-                continue;
-            }
-
-            let comment_text = &self.source[token.range()];
-            if let Some(assertion) = UnparsedAssertion::from_comment(comment_text) {
-                return Some(AssertionWithRange(assertion, token.range()));
-            }
-        }
     }
 }
 
@@ -530,7 +547,18 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let parsed = parsed_module(&db, file).load(&db);
-        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
+        InlineFileAssertions::from_file(
+            source,
+            AssertionSource::Python(&parsed),
+            &line_index(&db, file),
+        )
+    }
+
+    fn get_toml_assertions(source: &str) -> InlineFileAssertions<'_> {
+        let mut db = TestDb::setup();
+        db.write_file("/src/ruff.toml", source).unwrap();
+        let file = system_path_to_file(&db, "/src/ruff.toml").unwrap();
+        InlineFileAssertions::from_file(source, AssertionSource::Toml, &line_index(&db, file))
     }
 
     fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {
@@ -579,6 +607,27 @@ mod tests {
         };
 
         assert_eq!(format!("{assert}"), "error: ");
+    }
+
+    #[test]
+    fn toml_comments() {
+        let source = dedent(
+            r##"
+            first = "# error: [not-a-comment]"
+            second = "value" # error: [rule-codes-in-selectors]
+            "##,
+        );
+        let assertions = get_toml_assertions(&source);
+
+        let [line] = &into_vec(assertions)[..] else {
+            panic!("expected one line");
+        };
+
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
+        let [assertion] = &line.assertions[..] else {
+            panic!("expected one assertion");
+        };
+        assert_eq!(format!("{assertion}"), "error: [rule-codes-in-selectors]");
     }
 
     #[test]

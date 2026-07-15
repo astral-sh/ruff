@@ -161,6 +161,16 @@ impl<'db> ConstructorBinding<'db> {
         self.downstream_constructor.as_deref_mut()
     }
 
+    pub(super) fn init_argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
+        if self.constructor_kind().is_init() {
+            self.entry.argument_matches_keyword_variadic(argument_index)
+        } else {
+            self.downstream_constructor().is_some_and(|downstream| {
+                downstream.constructor_init_argument_matches_keyword_variadic(argument_index)
+            })
+        }
+    }
+
     pub(super) fn map<F>(self, f: &F) -> ConstructorBinding<'db>
     where
         F: Fn(CallableBinding<'db>) -> CallableBinding<'db>,

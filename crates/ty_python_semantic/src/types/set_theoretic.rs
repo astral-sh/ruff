@@ -902,10 +902,11 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = Type<'db>> {
-        if self.positive(db).is_empty() {
+        let positive = self.positive(db);
+        if positive.is_empty() {
             Either::Left(std::iter::once(Type::object()))
         } else {
-            Either::Right(self.positive(db).iter().copied())
+            Either::Right(positive.iter().copied())
         }
     }
 
@@ -924,6 +925,30 @@ impl<'db> IntersectionType<'db> {
             builder = builder.add_negative(*ty);
         }
         builder.build()
+    }
+
+    /// Compute the `__class__` type when this intersection contains a positive class-backed
+    /// protocol constraint.
+    ///
+    /// Negative instance constraints are not transferred: an object not satisfying `P` does not
+    /// imply that other instances of its class cannot satisfy `P`.
+    pub(crate) fn try_dunder_class(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if !self.iter_positive(db).any(|positive| {
+            matches!(
+                positive,
+                Type::ProtocolInstance(protocol) if protocol.class_origin().is_some()
+            )
+        }) {
+            return None;
+        }
+
+        Some(
+            self.iter_positive(db)
+                .fold(IntersectionBuilder::new(db), |builder, positive| {
+                    builder.add_positive(positive.dunder_class(db))
+                })
+                .build(),
+        )
     }
 
     pub(crate) fn map_with_boundness(

@@ -249,6 +249,22 @@ impl<'db> AllMembers<'db> {
                 SubclassOfInner::Dynamic(_) => {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
                 }
+                SubclassOfInner::Protocol(protocol) => {
+                    if let Some((class_literal, _)) = protocol
+                        .class_origin()
+                        .and_then(|origin| origin.static_class_literal(db))
+                    {
+                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                        self.extend_with_synthetic_members(
+                            db,
+                            ty,
+                            ClassLiteral::Static(class_literal),
+                        );
+                    }
+                    // A structural implementation can use any metaclass, so only members of
+                    // `type` itself are guaranteed in addition to the protocol interface.
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
                         if let Some((class_literal, _)) = class_type.static_class_literal(db) {

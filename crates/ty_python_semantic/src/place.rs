@@ -1615,7 +1615,8 @@ fn place_from_bindings_impl<'db>(
             // We need to "look through" loop header definitions to do boundness analysis. The
             // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
             // like all other bindings, so that it can participate in fixpoint iteration.
-            if binding.kind(db).is_loop_header() {
+            let binding_kind = binding.kind(db);
+            if binding_kind.is_loop_header() {
                 let loop_header = loop_header_reachability(db, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
@@ -1625,7 +1626,7 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
-            } else if matches!(binding.kind(db), DefinitionKind::NestedBindings(_)) {
+            } else if matches!(binding_kind, DefinitionKind::NestedBindings(_)) {
                 // Nested bindings definitions similar to loop header definitions, synthetic
                 // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {

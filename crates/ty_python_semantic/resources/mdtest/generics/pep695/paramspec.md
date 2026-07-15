@@ -1038,6 +1038,107 @@ reveal_type(lazy_frame.collect(background=False))  # revealed: DataFrame
 reveal_type(lazy_frame.collect(background=True))  # revealed: InProcessQuery
 ```
 
+The transparent decorator can be one overload among several. The workaround only inspects the
+overload selected by the decorator call.
+
+```py
+from typing import Any, Callable, overload, reveal_type
+
+@overload
+def select_transparent(function: Callable[P, R], /) -> Callable[P, R]: ...
+@overload
+def select_transparent(*, value: int | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+def select_transparent(function: Callable[P, R] | None = None, *, value: int | None = None) -> Any:
+    raise NotImplementedError
+
+@overload
+def selected(value: int) -> int: ...
+@overload
+def selected(value: str) -> str: ...
+@select_transparent
+def selected(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(selected)  # revealed: Overload[(value: int) -> int, (value: str) -> str]
+reveal_type(selected(1))  # revealed: int
+reveal_type(selected("one"))  # revealed: str
+```
+
+A transparent decorator can preserve a return type variable wrapped in `Awaitable`.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import overload
+
+def awaitable_transparent(function: Callable[P, Awaitable[R]], /) -> Callable[P, Awaitable[R]]:
+    raise NotImplementedError
+
+@overload
+async def awaitable(value: int) -> int: ...
+@overload
+async def awaitable(value: str) -> str: ...
+@awaitable_transparent
+async def awaitable(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(
+    awaitable  # revealed: Overload[(value: int) -> CoroutineType[Any, Any, int], (value: str) -> CoroutineType[Any, Any, str]]
+)
+
+async def check_awaitable() -> None:
+    reveal_type(await awaitable(1))  # revealed: int
+    reveal_type(await awaitable("one"))  # revealed: str
+
+def unwrap_awaitable(function: Callable[P, Awaitable[R]], /) -> Callable[P, R]:
+    raise NotImplementedError
+
+@overload
+async def unwrapped(value: int) -> int: ...
+@overload
+async def unwrapped(value: str) -> str: ...
+@unwrap_awaitable
+async def unwrapped(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(unwrapped(1))  # revealed: int | str
+```
+
+The selected decorator overload can use an `Awaitable` return type.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import overload
+
+@overload
+def select_awaitable_transparent(function: Callable[P, Awaitable[R]], /) -> Callable[P, Awaitable[R]]: ...
+@overload
+def select_awaitable_transparent(
+    *, value: int | None = None
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]: ...
+def select_awaitable_transparent(
+    function: Callable[P, Awaitable[R]] | None = None,
+    *,
+    value: int | None = None,
+) -> Any:
+    raise NotImplementedError
+
+@overload
+async def selected_awaitable(value: int) -> int: ...
+@overload
+async def selected_awaitable(value: str) -> str: ...
+@select_awaitable_transparent
+async def selected_awaitable(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(
+    selected_awaitable  # revealed: Overload[(value: int) -> CoroutineType[Any, Any, int], (value: str) -> CoroutineType[Any, Any, str]]
+)
+
+async def check_selected_awaitable() -> None:
+    reveal_type(await selected_awaitable(1))  # revealed: int
+    reveal_type(await selected_awaitable("one"))  # revealed: str
+```
+
 ### Overloads
 
 #### Return type filtering

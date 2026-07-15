@@ -538,7 +538,15 @@ pub fn create_diagnostic_snapshot<'d, C>(
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();
 
-    writeln!(snapshot, "# Python source files").unwrap();
+    let source_heading = if test
+        .files()
+        .all(|file| matches!(file.lang, "py" | "python" | "pyi" | "ipynb"))
+    {
+        "Python source files"
+    } else {
+        "Source files"
+    };
+    writeln!(snapshot, "# {source_heading}").unwrap();
     writeln!(snapshot).unwrap();
     for file in test.files() {
         writeln!(snapshot, "## {}", file.relative_path()).unwrap();

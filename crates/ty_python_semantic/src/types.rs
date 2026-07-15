@@ -2002,6 +2002,7 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
+                SubclassOfInner::Protocol(_) => true,
                 SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db),
                 SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db),
             },
@@ -2865,7 +2866,12 @@ impl<'db> Type<'db> {
         );
 
         let own_class = match self {
-            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Protocol(protocol) => {
+                    protocol.class_origin().map(|origin| *origin)
+                }
+                subclass_of => subclass_of.into_class(db),
+            },
             _ => self.to_class_type(db),
         };
         let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
@@ -3979,6 +3985,14 @@ impl<'db> Type<'db> {
                     .into()
                 }
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "for_all" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetForAll(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                     if name == "satisfied_by_all_typevars" =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -4769,6 +4783,10 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin().map_or_else(
+                    || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
+                    |origin| self.constructor_bindings(db, *origin),
+                ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
@@ -6288,7 +6306,10 @@ impl<'db> Type<'db> {
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
-            Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+            // Class-member lookup on a protocol instance must use the protocol's nominal class.
+            // The structural `type[Protocol]` view is exposed by `dunder_class` and explicit
+            // `type[Protocol]` annotations instead.
+            Type::ProtocolInstance(protocol) => protocol.to_nominal_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
             Type::TypedDict(typed_dict) => match typed_dict {
@@ -6305,20 +6326,24 @@ impl<'db> Type<'db> {
 
     /// Get the type of the `__class__` attribute of this type.
     ///
-    /// For most types, this is equivalent to the meta type of this type. For `TypedDict` types,
-    /// this returns `type[dict[str, object]]` instead, because inhabitants of a `TypedDict` are
-    /// instances of `dict` at runtime.
+    /// For most types, this is equivalent to the meta type of this type. `TypedDict` types return
+    /// `type[dict[str, object]]`, because their inhabitants are instances of `dict` at runtime.
+    /// Class-backed protocols return their structural `type[Protocol]` view.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
-        if self.is_typed_dict() {
-            return KnownClass::Dict
+        match self {
+            Type::Union(union) => union.map(db, |element| element.dunder_class(db)),
+            Type::Intersection(intersection) => intersection
+                .try_dunder_class(db)
+                .unwrap_or_else(|| self.to_meta_type(db)),
+            Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+            Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
-                .unwrap_or_else(Type::unknown);
+                .unwrap_or_else(Type::unknown),
+            _ => self.to_meta_type(db),
         }
-
-        self.to_meta_type(db)
     }
 
     #[must_use]
@@ -6382,6 +6407,7 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetNever
                         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                         | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                        | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
                 )
@@ -6751,6 +6777,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
@@ -7007,6 +7034,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
@@ -7174,6 +7202,7 @@ impl<'db> Type<'db> {
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
                 SubclassOfInner::Class(class) => class.type_definition(db),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin()?.type_definition(db),
                 SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
                     bound_typevar.typevar(db).definition(db)?,
                 )),

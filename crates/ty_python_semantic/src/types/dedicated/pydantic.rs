@@ -1,17 +1,21 @@
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{Expr, ExprCall, ExprDict, Keyword, name::Name};
+use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 
+use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
+use crate::types::call::Bindings;
 use crate::types::class::CodeGeneratorKind;
+use crate::types::context::InferContext;
+use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
 use crate::types::ide_support::{ImportAliasResolution, definitions_for_name};
 use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
 use crate::types::{
-    ClassBase, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
+    ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
     KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral, Type, UnionType,
     definition_expression_type,
 };
@@ -43,6 +47,10 @@ impl<'db> ModelMetadata<'db> {
 
     fn accepts_extra(self, db: &'db dyn Db) -> bool {
         !matches!(self.config(db).extra, Some(ExtraBehavior::Forbid))
+    }
+
+    fn discards_extra(self, db: &'db dyn Db) -> bool {
+        matches!(self.config(db).extra, None | Some(ExtraBehavior::Ignore))
     }
 
     pub(in crate::types) fn validates_by_alias(self, db: &'db dyn Db) -> bool {
@@ -999,6 +1007,73 @@ pub(in crate::types) fn model_init_accepts_extra(
             model_init_behavior(db, class),
             ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
         )
+}
+
+/// Return `true` if extra keywords passed to `class` are silently discarded by Pydantic.
+pub(in crate::types) fn model_init_discards_extra(
+    db: &dyn Db,
+    class: StaticClassLiteral<'_>,
+    metadata: ModelMetadata<'_>,
+) -> bool {
+    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
+}
+
+/// Report keyword arguments that the Pydantic model constructor silently discards.
+pub(in crate::types) fn report_discarded_extra_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassType<'db>,
+    arguments: &Arguments,
+    bindings: &Bindings<'db>,
+) {
+    if !context.is_lint_enabled(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT) {
+        return;
+    }
+
+    let db = context.db();
+    let Some((class, _)) = class.static_class_literal(db) else {
+        return;
+    };
+    let Some(metadata) = CodeGeneratorKind::from_class(db, class.into())
+        .and_then(CodeGeneratorKind::pydantic_metadata)
+    else {
+        return;
+    };
+    if !model_init_discards_extra(db, class, metadata) {
+        return;
+    }
+
+    let extra_names: Vec<_> = arguments
+        .iter_source_order()
+        .enumerate()
+        .filter_map(|(argument_index, argument)| {
+            let ArgOrKeyword::Keyword(keyword) = argument else {
+                return None;
+            };
+            let name = keyword.arg.as_ref()?;
+            bindings
+                .constructor_init_argument_matches_keyword_variadic(argument_index)
+                .then_some(name)
+        })
+        .collect();
+
+    if extra_names.is_empty() {
+        return;
+    }
+
+    let Some(builder) = context.report_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT, arguments) else {
+        return;
+    };
+
+    if let [name] = extra_names.as_slice() {
+        builder.into_diagnostic(format_args!(
+            "Extra argument `{name}` is discarded by Pydantic"
+        ));
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Extra arguments {} are discarded by Pydantic",
+            format_enumeration(extra_names.iter().map(|name| format!("`{name}`")))
+        ));
+    }
 }
 
 /// Create the catch-all keyword parameter for a Pydantic model constructor.

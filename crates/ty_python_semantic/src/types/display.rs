@@ -1061,6 +1061,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
+                SubclassOfInner::Protocol(protocol) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    Type::ProtocolInstance(protocol)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    f.write_char(']')
+                }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
@@ -1209,6 +1218,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                         return f.write_str("bound method `ConstraintSet.satisfies`");
+                    }
+                    KnownBoundMethodType::ConstraintSetForAll(_) => {
+                        return f.write_str("bound method `ConstraintSet.for_all`");
                     }
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                         return f
@@ -2758,6 +2770,11 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                 SubclassOfInner::Dynamic(dynamic) => {
                     let rep =
                         Type::Dynamic(dynamic).representation(self.db, self.settings.singleline());
+                    join.entry(&rep);
+                }
+                SubclassOfInner::Protocol(protocol) => {
+                    let rep = Type::ProtocolInstance(protocol)
+                        .representation(self.db, self.settings.singleline());
                     join.entry(&rep);
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {

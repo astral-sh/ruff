@@ -1050,22 +1050,22 @@ fn check_class_namespace_against_metaclass_members<'db>(
     {
         let body_scope = metaclass.body_scope(db);
         let metaclass_index = semantic_index(db, body_scope.file(db));
-        let body_scope = body_scope.file_scope_id(db);
-        let metaclass_table = metaclass_index.place_table(body_scope);
-        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+        let body_scope_id = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope_id);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
             metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
         }
 
-        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+        for function_scope in attribute_scopes(db, body_scope) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
                     // A method-scope member may only be declared, as in `cls.attr: int`.
                     // Only an assignment such as `cls.attr: int = 1` writes a value onto the
                     // newly created class object, potentially overwriting a class-body value.
-                    let is_assigned = attribute_assignments(db, metaclass.body_scope(db), name)
-                        .any(|(bindings, _)| {
+                    let is_assigned =
+                        attribute_assignments(db, body_scope, name).any(|(bindings, _)| {
                             bindings
                                 .into_iter()
                                 .any(|binding| binding.binding.definition().is_some())

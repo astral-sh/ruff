@@ -1,22 +1,17 @@
 use std::borrow::Cow;
-use std::ops::Range;
 use std::path::Path;
 
-use colored::Colorize;
-use log::warn;
 use pyproject_toml::PyProjectToml;
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::TomlSourceType;
-use ruff_text_size::{TextRange, TextSize};
 
-use crate::IOError;
 use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::{FixTable, MAX_ITERATIONS, report_failed_to_converge_error};
 use crate::registry::Rule;
-use crate::rules::ruff::rules::{InvalidPyprojectToml, rule_codes_in_selectors};
+use crate::rules::ruff::rules::{invalid_pyproject_toml, rule_codes_in_selectors};
 use crate::settings::LinterSettings;
 use crate::settings::types::UnsafeFixes;
 
@@ -28,36 +23,20 @@ pub struct TomlFixerResult<'a> {
 
 pub fn lint_toml(
     path: &Path,
-    source: &str,
+    contents: &str,
     settings: &LinterSettings,
     source_type: TomlSourceType,
 ) -> Vec<Diagnostic> {
-    let context = LintContext::new(path, source, settings);
+    let context = LintContext::new(path, contents, settings);
+
+    if let Err(err) = toml::from_str::<PyProjectToml>(contents) {
+        if source_type.is_pyproject() && context.is_rule_enabled(Rule::InvalidPyprojectToml) {
+            invalid_pyproject_toml(&context, &err);
+        }
+    }
 
     if context.is_rule_enabled(Rule::RuleCodesInSelectors) {
         rule_codes_in_selectors(&context, source_type);
-    }
-
-    // RUF200
-    if context.is_rule_enabled(Rule::InvalidPyprojectToml) && source_type.is_pyproject() {
-        let Some(err) = toml::from_str::<PyProjectToml>(source).err() else {
-            return context.into_diagnostics();
-        };
-
-        let range = match err.span() {
-            // This is bad but sometimes toml and/or serde just don't give us spans
-            // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
-            None => TextRange::default(),
-            Some(range) => {
-                let Some(range) = text_range_from_std(range, &context) else {
-                    return context.into_diagnostics();
-                };
-                range
-            }
-        };
-
-        let toml_err = err.message().to_string();
-        context.report_diagnostic(InvalidPyprojectToml { message: toml_err }, range);
     }
 
     context.into_diagnostics()
@@ -105,34 +84,6 @@ pub fn lint_fix_toml<'a>(
 
         diagnostics = lint_toml(path, transformed.as_ref(), settings, source_type);
     }
-}
-
-/// Try to convert a `range` into a `TextRange`, emitting an `IOError` diagnostic if the file is too
-/// large or a warning if the `IOError` lint rule is disabled.
-pub(crate) fn text_range_from_std(range: Range<usize>, context: &LintContext) -> Option<TextRange> {
-    let Ok(end) = TextSize::try_from(range.end) else {
-        let source_file = context.source_file();
-        let message = format!(
-            "{} is larger than 4GB, but ruff assumes all files to be smaller",
-            source_file.name(),
-        );
-        if context.is_rule_enabled(Rule::IOError) {
-            context.report_diagnostic(IOError { message }, TextRange::default());
-        } else {
-            warn!(
-                "{}{}{} {message}",
-                "Failed to lint ".bold(),
-                source_file.name().bold(),
-                ":".bold()
-            );
-        }
-        return None;
-    };
-    Some(TextRange::new(
-        // start <= end, so if end < 4GB follows start < 4GB
-        TextSize::try_from(range.start).unwrap(),
-        end,
-    ))
 }
 
 #[cfg(test)]
