@@ -290,23 +290,35 @@ fn definition_expression_annotation<'db>(
     }
 }
 
-struct ApplyDefaultTypeMapping;
-struct ApplyTopMaterialization;
-struct ApplyBottomMaterialization;
+struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
+
+#[repr(usize)]
+enum ApplyTypeMappingCache {
+    Default,
+    TopMaterialization,
+    BottomMaterialization,
+    TopSpecializationMaterialization,
+    BottomSpecializationMaterialization,
+    Promotion,
+    SkipPromotion,
+}
+
+impl ApplyTypeMappingCache {
+    const COUNT: usize = Self::SkipPromotion as usize + 1;
+}
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
-/// Materialization is the only mapping mode that needs to visit the same type under two different
-/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
-/// for those modes so invariant checks can safely reuse one visitor.
+/// Some recursive transformations visit the same type under more than one mapping mode within a
+/// single call chain. Keep separate cycle caches for those modes so one transformation cannot
+/// reuse the result of another.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
-    top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
-    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    type_transformers:
+        [OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>; ApplyTypeMappingCache::COUNT],
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -323,20 +335,28 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => self
-                .top_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::Materialize(MaterializationKind::Bottom) => self
-                .bottom_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            _ => self
-                .default
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-        }
+        let cache = match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => {
+                ApplyTypeMappingCache::TopMaterialization
+            }
+            TypeMapping::Materialize(MaterializationKind::Bottom) => {
+                ApplyTypeMappingCache::BottomMaterialization
+            }
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Top,
+                ..
+            } => ApplyTypeMappingCache::TopSpecializationMaterialization,
+            TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Bottom,
+                ..
+            } => ApplyTypeMappingCache::BottomSpecializationMaterialization,
+            TypeMapping::Promote(PromotionMode::On, _) => ApplyTypeMappingCache::Promotion,
+            TypeMapping::Promote(PromotionMode::Off, _) => ApplyTypeMappingCache::SkipPromotion,
+            _ => ApplyTypeMappingCache::Default,
+        };
+        self.type_transformers[cache as usize]
+            .get_or_init(TypeTransformer::default)
+            .visit_type(db, ty, func)
     }
 
     pub(crate) fn is_equivalent_to_materialization(
@@ -357,9 +377,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         debug_assert!(was_empty.is_ok());
 
         Self {
-            default: OnceCell::new(),
-            top_materialization: OnceCell::new(),
-            bottom_materialization: OnceCell::new(),
+            type_transformers: std::array::from_fn(|_| OnceCell::new()),
             materialization_equivalence,
         }
     }
@@ -368,9 +386,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 impl Default for ApplyTypeMappingVisitor<'_> {
     fn default() -> Self {
         Self {
-            default: OnceCell::new(),
-            top_materialization: OnceCell::new(),
-            bottom_materialization: OnceCell::new(),
+            type_transformers: std::array::from_fn(|_| OnceCell::new()),
             materialization_equivalence: OnceCell::new(),
         }
     }
