@@ -15,7 +15,6 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
 use ruff_python_ast::SourceType;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
-use ruff_source_file::SourceFileBuilder;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
 
@@ -128,10 +127,7 @@ fn run_test(
                             test_contents(&source_kind, path, &settings.linter).0
                         }
                         SourceType::Toml(source_type) if source_type.is_pyproject() => {
-                            let source_file =
-                                SourceFileBuilder::new(path.to_string_lossy(), source.as_str())
-                                    .finish();
-                            lint_pyproject_toml(&source_file, &settings.linter)
+                            lint_pyproject_toml(path, source.as_str(), &settings.linter)
                         }
                         SourceType::Toml(_) | SourceType::Markdown => Vec::new(),
                     }

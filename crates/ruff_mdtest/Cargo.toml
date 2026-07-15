@@ -20,7 +20,6 @@ ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_linter = { workspace = true, features = ["testing"] }
 ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
-ruff_source_file = { workspace = true }
 ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }

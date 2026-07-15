@@ -5,6 +5,8 @@
 select = ["RUF200"]
 ```
 
+## Reports an invalid `pyproject.toml`
+
 `pyproject.toml`:
 
 ```toml
@@ -19,4 +21,19 @@ error[RUF200]: Failed to parse pyproject.toml: invalid type: integer `1`, expect
 2 | name = 1 # snapshot: invalid-pyproject-toml
   |        ^
   |
+```
+
+## Respects per-file ignores
+
+```toml
+[lint]
+select = ["RUF200"]
+per-file-ignores = { "pyproject.toml" = ["RUF200"] }
+```
+
+`pyproject.toml`:
+
+```toml
+[project]
+name = 1
 ```

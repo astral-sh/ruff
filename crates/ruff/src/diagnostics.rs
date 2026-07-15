@@ -225,8 +225,7 @@ pub(crate) fn lint_path(
                         return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
                     }
                 };
-                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                lint_pyproject_toml(&source_file, settings)
+                lint_pyproject_toml(path, &contents, settings)
             } else {
                 vec![]
             };
@@ -370,8 +369,6 @@ pub(crate) fn lint_stdin(
             }
 
             let path = path.unwrap();
-            let source_file =
-                SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
 
             match fix_mode {
                 flags::FixMode::Diff | flags::FixMode::Generate => {}
@@ -379,7 +376,7 @@ pub(crate) fn lint_stdin(
             }
 
             return Ok(Diagnostics {
-                inner: lint_pyproject_toml(&source_file, &settings.linter),
+                inner: lint_pyproject_toml(path, &contents, &settings.linter),
                 fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                 notebook_indexes: FxHashMap::default(),
             });

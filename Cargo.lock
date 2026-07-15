@@ -3434,7 +3434,6 @@ dependencies = [
  "ruff_linter",
  "ruff_python_ast",
  "ruff_ranged_value",
- "ruff_source_file",
  "ruff_workspace",
  "salsa",
 ]

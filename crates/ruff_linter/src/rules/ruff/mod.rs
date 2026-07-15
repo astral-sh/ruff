@@ -13,7 +13,6 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use ruff_python_ast::PythonVersion;
-    use ruff_source_file::SourceFileBuilder;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
@@ -795,9 +794,9 @@ mod tests {
             .join(path)
             .join("pyproject.toml");
         let contents = fs::read_to_string(path)?;
-        let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(
-            &source_file,
+            Path::new("pyproject.toml"),
+            &contents,
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
         );
         assert_diagnostics!(snapshot, messages);

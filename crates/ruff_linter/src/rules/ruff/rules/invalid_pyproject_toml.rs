@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_text_size::{TextRange, TextSize};
 
-use crate::{FixAvailability, Violation};
+use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 
 /// ## What it does
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.
@@ -44,4 +45,20 @@ impl Violation for InvalidPyprojectToml {
         let InvalidPyprojectToml { message } = self;
         format!("Failed to parse pyproject.toml: {message}")
     }
+}
+
+/// RUF200
+pub(crate) fn invalid_pyproject_toml(context: &LintContext, err: &toml::de::Error) {
+    let range = match err.span() {
+        // This is bad but sometimes toml and/or serde just don't give us spans
+        // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
+        None => TextRange::default(),
+        Some(range) => TextRange::new(
+            TextSize::try_from(range.start).unwrap(),
+            TextSize::try_from(range.end).unwrap(),
+        ),
+    };
+
+    let toml_err = err.message().to_string();
+    context.report_diagnostic(InvalidPyprojectToml { message: toml_err }, range);
 }
