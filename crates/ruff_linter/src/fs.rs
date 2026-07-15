@@ -9,12 +9,10 @@ use crate::settings::types::CompiledPerFileIgnoreList;
 ///
 /// On WASM this just returns `.`. Otherwise, defer to [`path_absolutize::path_dedot::CWD`].
 pub fn get_cwd() -> &'static Path {
-    #[cfg(target_arch = "wasm32")]
-    {
-        Path::new(".")
+    cfg_select! {
+        target_arch = "wasm32" => Path::new("."),
+        _ => path_absolutize::path_dedot::CWD.as_path(),
     }
-    #[cfg(not(target_arch = "wasm32"))]
-    path_absolutize::path_dedot::CWD.as_path()
 }
 
 /// Create a set with codes matching the pattern/code pairs.
