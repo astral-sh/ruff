@@ -1278,6 +1278,31 @@ def alias_writes(
     bottom.value = 1
 ```
 
+Read and write mappings use separate transformation caches when a materialized specialization is
+nested inside another generic type:
+
+```py
+class Leaf[T](Protocol):
+    value: T
+
+class Outer[T](Protocol):
+    leaf: Leaf[T]
+
+class ReadHolder[T]:
+    @property
+    def outer(self) -> Outer[T]:
+        raise NotImplementedError
+
+def nested_specialization(
+    holder: Top[ReadHolder[Any]],
+    top_leaf: Top[Leaf[Any]],
+    bottom_leaf: Bottom[Leaf[Any]],
+) -> None:
+    reveal_type(holder.outer)  # revealed: Top[Outer[Any]]
+    holder.outer.leaf = bottom_leaf
+    holder.outer.leaf = top_leaf  # error: [invalid-assignment]
+```
+
 Repeated materialization has no further effect when a recursive protocol reference passes through an
 alias:
 
