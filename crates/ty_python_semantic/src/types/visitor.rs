@@ -449,7 +449,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
-                self.record(DynamicContent::Indeterminate);
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
                 return;
             };
 
