@@ -15,6 +15,7 @@ YIQ: Luminance, Chrominance (used by composite video signals)
 HLS: Hue, Luminance, Saturation
 HSV: Hue, Saturation, Value
 """
+
 from typing import Final
 
 __all__ = ["rgb_to_yiq", "yiq_to_rgb", "rgb_to_hls", "hls_to_rgb", "rgb_to_hsv", "hsv_to_rgb"]

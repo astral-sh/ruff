@@ -26,6 +26,7 @@ Whitespace between formats is ignored.
 
 The variable struct.error is an exception raised on errors.
 """
+
 from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Iterator
 from typing import Any
@@ -34,36 +35,41 @@ from typing_extensions import disjoint_base
 def pack(fmt: str | bytes, /, *v: Any) -> bytes:
     """Pack values and return the packed bytes.
 
-Return a bytes object containing the provided values packed according
-to the format string.  See help(struct) for more on format strings.
-"""
+    Return a bytes object containing the provided values packed according
+    to the format string.  See help(struct) for more on format strings.
+    """
+
 def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any) -> None:
     """Pack values and write the packed bytes into the buffer.
 
-Pack the provided values according to the format string and write the
-packed bytes into the writable buffer starting at offset.  Note that the
-offset is a required argument.  See help(struct) for more on format
-strings.
-"""
+    Pack the provided values according to the format string and write the
+    packed bytes into the writable buffer starting at offset.  Note that the
+    offset is a required argument.  See help(struct) for more on format
+    strings.
+    """
+
 def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
     """Return a tuple containing values unpacked according to the format string.
 
-The buffer's size in bytes must be calcsize(format).  See help(struct)
-for more on format strings.
-"""
+    The buffer's size in bytes must be calcsize(format).  See help(struct)
+    for more on format strings.
+    """
+
 def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
     """Return a tuple containing values unpacked according to the format string.
 
-The buffer's size, minus offset, must be at least calcsize(format).  See
-help(struct) for more on format strings.
-"""
+    The buffer's size, minus offset, must be at least calcsize(format).  See
+    help(struct) for more on format strings.
+    """
+
 def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
     """Return an iterator yielding tuples unpacked from the given bytes.
 
-The bytes are unpacked according to the format string, like a repeated
-invocation of unpack_from().  Requires that the bytes length be
-a multiple of calcsize(format).
-"""
+    The bytes are unpacked according to the format string, like a repeated
+    invocation of unpack_from().  Requires that the bytes length be
+    a multiple of calcsize(format).
+    """
+
 def calcsize(format: str | bytes, /) -> int:
     """Return size in bytes of the struct described by the format string."""
 
@@ -71,50 +77,57 @@ def calcsize(format: str | bytes, /) -> int:
 class Struct:
     """Create a compiled struct object.
 
-Return a new Struct object which writes and reads binary data according
-to the format string.  See help(struct) for more on format strings.
-"""
+    Return a new Struct object which writes and reads binary data according
+    to the format string.  See help(struct) for more on format strings.
+    """
+
     @property
     def format(self) -> str:
         """struct format string"""
+
     @property
     def size(self) -> int:
         """struct size in bytes"""
+
     def __init__(self, format: str | bytes) -> None: ...
     def pack(self, *v: Any) -> bytes:
         """Pack values and return the packed bytes.
 
-Return a bytes object containing the provided values packed
-according to the struct format string.  See help(struct) for more on
-format strings.
-"""
+        Return a bytes object containing the provided values packed
+        according to the struct format string.  See help(struct) for more on
+        format strings.
+        """
+
     def pack_into(self, buffer: WriteableBuffer, offset: int, *v: Any) -> None:
         """Pack values and write the packed bytes into the buffer.
 
-Pack the provided values according to the struct format string
-and write the packed bytes into the writable buffer starting at
-offset.  Note that the offset is a required argument.  See
-help(struct) for more on format strings.
-"""
+        Pack the provided values according to the struct format string
+        and write the packed bytes into the writable buffer starting at
+        offset.  Note that the offset is a required argument.  See
+        help(struct) for more on format strings.
+        """
+
     def unpack(self, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
         """Return a tuple containing unpacked values.
 
-Unpack according to the struct format string.  The buffer's
-size in bytes must be the struct size.  See help(struct) for more on
-format strings.
-"""
+        Unpack according to the struct format string.  The buffer's
+        size in bytes must be the struct size.  See help(struct) for more on
+        format strings.
+        """
+
     def unpack_from(self, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
         """Return a tuple containing unpacked values.
 
-Values are unpacked according to the struct format string.  The
-buffer's size in bytes, starting at position offset, must be at
-least the struct size.  See help(struct) for more on format
-strings.
-"""
+        Values are unpacked according to the struct format string.  The
+        buffer's size in bytes, starting at position offset, must be at
+        least the struct size.  See help(struct) for more on format
+        strings.
+        """
+
     def iter_unpack(self, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
         """Return an iterator yielding tuples.
 
-Tuples are unpacked from the given bytes source, like a repeated
-invocation of unpack_from().  Requires that the bytes length be
-a multiple of the struct size.
-"""
+        Tuples are unpacked from the given bytes source, like a repeated
+        invocation of unpack_from().  Requires that the bytes length be
+        a multiple of the struct size.
+        """

@@ -3,6 +3,7 @@
 Utility functions for creating archive files (tarballs, zip files,
 that sort of thing).
 """
+
 from _typeshed import StrOrBytesPath, StrPath
 from typing import Literal, overload
 
@@ -69,6 +70,7 @@ def make_tarball(
 
     Returns the output filename.
     """
+
 def make_zipfile(base_name: str, base_dir: str, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0) -> str:
     """Create a zip file from all the files under 'base_dir'.
 

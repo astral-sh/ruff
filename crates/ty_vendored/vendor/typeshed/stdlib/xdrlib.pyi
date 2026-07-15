@@ -3,6 +3,7 @@
 See: RFC 1014
 
 """
+
 from collections.abc import Callable, Sequence
 from typing import TypeVar
 
@@ -20,6 +21,7 @@ class Error(Exception):
         msg -- contains the message
 
     """
+
     msg: str
     def __init__(self, msg: str) -> None: ...
 
@@ -27,6 +29,7 @@ class ConversionError(Error): ...
 
 class Packer:
     """Pack various data representations into a buffer."""
+
     def reset(self) -> None: ...
     def get_buffer(self) -> bytes: ...
     def get_buf(self) -> bytes: ...
@@ -49,6 +52,7 @@ class Packer:
 
 class Unpacker:
     """Unpacks various data representations from the given buffer."""
+
     def __init__(self, data: bytes) -> None: ...
     def reset(self, data: bytes) -> None: ...
     def get_position(self) -> int: ...

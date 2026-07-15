@@ -67,6 +67,7 @@ Consumers MUST ignore unknown record ``"type"`` values and unknown object
 fields. New fields will be added by adding optional keys; an incompatible
 schema change will bump the per-record ``"v"``.
 """
+
 from _typeshed import StrOrBytesPath
 from collections.abc import Sequence
 
@@ -78,10 +79,11 @@ from .stack_collector import StackTraceCollector
 class JsonlCollector(StackTraceCollector):
     """Collector that exports finalized profiling data as JSONL.
 
-See the module docstring for the full record schema. The collector
-accumulates samples in memory and writes the complete file at
-``export()`` time.
-"""
+    See the module docstring for the full record schema. The collector
+    accumulates samples in memory and writes the complete file at
+    ``export()`` time.
+    """
+
     def __init__(self, sample_interval_usec: int, *, skip_idle: bool = False, mode: int | None = None) -> None: ...
     def collect(
         self, stack_frames: Sequence[InterpreterInfo] | Sequence[AwaitedInfo], timestamps_us: _Timestamps = None

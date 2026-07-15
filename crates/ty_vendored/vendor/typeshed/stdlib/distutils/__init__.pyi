@@ -7,6 +7,7 @@ used from a setup script as
 
    setup (...)
 """
+
 # Attempts to improve these stubs are probably not the best use of time:
 # - distutils is deleted in Python 3.12 and newer
 # - Most users already do not use stdlib distutils, due to setuptools monkeypatching

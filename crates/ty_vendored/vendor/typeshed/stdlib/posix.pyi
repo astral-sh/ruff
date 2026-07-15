@@ -3,6 +3,7 @@ standardized by the C Standard and the POSIX standard (a thinly
 disguised Unix interface).  Refer to the library manual and
 corresponding Unix manual entries for more information on calls.
 """
+
 import sys
 
 if sys.platform != "win32":

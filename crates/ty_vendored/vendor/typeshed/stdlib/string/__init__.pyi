@@ -13,6 +13,7 @@ punctuation -- a string containing all ASCII punctuation characters
 printable -- a string containing all ASCII characters considered printable
 
 """
+
 import sys
 from _typeshed import StrOrLiteralStr
 from collections.abc import Iterable, Mapping, Sequence
@@ -48,17 +49,18 @@ printable: Final[LiteralString]  # string too long
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
     """capwords(s [,sep]) -> string
 
-Split the argument into words using split, capitalize each
-word using capitalize, and join the capitalized words using
-join.  If the optional second argument sep is absent or None,
-runs of whitespace characters are replaced by a single space
-and leading and trailing whitespace are removed, otherwise
-sep is used to split and join the words.
+    Split the argument into words using split, capitalize each
+    word using capitalize, and join the capitalized words using
+    join.  If the optional second argument sep is absent or None,
+    runs of whitespace characters are replaced by a single space
+    and leading and trailing whitespace are removed, otherwise
+    sep is used to split and join the words.
 
-"""
+    """
 
 class Template:
     """A string class for supporting $-substitutions."""
+
     template: str
     delimiter: ClassVar[str]
     idpattern: ClassVar[str]
@@ -77,6 +79,7 @@ class Template:
 
 class Formatter:
     """See PEP 3101 for details and purpose of this class."""
+
     @overload
     def format(self, format_string: LiteralString, /, *args: LiteralString, **kwargs: LiteralString) -> LiteralString: ...
     @overload
@@ -102,20 +105,22 @@ class Formatter:
         self, format_string: StrOrLiteralStr
     ) -> Iterable[tuple[StrOrLiteralStr, StrOrLiteralStr | None, StrOrLiteralStr | None, StrOrLiteralStr | None]]:
         """
-Return an iterable that contains tuples of the form
-(literal_text, field_name, format_spec, conversion).
+        Return an iterable that contains tuples of the form
+        (literal_text, field_name, format_spec, conversion).
 
-*field_name* can be None, in which case there's no object
-to format and output; otherwise, it is looked up and
-formatted with *format_spec* and *conversion*.
-"""
+        *field_name* can be None, in which case there's no object
+        to format and output; otherwise, it is looked up and
+        formatted with *format_spec* and *conversion*.
+        """
+
     def get_field(self, field_name: str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any:
         """Find the object referenced by a given field name.
 
-The field name *field_name* can be for instance "0.name"
-or "lookup[3]". The *args* and *kwargs* arguments are
-passed to get_value().
-"""
+        The field name *field_name* can be for instance "0.name"
+        or "lookup[3]". The *args* and *kwargs* arguments are
+        passed to get_value().
+        """
+
     def get_value(self, key: int | str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> Any: ...
     def check_unused_args(self, used_args: set[int | str], args: Sequence[Any], kwargs: Mapping[str, Any]) -> None: ...
     def format_field(self, value: Any, format_spec: str) -> Any: ...
