@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, ParamSpec, TypeGuard, TypeVar, overload
-from typing_extensions import TypeIs, deprecated
+from typing_extensions import Never, TypeIs, deprecated
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 11):
@@ -22,7 +22,7 @@ if sys.version_info < (3, 11):
         an error message is logged.
         """
 
-def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
+def iscoroutine(obj: object) -> TypeIs[Coroutine[object, Never, object]]:
     """Return True if obj is a coroutine object."""
 
 if sys.version_info >= (3, 11):

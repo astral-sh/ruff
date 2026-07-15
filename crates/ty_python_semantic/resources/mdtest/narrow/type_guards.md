@@ -458,15 +458,14 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
-especially when using various functions from typeshed that are annotated as returning
-`TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
-purposes, it would usually lead to more intuitive results if `object` was used as the specialization
-for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+If a `TypeIs` function returns a gradual specialization of a generic class, we simply intersect with
+that generic type. This means that something like the following does not work like the user probably
+intended:
 
 ```py
+from typing import final
+
+@final
 class Unrelated: ...
 
 class Covariant[T]:
@@ -483,11 +482,9 @@ def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
         raise RuntimeError("oh no")
 
-    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+    reveal_type(x)  # revealed: Unrelated | (Covariant[int] & ~Covariant[Any])
 
-    # We would emit a false-positive diagnostic here if we didn't implicitly transform
-    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
-    needs_instance_of_unrelated(x)
+    needs_instance_of_unrelated(x)  # error: [invalid-argument-type]
 ```
 
 ## `TypeGuard` special cases

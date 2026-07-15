@@ -1,0 +1,58 @@
+--- a/stdlib/builtins.pyi
++++ b/stdlib/builtins.pyi
+@@ -78,6 +78,7 @@ from typing import (  # noqa: Y022,UP035
+ 
+ # we can't import `Literal` from typing or mypy crashes: see #11247
+ from typing_extensions import Literal, LiteralString, Self, TypeIs, TypeVarTuple, deprecated, disjoint_base  # noqa: Y023, UP035
++from ty_extensions import Top
+ 
+ if sys.version_info >= (3, 14):
+     from _typeshed import AnnotateFunc
+@@ -3667,7 +3668,7 @@ def breakpoint(*args: Any, **kws: Any) -> None:
+     By default, this drops you into the pdb debugger.
+     """
+ 
+-def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
++def callable(obj: object, /) -> TypeIs[Top[Callable[..., object]]]:
+     """Return whether the object is callable (i.e., some kind of function).
+ 
+     Note that classes are callable, as are instances of classes with a
+--- a/stdlib/asyncio/base_futures.pyi
++++ b/stdlib/asyncio/base_futures.pyi
+@@ -3,6 +3,7 @@ from collections.abc import Callable, Sequence
+ from contextvars import Context
+ from typing import Any, Final
+ from typing_extensions import TypeIs
++from ty_extensions import Top
+ 
+ from . import futures
+ 
+@@ -12,7 +13,7 @@ _PENDING: Final = "PENDING"  # undocumented
+ _CANCELLED: Final = "CANCELLED"  # undocumented
+ _FINISHED: Final = "FINISHED"  # undocumented
+ 
+-def isfuture(obj: object) -> TypeIs[Future[Any]]:
++def isfuture(obj: object) -> TypeIs[Top[Future[Any]]]:
+     """Check for a Future.
+ 
+     This returns True when obj is a Future instance or is advertising
+--- a/stdlib/asyncio/coroutines.pyi
++++ b/stdlib/asyncio/coroutines.pyi
+@@ -1,6 +1,6 @@
+ import sys
+ from collections.abc import Awaitable, Callable, Coroutine
+ from typing import Any, ParamSpec, TypeGuard, TypeVar, overload
+-from typing_extensions import TypeIs, deprecated
++from typing_extensions import Never, TypeIs, deprecated
+ 
+ # Keep asyncio.__all__ updated with any changes to __all__ here
+@@ -22,7 +22,7 @@ if sys.version_info < (3, 11):
+         If the coroutine is not yielded from before it is destroyed,
+         an error message is logged.
+         """
+ 
+-def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
++def iscoroutine(obj: object) -> TypeIs[Coroutine[object, Never, object]]:
+     """Return True if obj is a coroutine object."""
+ 
+ if sys.version_info >= (3, 11):

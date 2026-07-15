@@ -2322,12 +2322,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     Type::unknown()
                 }
-                _ => TypeGuardType::unbound(
-                    self.db(),
-                    // Unlike `TypeIs`, don't use top materialization, because
-                    // `TypeGuard` clobbering behavior makes it counterintuitive
-                    self.infer_type_expression(arguments_slice),
-                ),
+                _ => TypeGuardType::unbound(self.db(), self.infer_type_expression(arguments_slice)),
             },
             SpecialFormType::Concatenate => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
