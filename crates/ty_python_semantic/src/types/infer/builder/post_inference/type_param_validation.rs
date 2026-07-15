@@ -49,12 +49,12 @@ pub(crate) fn check_single_typevar_tuple_pep695(
 
         diagnostic.set_primary_message(format_args!(
             "`{}` is an additional TypeVarTuple",
-            &typevar_tuple.name
+            typevar_tuple.name
         ));
 
         diagnostic.annotate(context.secondary(first_typevar_tuple).message(format_args!(
             "`{}` is the first TypeVarTuple",
-            &first_typevar_tuple.name
+            first_typevar_tuple.name
         )));
 
         diagnostic.info(
