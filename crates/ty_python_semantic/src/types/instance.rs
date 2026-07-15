@@ -505,10 +505,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
-        // `ty` has the protocol class in its MRO. This is a much cheaper check than the
-        // structural check we perform below, so we do it first to avoid the structural check when
-        // we can.
+        // Explicit inheritance from a class-based protocol is nominal, even if the subclass
+        // overrides one of its members incompatibly. A materialized source can use that nominal
+        // relation only if materialization left every requirement of the target unchanged.
         let mut result = self.never();
 
         let source_protocol = ty.as_protocol_instance();
