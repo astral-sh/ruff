@@ -366,13 +366,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }),
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
-                if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
+                if left_typed_dict != TypedDictType::open_empty(db)
+                    && rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
             {
                 Some(Type::TypedDict(left_typed_dict))
             }
 
             (lhs, Type::TypedDict(right_typed_dict), ast::Operator::BitOr)
-                if lhs.is_assignable_to(db, Type::TypedDict(right_typed_dict)) =>
+                if right_typed_dict != TypedDictType::open_empty(db)
+                    && lhs.is_assignable_to(db, Type::TypedDict(right_typed_dict)) =>
             {
                 Some(Type::TypedDict(right_typed_dict))
             }

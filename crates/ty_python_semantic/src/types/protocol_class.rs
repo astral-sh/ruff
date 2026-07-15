@@ -22,7 +22,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
+        InstanceFallbackShadowsNonDataDescriptor, KnownClass, KnownFunction, MemberLookupPolicy,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
         TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
@@ -1044,6 +1044,16 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     pub(super) fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    /// Return whether this member is present on the concrete runtime type of a `TypedDict`.
+    pub(super) fn is_present_on_runtime_dict(&self, db: &'db dyn Db) -> bool {
+        KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
+            .member(db, self.name())
+            .place
+            .ignore_possibly_undefined()
+            .is_some_and(|member_ty| !self.is_method() || !member_ty.is_none(db))
     }
 
     fn is_instance_method(&self) -> bool {

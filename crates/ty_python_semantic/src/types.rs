@@ -39,7 +39,6 @@ pub(crate) use self::match_pattern::{
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
-    typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -102,6 +101,7 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
+use class::open_empty_typed_dict_member;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -1852,6 +1852,10 @@ impl<'db> Type<'db> {
         Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
+    pub(crate) fn open_empty_typed_dict(db: &'db dyn Db) -> Self {
+        Self::TypedDict(TypedDictType::open_empty(db))
+    }
+
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
@@ -2810,6 +2814,9 @@ impl<'db> Type<'db> {
                 name.as_str(),
                 policy,
             ),
+            Type::TypedDict(typed_dict) if typed_dict == TypedDictType::open_empty(db) => {
+                open_empty_typed_dict_member(db, policy, name.as_str())
+            }
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)

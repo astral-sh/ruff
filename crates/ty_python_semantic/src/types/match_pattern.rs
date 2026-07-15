@@ -12,6 +12,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
+use crate::types::narrow::runtime_instance_constraint_for_class_literal;
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -38,19 +39,6 @@ pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
 
 pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
     Type::Callable(CallableType::unknown(db)).top_materialization(db)
-}
-
-/// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
-///
-/// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
-/// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
-/// `Mapping()`, and `MutableMapping()`.
-pub(crate) fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
-    let Some(dict) = KnownClass::Dict.to_class_literal(db).as_class_literal() else {
-        return false;
-    };
-    Type::instance(db, dict.top_materialization(db))
-        .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
 }
 
 /// Return whether every value in `ty` belongs to a `TypedDict` domain accepted by `predicate`.
@@ -81,11 +69,6 @@ fn typed_dict_pattern_domain_satisfies<'db>(
             .any(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
         _ => false,
     }
-}
-
-/// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
-    typed_dict_pattern_domain_satisfies(db, ty, &|_| true)
 }
 
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
@@ -235,10 +218,8 @@ fn class_pattern_is_exhaustive(
     subject_ty: Type<'_>,
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
-    let class_instance_ty = Type::instance(db, class.top_materialization(db));
-    let is_typed_dict_match =
-        is_typed_dict_pattern_domain(db, subject_ty) && typed_dict_matches_class_pattern(db, class);
-    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
+    let class_instance_ty = runtime_instance_constraint_for_class_literal(db, class);
+    if !subject_ty.is_subtype_of(db, class_instance_ty) {
         return false;
     }
 
@@ -997,11 +978,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    let class_instance_ty = Type::instance(db, class.top_materialization(db));
-                    let typed_dict_adds_runtime_matches =
-                        typed_dict_matches_class_pattern(db, class)
-                            && !Type::object().is_subtype_of(db, class_instance_ty);
-                    (!typed_dict_adds_runtime_matches).then_some(class_instance_ty)
+                    Some(runtime_instance_constraint_for_class_literal(db, class))
                 }
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
@@ -1058,7 +1035,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, class.top_materialization(db))
+                    runtime_instance_constraint_for_class_literal(db, class)
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     callable_pattern_type(db)

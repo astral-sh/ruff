@@ -12,11 +12,15 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
-pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use self::typed_dict::synthesize_runtime_dict_merge;
+pub(super) use self::typed_dict::{
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, open_empty_typed_dict_member,
+};
 use super::dedicated::pydantic;
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
-    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy,
+    MroIterator, SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -1626,12 +1630,26 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
-                Some(generic.specialization(db)),
-                name,
-                policy,
-            ),
+            Self::Generic(generic) => {
+                let class_literal = generic.origin(db);
+                let specialization = generic.specialization(db);
+
+                // The invariant parameters of the top `dict` materialization make the ordinary
+                // merge signatures unusable: input positions become `Never`.
+                if matches!(name, "__or__" | "__ror__")
+                    && specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+                    && specialization.types(db).iter().all(Type::is_unknown)
+                    && class_literal.known(db) == Some(KnownClass::Dict)
+                {
+                    return Member::definitely_declared(synthesize_runtime_dict_merge(
+                        db,
+                        Type::instance(db, self),
+                    ))
+                    .inner;
+                }
+
+                class_literal.class_member_inner(db, Some(specialization), name, policy)
+            }
         }
     }
 

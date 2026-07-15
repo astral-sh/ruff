@@ -223,6 +223,17 @@ impl<'db> TypedDictType<'db> {
         Self::Class(defining_class)
     }
 
+    /// Return the structural top type of all `TypedDict`s.
+    ///
+    /// Every `TypedDict` is a subtype of an empty schema with read-only `object` extra items.
+    pub(crate) fn open_empty(db: &'db dyn Db) -> Self {
+        Self::from_schema_items_with_openness(
+            db,
+            TypedDictSchema::default(),
+            TypedDictOpenness::extra(db, Type::object(), true),
+        )
+    }
+
     pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(defining_class) => Some(defining_class),

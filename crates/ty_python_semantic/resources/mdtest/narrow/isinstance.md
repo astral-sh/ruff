@@ -744,6 +744,160 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+## Narrowing `TypedDict`s to runtime dictionary classes
+
+A `TypedDict` object is a `dict` and a `MutableMapping` at runtime, even though its static interface
+does not allow arbitrary mutation. Narrowing from `object` must therefore allow both ordinary
+dictionaries and any `TypedDict`:
+
+```py
+from collections.abc import MutableMapping
+from typing import TypedDict
+from typing_extensions import Never
+
+class Movie(TypedDict):
+    title: str
+
+def narrow_object(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Top[MutableMapping[Unknown, Unknown]] | <TypedDict with no items>
+
+def narrow_movie(movie: Movie) -> None:
+    if isinstance(movie, MutableMapping):
+        reveal_type(movie)  # revealed: Movie
+        reveal_type(reversed(movie))  # revealed: Iterator[str]
+```
+
+For an unconstrained type variable, neither the ordinary dictionary possibility nor the `TypedDict`
+possibility can be discarded:
+
+```py
+from typing import TypeVar
+
+TDict = TypeVar("TDict")
+
+def _(value: Movie | TDict):
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Movie | (TDict@_ & Top[dict[Unknown, Unknown]]) | (TDict@_ & <TypedDict with no items>)
+```
+
+The possibility of a `TypedDict` preserves read-only dictionary operations without exposing
+arbitrary mutation:
+
+```py
+def takes_dict(value: dict[str, object]) -> None: ...
+def use_narrowed_dict(
+    value: object,
+    key: object,
+    missing: Never,
+    keys: list[str],
+    item: int,
+) -> None:
+    if isinstance(value, dict):
+        reveal_type(value.get(key))  # revealed: object
+        reveal_type(reversed(value))  # revealed: Iterator[object]
+        reveal_type(value.fromkeys(keys, item))  # revealed: dict[str, int]
+        reveal_type(value.copy())  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        value.clear()  # error: [unresolved-attribute]
+        value.pop(missing)
+        value.setdefault(missing, missing)
+        takes_dict(value)  # error: [invalid-argument-type]
+```
+
+Merging two values narrowed to `dict` produces an ordinary dictionary. Calling the corresponding
+special methods directly has the same result:
+
+```py
+def merge_narrowed_dicts(left: object, right: object) -> None:
+    if isinstance(left, dict) and isinstance(right, dict):
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
+        reveal_type(right.__ror__(left))  # revealed: dict[Unknown, Unknown]
+```
+
+Narrowing a union with a concrete dictionary keeps its methods callable with `IntEnum` keys:
+
+```py
+from enum import IntEnum
+from typing import Protocol
+
+class DiagnosticField(IntEnum):
+    MESSAGE = 77
+
+class PGresult(Protocol):
+    def error_field(self, fieldcode: int) -> bytes | None: ...
+
+ErrorInfo = PGresult | dict[int, bytes | None] | None
+
+def _(info: ErrorInfo):
+    if isinstance(info, dict):
+        reveal_type(info.get(DiagnosticField.MESSAGE))  # revealed: object
+    elif info:
+        reveal_type(info.error_field(DiagnosticField.MESSAGE))  # revealed: bytes | None
+```
+
+Runtime protocol checks preserve `TypedDict` possibilities by checking the concrete `dict` member
+surface. Compatible protocols retain their structural refinement, while an incompatible static
+signature cannot eliminate a runtime-compatible `TypedDict`:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+@runtime_checkable
+class HasKeysReturningInt(Protocol):
+    def keys(self) -> int: ...
+
+@runtime_checkable
+class HasMissingMember(Protocol):
+    def missing(self) -> None: ...
+
+@runtime_checkable
+class HasHash(Protocol):
+    def __hash__(self) -> int: ...
+    def keys(self) -> object: ...
+
+def preserve_empty_typed_dict_protocol(value: object) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (<TypedDict with no items> & HasClear)
+        value.clear()
+
+def runtime_protocols_use_dict_member_presence(movie: Movie) -> None:
+    if isinstance(movie, HasKeysReturningInt):
+        # Runtime protocol checks ignore the incompatible static return type.
+        reveal_type(movie)  # revealed: Movie
+    else:
+        reveal_type(movie)  # revealed: Never
+
+    if isinstance(movie, HasMissingMember):
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
+
+    if isinstance(movie, HasHash):
+        # `dict.__hash__` exists but is explicitly disabled with `None`.
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
+```
+
+`TypedDict` objects have exact runtime type `dict`, so they cannot be instances of a proper `dict`
+subclass:
+
+```py
+from collections import defaultdict
+
+def narrow_typed_dict_defaultdict(movie: Movie) -> None:
+    if isinstance(movie, defaultdict):
+        reveal_type(movie)  # revealed: Never
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
@@ -812,12 +966,11 @@ def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
 
 ## Narrowing with TypedDict unions
 
-Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
-during type ordering of normalized intersection types. Regression test for
-<https://github.com/astral-sh/ty/issues/2451>.
+`TypedDict` unions narrow through `isinstance(x, dict)` without leaving intersections with `dict`.
+This also covers the previous panic regression from <https://github.com/astral-sh/ty/issues/2451>.
 
 ```py
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 class A(TypedDict):
     x: str
@@ -827,11 +980,50 @@ class B(TypedDict):
 
 T = int | A | B
 
-def test(a: Any, items: list[T]) -> None:
-    combined = a or items
-    v = combined[0]
+def narrow_typeddict_union(v: T) -> None:
     if isinstance(v, dict):
-        cast(T, v)  # no panic
+        reveal_type(v)  # revealed: A | B
+    else:
+        reveal_type(v)  # revealed: int
+```
+
+This also covers the recursive `Result | list[Result]` example reported on
+<https://github.com/astral-sh/ty/issues/1130#issuecomment-4762266723>. The `else` branch must remove
+the `TypedDict`; otherwise iterating `result` introduces its string keys into the element type:
+
+```py
+import collections
+from typing import TypedDict
+
+class Result(TypedDict):
+    name: str
+    score: float
+
+class MyDict(collections.defaultdict[str, float]):
+    def add(self, text: str, result: Result | list[Result]) -> None:
+        if isinstance(result, dict):
+            self[result["name"]] += result["score"] * len(text)
+        else:
+            for item in result:
+                self.add(text, item)
+```
+
+The negative branch removes a `TypedDict` member, making attributes from the remaining class
+available:
+
+```py
+class Package:
+    ecosystem: str
+
+class Vulnerability:
+    package: Package
+    patched_versions: str | None
+
+def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value.package.ecosystem)  # revealed: str
 ```
 
 ## Narrowing with named expressions (walrus operator)

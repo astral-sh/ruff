@@ -19,7 +19,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeVarBoundOrConstraints, TypedDictType, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -2514,6 +2514,49 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             })
     }
 
+    /// Check a protocol against the concrete runtime surface of a `TypedDict`.
+    ///
+    /// A missing or disabled `dict` member proves disjointness. Otherwise, a statically visible
+    /// `TypedDict` member can still prove disjointness through its declared type; members that are
+    /// intentionally hidden from the static `TypedDict` interface cannot.
+    fn any_typed_dict_protocol_members_absent_or_disjoint(
+        &self,
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+        typed_dict: TypedDictType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let typed_dict = Type::TypedDict(typed_dict);
+
+        protocol
+            .interface(db)
+            .members(db)
+            .when_any(db, self.constraints, |member| {
+                if !member.is_present_on_runtime_dict(db) {
+                    return self.always();
+                }
+
+                typed_dict
+                    .member(db, member.name())
+                    .place
+                    .ignore_possibly_undefined()
+                    .map_or_else(
+                        || self.never(),
+                        |attribute_type| {
+                            self.protocol_member_has_disjoint_type_from_ty(
+                                db,
+                                &member,
+                                attribute_type,
+                            )
+                            .or(db, self.constraints, || {
+                                self.protocol_member_write_is_definitely_missing_from_ty(
+                                    db, &member, typed_dict,
+                                )
+                            })
+                        },
+                    )
+            })
+    }
+
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
     }
@@ -2894,6 +2937,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::ProtocolInstance(protocol), Type::TypedDict(typed_dict))
+            | (Type::TypedDict(typed_dict), Type::ProtocolInstance(protocol)) => self
+                .with_recursion_guard(left, right, || {
+                    self.any_typed_dict_protocol_members_absent_or_disjoint(
+                        db, protocol, typed_dict,
+                    )
+                }),
+
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(left, right, || {
@@ -3246,11 +3297,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
-            // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
-            // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
-            // approximation, and some false negatives are acceptable.
             (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
+                // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all
+                // `TypedDict` types will always be disjoint from `T`. This doesn't cover all
+                // cases -- in fact `dict` *itself* is almost always disjoint from `TypedDict` --
+                // but it's a good approximation, and some false negatives are acceptable.
                 let dict_str_any = KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
 

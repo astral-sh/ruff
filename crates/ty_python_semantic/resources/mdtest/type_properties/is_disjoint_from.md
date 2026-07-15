@@ -851,7 +851,7 @@ attribute on the other type *but* the type of the attribute on the other type is
 type of the protocol's member.
 
 ```py
-from typing_extensions import Protocol, Literal, final, ClassVar
+from typing_extensions import Protocol, Literal, TypedDict, final, ClassVar, runtime_checkable
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -904,6 +904,18 @@ class BarNone(Protocol):
     BAR: None
 
 static_assert(is_disjoint_from(type[Foo], BarNone))
+
+class Movie(TypedDict):
+    title: str
+
+@runtime_checkable
+class HasKeysReturningInt(Protocol):
+    def keys(self) -> int: ...
+
+# Static protocol disjointness considers member types, even though a runtime-checkable protocol
+# passed to `isinstance` would only test whether the member exists.
+static_assert(is_disjoint_from(Movie, HasKeysReturningInt))
+static_assert(is_disjoint_from(HasKeysReturningInt, Movie))
 ```
 
 ### `NamedTuple`

@@ -110,7 +110,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    3,
+    10,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(

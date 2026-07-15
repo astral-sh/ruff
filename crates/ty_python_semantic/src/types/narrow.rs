@@ -21,7 +21,7 @@ use crate::types::{
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -438,7 +438,7 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                runtime_instance_constraint_for_class_literal(db, class)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -611,6 +611,40 @@ impl ClassInfoConstraintFunction {
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => None,
         }
+    }
+}
+
+/// Return the constraint imposed by an `isinstance()`-style runtime check against `class`.
+///
+/// `TypedDict` instances are runtime dictionaries, even though they are not always statically
+/// assignable to the supertypes of `dict`.
+pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Type<'db> {
+    let constraint = Type::instance(db, class.top_materialization(db));
+    let open_empty_typed_dict = Type::open_empty_typed_dict(db);
+
+    if let Type::ProtocolInstance(protocol) = constraint {
+        let dict = KnownClass::Dict
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+        let all_members_present = protocol
+            .interface(db)
+            .members(db)
+            .all(|member| member.is_present_on_runtime_dict(db));
+
+        return if all_members_present && dict.is_disjoint_from(db, constraint) {
+            UnionType::from_two_elements(db, constraint, open_empty_typed_dict)
+        } else {
+            constraint
+        };
+    }
+
+    let runtime_dict = KnownClass::Dict.to_instance(db).top_materialization(db);
+    if runtime_dict.is_assignable_to(db, constraint) {
+        UnionType::from_two_elements(db, constraint, open_empty_typed_dict)
+    } else {
+        constraint
     }
 }
 
@@ -1673,11 +1707,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 } else {
                     self.intersect_types(subject_ty, class_ty)
                 }
-            }
-            Type::TypedDict(_)
-                if class.is_some_and(|class| typed_dict_matches_class_pattern(self.db, class)) =>
-            {
-                subject_ty
             }
             _ if subject_ty.is_subtype_of(self.db, class_ty) => subject_ty,
             _ if subject_ty.is_disjoint_from(self.db, class_ty) => Type::Never,
@@ -3631,15 +3660,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
-
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
-                    .map(|constraint| {
+                    .generate_constraint(
+                        self.db,
+                        inference.expression_type(second_arg),
+                        is_positive,
+                    )
+                    .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
                             NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
+                                classinfo.negate_if(self.db, !is_positive),
                             ),
                         )])
                     })
@@ -4379,10 +4410,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     field_name: &str,
 ) -> bool {
     let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
-        // There's no matching field to check if `.get()` returns `None`.
+        // There's no matching field to check if `.item()` returns `None`.
         typeddict
-            .items(db)
-            .get(field_name)
+            .item(db, field_name)
             .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };
 
