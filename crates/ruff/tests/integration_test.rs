@@ -1818,7 +1818,7 @@ fn check_input_from_argfile() -> Result<()> {
     )?;
 
     // Generate the args with the argfile notation
-    let argfile = format!("@{}", &input_file_path.display());
+    let argfile = format!("@{}", input_file_path.display());
     let mut cmd = RuffCheck::default().filename(argfile.as_ref()).build();
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),

@@ -30,7 +30,7 @@ impl std::error::Error for ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} at byte range {:?}", &self.error, self.location)
+        write!(f, "{} at byte range {:?}", self.error, self.location)
     }
 }
 

@@ -399,19 +399,17 @@ impl<'a> Dependency<'a> {
                         .map(|name| name.id.as_str())
                 })
                 .collect()
-        } else if let Some(method_def) = class_def
-            .body
-            .iter()
-            .filter_map(|stmt| stmt.as_function_def_stmt())
-            .find(|func_def| func_def.name.as_str() == method_name)
-        {
+        } else {
+            let method_def = class_def
+                .body
+                .iter()
+                .filter_map(|stmt| stmt.as_function_def_stmt())
+                .find(|func_def| func_def.name.as_str() == method_name)?;
             // Skip `self` parameter
             non_posonly_non_variadic_parameters(method_def)
                 .skip(1)
                 .map(|param| param.name().as_str())
                 .collect()
-        } else {
-            return None;
         };
 
         Some(Self::Class(parameter_names))

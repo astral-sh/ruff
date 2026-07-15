@@ -541,32 +541,26 @@ impl NarrowRange<'_> {
             // The challenge here is that the second line of the multiline string uses a 4 space indentation. Using `dedent` would
             // dedent the second line to 0 spaces and the `indent` then adds a 2 space indentation to match the indentation in the source.
             // This is incorrect because the leading whitespace is the content of the string and not indentation, resulting in changed string content.
-            if let Some(indentation) =
-                indentation_at_offset(first_child.start(), self.context.source())
-            {
-                let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
-                let expected_indents = self.level;
+            // Missing indentation indicates a simple-statement body of a compound statement (not a suite body).
+            // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+            let indentation = indentation_at_offset(first_child.start(), self.context.source())?;
+            let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
+            let expected_indents = self.level;
 
-                // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
-                let has_expected_indentation = match self.context.options().indent_style() {
-                    IndentStyle::Tab => {
-                        relative_indent.len() == expected_indents
-                            && relative_indent.chars().all(|c| c == '\t')
-                    }
-                    IndentStyle::Space => {
-                        relative_indent.len()
-                            == expected_indents
-                                * self.context.options().indent_width().value() as usize
-                            && relative_indent.chars().all(|c| c == ' ')
-                    }
-                };
-
-                if !has_expected_indentation {
-                    return None;
+            // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
+            let has_expected_indentation = match self.context.options().indent_style() {
+                IndentStyle::Tab => {
+                    relative_indent.len() == expected_indents
+                        && relative_indent.chars().all(|c| c == '\t')
                 }
-            } else {
-                // Simple-statement body of a compound statement (not a suite body).
-                // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+                IndentStyle::Space => {
+                    relative_indent.len()
+                        == expected_indents * self.context.options().indent_width().value() as usize
+                        && relative_indent.chars().all(|c| c == ' ')
+                }
+            };
+
+            if !has_expected_indentation {
                 return None;
             }
         }

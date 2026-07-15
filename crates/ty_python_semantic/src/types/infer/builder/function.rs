@@ -490,7 +490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Useless body for `@overload`-decorated function `{}`",
-                    &function.name
+                    function.name
                 ));
                 diagnostic.set_primary_message("This statement will never be executed");
                 diagnostic.info(

@@ -413,32 +413,27 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         let mut pyproject_config = pyproject_config;
 
         loop {
-            match rx.recv() {
-                Ok(event) => {
-                    let Some(change_kind) = change_detected(&event?) else {
-                        continue;
-                    };
+            let Some(change_kind) = change_detected(&rx.recv()??) else {
+                continue;
+            };
 
-                    if matches!(change_kind, ChangeKind::Configuration) {
-                        pyproject_config =
-                            resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
-                    }
-                    Printer::clear_screen()?;
-                    printer.write_to_user("File change detected...\n");
-
-                    let diagnostics = commands::check::check(
-                        &files,
-                        &pyproject_config,
-                        &config_arguments,
-                        cache.into(),
-                        noqa.into(),
-                        fix_mode,
-                        unsafe_fixes,
-                    )?;
-                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
-                }
-                Err(err) => return Err(err.into()),
+            if matches!(change_kind, ChangeKind::Configuration) {
+                pyproject_config =
+                    resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
             }
+            Printer::clear_screen()?;
+            printer.write_to_user("File change detected...\n");
+
+            let diagnostics = commands::check::check(
+                &files,
+                &pyproject_config,
+                &config_arguments,
+                cache.into(),
+                noqa.into(),
+                fix_mode,
+                unsafe_fixes,
+            )?;
+            printer.write_continuously(&mut writer, &diagnostics, preview)?;
         }
     } else {
         // Generate lint violations.
