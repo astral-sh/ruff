@@ -32,7 +32,8 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEv
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, MaterializationKind, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    IntersectionType, Materialization, MaterializationKind, Type, TypeContext, TypeMapping,
+    UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -259,10 +260,10 @@ impl<'db> TupleType<'db> {
                 let element_type = self.tuple(db).tuple_class_type(db);
                 generic_context
                     .specialize_tuple(db, element_type, self)
-                    .with_materialization_kind(
+                    .with_materialization(
                         db,
                         self.deferred_top_materialization(db)
-                            .then_some(MaterializationKind::DeferredTop),
+                            .then_some(Materialization::deferred(MaterializationKind::Top)),
                     )
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -293,7 +294,10 @@ impl<'db> TupleType<'db> {
     ) -> Option<Self> {
         if matches!(
             type_mapping,
-            TypeMapping::Materialize(MaterializationKind::DeferredTop)
+            TypeMapping::Materialize(Materialization {
+                kind: MaterializationKind::Top,
+                deferred: true,
+            })
         ) {
             return Some(if self.deferred_top_materialization(db) {
                 self
@@ -329,7 +333,7 @@ impl<'db> TupleType<'db> {
 
         let tuple = self.tuple(db).apply_type_mapping_impl(
             db,
-            &TypeMapping::Materialize(MaterializationKind::Top),
+            &TypeMapping::Materialize(Materialization::new(MaterializationKind::Top)),
             TypeContext::default(),
             visitor,
         );
@@ -796,11 +800,11 @@ fn to_class_type_cycle_initial<'db>(
         if generic_context.variables(db).len() == 1 {
             generic_context
                 .specialize_tuple(db, Type::divergent(id), self_)
-                .with_materialization_kind(
+                .with_materialization(
                     db,
                     self_
                         .deferred_top_materialization(db)
-                        .then_some(MaterializationKind::DeferredTop),
+                        .then_some(Materialization::deferred(MaterializationKind::Top)),
                 )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))

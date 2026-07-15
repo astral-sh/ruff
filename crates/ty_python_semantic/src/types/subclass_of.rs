@@ -192,13 +192,9 @@ impl<'db> SubclassOfType<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 .to_meta_type(db),
             SubclassOfInner::Dynamic(_) => match type_mapping {
-                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top | MaterializationKind::DeferredTop => {
-                        KnownClass::Type.to_instance(db)
-                    }
-                    MaterializationKind::Bottom | MaterializationKind::DeferredBottom => {
-                        Type::Never
-                    }
+                TypeMapping::Materialize(materialization) => match materialization.kind {
+                    MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                    MaterializationKind::Bottom => Type::Never,
                 },
                 _ => Type::SubclassOf(self),
             },

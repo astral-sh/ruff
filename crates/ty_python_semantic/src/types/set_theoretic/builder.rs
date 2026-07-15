@@ -121,8 +121,8 @@ fn is_invariant_dynamic_generalization_of<'db>(
 
     // Top and bottom materializations are not gradual types.
     if general_class != specific_class
-        || general_specialization.materialization_kind(db).is_some()
-        || specific_specialization.materialization_kind(db).is_some()
+        || general_specialization.materialization(db).is_some()
+        || specific_specialization.materialization(db).is_some()
     {
         return false;
     }

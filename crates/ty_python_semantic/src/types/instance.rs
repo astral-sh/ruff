@@ -10,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    Materialization, MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -47,7 +47,10 @@ impl<'db> Type<'db> {
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
                 | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
+                    materialization: Some(Materialization {
+                        kind: MaterializationKind::Top,
+                        ..
+                    }),
                     ..
                 })
         )
