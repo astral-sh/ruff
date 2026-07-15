@@ -443,7 +443,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
-                | TypeMapping::EraseDeferredMaterialization
+                | TypeMapping::MaterializeForNarrowing(_)
+                | TypeMapping::EraseNarrowingBounds
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),

@@ -1440,7 +1440,7 @@ struct InnerIntersectionBuilder<'db> {
 
 impl<'db> InnerIntersectionBuilder<'db> {
     fn contains_never(&self) -> bool {
-        self.positive.contains(&Type::Never)
+        self.positive.iter().any(Type::is_never)
     }
 
     /// Return `true` when an intersection excludes every member of an enum class.
@@ -1512,14 +1512,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
         mut new_positive: Type<'db>,
     ) {
         // `Never & T` -> `Never`
-        if self.positive.contains(&Type::Never) {
+        if self.positive.iter().any(Type::is_never) {
             return;
         }
 
         // `T & Never` -> `Never`
         if new_positive.is_never() {
             *self = Self::default();
-            self.positive.insert(Type::Never);
+            self.positive.insert(new_positive);
             return;
         }
 
@@ -1746,7 +1746,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         new_negative: Type<'db>,
     ) {
         // `Never & ~T` -> `Never`.
-        if self.positive.contains(&Type::Never) {
+        if self.positive.iter().any(Type::is_never) {
             return;
         }
 

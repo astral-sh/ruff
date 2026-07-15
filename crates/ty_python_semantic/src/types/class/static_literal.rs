@@ -1524,7 +1524,6 @@ impl<'db> StaticClassLiteral<'db> {
                     signatures,
                     CallableTypeKind::FunctionLike,
                     CallableFunctionProvenance::None,
-                    false,
                 )
             });
 
@@ -2073,7 +2072,6 @@ impl<'db> StaticClassLiteral<'db> {
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::None,
-            false,
         )))
     }
 
