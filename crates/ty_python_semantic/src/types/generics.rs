@@ -2465,6 +2465,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
+    /// Infer type mappings from protocol constraints.
+    ///
+    /// Unsatisfiable results are treated as "no inference" instead of an immediate specialization
+    /// error. This matches the previous behavior, where unsatisfied comparisons simply produced no
+    /// type mappings, and avoids false positives while this path is still a hybrid of the old and
+    /// new solver logic.
+    fn infer_from_protocol_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+        if self.add_type_mappings_from_constraint_set(when).is_ok() {
+            self.pending.intersect(self.db, self.constraints, when);
+        }
+    }
+
     /// Returns common protocol constraints for a union containing only `TypedDict`s when every
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
@@ -3120,15 +3132,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // (replacing the logic below).
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                         let when = self.constraints.load(self.db, &when);
-                        // For protocol inference via constraint sets, we currently treat
-                        // unsatisfiable results as "no inference" instead of an immediate
-                        // specialization error. This matches the previous behavior (where
-                        // unsatisfied comparisons simply produced no type mappings), and avoids
-                        // false positives for callable-wrapper patterns while this path is still
-                        // a hybrid of old and new solver logic.
-                        if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                            self.pending.intersect(self.db, self.constraints, when);
-                        }
+                        self.infer_from_protocol_constraint_set(when);
                         return Ok(());
                     }
 
@@ -3173,24 +3177,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .unwrap_or_else(|| {
                         actual.when_constraint_set_assignable_to(self.db, formal, self.constraints)
                     });
-                // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
-                // for now, matching the protocol constraint-set path in the nominal-instance
-                // arm above.
-                if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.pending.intersect(self.db, self.constraints, when);
-                }
+                self.infer_from_protocol_constraint_set(when);
                 return Ok(());
             }
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 let when = self.constraints.load(self.db, &when);
-                // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
-                // for now, matching the protocol constraint-set path in the nominal-instance
-                // arm above.
-                if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.pending.intersect(self.db, self.constraints, when);
-                }
+                self.infer_from_protocol_constraint_set(when);
                 return Ok(());
             }
 
