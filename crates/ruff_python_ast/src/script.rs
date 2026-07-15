@@ -14,7 +14,7 @@ pub struct ScriptTag {
     /// The content of the script before the metadata block.
     prelude: String,
     /// The metadata block.
-    metadata: String,
+    pub metadata: String,
     /// The content of the script after the metadata block.
     postlude: String,
 }
