@@ -506,7 +506,11 @@ fn render_origin(
             write!(&mut buffer, ":cell {cell_index}").unwrap();
         }
         if let Some(line) = origin.line {
-            write!(&mut buffer, ":{line}").unwrap();
+            if renderer.anonymized_line_numbers {
+                write!(&mut buffer, ":{ANONYMIZED_LINE_NUM}").unwrap();
+            } else {
+                write!(&mut buffer, ":{line}").unwrap();
+            }
             if let Some(col) = origin.char_column {
                 write!(&mut buffer, ":{col}").unwrap();
             }
@@ -1497,7 +1501,11 @@ fn emit_suggestion_default(
         }
         let arrow = renderer.decor_style.file_start(is_first, false);
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
-        let message = format!("{}:{}:{}", path, loc.line, loc.char + 1);
+        let message = if renderer.anonymized_line_numbers {
+            format!("{}:{}:{}", path, loc.line, loc.char + 1)
+        } else {
+            format!("{}:{}:{}", path, ANONYMIZED_LINE_NUM, loc.char + 1)
+        };
         buffer.append(row_num - 1, &message, ElementStyle::LineAndColumn);
 
         draw_col_separator_no_space(renderer, buffer, row_num, max_line_num_len + 1);
