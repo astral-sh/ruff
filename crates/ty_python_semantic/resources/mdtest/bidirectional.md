@@ -1802,6 +1802,38 @@ def _(dtype: FloatDtype):
     reveal_type(x)  # revealed: int | float
 ```
 
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class TakesInt(Protocol):
+    def __call__(
+        self,
+        tag: Literal["int"],
+        callback: Callable[[int], int],
+    ) -> int: ...
+
+@runtime_checkable
+class TakesStr(Protocol):
+    def __call__(
+        self,
+        tag: Literal["str"],
+        callback: Callable[[str], str],
+    ) -> str: ...
+
+def _(callback: TakesInt) -> None:
+    if isinstance(callback, TakesStr):
+        reveal_type(callback)  # revealed: TakesInt & TakesStr
+
+        # TODO: Perform fixpoint iteration when evaluating callable intersections.
+        x1 = callback("int", lambda value: reveal_type(value) + 1)  # revealed: Unknown
+        reveal_type(x1)  # revealed: int
+
+        # TODO: Perform fixpoint iteration when evaluating callable intersections.
+        x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
+        reveal_type(x2)  # revealed: str
+```
+
 Note that long chains of callables with constraint dependencies in reverse source-order may require
 multiple fixpoint iterations.
 
