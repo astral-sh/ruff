@@ -1119,7 +1119,19 @@ impl<'db> Signature<'db> {
         }
     }
 
-    #[cold]
+    /// Decides whether a concrete receiver satisfies a receiver-only type variable's domain.
+    ///
+    /// For a direct receiver annotation such as `self: T`, the receiver relation can be reduced to
+    /// a terminal constraint when `T` does not survive in another parameter or the return type:
+    /// `always` if the receiver satisfies `T`'s bound or constraints, and `never` otherwise. Returns
+    /// `None` when normal signature inference must retain the receiver relation.
+    ///
+    /// Transparent PEP 695 receiver aliases are resolved by the caller before this check.
+    ///
+    /// ```python
+    /// class C:
+    ///     def method[T: int](self: T) -> None: ...
+    /// ```
     fn direct_receiver_domain_constraints(
         db: &'db dyn Db,
         receiver: Type<'db>,
