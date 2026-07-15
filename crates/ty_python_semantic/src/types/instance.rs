@@ -858,6 +858,9 @@ impl<'db> ProtocolInstanceType<'db> {
             return self;
         };
         let materialized = (*class).apply_deferred_materialization(db, visitor);
+        if materialized == *class {
+            return self;
+        }
         materialized
             .into_protocol_class(db)
             .map_or(self, Self::from_class)
