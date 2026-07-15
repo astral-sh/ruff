@@ -1,8 +1,8 @@
 # Suppressing errors with `ty: ignore`
 
-Type check errors can be suppressed by a `ty: ignore` comment on the same line as the violation. The
-optional `blanket-ignore-comment` rule is tested separately so that these examples can exercise bare
-ignore comments.
+Type check errors can be suppressed by a `ty: ignore` comment on the same line as the violation or
+on a preceding own line. The optional `blanket-ignore-comment` rule is tested separately so that
+these examples can exercise bare ignore comments.
 
 ```toml
 [rules]
@@ -11,14 +11,74 @@ blanket-ignore-comment = "ignore"
 
 ## Simple `ty: ignore`
 
+A suppression can appear at the end of the affected line:
+
 ```py
 a = 4 + test  # ty: ignore
+```
+
+Or on the preceding line:
+
+```py
+seen_code = True
+
+# ty: ignore
+a = missing
 ```
 
 ## Suppressing a specific code
 
 ```py
 a = 4 + test  # ty: ignore[unresolved-reference]
+```
+
+A code-specific suppression can likewise appear on the preceding line. It applies to the following
+logical line, including when other comments appear between the suppression and the statement.
+
+```py
+seen_code = True
+
+# ty: ignore[unresolved-reference]
+a = missing
+
+# ty: ignore[unresolved-reference]
+# This comment explains why the suppression is necessary.
+b = missing
+```
+
+The suppression covers every statement on the following logical line.
+
+```py
+seen_code = True
+
+# ty: ignore[unresolved-reference]
+first = 1; second = missing  # fmt: skip
+```
+
+## Multiline statements
+
+An ignore before a multiline statement applies to the entire logical line. Suppression ranges can
+also be nested.
+
+```py
+seen_code = True
+
+# ty: ignore[invalid-assignment]
+nested_values: tuple[int] = [
+    # ty: ignore[division-by-zero]
+    1 / 0,
+]
+```
+
+Inside a multiline statement, an ignore applies only to the next non-comment physical line.
+
+```py
+values = [
+    # ty: ignore[division-by-zero]
+    1 / 0,
+    # error: [division-by-zero]
+    2 / 0,
+]
 ```
 
 ## Unused suppression
@@ -191,6 +251,72 @@ help: Remove the unused suppression codes
 def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[invalid-type-form, unresolved-reference]
 ```
 
+## Nested comments
+
+An own-line suppression can be nested after another pragma comment:
+
+```py
+seen_code = True
+
+# fmt: off # ty: ignore[division-by-zero]
+value = 1 / 0
+# fmt: on
+```
+
+Removing an unused nested suppression is safe when another pragma precedes it, but unsafe when
+removal would promote a following pragma to an own-line comment:
+
+```py
+seen_code = True
+
+# snapshot
+# fmt: off # ty: ignore[division-by-zero]
+value = 1
+# fmt: on
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:9:12
+  |
+9 | # fmt: off # ty: ignore[division-by-zero]
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression comment
+   |
+8  | # snapshot
+   - # fmt: off # ty: ignore[division-by-zero]
+9  + # fmt: off
+10 | value = 1
+   |
+```
+
+```py
+seen_code = True
+
+# snapshot
+# ty: ignore[division-by-zero] # fmt: off
+value = 1
+# fmt: on
+```
+
+```snapshot
+warning[unused-ignore-comment]: Unused `ty: ignore` directive
+  --> src/mdtest_snippet.py:15:1
+   |
+15 | # ty: ignore[division-by-zero] # fmt: off
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the unused suppression comment
+   |
+14 | # snapshot
+   - # ty: ignore[division-by-zero] # fmt: off
+15 + # fmt: off
+16 | value = 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ## Can't suppress syntax errors
 
 <!-- fmt:off -->
@@ -292,6 +418,17 @@ File level suppression comments suppress all errors in a file with a given code.
 
 a = 4 / 0
 b = a + c  # error: [unresolved-reference]
+```
+
+## File-level suppression nested after another pragma
+
+File-level suppressions can be nested after another pragma comment:
+
+```py
+# fmt: off # ty: ignore[division-by-zero]
+
+a = 4 / 0
+# fmt: on
 ```
 
 ## Unknown rule

@@ -2,14 +2,15 @@ mod add_ignore;
 mod parser;
 mod unused;
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 use std::fmt;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
@@ -96,7 +97,11 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                             if comment.kind().is_type_ignore() && !respect_type_ignore {
                                 continue;
                             }
-                            builder.add_comment(comment, TextRange::new(line_start, token.end()));
+                            builder.add_comment(
+                                comment,
+                                TextRange::new(line_start, token.end()),
+                                parsed.tokens(),
+                            );
                         }
                         Err(error) => match error.kind {
                             ParseErrorKind::NotASuppression
@@ -306,12 +311,23 @@ pub(crate) struct Suppressions {
     /// spans the entire file.
     file: SmallVec<[Suppression; 1]>,
 
-    /// Suppressions that apply to a specific line (or lines).
+    /// Suppressions that apply inline rather than to the entire file.
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
-    /// The suppressions are sorted by [`Suppression::range`] (which implies [`Suppression::comment_range`]).
-    line: Vec<Suppression>,
+    /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
+    /// Their range ends aren't necessarily sorted because own-line suppressions can be nested:
+    ///
+    /// ```py
+    /// # ty: ignore
+    /// value = (
+    ///     # ty: ignore
+    ///     missing
+    /// )
+    /// ```
+    ///
+    /// The outer suppression starts before the inner suppression but ends after it.
+    inline: IntervalIndex<Suppression>,
 
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
@@ -333,54 +349,26 @@ impl Suppressions {
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.file
             .iter()
-            .chain(self.line_suppressions(range))
+            .chain(self.inline_suppressions(range))
             .filter(move |suppression| suppression.matches(id))
     }
 
-    /// Returns the line-level suppressions that apply for `range`.
+    /// Returns the inline suppressions that apply for `range`.
     ///
-    /// A suppression applies for the given range if it contains the range's
-    /// start or end offset. This means the suppression is on the same line
-    /// as the diagnostic's start or end.
-    fn line_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        // First find the index of the suppression comment that ends right before the range
-        // starts. This allows us to skip suppressions that are not relevant for the range.
-        let end_offset = self
-            .line
-            .binary_search_by_key(&range.start(), |suppression| {
-                suppression.suppressed_range.end()
-            })
-            .unwrap_or_else(|index| index);
-
-        // From here, search the remaining suppression comments for one that
-        // contains the range's start or end offset. Stop the search
-        // as soon as the suppression's range and the range no longer overlap.
-        self.line[end_offset..]
-            .iter()
-            // Stop searching if the suppression starts after the range we're looking for.
-            .take_while(move |suppression| range.end() >= suppression.suppressed_range.start())
-            .filter(move |suppression| {
-                // Don't use intersect to avoid that suppressions on inner-expression
-                // ignore errors for outer expressions
-                suppression.suppressed_range.contains(range.start())
-                    || suppression.suppressed_range.contains_inclusive(range.end())
-            })
+    /// A suppression applies for the given range if it contains the range's start or end offset.
+    /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
+    /// suppressions cover the following logical line.
+    fn inline_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
+        self.inline.intersecting(range).filter(move |suppression| {
+            // Don't use intersect to avoid that suppressions on inner-expression
+            // ignore errors for outer expressions
+            suppression.suppressed_range.contains(range.start())
+                || suppression.suppressed_range.contains_inclusive(range.end())
+        })
     }
 
-    fn iter(&self) -> SuppressionsIter<'_> {
-        self.file.iter().chain(&self.line)
-    }
-}
-
-pub(crate) type SuppressionsIter<'a> =
-    std::iter::Chain<std::slice::Iter<'a, Suppression>, std::slice::Iter<'a, Suppression>>;
-
-impl<'a> IntoIterator for &'a Suppressions {
-    type Item = &'a Suppression;
-    type IntoIter = SuppressionsIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+    fn iter(&self) -> impl Iterator<Item = &Suppression> {
+        self.file.iter().chain(self.inline.iter())
     }
 }
 
@@ -413,7 +401,8 @@ pub(crate) struct Suppression {
     comment_range: TextRange,
 
     /// The range for which this suppression applies.
-    /// Most of the time, this is the range of the comment's line.
+    /// Most of the time, this is the range of the comment's line. An own-line `ty: ignore`
+    /// suppression also covers the following logical line.
     /// However, there are few cases where the range gets expanded to
     /// cover multiple lines:
     /// * multiline strings: `expr + """multiline\nstring"""  # type: ignore`
@@ -432,6 +421,12 @@ impl Suppression {
 
     pub(crate) fn id(&self) -> FileSuppressionId {
         FileSuppressionId(self.range)
+    }
+}
+
+impl Interval for Suppression {
+    fn interval(&self) -> TextRange {
+        self.suppressed_range
     }
 }
 
@@ -498,7 +493,7 @@ struct SuppressionsBuilder<'a> {
     /// This boolean tracks if there has been any non trivia token.
     seen_non_trivia_token: bool,
 
-    line: Vec<Suppression>,
+    inline: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
     unknown: Vec<UnknownSuppression>,
     invalid: Vec<InvalidSuppression>,
@@ -510,7 +505,7 @@ impl<'a> SuppressionsBuilder<'a> {
             source,
             lint_registry,
             seen_non_trivia_token: false,
-            line: Vec::new(),
+            inline: Vec::new(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
             invalid: Vec::new(),
@@ -522,21 +517,20 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 
     fn finish(mut self) -> Suppressions {
-        self.line.shrink_to_fit();
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
 
         Suppressions {
             file: self.file,
-            line: self.line,
+            inline: IntervalIndex::from_sorted(self.inline),
             unknown: self.unknown,
             invalid: self.invalid,
         }
     }
 
     #[expect(clippy::needless_pass_by_value)]
-    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
+    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange, tokens: &Tokens) {
         // ignore comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
         // > imports, or other executable code, silences all errors in the file.
@@ -544,9 +538,14 @@ impl<'a> SuppressionsBuilder<'a> {
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = !self.seen_non_trivia_token;
+        let comment_token_start = tokens.token_range(comment.range().start()).start();
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
+        } else if !comment.kind().is_type_ignore()
+            && indentation_at_offset(comment_token_start, self.source).is_some()
+        {
+            own_line_suppression_range(comment.range(), tokens)
         } else {
             line_range
         };
@@ -555,7 +554,7 @@ impl<'a> SuppressionsBuilder<'a> {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
-                self.line.push(suppression);
+                self.inline.push(suppression);
             }
         };
 
@@ -624,6 +623,70 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 }
 
+/// Returns the range covered by an own-line suppression comment.
+///
+/// A suppression before a logical line covers the entire logical line. A suppression inside a
+/// multiline logical line covers the next non-comment physical line instead. This matches Ruff's
+/// own-line suppression behavior.
+fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
+    let comment_token_start = tokens.token_range(range.start()).start();
+    let (before, after) = tokens.split_at(comment_token_start);
+    let mut end = range.end();
+
+    // A suppression after a logical newline precedes a new logical line:
+    //
+    // # ty: ignore
+    // value = (
+    //     missing
+    // )
+    //
+    // A suppression after a non-logical newline is inside an unfinished logical line:
+    //
+    // values = [
+    //     # ty: ignore
+    //     missing,
+    // ]
+    //
+    // Walk backwards through comments and non-logical newlines to distinguish the two cases.
+    let is_inner_comment = before.iter().rev().find_map(|token| match token.kind() {
+        TokenKind::Newline => Some(false),
+        TokenKind::NonLogicalNewline | TokenKind::Comment => None,
+        _ => Some(true),
+    });
+
+    let is_inner_comment = is_inner_comment.unwrap_or(false);
+    // For an inner suppression, the first non-logical newline ends the suppression's own
+    // physical line. Subsequent blank or comment-only lines are skipped before the range ends at
+    // the first physical line containing code.
+    let mut is_blank_or_comment_only = true;
+    let mut past_suppression_line = false;
+
+    for token in after {
+        match token.kind() {
+            TokenKind::Newline => {
+                // A suppression preceding a logical line includes that complete logical line.
+                end = token.start();
+                break;
+            }
+            TokenKind::Comment => {}
+            TokenKind::NonLogicalNewline if is_inner_comment => {
+                end = token.start();
+                if past_suppression_line && !is_blank_or_comment_only {
+                    break;
+                }
+                past_suppression_line = true;
+                is_blank_or_comment_only = true;
+            }
+            _ => {
+                is_blank_or_comment_only = false;
+                end = token.end();
+            }
+        }
+    }
+
+    TextRange::new(range.start(), end)
+}
+
 /// Suppression for an unknown lint rule.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UnknownSuppression {
@@ -640,4 +703,121 @@ struct UnknownSuppression {
 struct InvalidSuppression {
     kind: SuppressionKind,
     error: ParseError,
+}
+
+/// A value with a source range that can be stored in an [`IntervalIndex`].
+trait Interval {
+    /// Returns the range indexed for this value.
+    fn interval(&self) -> TextRange;
+}
+
+/// A start-sorted interval index.
+///
+/// The entries form an implicit balanced binary tree. Each entry stores the maximum interval end
+/// in its subtree, which allows intersection queries to skip subtrees that end before the query.
+/// Intervals may overlap or nest, and queries return them in their original order.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalIndex<T> {
+    entries: Box<[IntervalEntry<T>]>,
+}
+
+/// An indexed value and the largest interval end in its implicit subtree.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalEntry<T> {
+    value: T,
+    subtree_max_end: TextSize,
+}
+
+impl<T: Interval> IntervalIndex<T> {
+    /// Builds an index from values sorted by interval start, retaining their input order.
+    ///
+    /// The caller must ensure that `values` is sorted by [`Interval::interval`] start.
+    fn from_sorted(values: Vec<T>) -> Self {
+        debug_assert!(values.is_sorted_by_key(|value| value.interval().start()));
+
+        let mut entries = values
+            .into_iter()
+            .map(|value| IntervalEntry {
+                subtree_max_end: value.interval().end(),
+                value,
+            })
+            .collect::<Box<[_]>>();
+
+        Self::set_subtree_max_ends(&mut entries);
+
+        Self { entries }
+    }
+
+    /// Populates each entry's subtree maximum and returns the maximum end in `entries`.
+    fn set_subtree_max_ends(entries: &mut [IntervalEntry<T>]) -> TextSize {
+        let mid = entries.len() / 2;
+        let (left, root_and_right) = entries.split_at_mut(mid);
+        let Some((root, right)) = root_and_right.split_first_mut() else {
+            return TextSize::default();
+        };
+
+        let left_max_end = Self::set_subtree_max_ends(left);
+        let right_max_end = Self::set_subtree_max_ends(right);
+        root.subtree_max_end = root
+            .value
+            .interval()
+            .end()
+            .max(left_max_end)
+            .max(right_max_end);
+        root.subtree_max_end
+    }
+
+    /// Returns the indexed values that intersect `query`, in input order.
+    ///
+    /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
+    /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
+    /// returned values.
+    fn intersecting(&self, query: TextRange) -> impl Iterator<Item = &T> {
+        let mut pending: SmallVec<[&[IntervalEntry<T>]; 16]> = smallvec![self.entries.as_ref()];
+
+        std::iter::from_fn(move || {
+            while let Some(entries) = pending.pop() {
+                match entries {
+                    [entry] => {
+                        if entry.value.interval().start() <= query.end()
+                            && entry.value.interval().end() >= query.start()
+                        {
+                            return Some(&entry.value);
+                        }
+                    }
+                    entries => {
+                        let mid = entries.len() / 2;
+                        let (left, root_and_right) = entries.split_at(mid);
+                        let Some((root, right)) = root_and_right.split_first() else {
+                            continue;
+                        };
+
+                        if root.subtree_max_end < query.start() {
+                            continue;
+                        }
+
+                        if root.value.interval().start() > query.end() {
+                            pending.push(left);
+                            continue;
+                        }
+
+                        // Push in reverse source order so the left subtree is visited first.
+                        pending.push(right);
+                        pending.push(std::slice::from_ref(root));
+                        pending.push(left);
+                    }
+                }
+            }
+
+            None
+        })
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &T> {
+        self.entries.iter().map(|entry| &entry.value)
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
 }

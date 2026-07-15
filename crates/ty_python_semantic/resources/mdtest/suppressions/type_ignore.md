@@ -265,6 +265,19 @@ a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
 ```
 
+Unlike `ty: ignore`, an own-line `type: ignore` does not suppress the following line (unless it
+appears before any Python statements in the file, in which case it suppresses the entire file). This
+preserves the standardized semantics of `type: ignore` comments.
+
+```py
+seen_code = True
+
+# error: [unused-type-ignore-comment]
+# type: ignore
+# error: [unresolved-reference]
+value = missing
+```
+
 ## `respect-type-ignore-comments=false`
 
 ty ignore `type-ignore` comments if `respect-type-ignore-comments` is set to false.

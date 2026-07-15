@@ -1,5 +1,6 @@
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
@@ -26,12 +27,12 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
     let mut unused = Vec::with_capacity(
         all.file
             .len()
-            .saturating_add(all.line.len())
+            .saturating_add(all.inline.len())
             .saturating_sub(diagnostics.used_len()),
     );
 
     // Collect all suppressions that are unused after type-checking.
-    for suppression in all {
+    for suppression in all.iter() {
         if diagnostics.is_used(suppression.id()) {
             continue;
         }
@@ -211,7 +212,15 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
-        return Fix::safe_edit(Edit::range_deletion(suppression.comment_range));
+        let edit = Edit::range_deletion(suppression.comment_range);
+
+        if indentation_at_offset(comment_start, source).is_some() {
+            // Removing `# ty: ignore` from `# ty: ignore # fmt: off` would promote
+            // `# fmt: off` to the primary own-line comment.
+            return Fix::unsafe_edit(edit);
+        }
+
+        return Fix::safe_edit(edit);
     }
 
     // Remove any leading whitespace before the comment
