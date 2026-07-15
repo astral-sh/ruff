@@ -23,7 +23,6 @@ drop_bomb = { workspace = true }
 get-size2 = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
-smallvec = { workspace = true }
 static_assertions = { workspace = true }
 thin-vec = { workspace = true }
 unicode-ident = { workspace = true }

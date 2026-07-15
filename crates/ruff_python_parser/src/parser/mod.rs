@@ -58,20 +58,6 @@ impl NameInterner {
         self.names.insert(name.clone());
         name
     }
-
-    /// Interns a name that has already been allocated, such as a normalized identifier.
-    fn intern_owned(&mut self, name: Name) -> Name {
-        if name.len() <= Name::INLINE_CAPACITY {
-            return name;
-        }
-
-        if let Some(interned) = self.names.get(&name) {
-            return interned.clone();
-        }
-
-        self.names.insert(name.clone());
-        name
-    }
 }
 
 #[derive(Debug)]
@@ -83,6 +69,9 @@ pub(crate) struct Parser<'src> {
 
     /// Deduplicates the backing allocations for repeated names that do not fit inline.
     name_interner: NameInterner,
+
+    /// Reusable storage for names that need to be constructed by the parser.
+    name_buffer: String,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -154,6 +143,7 @@ impl<'src> Parser<'src> {
             unsupported_syntax_errors: Vec::new(),
             tokens,
             name_interner: NameInterner::default(),
+            name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
@@ -464,8 +454,7 @@ impl<'src> Parser<'src> {
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
             self.intern_name(text)
         } else {
-            let normalized = normalize_name(text);
-            self.intern_owned_name(normalized)
+            self.intern_normalized_name(text)
         };
         self.bump(TokenKind::Name);
         name
@@ -475,8 +464,16 @@ impl<'src> Parser<'src> {
         self.name_interner.intern(text)
     }
 
-    fn intern_owned_name(&mut self, name: Name) -> Name {
-        self.name_interner.intern_owned(name)
+    fn intern_normalized_name(&mut self, text: &str) -> Name {
+        let mut normalized = std::mem::take(&mut self.name_buffer);
+        normalized.clear();
+        normalized.extend(text.nfkc());
+
+        let name = self.name_interner.intern(&normalized);
+
+        normalized.clear();
+        self.name_buffer = normalized;
+        name
     }
 
     fn bump_int(&mut self) -> Int {
@@ -978,11 +975,6 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(text)
     }
-}
-
-#[cold]
-fn normalize_name(text: &str) -> Name {
-    text.nfkc().collect::<Name>()
 }
 
 #[derive(Copy, Clone)]

@@ -5694,7 +5694,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getattr__",
-                CallArguments::positional([Type::string_literal(db, name.as_str())]),
+                CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
             )
             .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -5713,7 +5713,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder_with_policy(
                 db,
                 "__getattribute__",
-                &mut CallArguments::positional([Type::string_literal(db, name.as_str())]),
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )

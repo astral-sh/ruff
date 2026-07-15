@@ -387,7 +387,7 @@ impl<'db> EnumClassLiteral<'db> {
     /// canonical, even though custom enum construction could make it an alias of another member.
     pub(crate) fn name_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
         self.resolve_member(db, name)
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
@@ -615,7 +615,7 @@ impl<'db> EnumMetadata<'db> {
         let union = self
             .members
             .keys()
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
             .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
         Some(union)

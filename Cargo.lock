@@ -3620,7 +3620,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
- "smallvec",
  "static_assertions",
  "thin-vec",
  "unicode-ident",
@@ -4716,7 +4715,6 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.13.0",
  "camino",
- "char_str",
  "compact_str",
  "get-size2",
  "indexmap",

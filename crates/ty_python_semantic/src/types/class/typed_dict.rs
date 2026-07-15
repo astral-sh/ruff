@@ -206,7 +206,7 @@ fn synthesize_typed_dict_getitem<'db>(
     let overloads = fields
         .iter()
         .map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name.as_str());
+            let key_type = Type::string_literal(db, field_name);
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
@@ -265,7 +265,7 @@ fn synthesize_typed_dict_setitem<'db>(
 
     let overloads = writable_fields
         .map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name.as_str());
+            let key_type = Type::string_literal(db, field_name);
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
@@ -322,7 +322,7 @@ fn synthesize_typed_dict_delitem<'db>(
 
     let overloads = deletable_fields
         .map(|(field_name, _)| {
-            let key_type = Type::string_literal(db, field_name.as_str());
+            let key_type = Type::string_literal(db, field_name);
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
@@ -364,7 +364,7 @@ fn synthesize_typed_dict_get<'db>(
     let overloads = fields
         .iter()
         .flat_map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name.as_str());
+            let key_type = Type::string_literal(db, field_name);
 
             let get_sig_params = [
                 Parameter::positional_only(Some(Name::new_static("self")))
@@ -580,10 +580,7 @@ fn synthesize_typed_dict_pop<'db>(
         .iter()
         .filter(|(_, field)| !field.is_required() && !field.is_read_only())
         .flat_map(|(field_name, field)| {
-            pop_overloads(
-                Type::string_literal(db, field_name.as_str()),
-                field.declared_ty,
-            )
+            pop_overloads(Type::string_literal(db, field_name), field.declared_ty)
         })
         .chain(
             typed_dict
@@ -612,7 +609,7 @@ fn synthesize_typed_dict_setdefault<'db>(
         .iter()
         .filter(|(_, field)| !field.is_read_only())
         .map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name.as_str());
+            let key_type = Type::string_literal(db, field_name);
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),

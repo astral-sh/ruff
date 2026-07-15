@@ -175,6 +175,48 @@ impl From<Name> for CharStr {
     }
 }
 
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        compact_str::CompactString::new(self.as_str())
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for &Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        compact_str::CompactString::new(self.as_str())
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &Name) -> bool {
+        self.as_str() == data.as_str()
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&Name) -> bool {
+        self.as_str() == data.as_str()
+    }
+}
+
 impl From<CharString> for Name {
     #[inline]
     fn from(name: CharString) -> Self {

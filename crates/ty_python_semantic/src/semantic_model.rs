@@ -1,4 +1,4 @@
-use char_str::CharStr;
+use compact_str::CompactString;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
@@ -135,7 +135,7 @@ impl<'db> SemanticModel<'db> {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
-                    name: CharStr::from(module.name(self.db).as_str()),
+                    name: CompactString::new(module.name(self.db).as_str()),
                     ty: Some(ty),
                     builtin,
                 }
@@ -188,7 +188,7 @@ impl<'db> SemanticModel<'db> {
         )]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
-                name: name.into(),
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin,
             });
@@ -206,7 +206,7 @@ impl<'db> SemanticModel<'db> {
             let ty = Type::module_literal(self.db, self.file, *submodule);
             let base = submodule.name(self.db).last_component();
             completions.push(Completion {
-                name: CharStr::from(base),
+                name: CompactString::new(base),
                 ty: Some(ty),
                 builtin,
             });
@@ -223,7 +223,7 @@ impl<'db> SemanticModel<'db> {
         all_members(self.db, ty)
             .into_iter()
             .map(|member| Completion {
-                name: member.name.into(),
+                name: CompactString::new(member.name),
                 ty: Some(member.ty),
                 builtin: false,
             })
@@ -245,7 +245,7 @@ impl<'db> SemanticModel<'db> {
             completions.extend(
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
                     |memberdef| Completion {
-                        name: memberdef.member.name.into(),
+                        name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
                     },
@@ -259,7 +259,7 @@ impl<'db> SemanticModel<'db> {
         // not `str | None`).
         completions.extend(
             all_implicit_module_globals(self.db, self.file).map(|(name, ty)| Completion {
-                name: name.into(),
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin: true,
             }),
@@ -641,7 +641,7 @@ impl NameKind {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
-    pub name: CharStr,
+    pub name: CompactString,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available

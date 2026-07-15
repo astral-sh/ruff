@@ -1,14 +1,5 @@
 use std::fmt::{Display, Write};
 
-use ruff_python_ast::name::Name;
-use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
-    Operator, PythonVersion, Stmt, Suite, WithItem,
-};
-use ruff_text_size::{Ranged, TextRange, TextSize};
-use smallvec::SmallVec;
-
 use crate::error::StarTupleKind;
 use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
@@ -18,6 +9,13 @@ use crate::parser::{
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
+};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::Parenthesized;
 use super::expression::ExpressionContext;
@@ -834,8 +832,9 @@ impl<'src> Parser<'src> {
             return first;
         }
 
-        let mut names = SmallVec::<[Name; 4]>::new();
-        names.push(first.id);
+        let mut dotted_name = std::mem::take(&mut self.name_buffer);
+        dotted_name.clear();
+        dotted_name.push_str(&first.id);
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -844,14 +843,19 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            names.push(self.parse_identifier().id);
+            dotted_name.push('.');
+            dotted_name.push_str(&self.parse_identifier().id);
         }
+
+        let id = self.name_interner.intern(&dotted_name);
+        dotted_name.clear();
+        self.name_buffer = dotted_name;
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: self.intern_owned_name(Name::join(&names, ".")),
+            id,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

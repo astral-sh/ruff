@@ -1,8 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
-use char_str::CharStr;
-use compact_str::CompactString;
+use compact_str::{CompactString, CompactStringExt};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
@@ -286,11 +285,11 @@ impl<'db> Extend<CompletionBuilder<'db>> for Completions<'db> {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The name used when matching the query and ranking this suggestion.
-    pub name: CharStr,
+    pub name: CompactString,
     /// The label shown to the user for this suggestion.
     ///
     /// This is only set when the label differs from the insert text.
-    label: Option<CharStr>,
+    label: Option<CompactString>,
     /// The fully qualified name, when available.
     ///
     /// This is only set when `module_name` is available.
@@ -362,7 +361,7 @@ impl<'db> Completion<'db> {
             .unwrap_or(self.name.as_str())
     }
 
-    fn builder(name: impl Into<CharStr>) -> CompletionBuilder<'db> {
+    fn builder(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder::new(name)
     }
 }
@@ -372,7 +371,7 @@ impl<'db> Completion<'db> {
 #[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
-    name: CharStr,
+    name: CompactString,
     qualified: Option<CompactString>,
     insert: Option<CompactString>,
     ty: Option<Type<'db>>,
@@ -393,7 +392,7 @@ impl<'db> CompletionBuilder<'db> {
     /// All other values given to the completion by default are
     /// valid, but callers will generally want to fill in as much
     /// as is appropriate.
-    fn new(name: impl Into<CharStr>) -> CompletionBuilder<'db> {
+    fn new(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder {
             name: name.into(),
             qualified: None,
@@ -427,7 +426,7 @@ impl<'db> CompletionBuilder<'db> {
     ///
     /// This is just like `CompletionBuilder::new`, but sets the kind
     /// to "keyword."
-    fn keyword(name: impl Into<CharStr>) -> CompletionBuilder<'db> {
+    fn keyword(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         Completion::builder(name).kind(CompletionKind::Keyword)
     }
 
@@ -437,7 +436,7 @@ impl<'db> CompletionBuilder<'db> {
     fn argument(name: impl Into<Name>) -> CompletionBuilder<'db> {
         let name = name.into();
         let insert = compact_str::format_compact!("{name}=");
-        Completion::builder(name)
+        Completion::builder(CompactString::new(name))
             .kind(CompletionKind::Variable)
             .insert(insert)
             .context_specific(true)
@@ -490,10 +489,7 @@ impl<'db> CompletionBuilder<'db> {
         let relevance = Relevance::new(ctx, query, &self);
         let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
         {
-            let label = match &self.insert {
-                Some(insert) => CharStr::from(insert.as_str()),
-                None => self.name.clone(),
-            };
+            let label = self.insert.unwrap_or_else(|| self.name.clone());
             if ctx.capabilities.snippets {
                 let insert = compact_str::format_compact!("{label}($0)");
                 (
@@ -778,7 +774,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(class_def.name.id.clone().into());
+                        bases.insert(CompactString::new(&class_def.name.id));
                     }
                     bases
                 });
@@ -1564,7 +1560,7 @@ struct CollectionContext<'db> {
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
     /// This is only `Some` when we're in a class definition context.
-    existing_class_bases: Option<FxHashSet<CharStr>>,
+    existing_class_bases: Option<FxHashSet<CompactString>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1608,14 +1604,14 @@ impl<'db> CollectionContext<'db> {
         // Exclude classes that are already listed as base classes in the class definition.
         if let Some(ref existing_class_bases) = self.existing_class_bases {
             // For in-scope completions, check if the simple name matches.
-            if builder.import.is_none() && existing_class_bases.contains(builder.name.as_str()) {
+            if builder.import.is_none() && existing_class_bases.contains(&builder.name) {
                 return true;
             }
             // For auto-import completions, check if the qualified name matches.
             // This handles cases like `class Foo(mod.Bar, ...)` where we want to
             // filter out auto-import suggestions for `Bar` from module `mod`.
             if let Some(ref qualified) = builder.qualified
-                && existing_class_bases.contains(qualified.as_str())
+                && existing_class_bases.contains(qualified)
             {
                 return true;
             }
@@ -1638,18 +1634,12 @@ impl<'db> CollectionContext<'db> {
 ///
 /// For simple name references (e.g., `Foo`), returns the name as-is.
 /// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
-fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CharStr> {
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
     class_def
         .bases()
         .iter()
-        .filter_map(|base| {
-            if let ast::Expr::Name(name) = base {
-                return Some(name.id.clone().into());
-            }
-
-            let name = UnqualifiedName::from_expr(base)?;
-            Some(Name::join(name.segments(), ".").into())
-        })
+        .filter_map(UnqualifiedName::from_expr)
+        .map(|name| name.segments().join_compact("."))
         .collect()
 }
 

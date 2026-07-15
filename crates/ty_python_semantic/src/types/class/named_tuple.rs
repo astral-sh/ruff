@@ -68,12 +68,12 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             }
 
             // __match_args__: tuple[Literal["field1"], Literal["field2"], ...]
-            let field_types = fields.map(|field| Type::string_literal(db, field.name.as_str()));
+            let field_types = fields.map(|field| Type::string_literal(db, &field.name));
             Some(Type::heterogeneous_tuple(db, field_types))
         }
         "_fields" => {
             // _fields: tuple[Literal["field1"], Literal["field2"], ...]
-            let field_types = fields.map(|field| Type::string_literal(db, field.name.as_str()));
+            let field_types = fields.map(|field| Type::string_literal(db, &field.name));
             Some(Type::heterogeneous_tuple(db, field_types))
         }
         "__slots__" => {
