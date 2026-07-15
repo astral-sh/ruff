@@ -1161,16 +1161,14 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
-        // Keep the overload if any specialization of its receiver typevars permits binding. The
-        // resulting receiver constraint is retained and checked during callable comparison.
-        !self_type
+        self_type
             .when_assignable_to(
                 db,
                 expected_self_ty,
                 &constraints,
                 self.inferable_typevars(db),
             )
-            .is_never_satisfied(db)
+            .is_always_satisfied(db)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
