@@ -302,154 +302,6 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     }
 }
 
-/// A value with a source range that can be stored in an [`IntervalIndex`].
-trait Interval {
-    /// Returns the range indexed for this value.
-    fn interval(&self) -> TextRange;
-}
-
-/// A start-sorted interval index.
-///
-/// The entries form an implicit balanced binary tree. Each entry stores the maximum interval end
-/// in its subtree, which allows intersection queries to skip subtrees that end before the query.
-/// Intervals may overlap or nest, and queries return them in their original order.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
-struct IntervalIndex<T> {
-    entries: Box<[IntervalEntry<T>]>,
-}
-
-/// An indexed value and the largest interval end in its implicit subtree.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
-struct IntervalEntry<T> {
-    value: T,
-    subtree_max_end: TextSize,
-}
-
-impl<T: Interval> IntervalIndex<T> {
-    /// Builds an index from values sorted by interval start, retaining their input order.
-    ///
-    /// The caller must ensure that `values` is sorted by [`Interval::interval`] start.
-    fn from_sorted(values: Vec<T>) -> Self {
-        let mut entries = values
-            .into_iter()
-            .map(|value| IntervalEntry {
-                subtree_max_end: value.interval().end(),
-                value,
-            })
-            .collect::<Box<[_]>>();
-
-        Self::set_subtree_max_ends(&mut entries);
-
-        Self { entries }
-    }
-
-    /// Populates each entry's subtree maximum and returns the maximum end in `entries`.
-    fn set_subtree_max_ends(entries: &mut [IntervalEntry<T>]) -> TextSize {
-        let mid = entries.len() / 2;
-        let (left, root_and_right) = entries.split_at_mut(mid);
-        let Some((root, right)) = root_and_right.split_first_mut() else {
-            return TextSize::default();
-        };
-
-        let left_max_end = Self::set_subtree_max_ends(left);
-        let right_max_end = Self::set_subtree_max_ends(right);
-        root.subtree_max_end = root
-            .value
-            .interval()
-            .end()
-            .max(left_max_end)
-            .max(right_max_end);
-        root.subtree_max_end
-    }
-
-    /// Returns the indexed values that intersect `query`, in input order.
-    ///
-    /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
-    /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
-    /// returned values.
-    fn intersecting(&self, query: TextRange) -> Intersecting<'_, T> {
-        Intersecting {
-            query,
-            pending: smallvec![IntervalTraversal::Subtree(&self.entries)],
-        }
-    }
-
-    fn iter(&self) -> IntervalValues<'_, T> {
-        IntervalValues(self.entries.iter())
-    }
-
-    fn len(&self) -> usize {
-        self.entries.len()
-    }
-}
-
-/// A lazy, source-ordered traversal of values whose intervals intersect a query.
-struct Intersecting<'a, T> {
-    query: TextRange,
-    pending: SmallVec<[IntervalTraversal<'a, T>; 16]>,
-}
-
-enum IntervalTraversal<'a, T> {
-    Subtree(&'a [IntervalEntry<T>]),
-    Entry(&'a IntervalEntry<T>),
-}
-
-impl<'a, T: Interval> Iterator for Intersecting<'a, T> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(next) = self.pending.pop() {
-            match next {
-                IntervalTraversal::Subtree(entries) => {
-                    let mid = entries.len() / 2;
-                    let (left, root_and_right) = entries.split_at(mid);
-                    let Some((root, right)) = root_and_right.split_first() else {
-                        continue;
-                    };
-
-                    if root.subtree_max_end < self.query.start() {
-                        continue;
-                    }
-
-                    if root.value.interval().start() > self.query.end() {
-                        self.pending.push(IntervalTraversal::Subtree(left));
-                        continue;
-                    }
-
-                    // Push in reverse source order so the left subtree is visited first.
-                    self.pending.push(IntervalTraversal::Subtree(right));
-                    self.pending.push(IntervalTraversal::Entry(root));
-                    self.pending.push(IntervalTraversal::Subtree(left));
-                }
-                IntervalTraversal::Entry(entry) => {
-                    if entry.value.interval().end() >= self.query.start() {
-                        return Some(&entry.value);
-                    }
-                }
-            }
-        }
-
-        None
-    }
-}
-
-/// An iterator over every indexed value in source order.
-pub(crate) struct IntervalValues<'a, T>(std::slice::Iter<'a, IntervalEntry<T>>);
-
-impl<'a, T> Iterator for IntervalValues<'a, T> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|entry| &entry.value)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-impl<T> ExactSizeIterator for IntervalValues<'_, T> {}
-
 /// The suppressions of a single file.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppressions {
@@ -515,20 +367,8 @@ impl Suppressions {
         })
     }
 
-    fn iter(&self) -> SuppressionsIter<'_> {
+    fn iter(&self) -> impl Iterator<Item = &Suppression> {
         self.file.iter().chain(self.inline.iter())
-    }
-}
-
-pub(crate) type SuppressionsIter<'a> =
-    std::iter::Chain<std::slice::Iter<'a, Suppression>, IntervalValues<'a, Suppression>>;
-
-impl<'a> IntoIterator for &'a Suppressions {
-    type Item = &'a Suppression;
-    type IntoIter = SuppressionsIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 
@@ -863,4 +703,121 @@ struct UnknownSuppression {
 struct InvalidSuppression {
     kind: SuppressionKind,
     error: ParseError,
+}
+
+/// A value with a source range that can be stored in an [`IntervalIndex`].
+trait Interval {
+    /// Returns the range indexed for this value.
+    fn interval(&self) -> TextRange;
+}
+
+/// A start-sorted interval index.
+///
+/// The entries form an implicit balanced binary tree. Each entry stores the maximum interval end
+/// in its subtree, which allows intersection queries to skip subtrees that end before the query.
+/// Intervals may overlap or nest, and queries return them in their original order.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalIndex<T> {
+    entries: Box<[IntervalEntry<T>]>,
+}
+
+/// An indexed value and the largest interval end in its implicit subtree.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
+struct IntervalEntry<T> {
+    value: T,
+    subtree_max_end: TextSize,
+}
+
+impl<T: Interval> IntervalIndex<T> {
+    /// Builds an index from values sorted by interval start, retaining their input order.
+    ///
+    /// The caller must ensure that `values` is sorted by [`Interval::interval`] start.
+    fn from_sorted(values: Vec<T>) -> Self {
+        debug_assert!(values.is_sorted_by_key(|value| value.interval().start()));
+
+        let mut entries = values
+            .into_iter()
+            .map(|value| IntervalEntry {
+                subtree_max_end: value.interval().end(),
+                value,
+            })
+            .collect::<Box<[_]>>();
+
+        Self::set_subtree_max_ends(&mut entries);
+
+        Self { entries }
+    }
+
+    /// Populates each entry's subtree maximum and returns the maximum end in `entries`.
+    fn set_subtree_max_ends(entries: &mut [IntervalEntry<T>]) -> TextSize {
+        let mid = entries.len() / 2;
+        let (left, root_and_right) = entries.split_at_mut(mid);
+        let Some((root, right)) = root_and_right.split_first_mut() else {
+            return TextSize::default();
+        };
+
+        let left_max_end = Self::set_subtree_max_ends(left);
+        let right_max_end = Self::set_subtree_max_ends(right);
+        root.subtree_max_end = root
+            .value
+            .interval()
+            .end()
+            .max(left_max_end)
+            .max(right_max_end);
+        root.subtree_max_end
+    }
+
+    /// Returns the indexed values that intersect `query`, in input order.
+    ///
+    /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
+    /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
+    /// returned values.
+    fn intersecting(&self, query: TextRange) -> impl Iterator<Item = &T> {
+        let mut pending: SmallVec<[&[IntervalEntry<T>]; 16]> = smallvec![self.entries.as_ref()];
+
+        std::iter::from_fn(move || {
+            while let Some(entries) = pending.pop() {
+                match entries {
+                    [entry] => {
+                        if entry.value.interval().start() <= query.end()
+                            && entry.value.interval().end() >= query.start()
+                        {
+                            return Some(&entry.value);
+                        }
+                    }
+                    entries => {
+                        let mid = entries.len() / 2;
+                        let (left, root_and_right) = entries.split_at(mid);
+                        let Some((root, right)) = root_and_right.split_first() else {
+                            continue;
+                        };
+
+                        if root.subtree_max_end < query.start() {
+                            continue;
+                        }
+
+                        if root.value.interval().start() > query.end() {
+                            pending.push(left);
+                            continue;
+                        }
+
+                        // Push in reverse source order so the left subtree is visited first.
+                        pending.push(right);
+                        pending.push(std::slice::from_ref(root));
+                        pending.push(left);
+                    }
+                }
+            }
+
+            None
+        })
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &T> {
+        self.entries.iter().map(|entry| &entry.value)
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
 }

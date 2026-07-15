@@ -32,7 +32,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
     );
 
     // Collect all suppressions that are unused after type-checking.
-    for suppression in all {
+    for suppression in all.iter() {
         if diagnostics.is_used(suppression.id()) {
             continue;
         }
