@@ -51,6 +51,41 @@ reveal_type(generic_context(C))
 reveal_type(C(1))
 ```
 
+Explicit generic receiver annotations constrain a bound method's callable type:
+
+```py
+from typing import Callable
+
+class GenericReceiver:
+    def method[T](self: T, value: T) -> T:
+        return self
+
+receiver = GenericReceiver()
+
+# Binding adds `GenericReceiver <= T`. `T = object` satisfies that constraint, but `T = int` does
+# not.
+accepts_object: Callable[[object], object] = receiver.method
+accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
+```
+
+Declared bounds and constraints on receiver TypeVars are not yet enforced when comparing a bound
+method with another callable:
+
+```py
+from typing import Callable
+
+class InvalidBoundedReceiver:
+    # TODO: Binding should reject this method because the receiver is outside `T`'s declared bound.
+    def method[T: int](self: T) -> None: ...
+
+class InvalidConstrainedReceiver:
+    # TODO: Binding should reject this method because the receiver is outside `T`'s constraints.
+    def method[T: (int, str)](self: T) -> None: ...
+
+invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method
+invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method
+```
+
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py

@@ -3055,7 +3055,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import Any, final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
@@ -3154,6 +3154,47 @@ class NominalReturningOtherClass:
     def g(self) -> Other:
         raise NotImplementedError
 
+class ConcreteMethod(Protocol):
+    def f(self, input: int) -> int: ...
+
+class GenericReceiver:
+    def f[T](self: T, input: T) -> T:
+        return self
+
+class GradualReceiverProtocol(Protocol):
+    def method(self: list[Any]) -> None: ...
+
+class GradualReceiverImplementation(list[int]):
+    def method(self: list[Any]) -> None: ...
+
+class ExplicitReceiverProtocol(Protocol):
+    def method(self: "ExplicitReceiverProtocol") -> None: ...
+
+class StructuralExplicitReceiver:
+    def method(self: ExplicitReceiverProtocol) -> None: ...
+
+class OverloadedExplicitReceiverProtocol(Protocol):
+    def overloaded(self: str, value: int | str) -> int: ...
+
+class OverloadedExplicitReceiverImplementation:
+    @overload
+    def overloaded(self, value: int) -> int: ...
+    @overload
+    def overloaded(self, value: str) -> int: ...
+    def overloaded(self, value: int | str) -> int:
+        return 1
+
+class ReceiverOnly(Protocol):
+    def method(self) -> None: ...
+
+class InvalidBoundedReceiver:
+    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
+    def method[T: int](self: T) -> None: ...
+
+class InvalidConstrainedReceiver:
+    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
+    def method[T: (int, str)](self: T) -> None: ...
+
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
@@ -3184,6 +3225,31 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctio
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
 
 static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
+
+# Binding `GenericReceiver.f` adds the constraint `GenericReceiver <= T`. It cannot choose
+# `T = int`, so the resulting bound method does not satisfy `ConcreteMethod.f`.
+static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
+static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
+
+# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
+# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
+# `list[Any]`.
+static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
+
+# Checking the receiver constraint requires the same protocol relation that is already in
+# progress. The recursive check should terminate and establish the structural relation.
+static_assert(is_assignable_to(StructuralExplicitReceiver, ExplicitReceiverProtocol))
+static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol))
+
+# Aggregating the implementation's overloads covers the visible `int | str` parameter, but the
+# implementation's concrete receiver does not satisfy the protocol's explicit `str` receiver.
+static_assert(not is_assignable_to(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
+static_assert(not is_subtype_of(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
+
+static_assert(is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
@@ -3272,9 +3338,18 @@ class FactoryProtocol(Protocol):
     @classmethod
     def make(cls) -> Self: ...
 
+class ExplicitReceiverFactoryProtocol(Protocol):
+    @classmethod
+    def make(cls: type[Self]) -> Self: ...
+
 class Factory:
     @classmethod
     def make(cls) -> Self:
+        return cls()
+
+class ExplicitReceiverFactory:
+    @classmethod
+    def make(cls: type[Self]) -> Self:
         return cls()
 
 class BadFactory:
@@ -3288,6 +3363,7 @@ class ClassObjectFactory:
         return cls
 
 static_assert(not is_assignable_to(TypeOf[Factory], FactoryProtocol))
+static_assert(not is_assignable_to(TypeOf[ExplicitReceiverFactory], ExplicitReceiverFactoryProtocol))
 static_assert(not is_assignable_to(TypeOf[BadFactory], FactoryProtocol))
 static_assert(is_assignable_to(type[ClassObjectFactory], FactoryProtocol))
 

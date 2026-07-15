@@ -592,9 +592,19 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
+        self.apply_self_with_receiver(db, self_type, self_type)
+    }
+
+    pub(crate) fn apply_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> CallableType<'db> {
         CallableType::new(
             db,
-            self.signatures(db).apply_self(db, self_type),
+            self.signatures(db)
+                .apply_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
         )

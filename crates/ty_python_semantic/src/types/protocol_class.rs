@@ -1220,6 +1220,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         )
     }
 
+    fn is_class_method(&self) -> bool {
+        matches!(
+            self.data.kind,
+            ProtocolMemberKind::Method(_, ProtocolMethodKind::Class)
+        )
+    }
+
     fn is_property(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Property { .. })
     }
@@ -1806,6 +1813,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .to_instance(db)
             .or_else(|| ty.literal_fallback_instance(db))
             .unwrap_or(ty);
+        let implementation_receiver_binding_ty = if member.is_class_method() {
+            implementation_self_binding_ty.to_meta_type(db)
+        } else {
+            implementation_self_binding_ty
+        };
+        let protocol_receiver_binding_ty = if member.is_class_method() {
+            protocol_self_binding_ty.to_meta_type(db)
+        } else {
+            protocol_self_binding_ty
+        };
 
         // Checking a class object against a protocol's instance capabilities can expose the
         // property descriptor itself rather than the value returned by its getter. Compatibility
@@ -1829,9 +1846,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_callables_vs_callable(
                         db,
                         &callables.map(|callable| {
-                            callable.apply_self(db, implementation_self_binding_ty)
+                            callable.apply_self_with_receiver(
+                                db,
+                                implementation_receiver_binding_ty,
+                                implementation_self_binding_ty,
+                            )
                         }),
-                        required_callable.apply_self(db, protocol_self_binding_ty),
+                        required_callable.apply_self_with_receiver(
+                            db,
+                            protocol_receiver_binding_ty,
+                            protocol_self_binding_ty,
+                        ),
                     )
                 })
         } else if member.is_instance_method() {
@@ -1870,7 +1895,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(required_callable.apply_self(db, protocol_self_binding_ty)),
+                Type::Callable(required_callable.apply_self_with_receiver(
+                    db,
+                    protocol_receiver_binding_ty,
+                    protocol_self_binding_ty,
+                )),
             )
         } else {
             required_ty
