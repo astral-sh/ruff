@@ -1778,10 +1778,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(db, self.constraints, signature_inferable)
+        // we produce, those signature-local typevars should be existentially quantified away
+        // before final semantic observation or solution extraction. Record that quantification on
+        // the returned constraint set so later positive constraint construction can still refer to
+        // the freshened callable typevars.
+        when.with_deferred_quantification(db, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(

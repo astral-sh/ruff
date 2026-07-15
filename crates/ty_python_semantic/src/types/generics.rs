@@ -289,15 +289,22 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> InferableTypeVars<'db> {
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn merge_inner<'db>(
+            db: &'db dyn Db,
+            self_inner: InferableTypeVarsInner<'db>,
+            other_inner: InferableTypeVarsInner<'db>,
+        ) -> InferableTypeVarsInner<'db> {
+            let merged = self_inner.inferable(db) | other_inner.inferable(db);
+            InferableTypeVarsInner::new_internal(db, merged)
+        }
+
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+                InferableTypeVars::Some(merge_inner(db, self_inner, other_inner))
             }
         }
     }

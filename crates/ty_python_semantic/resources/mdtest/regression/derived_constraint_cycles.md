@@ -182,4 +182,19 @@ def check_deep_bound[T, U]():
     static_assert(constraints.implies_subtype_of(T, Deep))
 ```
 
+## Nested substitutions during projection must make progress
+
+Assigning `operator.mul` to `functools.reduce`'s generic callback retains the typevars local to
+`mul` until solution extraction. Nested substitutions can derive recursively nested
+`SupportsMul[...]` bounds that still mention all of those soon-to-be-projected typevars. Those
+constraints are valid but do not make progress toward projection, and their closure grows
+combinatorially with the number of distinct tuple elements.
+
+```py
+import functools
+import operator
+
+reveal_type(functools.reduce(operator.mul, (1, 2, 3, 4), 1))  # revealed: int
+```
+
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660
