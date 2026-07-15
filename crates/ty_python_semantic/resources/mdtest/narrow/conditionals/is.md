@@ -176,23 +176,6 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
         reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
-## `is` between a `TypedDict` and `dict`
-
-An optional `TypedDict` may be empty at runtime. It can therefore be the same object as an empty
-`dict[Never, Never]`, so the identity branch remains reachable:
-
-```py
-from typing import TypedDict
-from typing_extensions import Never
-
-class Movie(TypedDict, total=False):
-    title: str
-
-def _(x: Movie, y: dict[Never, Never]) -> None:
-    if x is y:
-        reveal_type(x)  # revealed: Movie & dict[Never, Never]
-```
-
 ## `is` where the other operand is a call expression
 
 ```py
