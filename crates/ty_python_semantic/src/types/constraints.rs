@@ -273,7 +273,13 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
-    pub(crate) fn is_always(&self) -> bool {
+    /// Returns `true` if this constraint set's root is the `always` terminal.
+    ///
+    /// This is only a cheap sufficient check. A nonterminal constraint set can also be always
+    /// satisfied, so `false` does not prove that the set is not always satisfied. Call
+    /// [`ConstraintSet::is_always_satisfied`] through [`Self::query`] when false negatives are not
+    /// acceptable.
+    pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
         self.node == ALWAYS_TRUE
     }
 
@@ -593,53 +599,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
-    }
-
-    /// Copies this constraint set into an owned snapshot.
-    pub(crate) fn into_owned(self, db: &'db dyn Db) -> OwnedConstraintSet<'db> {
-        fn rebuild_node<'db>(
-            db: &'db dyn Db,
-            source: &ConstraintSetBuilder<'db>,
-            target: &ConstraintSetBuilder<'db>,
-            cache: &mut FxHashMap<NodeId, NodeId>,
-            old_node: NodeId,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(remapped) = cache.get(&old_node) {
-                return *remapped;
-            }
-
-            let old_interior = source.interior_node_data(old_node);
-            let old_constraint = source.constraint_data(old_interior.constraint);
-            let condition = Constraint::new_node_with_bounds(
-                db,
-                target,
-                old_constraint.typevar,
-                old_constraint.bounds.lower,
-                old_constraint.bounds.upper,
-            )
-            .with_adjusted_source_order(target, old_interior.source_order.saturating_sub(1));
-            let if_true = rebuild_node(db, source, target, cache, old_interior.if_true);
-            let if_uncertain = rebuild_node(db, source, target, cache, old_interior.if_uncertain);
-            let if_false = rebuild_node(db, source, target, cache, old_interior.if_false);
-            let remapped = condition.ite_uncertain(target, if_true, if_uncertain, if_false);
-            cache.insert(old_node, remapped);
-            remapped
-        }
-
-        let builder = ConstraintSetBuilder::new();
-        builder.into_owned(|builder| {
-            let node = rebuild_node(
-                db,
-                self.builder,
-                builder,
-                &mut FxHashMap::default(),
-                self.node,
-            );
-            ConstraintSet::from_node(builder, node)
-        })
     }
 
     /// Applies a type mapping to every constraint in this constraint set.
