@@ -4683,10 +4683,12 @@ def f(x: PGconn):
     isinstance(x, Connection)
 ```
 
-### Recursive protocols used as the first argument to `cast()`
+### Class-based protocols used as the first argument to `cast()`
 
-A redundant cast is reported only if neither type contains `Unknown` nor `Todo`. Inspecting protocol
-members for these types must terminate when a protocol refers back to itself.
+A redundant cast is reported only if neither type contains `Unknown` nor `Todo`. Protocol interfaces
+are lazily inferred and can be recursive, so this check does not inspect them. Encountering a
+class-based protocol therefore conservatively suppresses the diagnostic, even when its visible type
+arguments contain no dynamic types.
 
 ```toml
 [environment]
@@ -4701,13 +4703,13 @@ class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
 def f(value: Iterator[Any]):
-    cast(Iterator[Any], value)  # error: [redundant-cast]
+    cast(Iterator[Any], value)
 ```
 
 ### Protocol methods and properties in `cast()`
 
-The `Iterator` example above also ensures that the implicit `self` parameter of an ordinary method
-does not make the protocol appear recursive. The method's return type must still be checked.
+The protocol interface is skipped as a unit, regardless of whether a method or property would expose
+a dynamic type.
 
 ```toml
 [environment]
@@ -4743,14 +4745,15 @@ class UnknownProperty[T](Protocol):
     def value(self) -> Unknown: ...
 
 def properties(known: IntProperty[int], unknown: UnknownProperty[int]) -> None:
-    cast(IntProperty[int], known)  # error: [redundant-cast]
+    cast(IntProperty[int], known)
     cast(UnknownProperty[int], unknown)
 ```
 
 ### Specialized protocol type parameters in `cast()`
 
-A type variable's bound does not remain part of a specialized protocol. Here, the `Unknown` bound
-has been replaced by `int`, so the cast is redundant.
+A type variable's bound does not remain part of a specialized protocol. The eager `int`
+specialization is inspected, but the lazily inferred protocol interface is still skipped, so the
+diagnostic is conservatively suppressed.
 
 ```py
 from typing import Protocol, TypeVar, cast
@@ -4763,7 +4766,7 @@ class BoundedProtocol(Protocol[T]):
     value: T
 
 def bounded(value: BoundedProtocol[int]) -> None:
-    cast(BoundedProtocol[int], value)  # error: [redundant-cast]
+    cast(BoundedProtocol[int], value)
 ```
 
 ### Recursive protocol specializations in `cast()`

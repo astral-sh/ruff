@@ -81,6 +81,27 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
+Lazily inferred nested types are not evaluated solely to determine whether a cast is redundant. If
+checking an otherwise-equivalent type would require inspecting a deferred alias value, type variable
+bound, or `NewType` base, the diagnostic is conservatively suppressed.
+
+```py
+from typing import NewType, cast
+
+type Alias = int
+
+def alias(value: Alias) -> None:
+    cast(Alias, value)
+
+def typevar[T: int](value: T) -> None:
+    cast(T, value)
+
+UserId = NewType("UserId", int)
+
+def newtype(value: UserId) -> None:
+    cast(UserId, value)
+```
+
 Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
 
 ```toml

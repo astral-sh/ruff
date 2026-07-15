@@ -28,7 +28,6 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
-        signatures::walk_signature,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -203,57 +202,6 @@ pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> +
 ) {
     for member in interface.members(db) {
         walk_protocol_member(db, &member, visitor);
-    }
-}
-
-/// Walk the member types exposed through an instance of a protocol.
-///
-/// This binds inferred method receivers and property accessors to `receiver_ty`, while leaving
-/// explicit receiver annotations in place because they can affect which overload is exposed.
-/// For example, walking `P[int]` visits the return type `int`, but not the inferred receiver type:
-///
-/// ```python
-/// class P[T](Protocol):
-///     def method(self) -> T: ...
-/// ```
-pub(super) fn walk_protocol_instance_interface<
-    'db,
-    V: super::visitor::TypeVisitor<'db> + ?Sized,
->(
-    db: &'db dyn Db,
-    interface: ProtocolInterface<'db>,
-    receiver_ty: Type<'db>,
-    visitor: &V,
-) {
-    for member in interface.members(db) {
-        match member.data.kind {
-            ProtocolMemberKind::Method(method, _) => {
-                let Type::Callable(callable) = method.ty() else {
-                    visitor.visit_type(db, method.ty());
-                    continue;
-                };
-                for signature in callable.signatures(db) {
-                    if signature.has_implicit_positional_receiver_annotation() {
-                        let signature = signature.bind_self(db, Some(receiver_ty));
-                        walk_signature(db, &signature, visitor);
-                    } else {
-                        walk_signature(db, signature, visitor);
-                    }
-                }
-            }
-            ProtocolMemberKind::Property { read, write } => {
-                for member_type in [read, write].into_iter().flatten() {
-                    if let Some(ty) = member_type.bind_self(db, receiver_ty) {
-                        visitor.visit_type(db, ty);
-                    }
-                }
-            }
-            ProtocolMemberKind::Attribute(attribute) => {
-                if let Some(ty) = attribute.bind_self(db, receiver_ty) {
-                    visitor.visit_type(db, ty);
-                }
-            }
-        }
     }
 }
 

@@ -803,6 +803,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(class) => {
+                visitor.notify_skipped_lazy_type_attributes();
                 if let Some((_, Some(specialization))) = class.static_class_literal(db) {
                     walk_specialization(db, specialization, visitor);
                 }
@@ -836,14 +837,6 @@ impl<'db> ProtocolInstanceType<'db> {
         Self {
             inner: Protocol::Synthesized(synthesized),
             _phantom: PhantomData,
-        }
-    }
-
-    /// Return the class backing a class-based protocol instance.
-    pub(super) fn as_class_based(self) -> Option<ProtocolClass<'db>> {
-        match self.inner {
-            Protocol::FromClass(class) => Some(class),
-            Protocol::Synthesized(_) => None,
         }
     }
 

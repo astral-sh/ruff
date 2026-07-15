@@ -251,7 +251,11 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     let base = if visitor.should_visit_lazy_type_attributes() {
         Some(newtype.base(db))
     } else {
-        newtype.eager_base(db)
+        let base = newtype.eager_base(db);
+        if base.is_none() {
+            visitor.notify_skipped_lazy_type_attributes();
+        }
+        base
     };
     if let Some(base) = base {
         visitor.visit_type(db, base.instance_type(db));

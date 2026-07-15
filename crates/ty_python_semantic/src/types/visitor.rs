@@ -9,19 +9,16 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, StaticClassLiteral,
-        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
-        TypedDictType, UnionType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
+        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
-        cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
-        protocol_class::walk_protocol_instance_interface,
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
@@ -40,6 +37,9 @@ use crate::{
 pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
+
+    /// Notify the visitor that lazily-inferred type attributes were not visited.
+    fn notify_skipped_lazy_type_attributes(&self) {}
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
@@ -379,7 +379,7 @@ pub(super) enum DynamicContent {
     Absent,
     /// The type contains a non-`Any` dynamic type.
     Present,
-    /// Recursive specialization prevented the type from being fully inspected.
+    /// A lazily-inferred type attribute prevented the type from being fully inspected.
     Indeterminate,
 }
 
@@ -391,94 +391,17 @@ impl DynamicContent {
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
 ///
-/// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
-/// no new information, but revisiting the same protocol definition under a different
-/// specialization may expose different members and is therefore indeterminate.
-///
-/// ```python
-/// class Exact[T](Protocol):
-///     next: Exact[T]
-///
-/// class Growing[T](Protocol):
-///     next: Growing[list[T]]
-/// ```
-///
-/// Walking `Exact[int]` can skip its exact back-edge. Walking `Growing[int]` is indeterminate
-/// because each recursive edge creates a new specialization.
+/// The traversal does not evaluate lazy type attributes, which can be recursively defined. If a
+/// lazy attribute would need to be inspected to prove that the type contains no dynamic content,
+/// the result is indeterminate.
 pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
-    struct DynamicContentVisitor<'db> {
-        recursion_guard: TypeCollector<'db>,
-        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
-        content: Cell<DynamicContent>,
+    match any_over_type_without_inference(db, ty, |ty| {
+        ty.is_dynamic() && !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any))
+    }) {
+        AnyOverTypeResult::Match => DynamicContent::Present,
+        AnyOverTypeResult::NoMatch => DynamicContent::Absent,
+        AnyOverTypeResult::SkippedLazyTypeAttributes => DynamicContent::Indeterminate,
     }
-
-    impl DynamicContentVisitor<'_> {
-        fn record(&self, content: DynamicContent) {
-            debug_assert!(self.content.get().is_absent());
-            debug_assert!(!content.is_absent());
-            self.content.set(content);
-        }
-    }
-
-    impl<'db> TypeVisitor<'db> for DynamicContentVisitor<'db> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            true
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            if !self.content.get().is_absent() {
-                return;
-            }
-
-            if ty.is_dynamic() && !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)) {
-                self.record(DynamicContent::Present);
-                return;
-            }
-
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-        }
-
-        fn visit_protocol_instance_type(
-            &self,
-            db: &'db dyn Db,
-            protocol: ProtocolInstanceType<'db>,
-        ) {
-            let protocol_ty = Type::ProtocolInstance(protocol);
-            let Some(class) = protocol.as_class_based() else {
-                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
-                return;
-            };
-            let Some((origin, specialization)) = class.static_class_literal(db) else {
-                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
-                return;
-            };
-
-            if let Some(specialization) = specialization {
-                // Bounds and defaults in the generic context do not describe the specialized
-                // instance; only inspect the types assigned to its parameters.
-                for ty in specialization.types(db) {
-                    self.visit_type(db, *ty);
-                    if !self.content.get().is_absent() {
-                        return;
-                    }
-                }
-            }
-
-            self.active_class_protocols.visit(
-                &origin,
-                || self.record(DynamicContent::Indeterminate),
-                || walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self),
-            );
-        }
-    }
-
-    let visitor = DynamicContentVisitor {
-        recursion_guard: TypeCollector::default(),
-        active_class_protocols: ActiveRecursionDetector::default(),
-        content: Cell::new(DynamicContent::Absent),
-    };
-    visitor.visit_type(db, ty);
-    visitor.content.get()
 }
 
 /// Implementation for `any_over_type` and `find_over_type`.
@@ -487,7 +410,7 @@ fn any_over_type_impl<'db, F, T>(
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: F,
-) -> T
+) -> TypeTraversalResult<T>
 where
     T: Copy + Default + PartialEq,
     F: Fn(Type<'db>) -> T,
@@ -496,6 +419,7 @@ where
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
+        skipped_lazy_type_attributes: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
 
@@ -505,6 +429,10 @@ where
     {
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.should_visit_lazy_type_attributes
+        }
+
+        fn notify_skipped_lazy_type_attributes(&self) {
+            self.skipped_lazy_type_attributes.set(true);
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -526,10 +454,49 @@ where
         query: &query,
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
+        skipped_lazy_type_attributes: Cell::new(false),
         should_visit_lazy_type_attributes,
     };
     visitor.visit_type(db, ty);
-    visitor.found_matching_type.get()
+    TypeTraversalResult {
+        value: visitor.found_matching_type.get(),
+        skipped_lazy_type_attributes: visitor.skipped_lazy_type_attributes.get(),
+    }
+}
+
+struct TypeTraversalResult<T> {
+    value: T,
+    skipped_lazy_type_attributes: bool,
+}
+
+/// The result of searching a type without evaluating lazily-inferred type attributes.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum AnyOverTypeResult {
+    /// A matching type was found.
+    Match,
+    /// No matching type was found and the type was fully inspected.
+    NoMatch,
+    /// No matching type was found, but lazily-inferred attributes were not inspected.
+    SkippedLazyTypeAttributes,
+}
+
+/// Return whether `ty`, or any eagerly available nested type, matches `query`.
+///
+/// Unlike [`any_over_type`], this reports when the traversal is incomplete because evaluating a
+/// lazy type attribute would be required.
+pub(super) fn any_over_type_without_inference<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> AnyOverTypeResult {
+    let result = any_over_type_impl(db, ty, false, query);
+    if result.value {
+        AnyOverTypeResult::Match
+    } else if result.skipped_lazy_type_attributes {
+        AnyOverTypeResult::SkippedLazyTypeAttributes
+    } else {
+        AnyOverTypeResult::NoMatch
+    }
 }
 
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
@@ -546,7 +513,7 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query).value
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -571,7 +538,7 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query).value
 }
 
 #[cfg(test)]
