@@ -592,7 +592,7 @@ x5: ObjectCallback | IntCallback = make_callback(lambda value: consume(value.bit
 But not in a way that leads to assignability errors:
 
 ```py
-from typing import TypedDict, Any
+from typing import Any, Sequence, TypedDict
 
 class TD2(TypedDict):
     x: str
@@ -621,6 +621,15 @@ def _(dt: dict[str, Any], key: str):
 
     x8: TD2 | None = dt.get(key, {"x": 0})
     reveal_type(x8)  # revealed: TD2 | None
+
+def as_sequence[T](x: T, y: list[T], z: list[T]) -> Sequence[T]:
+    return [x]
+
+def _(x: int, z: list[int]):
+    x1: Sequence[int] = as_sequence(x, [x], z)
+
+    # TODO: A covariant type context should not cause us to unnecessarily widen call arguments.
+    x2: Sequence[int | str] = as_sequence(x, [x], z)  # error: [invalid-argument-type]
 ```
 
 Partially specialized type context is not ignored:
@@ -651,43 +660,43 @@ def two_dicts_default(x: dict[U | int, Any], y: dict[U | str, Any]) -> U:
     raise NotImplementedError
 
 def _():
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x1 = two_lists(reveal_type(lst(X())), reveal_type(lst(X())))
     reveal_type(x1)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x2 = two_lists(reveal_type([X()]), reveal_type([X()]))
     reveal_type(x2)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x3 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
     reveal_type(x3)  # revealed: X
 
-    # revealed: list[int | X]
-    # revealed: list[str | X]
+    # revealed: list[X | int]
+    # revealed: list[X | str]
     x4 = two_lists_default(reveal_type([X()]), reveal_type([X()]))
     reveal_type(x4)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x5 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
     reveal_type(x5)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x6 = two_dicts(reveal_type({X(): X()}), reveal_type({X(): X()}))
     reveal_type(x6)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x7 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
     reveal_type(x7)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
+    # revealed: dict[X | int, Any]
+    # revealed: dict[X | str, Any]
     x8 = two_dicts_default(reveal_type({X(): X()}), reveal_type({X(): X()}))
     reveal_type(x8)  # revealed: X
 ```
@@ -1265,8 +1274,7 @@ def f1(x: list[int | str], y: str) -> str: ...
 def f1(x, y) -> int | str:
     raise NotImplementedError
 
-# TODO: We should reveal `list[int]` here.
-x1 = f1(reveal_type([1]), 1)  # revealed: list[int]
+x1 = f1(reveal_type([1]), 1)  # revealed: list[int | None]
 reveal_type(x1)  # revealed: int
 
 x2 = f1(reveal_type([1]), int_or_str())  # revealed: list[int]
@@ -1293,8 +1301,7 @@ def f3(x: TD, y: int) -> int: ...
 def f3(x: TD2, y: str) -> str: ...
 def f3(x, y) -> object: ...
 
-# TODO: We should reveal `TD2` here.
-x4 = f3(reveal_type({"x": [1]}), "1")  # revealed: dict[str, list[int]]
+x4 = f3(reveal_type({"x": [1]}), "1")  # revealed: TD2
 reveal_type(x4)  # revealed: str
 
 x5 = f3(reveal_type({"x": [1]}), int_or_str())  # revealed: dict[str, list[int]]
@@ -1335,7 +1342,7 @@ def list_or_set2[T, U](x: T, y: U) -> list[T] | set[U]:
 
 # TODO: We should not error here.
 # error: [no-matching-overload]
-x8 = f6(reveal_type(list_or_set2(1, 1)))  # revealed: list[int] | set[int]
+x8 = f6(reveal_type(list_or_set2(1, 1)))  # revealed: list[int | None] | set[int]
 reveal_type(x8)  # revealed: Unknown
 
 @overload
@@ -1345,8 +1352,7 @@ def f7[T](y: list[T]) -> list[T]: ...
 def f7(y: object) -> object:
     raise NotImplementedError
 
-# TODO: We should reveal `list[int | str]` here.
-x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
+x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[int | str]
 reveal_type(x9)  # revealed: list[int | str]
 
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
@@ -1570,10 +1576,9 @@ reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
 f11: Callable[[*tuple[int, ...]], tuple[int, ...]] = lambda *args: reveal_type(args)  # revealed: tuple[Unknown, ...]
 reveal_type(f11)  # revealed: (*args) -> tuple[Unknown, ...]
 
-# TODO: Better generic call inference.
 def _(x: list[int]):
-    f12 = list(map(lambda y: y + 1, x))
-    reveal_type(f12)  # revealed: list[Unknown]
+    f12 = list(map(lambda y: reveal_type(y) + 1, x))  # revealed: int
+    reveal_type(f12)  # revealed: list[int]
 
 def _() -> Callable[[int], int]:
     return id(lambda x: reveal_type(x))  # revealed: int
@@ -1602,6 +1607,317 @@ f12 = lambda: [1]
 # TODO: This should not error.
 _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
+```
+
+## Unified call inference
+
+Generic call arguments are inferred under fixpoint iteration, allowing constraints from call
+arguments to contribute type context to sibling arguments within a given generic call, until
+convergence.
+
+```py
+from typing import Any, Callable, Literal, Sequence, TypedDict, TypeVar, overload
+
+def combine[T](x: T, y: list[T], z: list[T]) -> T:
+    return x
+
+def combine_reversed[T](x: T, z: list[T], y: list[T]) -> T:
+    return x
+
+def _(x: int, y: int | str, z: int | str | None):
+    x1: int | str | None = combine(y, [x], [z])
+    reveal_type(x1)  # revealed: int | str | None
+
+    x2 = combine(y, [x], [z])
+    reveal_type(x2)  # revealed: int | str | None
+
+    x3 = combine_reversed(y, [z], [x])
+    reveal_type(x3)  # revealed: int | str | None
+
+def collection_pair[T](pair: tuple[T, list[T]]) -> T:
+    return pair[0]
+
+x = collection_pair((1, [True]))
+reveal_type(x)  # revealed: int
+
+def callable_pair[T](pair: tuple[Callable[[T], int], list[T]]) -> None:
+    function, values = pair
+    function(values[0])
+
+callable_pair((lambda value: reveal_type(value) + 1, [1]))  # revealed: int
+
+def nested_pair[T](pair: tuple[T, list[T]]) -> T:
+    return pair[0]
+
+x = nested_pair(("value", [None]))
+reveal_type(x)  # revealed: str | None
+```
+
+```py
+class A(TypedDict):
+    a: int
+    b: int
+
+def pair_with_list[T](x: T, y: list[T]) -> T:
+    return x
+
+def pair_with_sequence[T](x: T, y: Sequence[T]) -> T:
+    return x
+
+def list_pair[T](x: list[T], y: list[T]) -> T:
+    return x[0]
+
+def pair[T](x: T, y: T) -> T:
+    return x
+
+def _(a: A, b: list[A]):
+    x1: A = pair_with_list(a, [{"a": 1, "b": 2}])
+    reveal_type(x1)  # revealed: A
+
+    # TODO: This should solve to `A`.
+    x2 = pair_with_list(a, [{"a": 1, "b": 2}])
+    reveal_type(x2)  # revealed: A | dict[str, int]
+
+    x3 = pair_with_sequence(a, [{"a": 1, "b": 2}])
+    reveal_type(x3)  # revealed: A
+
+    # TODO: This should solve to `A`.
+    x4 = list_pair(b, [{"a": 1, "b": 2}])  # error: [invalid-argument-type]
+    reveal_type(x4)  # revealed: A | dict[str, int]
+
+    x5 = pair({"a": 1, "b": 2}, a)
+    reveal_type(x5)  # revealed: A
+
+    x6 = pair(a, {"a": 1, "b": 2})
+    reveal_type(x6)  # revealed: A
+```
+
+```py
+from typing import TypedDict, reveal_type
+
+class TD(TypedDict):
+    x: int
+
+def f[T](x: T, y: T) -> T:
+    return x
+
+def _(td: TD):
+    # revealed: TD
+    x = reveal_type(f(td, reveal_type({"x": 1})))  # revealed: TD
+
+    # TODO: Generic call narrowing on `reveal_type` happens to choose
+    # the `dict` constraint here instead of `TD`, failing to narrow the
+    # dictionary literal.
+    x = f(td, reveal_type({"x": 1}))  # revealed: dict[str, int]
+    reveal_type(x)  # revealed: TD | dict[str, int]
+```
+
+```py
+class ActiveInitializer[T]:
+    def __new__(cls, *args: object) -> "ActiveInitializer[T]":
+        return super().__new__(cls)
+
+    def __init__(self, value: T, values: list[T]) -> None:
+        pass
+
+x = ActiveInitializer(1, [True])
+reveal_type(x)  # revealed: ActiveInitializer[int]
+
+class InactiveInitializer:
+    def __new__[T](cls, value: T, values: list[T]) -> T:
+        return value
+
+    def __init__(self) -> None:
+        pass
+
+x = InactiveInitializer(1, [True])
+reveal_type(x)  # revealed: int
+```
+
+```py
+def consume_and_produce[T, R](
+    consumer: Callable[[T], R],
+    producer: Callable[[], T],
+    value: T,
+) -> T:
+    produced = producer()
+    consumer(produced)
+    consumer(value)
+    return produced
+
+x = consume_and_produce(
+    lambda x: reveal_type(x),  # revealed: str | int
+    lambda: "s",
+    1,
+)
+
+reveal_type(x)  # revealed: Literal["s", 1]
+```
+
+```py
+def nested_callable[T](
+    value: T,
+    callbacks: Sequence[Callable[[Callable[[T], None]], None]],
+) -> None:
+    pass
+
+nested_callable(
+    1,
+    [lambda callable: print(reveal_type(callable))],  # revealed: (int, /) -> None
+)
+```
+
+```py
+class Base: ...
+class Dog(Base): ...
+class Cat(Base): ...
+
+BaseType = TypeVar("BaseType", bound=Base)
+
+def register_handlers(handlers: dict[str, type[BaseType]]) -> None: ...
+
+register_handlers({"dog": Dog, "cat": Cat})
+
+class X: ...
+
+def accept_classes[T: X](classes: list[type[T]]) -> None: ...
+
+accept_classes([X])
+```
+
+```py
+FloatDtype = type[float] | Literal["float"]
+
+@overload
+def overloaded_call(data: Sequence[str], dtype: object) -> str: ...
+@overload
+def overloaded_call(data: list[Any], dtype: FloatDtype) -> float: ...
+@overload
+def overloaded_call[T](data: Sequence[T], dtype: Literal["generic"]) -> T: ...
+def overloaded_call(data: object, dtype: object) -> object:
+    return data
+
+def _(dtype: FloatDtype):
+    x = overloaded_call([1.0], dtype)
+    reveal_type(x)  # revealed: int | float
+```
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class TakesInt(Protocol):
+    def __call__(
+        self,
+        tag: Literal["int"],
+        callback: Callable[[int], int],
+    ) -> int: ...
+
+@runtime_checkable
+class TakesStr(Protocol):
+    def __call__(
+        self,
+        tag: Literal["str"],
+        callback: Callable[[str], str],
+    ) -> str: ...
+
+def _(callback: TakesInt) -> None:
+    if isinstance(callback, TakesStr):
+        reveal_type(callback)  # revealed: TakesInt & TakesStr
+
+        # TODO: Perform fixpoint iteration when evaluating callable intersections.
+        x1 = callback("int", lambda value: reveal_type(value) + 1)  # revealed: Unknown
+        reveal_type(x1)  # revealed: int
+
+        # TODO: Perform fixpoint iteration when evaluating callable intersections.
+        x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
+        reveal_type(x2)  # revealed: str
+```
+
+Note that long chains of callables with constraint dependencies in reverse source-order may require
+multiple fixpoint iterations.
+
+```py
+from typing import Callable
+
+def chain[A, B, C, D](
+    first: Callable[[C], D],
+    second: Callable[[B], C],
+    third: Callable[[A], B],
+    source: list[A],
+) -> D:
+    return first(second(third(source[0])))
+
+x = chain(
+    lambda c: c + 1,
+    lambda b: b + 1,
+    lambda a: a + 1,
+    [1, 2, 3],
+)
+reveal_type(x)  # revealed: int
+```
+
+The upper bound on iterations is calculated based on the number of independent occurences of
+inferable type variables, not the number of arguments.
+
+```py
+from typing import Callable
+
+def list_to_callable[T](values: list[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+def propagate[A, B, C, D](
+    first: Callable[[C], D],
+    second: Callable[[B], C],
+    third: Callable[[A], B],
+    source: list[A],
+) -> D:
+    return first(second(third(source[0])))
+
+def propagate_tuple[A, B, C, D](
+    arguments: tuple[
+        Callable[[C], D],
+        Callable[[B], C],
+        Callable[[A], B],
+        list[A],
+    ],
+) -> D:
+    raise NotImplementedError
+
+def _(seed: int):
+    x = propagate(
+        list_to_callable([]),
+        list_to_callable([]),
+        list_to_callable([]),
+        [seed],
+    )
+    reveal_type(x)  # revealed: int
+
+    x = propagate_tuple((
+        list_to_callable([]),
+        list_to_callable([]),
+        list_to_callable([]),
+        [seed],
+    ))
+    reveal_type(x)  # revealed: int
+```
+
+Only diagnostics from the final round of iteration are preserved:
+
+```py
+def diagnostic_pair[T](value: T, values: list[T]) -> T:
+    return value
+
+# error: [unresolved-reference]
+diagnostic_pair(missing_name, [1])
+diagnostic_pair(suppressed_missing, [1])  # ty: ignore[unresolved-reference]
+
+def non_generic(value: int) -> int:
+    return value
+
+# error: [unresolved-reference]
+diagnostic_pair(non_generic(missing_argument), [1])
+diagnostic_pair(non_generic(suppressed_argument), [1])  # ty: ignore[unresolved-reference]
 ```
 
 ## Dunder Calls

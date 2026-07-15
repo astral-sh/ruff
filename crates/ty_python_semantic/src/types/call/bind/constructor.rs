@@ -1,4 +1,4 @@
-use super::{Binding, Bindings, CallableBinding, CallableItem};
+use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -76,58 +76,78 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
-    /// Check types for this constructor method, and then decide (based on the resolved return
-    /// types) whether we should continue considering downstream constructors or discard them.
+    /// Check types for all bindings in this constructor.
+    ///
+    /// If `CheckTypesMode::Finalize` is provided, inactive downstream constructors will be
+    /// discarded. Otherwise, all constructor bindings are preserved after the check.
     pub(super) fn check_types(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
-        /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
-        /// analyze their overloads to determine whether to check downstream constructors.
-        ///
-        /// We analyze overloads individually rather than just relying on the resolved return type of
-        /// the overall callable, because in multiple-matching-overload cases where the overload
-        /// resolution algorithm might just collapse to `Unknown`, we want to make a more informed
-        /// decision based on whether all overloads return instance types, or not.
-        fn should_check_downstream<'db>(
-            binding: &ConstructorBinding<'db>,
-            db: &'db dyn Db,
-        ) -> bool {
-            let constructor_kind = binding.constructor_kind();
-            if constructor_kind.is_init() || binding.downstream_constructor().is_none() {
-                return false;
-            }
-
-            let callable = binding.callable();
-
-            if callable.as_result().is_err() {
-                return false;
-            }
-
-            let constructed_instance_type = binding.constructed_instance_type();
-            let constructor_class_literal = binding.constructed_class_literal(db);
-
-            // If any matching overload returns the constructed instance type itself, or an instance of
-            // the constructed class, we need to check downstream constructors.
-            callable.matching_overloads().any(|(_, overload)| {
-                overload.return_ty == constructed_instance_type
-                    || constructor_class_literal.is_some_and(|class_literal| {
-                        constructor_returns_instance(db, class_literal, overload.return_ty)
-                    })
-            })
-        }
-
         self.entry
             .check_types(db, constraints, argument_types, call_expression_tcx);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
-        if !should_check_downstream(self, db) {
+        if mode.is_provisional() {
+            if let Some(downstream) = self.downstream_constructor_mut() {
+                let _ = downstream.check_types_impl(
+                    db,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    &[],
+                    mode,
+                );
+            }
+        } else if !self.should_check_downstream(db) {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
+        }
+    }
+
+    /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
+    /// analyze their overloads to determine whether to check downstream constructors.
+    ///
+    /// We analyze overloads individually rather than just relying on the resolved return type of
+    /// the overall callable, because in multiple-matching-overload cases where the overload
+    /// resolution algorithm might just collapse to `Unknown`, we want to make a more informed
+    /// decision based on whether all overloads return instance types, or not.
+    fn should_check_downstream(&self, db: &'db dyn Db) -> bool {
+        let constructor_kind = self.constructor_kind();
+        if constructor_kind.is_init() || self.downstream_constructor().is_none() {
+            return false;
+        }
+
+        let callable = self.callable();
+        if callable.as_result().is_err() {
+            return false;
+        }
+
+        let constructed_instance_type = self.constructed_instance_type();
+        let constructor_class_literal = self.constructed_class_literal(db);
+
+        // If any matching overload returns the constructed instance type itself, or an instance of
+        // the constructed class, we need to check downstream constructors.
+        callable.matching_overloads().any(|(_, overload)| {
+            overload.return_ty == constructed_instance_type
+                || constructor_class_literal.is_some_and(|class_literal| {
+                    constructor_returns_instance(db, class_literal, overload.return_ty)
+                })
+        })
+    }
+
+    /// Discards an inactive downstream constructor.
+    pub(super) fn discard_downstream_constructor(&mut self, db: &'db dyn Db) -> bool {
+        if self.should_check_downstream(db) {
+            true
+        } else {
+            self.downstream_constructor = None;
+            false
         }
     }
 
@@ -149,6 +169,7 @@ impl<'db> ConstructorBinding<'db> {
                 argument_types,
                 call_expression_tcx,
                 dataclass_field_specifiers,
+                CheckTypesMode::Finalize,
             );
         }
     }

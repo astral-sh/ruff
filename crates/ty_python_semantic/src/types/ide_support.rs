@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
+use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -777,6 +778,7 @@ pub fn call_signature_details<'db>(
             &call_arguments,
             TypeContext::default(),
             &[],
+            CheckTypesMode::Finalize,
         );
 
         // Extract signature details from all callable bindings
