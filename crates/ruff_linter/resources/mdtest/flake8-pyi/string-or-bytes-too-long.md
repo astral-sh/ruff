@@ -11,8 +11,6 @@ Strings in `__all__` correspond to exported names and should be exempt from the 
 
 ```pyi
 __all__ = [
-    # TODO
-    # error: [string-or-bytes-too-long]
     "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeef",
 ]
 ```
