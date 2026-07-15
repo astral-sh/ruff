@@ -436,13 +436,15 @@ impl ClassInfoConstraintFunction {
         strict_generic_narrowing: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let (specialization, is_deferred_materialization) =
-                if is_positive && !strict_generic_narrowing {
-                    (class.unknown_specialization(db), true)
-                } else {
-                    // A negative result excludes every specialization of the class.
-                    (class.top_materialization(db), false)
-                };
+            let (specialization, is_deferred_materialization) = if is_positive
+                && !strict_generic_narrowing
+                && class.generic_context(db).is_some()
+            {
+                (class.unknown_specialization(db), true)
+            } else {
+                // A negative result excludes every specialization of the class.
+                (class.top_materialization(db), false)
+            };
 
             let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, specialization),
@@ -3790,6 +3792,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     .db
                     .analysis_settings(self.scope().file(self.db))
                     .strict_generic_narrowing;
+                let has_deferred_materialization = is_positive
+                    && !strict_generic_narrowing
+                    && !matches!(
+                        class_info_ty,
+                        Type::ClassLiteral(class) if class.generic_context(self.db).is_none()
+                    );
 
                 function
                     .generate_constraint(
@@ -3803,7 +3811,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                             place,
                             NarrowingConstraint::class_info(
                                 constraint.negate_if(self.db, !is_positive),
-                                is_positive && !strict_generic_narrowing,
+                                has_deferred_materialization,
                             ),
                         )])
                     })

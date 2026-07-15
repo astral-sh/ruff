@@ -1046,10 +1046,14 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(alias) => {
-                let specialization = alias
-                    .specialization(db)
-                    .apply_deferred_materialization(db, visitor);
-                Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
+                let original_specialization = alias.specialization(db);
+                let specialization =
+                    original_specialization.apply_deferred_materialization(db, visitor);
+                if specialization == original_specialization {
+                    self
+                } else {
+                    Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
+                }
             }
         }
     }
