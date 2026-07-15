@@ -469,9 +469,7 @@ reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...
 
 def accept_forwarded[*Ts](callback: Callable[[*Ts], object], args: tuple[*Ts]) -> None: ...
 def forward[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None:
-    # TODO: This should not emit an `invalid-argument-type` diagnostic. The captured variadic
-    # parameter should remain a symbolic `TypeVarTuple` segment rather than `tuple[Ts, ...]`.
-    accept_forwarded(callback, args)  # error: [invalid-argument-type]
+    accept_forwarded(callback, args)
 
 def accept_mixed_forwarded[*Ts](
     callback: Callable[[int, *Ts, str], object],
@@ -481,9 +479,7 @@ def forward_mixed[*Ts](
     callback: Callable[[int, *Ts, str], object],
     *args: *tuple[int, *Ts, str],
 ) -> None:
-    # TODO: This should not emit an `invalid-argument-type` diagnostic. Expanding the mixed tuple
-    # annotation loses the starred-annotation flag but must preserve the nested symbolic segment.
-    accept_mixed_forwarded(callback, args)  # error: [invalid-argument-type]
+    accept_mixed_forwarded(callback, args)
 ```
 
 ### Unsupported callable checks are deferred

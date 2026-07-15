@@ -3329,12 +3329,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         captured_source_parameters()
                                             .find_position(|parameter| parameter.is_variadic())
                                     {
-                                        Type::tuple(TupleType::mixed(
+                                        let variable = match source_variadic.annotated_type() {
+                                            Type::TypeVar(typevartuple)
+                                                if typevartuple.is_typevartuple(db) =>
+                                            {
+                                                VariableSegment::TypeVarTuple(typevartuple)
+                                            }
+                                            element => VariableSegment::Homogeneous(element),
+                                        };
+                                        Type::tuple(TupleType::mixed_with_segment(
                                             db,
                                             captured_source_parameters()
                                                 .take(source_variadic_index)
                                                 .map(Parameter::annotated_type),
-                                            source_variadic.annotated_type(),
+                                            variable,
                                             captured_source_parameters()
                                                 .skip(source_variadic_index + 1)
                                                 .map(Parameter::annotated_type),
