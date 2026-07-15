@@ -270,7 +270,7 @@ t7: tuple[*tuple[str, ...], ...]
 def invalid_typevartuple_ellipsis(
     # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
     starred: tuple[*Ts, ...],
-    # TODO: This should emit the same `invalid-type-form` diagnostic as the starred spelling.
+    # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
     unpacked: tuple[Unpack[Ts], ...],
 ) -> None: ...
 ```

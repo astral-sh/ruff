@@ -1365,23 +1365,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .contains(TypeExpressionFlags::INVALID_UNPACK)
             });
             let is_unpacked_typevartuple = |argument: &ast::Expr| {
-                let is_unpack = argument.is_starred_expr()
-                    || matches!(
-                        argument,
-                        ast::Expr::Subscript(subscript)
-                            if self.expression_type(&subscript.value)
-                                == Type::SpecialForm(SpecialFormType::Unpack)
-                    );
+                let operand = match argument {
+                    ast::Expr::Starred(starred) => &*starred.value,
+                    ast::Expr::Subscript(subscript)
+                        if self.expression_type(&subscript.value)
+                            == Type::SpecialForm(SpecialFormType::Unpack) =>
+                    {
+                        &*subscript.slice
+                    }
+                    _ => return false,
+                };
                 let argument_ty = self.expression_type(argument);
-                is_unpack
-                    && (matches!(
-                        argument_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    ) || matches!(
-                        argument_ty.exact_tuple_instance_spec(db).as_deref(),
-                        Some(Tuple::Variable(variable))
-                            if variable.variable().typevartuple().is_some()
-                    ))
+                let operand_ty = self.expression_type(operand);
+                matches!(
+                    argument_ty,
+                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                ) || matches!(
+                    argument_ty.exact_tuple_instance_spec(db).as_deref(),
+                    Some(Tuple::Variable(variable))
+                        if variable.variable().typevartuple().is_some()
+                ) || matches!(
+                    operand_ty,
+                    Type::NominalInstance(instance)
+                        if matches!(
+                            instance.known_class(db),
+                            Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+                        )
+                )
             };
             // A tuple type can preserve only one variable segment, so count unpacked
             // `TypeVarTuple`s before the argument tuple is lowered to its type.
@@ -1390,6 +1400,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .filter(|argument| is_unpacked_typevartuple(argument))
                 .nth(1)
                 .is_some();
+            if has_multiple_typevartuple_arguments {
+                let error = SubscriptError::new(
+                    Type::unknown(),
+                    SubscriptErrorKind::MultipleTypeVarTuples { origin },
+                );
+                error.report_diagnostics(&self.context, subscript);
+                return error.result_type();
+            }
             if has_invalid_unpack_argument {
                 let error = SubscriptError::new(
                     Type::unknown(),
@@ -1397,14 +1415,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         origin,
                         argument_ty: Type::SpecialForm(SpecialFormType::Unpack),
                     },
-                );
-                error.report_diagnostics(&self.context, subscript);
-                return error.result_type();
-            }
-            if has_multiple_typevartuple_arguments {
-                let error = SubscriptError::new(
-                    Type::unknown(),
-                    SubscriptErrorKind::MultipleTypeVarTuples { origin },
                 );
                 error.report_diagnostics(&self.context, subscript);
                 return error.result_type();

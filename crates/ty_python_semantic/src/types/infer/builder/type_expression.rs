@@ -1065,14 +1065,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match &*tuple.slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
-                    if element.is_starred_expr()
-                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                    {
-                        let mut diagnostic =
-                            builder.into_diagnostic("Invalid `tuple` specialization");
-                        diagnostic
-                            .set_primary_message("`...` cannot be used after an unpacked element");
-                    }
                     self.infer_expression(ellipsis, TypeContext::default());
                     let previously_in_valid_unpack_context = self
                         .context
@@ -1083,6 +1075,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
+                    if self
+                        .type_expression_flags(element)
+                        .contains(TypeExpressionFlags::UNPACK)
+                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic
+                            .set_primary_message("`...` cannot be used after an unpacked element");
+                    }
                     let result = TupleType::homogeneous(self.db(), element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
                     return Some(result);

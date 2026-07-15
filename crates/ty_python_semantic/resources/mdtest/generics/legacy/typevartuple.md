@@ -261,8 +261,7 @@ class Ambiguous(Generic[*Xs, *Ys]): ...
 # error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class VeryAmbiguous(Generic[*Xs, *Ys, *Zs]): ...
 
-# TODO: This should also emit an `invalid-generic-class` diagnostic even though `Invalid` did not
-# produce a recognized type variable tuple.
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class InvalidAmbiguous(Generic[*Xs, *Invalid]): ...
 ```
 
@@ -438,9 +437,7 @@ python-version = "3.10"
 from typing import Generic
 from typing_extensions import TypeVarTuple, Unpack
 
-# TODO: This should not emit an `invalid-legacy-type-variable` diagnostic because
-# `typing_extensions.TypeVarTuple` backports `default` to Python 3.10.
-Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])  # error: [invalid-legacy-type-variable]
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 
 class WithBackportedDefault(Generic[Unpack[Ts]]):
     attr: tuple[Unpack[Ts]]

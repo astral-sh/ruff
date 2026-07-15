@@ -1683,7 +1683,9 @@ impl KnownClass {
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
-            "TypeVarTuple" => &[Self::TypeVarTuple, Self::ExtensionsTypeVarTuple],
+            // On Python 3.10, both candidates resolve to `typing_extensions`. Prefer the
+            // backport-aware variant so that we recognize features such as `default`.
+            "TypeVarTuple" => &[Self::ExtensionsTypeVarTuple, Self::TypeVarTuple],
             "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
