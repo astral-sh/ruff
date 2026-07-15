@@ -237,7 +237,8 @@ dependencies = [
 [[package]]
 name = "char_str"
 version = "0.0.1"
-source = "git+https://github.com/astral-sh/char_str?rev=d2d138b274b2f01913cd8391082b225f2ade2d53#d2d138b274b2f01913cd8391082b225f2ade2d53"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f826e1dd81cad0bcd59e3ba09153b87b1d0630423af6083204d08c310eb0cccf"
 dependencies = [
  "castaway",
  "get-size2",
