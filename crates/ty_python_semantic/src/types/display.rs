@@ -32,10 +32,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    LiteralValueType, LiteralValueTypeKind, Materialization, MaterializationKind,
+    PropertyInstanceType, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
+    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictModule,
+    TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -1744,20 +1744,28 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix_details = match self.specialization.materialization_kind(self.db) {
+            let prefix_details = match self.specialization.materialization(self.db) {
                 None => None,
-                Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
-                Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                Some(Materialization {
+                    kind: MaterializationKind::Top,
+                    deferred: false,
+                }) => Some(("Top", SpecialFormType::Top)),
+                Some(Materialization {
+                    kind: MaterializationKind::Bottom,
+                    deferred: false,
+                }) => Some(("Bottom", SpecialFormType::Bottom)),
                 // The following two are not user-facing, but we distinguish them here from
                 // Top/Bottom for debugging purposes.
-                Some(MaterializationKind::DeferredTop) => {
-                    Some(("DeferredTop", SpecialFormType::Top))
-                }
-                Some(MaterializationKind::DeferredBottom) => {
-                    Some(("DeferredBottom", SpecialFormType::Bottom))
-                }
+                Some(Materialization {
+                    kind: MaterializationKind::Top,
+                    deferred: true,
+                }) => Some(("DeferredTop", SpecialFormType::Top)),
+                Some(Materialization {
+                    kind: MaterializationKind::Bottom,
+                    deferred: true,
+                }) => Some(("DeferredBottom", SpecialFormType::Bottom)),
             };
-            let suffix = match self.specialization.materialization_kind(self.db) {
+            let suffix = match self.specialization.materialization(self.db) {
                 None => "",
                 Some(_) => "]",
             };

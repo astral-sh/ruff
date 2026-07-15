@@ -8,9 +8,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MaterializationKind, MemberLookupPolicy, Parameter, Parameters,
-        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        LiteralValueTypeKind, Materialization, MaterializationKind, MemberLookupPolicy, Parameter,
+        Parameters, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -689,7 +689,7 @@ impl<'db> CallableType<'db> {
         self.with_deferred_top_materialization(db, false)
             .apply_type_mapping_impl(
                 db,
-                &TypeMapping::Materialize(MaterializationKind::Top),
+                &TypeMapping::Materialize(Materialization::new(MaterializationKind::Top)),
                 TypeContext::default(),
                 visitor,
             )
@@ -704,7 +704,10 @@ impl<'db> CallableType<'db> {
     ) -> Self {
         if matches!(
             type_mapping,
-            TypeMapping::Materialize(MaterializationKind::DeferredTop)
+            TypeMapping::Materialize(Materialization {
+                kind: MaterializationKind::Top,
+                deferred: true,
+            })
         ) {
             return self.with_deferred_top_materialization(db, true);
         }

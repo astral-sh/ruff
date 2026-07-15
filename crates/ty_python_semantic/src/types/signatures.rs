@@ -4017,19 +4017,19 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if let TypeMapping::Materialize(materialization_kind) = type_mapping
+        if let TypeMapping::Materialize(materialization) = type_mapping
             && matches!(
                 self.data.kind,
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
-            match materialization_kind {
-                MaterializationKind::Bottom | MaterializationKind::DeferredBottom => {
+            match materialization.kind {
+                MaterializationKind::Bottom => {
                     // The bottom materialization of the `...` parameters is `(*object, **object)`,
                     // which accepts any call and is thus a subtype of all other parameters.
                     return Parameters::bottom();
                 }
-                MaterializationKind::Top | MaterializationKind::DeferredTop => {
+                MaterializationKind::Top => {
                     return Parameters::top();
                 }
             }

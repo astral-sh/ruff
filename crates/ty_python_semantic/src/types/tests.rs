@@ -148,8 +148,16 @@ fn divergent_type() {
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
     let visitor = ApplyTypeMappingVisitor::default();
-    let top_div = div.materialize(&db, MaterializationKind::Top, &visitor);
-    let bottom_div = div.materialize(&db, MaterializationKind::Bottom, &visitor);
+    let top_div = div.materialize(
+        &db,
+        Materialization::new(MaterializationKind::Top),
+        &visitor,
+    );
+    let bottom_div = div.materialize(
+        &db,
+        Materialization::new(MaterializationKind::Bottom),
+        &visitor,
+    );
 
     assert!(top_div.is_divergent());
     assert!(bottom_div.is_divergent());
