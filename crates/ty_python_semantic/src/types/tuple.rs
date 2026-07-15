@@ -1183,6 +1183,8 @@ enum FixedPositionOrigin {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct VariableSlice {
     include_variable: bool,
+    /// Whether the complete variable segment is retained in its original order.
+    preserve_variable: bool,
     suffix_start: usize,
     suffix_stop: usize,
 }
@@ -1284,6 +1286,7 @@ impl VariableSlice {
     fn variable_only() -> Self {
         Self {
             include_variable: true,
+            preserve_variable: true,
             suffix_start: 0,
             suffix_stop: 0,
         }
@@ -1292,6 +1295,7 @@ impl VariableSlice {
     fn suffix(start: usize, stop: usize) -> Option<Self> {
         (start < stop).then_some(Self {
             include_variable: false,
+            preserve_variable: false,
             suffix_start: start,
             suffix_stop: stop,
         })
@@ -1337,15 +1341,11 @@ impl VariableTupleSlicePlan {
                 variable,
                 fixed_suffix,
             } => {
-                // Preserve the symbolic segment only when it is the entire variable portion of
-                // the result. If fixed suffix elements are folded into that portion, it must be
-                // represented by their homogeneous union instead.
-                let variable_segment =
-                    if variable.include_variable && variable.suffix_start == variable.suffix_stop {
-                        tuple.variable()
-                    } else {
-                        VariableSegment::Homogeneous(variable.ty(db, tuple))
-                    };
+                let variable_segment = if variable.preserve_variable {
+                    tuple.variable()
+                } else {
+                    VariableSegment::Homogeneous(variable.ty(db, tuple))
+                };
                 Type::tuple(TupleType::new(
                     db,
                     &VariableLengthTuple::mixed(
@@ -1519,10 +1519,12 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         })
     }
 
-    fn reversed(&self) -> Self {
+    fn reversed(&self, db: &'db dyn Db) -> Self {
+        // Reversing a `TypeVarTuple` changes its element order, so the result can no longer use
+        // the original symbolic segment.
         Self::new(
             self.iter_suffix_elements().rev(),
-            self.variable(),
+            VariableSegment::Homogeneous(self.variable().element_type(db)),
             self.iter_prefix_elements().rev(),
         )
     }
@@ -1553,7 +1555,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 .forward_slice_plan(start, stop, step)
                 .into_type(db, self),
             TupleSliceDirection::Backward => {
-                let reversed = self.reversed();
+                let reversed = self.reversed(db);
                 reversed
                     .forward_slice_plan(
                         TupleSliceDirection::reverse_bound(start),
@@ -1781,6 +1783,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 .and_then(|prefix_start| self.fixed_prefix_slice(Some(prefix_start), None, step)),
             variable: VariableSlice {
                 include_variable: true,
+                preserve_variable: false,
                 suffix_start: 0,
                 suffix_stop: suffix_stop.unwrap_or_else(|| self.suffix_len()),
             },
@@ -1801,6 +1804,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 fixed_prefix: self.fixed_prefix_slice(Some(start), None, step),
                 variable: VariableSlice {
                     include_variable: true,
+                    preserve_variable: false,
                     suffix_start: 0,
                     suffix_stop,
                 },
@@ -1819,6 +1823,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             fixed_prefix: None,
             variable: VariableSlice {
                 include_variable: true,
+                preserve_variable: false,
                 suffix_start: 0,
                 suffix_stop: variable_suffix_stop,
             },

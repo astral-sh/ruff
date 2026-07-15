@@ -987,23 +987,24 @@ A slice preserves a symbolic pack only when it retains the complete pack in its 
 def slices[*Ts](values: tuple[*Ts]) -> None:
     reveal_type(values[:])  # revealed: tuple[*Ts@slices]
 
-    # TODO: should reveal `tuple[object, ...]`
-    reveal_type(values[1:])  # revealed: tuple[*Ts@slices]
-    # TODO: should reveal `tuple[object, ...]`
-    reveal_type(values[::-1])  # revealed: tuple[*Ts@slices]
-    # TODO: should reveal `tuple[object, ...]`
-    reveal_type(values[::2])  # revealed: tuple[*Ts@slices]
+    reveal_type(values[1:])  # revealed: tuple[object, ...]
+    reveal_type(values[::-1])  # revealed: tuple[object, ...]
+    reveal_type(values[::2])  # revealed: tuple[object, ...]
+
+def reverse_boundaries[*Ts](values: tuple[int, *Ts, str]) -> None:
+    reveal_type(values[::-1])  # revealed: tuple[str, *tuple[object, ...], int]
+    reveal_type(values[:0:-1])  # revealed: tuple[str, *tuple[object, ...]]
 
 def trim_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[*Ts]:
     reveal_type(values[1:-1])  # revealed: tuple[*Ts@trim_boundaries]
     return values[1:-1]
 
 def reverse[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # TODO: This should emit an `invalid-return-type` diagnostic.
+    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@reverse]`, found `tuple[object, ...]`"
     return values[::-1]
 
 def stride[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # TODO: This should emit an `invalid-return-type` diagnostic.
+    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@stride]`, found `tuple[object, ...]`"
     return values[::2]
 ```
 
