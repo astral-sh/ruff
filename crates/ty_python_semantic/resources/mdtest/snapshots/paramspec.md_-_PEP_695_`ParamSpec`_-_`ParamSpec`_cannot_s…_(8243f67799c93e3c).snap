@@ -48,7 +48,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/paramspe
 
 ```
 error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type variable `T`
-  --> src/mdtest_snippet.py:9:9
+  --> src/mdtest_snippet.py:11:20
    |
  9 | def f[**P, T]():
    |         - ParamSpec `P` defined here

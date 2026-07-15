@@ -1122,7 +1122,7 @@ fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
-      --> test.py:6:5
+      --> test.py:11:7
        |
      6 | /     @abstractmethod
      7 | |     def foo(self) -> int:
@@ -1184,7 +1184,7 @@ fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
-      --> src/test.py:6:5
+      --> src/test.py:11:7
        |
      6 | /     @abstractmethod
      7 | |     def foo(self) -> int:

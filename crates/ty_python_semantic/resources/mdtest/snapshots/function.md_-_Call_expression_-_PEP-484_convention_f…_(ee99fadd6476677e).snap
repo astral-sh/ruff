@@ -99,7 +99,7 @@ info: Function signature here
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
- --> src/mdtest_snippet.py:9:7
+ --> src/mdtest_snippet.py:9:15
   |
 9 | def g(x: int, __y: str): ...
   |       -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
@@ -111,7 +111,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:20:8
+  --> src/mdtest_snippet.py:20:16
    |
 20 | def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
    |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
@@ -123,7 +123,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:22:8
+  --> src/mdtest_snippet.py:22:16
    |
 22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
    |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
@@ -135,7 +135,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:23:8
+  --> src/mdtest_snippet.py:23:22
    |
 23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
    |        -             ^^^ Parameter name begins with `__` but will not be treated as positional-only
@@ -147,7 +147,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:41:8
+  --> src/mdtest_snippet.py:41:11
    |
 41 | def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
    |        -  ^^^ Parameter name begins with `__` but will not be treated as positional-only
@@ -159,7 +159,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
-  --> src/mdtest_snippet.py:55:23
+  --> src/mdtest_snippet.py:55:29
    |
 55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
    |                       ----  ^^^ Parameter name begins with `__` but will not be treated as positional-only

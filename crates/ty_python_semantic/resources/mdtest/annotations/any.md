@@ -244,7 +244,7 @@ def check_callable_union(value1: CallableSubclassOfAny | IncompatibleCallable):
 
 ```snapshot
 error[invalid-assignment]: Object of type `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
-   --> src/mdtest_snippet.py:141:14
+   --> src/mdtest_snippet.py:141:37
     |
 141 |     target1: Callable[[int], int] = value1  # snapshot
     |              --------------------   ^^^^^^ Incompatible value of type `CallableSubclassOfAny | IncompatibleCallable`

@@ -50,7 +50,7 @@ fn test_quiet_output() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:4
+     --> test.py:1:10
       |
     1 | x: int = 'foo'
       |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`

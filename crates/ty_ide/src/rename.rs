@@ -2208,7 +2208,7 @@ DC(f=1)
         // position-aware binding resolution in `definitions_for_name`.
         assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 2 locations)
-          --> lib.py:11:2
+          --> lib.py:12:5
            |
         11 | @my_func.setter
            |  -------

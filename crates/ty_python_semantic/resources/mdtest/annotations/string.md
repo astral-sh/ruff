@@ -403,7 +403,7 @@ help: Did you mean `typing.Literal["yield from 1"]`?
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:55:5
+  --> src/mdtest_snippet.py:55:10
    |
 55 | t: "list[yield from 1]"
    |     -----^^^^^^^^^^^^-
@@ -413,7 +413,7 @@ help: Did you mean `typing.Literal["list[yield from 1]"]`?
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:57:5
+  --> src/mdtest_snippet.py:57:9
    |
 57 | u: "type]"
    |     ----^
@@ -461,7 +461,7 @@ str
 
 ```snapshot
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:17:12
+  --> src/mdtest_snippet.py:19:4
    |
 17 |       a1: """
    |  ____________-
@@ -473,7 +473,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:22:12
+  --> src/mdtest_snippet.py:23:6
    |
 22 |       a2: """
    |  ____________-
@@ -484,7 +484,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:27:12
+  --> src/mdtest_snippet.py:28:12
    |
 27 |       a3: """
    |  ____________-

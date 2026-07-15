@@ -652,7 +652,7 @@ fn output_format_notebook() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:2:1
      ::: cell 1
       |
     1 | import numpy
@@ -2491,7 +2491,7 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:4:7
        |
     3  | ```py
        - print( "hello" )
@@ -2631,7 +2631,7 @@ print( 'hello' )
     --> format:1:1
 
     unformatted: File would be reformatted
-     --> test.bar:1:1
+     --> test.bar:5:7
       |
     4 | ```py
       - print( 'hello' )

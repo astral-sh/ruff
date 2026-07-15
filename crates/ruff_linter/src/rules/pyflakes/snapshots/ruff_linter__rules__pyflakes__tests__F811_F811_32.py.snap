@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
 F811 [*] Redefinition of unused `List` from line 4
- --> F811_32.py:4:5
+ --> F811_32.py:5:5
   |
 3 | from typing import (
 4 |     List,

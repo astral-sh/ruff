@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Child` has unimplemented abstract methods
-  --> src/mdtest_snippet.py:5:5
+  --> src/mdtest_snippet.py:12:7
    |
  5 | /     @abstractmethod
  6 | |     def method(self) -> int: ...

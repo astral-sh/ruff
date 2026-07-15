@@ -194,7 +194,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 
 ```
 error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
-  --> src/mdtest_snippet.pyi:98:5
+  --> src/mdtest_snippet.pyi:99:9
    |
 98 |     @override
    |     ---------
@@ -206,7 +206,7 @@ info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `foo` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:100:5
+   --> src/mdtest_snippet.pyi:102:9
     |
 100 |     @override
     |     ---------
@@ -219,7 +219,7 @@ info: No `foo` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:104:5
+   --> src/mdtest_snippet.pyi:105:9
     |
 104 |     @override
     |     ---------
@@ -231,7 +231,7 @@ info: No `bar` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `baz` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:107:5
+   --> src/mdtest_snippet.pyi:108:9
     |
 107 |     @override
     |     ---------
@@ -243,7 +243,7 @@ info: No `baz` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:109:5
+   --> src/mdtest_snippet.pyi:111:9
     |
 109 |     @override
     |     ---------
@@ -256,7 +256,7 @@ info: No `eggs` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_property1` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:113:5
+   --> src/mdtest_snippet.pyi:114:9
     |
 113 |     @override
     |     ---------
@@ -268,7 +268,7 @@ info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_property2` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:115:5
+   --> src/mdtest_snippet.pyi:117:9
     |
 115 |     @override
     |     ---------
@@ -281,7 +281,7 @@ info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_settable_property` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:119:5
+   --> src/mdtest_snippet.pyi:120:9
     |
 119 |     @override
     |     ---------
@@ -293,7 +293,7 @@ info: No `bad_settable_property` definitions were found on any superclasses of `
 
 ```
 error[invalid-explicit-override]: Method `lossy` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:124:5
+   --> src/mdtest_snippet.pyi:125:9
     |
 124 |     @override
     |     ---------
@@ -305,7 +305,7 @@ info: No `lossy` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `lossy2` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:126:5
+   --> src/mdtest_snippet.pyi:128:9
     |
 126 |     @override
     |     ---------

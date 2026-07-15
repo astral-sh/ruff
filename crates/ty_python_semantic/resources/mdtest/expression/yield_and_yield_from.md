@@ -209,7 +209,7 @@ def invalid_generator() -> Generator[int, None, None]:
 
 ```snapshot
 error[invalid-yield]: Yield expression type does not match annotation
- --> src/mdtest_snippet.py:3:28
+ --> src/mdtest_snippet.py:5:11
   |
 3 | def invalid_generator() -> Generator[int, None, None]:
   |                            -------------------------- Function annotated with yield type `int` here
@@ -276,7 +276,7 @@ def outer() -> Generator[int, str, None]:
 
 ```snapshot
 error[invalid-yield]: Send type does not match annotation
- --> src/mdtest_snippet.py:6:16
+ --> src/mdtest_snippet.py:8:16
   |
 6 | def outer() -> Generator[int, str, None]:
   |                ------------------------- Function annotated with send type `str` here
@@ -299,7 +299,7 @@ reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
 
 ```snapshot
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:3:18
+ --> src/mdtest_snippet.py:5:12
   |
 3 | def non_gen() -> Generator[int, int, None]:
   |                  ------------------------- Expected `Generator[int, int, None]` because of return type

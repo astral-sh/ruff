@@ -95,7 +95,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:16:9
    |
 12 |     @overload
    |     ---------
@@ -146,7 +146,7 @@ error[call-non-callable]: Object of type `CheckClassMethod` is not callable
 
 ```
 error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
-  --> src/mdtest_snippet.py:76:6
+  --> src/mdtest_snippet.py:76:29
    |
 76 | bad: Callable[[str], str] = Base.from_value
    |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`

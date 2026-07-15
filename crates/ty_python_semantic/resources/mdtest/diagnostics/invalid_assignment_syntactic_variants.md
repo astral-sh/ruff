@@ -13,7 +13,7 @@ Here, we point to the type annotation directly:
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
- --> src/mdtest_snippet.py:1:4
+ --> src/mdtest_snippet.py:1:10
   |
 1 | x: int = "three"  # snapshot: invalid-assignment
   |    ---   ^^^^^^^ Incompatible value of type `Literal["three"]`
@@ -33,7 +33,7 @@ type in an annotation on the variable name:
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
- --> src/mdtest_snippet.py:2:1
+ --> src/mdtest_snippet.py:2:5
   |
 2 | x = "three"  # snapshot: invalid-assignment
   | -   ^^^^^^^ Incompatible value of type `Literal["three"]`
@@ -53,7 +53,7 @@ Similar here, we could ideally point to the type annotation:
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
- --> src/mdtest_snippet.py:3:2
+ --> src/mdtest_snippet.py:3:7
   |
 3 | (x := "three")  # snapshot: invalid-assignment
   |  -    ^^^^^^^ Incompatible value of type `Literal["three"]`
@@ -76,7 +76,7 @@ x: str = (
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `str`
- --> src/mdtest_snippet.py:4:4
+ --> src/mdtest_snippet.py:4:10
   |
 4 |   x: str = (
   |  ____---___^
@@ -105,7 +105,7 @@ tuple:
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:4:8
   |
 4 | x, y = ("a", "b")  # snapshot: invalid-assignment
   | -      ^^^^^^^^^^ Incompatible value of type `Literal["a"]`
@@ -114,7 +114,7 @@ error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `i
 
 
 error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str`
- --> src/mdtest_snippet.py:6:4
+ --> src/mdtest_snippet.py:6:8
   |
 6 | x, y = (0, 0)  # snapshot: invalid-assignment
   |    -   ^^^^^^ Incompatible value of type `Literal[0]`

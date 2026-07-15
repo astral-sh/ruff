@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 
 ```
 error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
- --> src/mdtest_snippet.py:4:18
+ --> src/mdtest_snippet.py:4:36
   |
 4 | T = TypeVar("T", int, str, default=bytes)
   |                  --------          ^^^^^ `bytes` is not one of the constraints of `T`
@@ -43,7 +43,7 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
 
 ```
 error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
-  --> src/mdtest_snippet.py:10:18
+  --> src/mdtest_snippet.py:10:36
    |
 10 | U = TypeVar("U", int, str, default=bool)
    |                  --------          ^^^^ `bool` is not one of the constraints of `U`

@@ -927,7 +927,7 @@ print()
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
-         --> example.py:2:1
+         --> example.py:1:16
           |
         1 | unexpected eof
           |               ^

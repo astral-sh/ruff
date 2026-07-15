@@ -45,7 +45,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 
 ```
 error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented abstract methods
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:6:7
   |
 4 |   @final
   |   ------

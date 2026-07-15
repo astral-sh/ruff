@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:15:15
+  --> RUF068.py:15:20
    |
 13 | __all__: typing.Any = ("A", "B")
 14 | __all__ = ["A", "B"]
@@ -22,7 +22,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:20:23
+  --> RUF068.py:20:33
    |
 19 | # Bad
 20 | __all__: list[str] = ["A", "B", "A"]
@@ -41,7 +41,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:21:29
+  --> RUF068.py:21:34
    |
 19 | # Bad
 20 | __all__: list[str] = ["A", "B", "A"]
@@ -61,7 +61,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:22:12
+  --> RUF068.py:22:22
    |
 20 | __all__: list[str] = ["A", "B", "A"]
 21 | __all__: typing.Any = ("A", "B", "B")
@@ -81,7 +81,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:23:12
+  --> RUF068.py:23:17
    |
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
@@ -101,7 +101,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:23:22
+  --> RUF068.py:23:27
    |
 21 | __all__: typing.Any = ("A", "B", "B")
 22 | __all__ = ["A", "B", "A"]
@@ -121,7 +121,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:25:5
+  --> RUF068.py:26:5
    |
 23 | __all__ = ["A", "A", "B", "B"]
 24 | __all__ = [
@@ -140,7 +140,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:27:5
+  --> RUF068.py:28:5
    |
 25 |     "A",
 26 |     "A",
@@ -159,7 +159,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:30:13
+  --> RUF068.py:30:18
    |
 28 |     "B"
 29 | ]
@@ -178,7 +178,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:31:17
+  --> RUF068.py:31:22
    |
 29 | ]
 30 | __all__ += ["B", "B"]
@@ -198,7 +198,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:35:5
+  --> RUF068.py:36:5
    |
 33 | # Bad, unsafe
 34 | __all__ = [
@@ -217,7 +217,7 @@ help: Remove duplicate entries from `__all__`
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:37:5
+  --> RUF068.py:39:5
    |
 35 |     "A",
 36 |     "A",

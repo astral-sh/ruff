@@ -80,7 +80,7 @@ fn metadata_without_tool_ty_uses_default_settings() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["not an int"]` is not assignable to `int`
-     --> script.py:6:8
+     --> script.py:6:14
       |
     6 | value: int = "not an int"
       |        ---   ^^^^^^^^^^^^ Incompatible value of type `Literal["not an int"]`

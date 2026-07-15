@@ -76,7 +76,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:15:9
    |
 12 |     @overload
    |     ---------
@@ -94,7 +94,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:23:5
+  --> src/mdtest_snippet.py:26:9
    |
 23 |     @overload
    |     ---------
@@ -110,7 +110,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:9:5
+  --> src/mdtest_snippet.pyi:14:9
    |
  9 | /     @overload
 10 | |     def method2(self, x: int) -> int: ...
@@ -126,7 +126,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:15:5
+  --> src/mdtest_snippet.pyi:19:9
    |
 15 | /     @overload
 16 | |     def method3(self, x: int) -> int: ...
@@ -141,7 +141,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 
 ```
 error[invalid-overload]: `@final` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:15:5
+  --> src/mdtest_snippet.pyi:22:9
    |
 15 | /     @overload
 16 | |     def method3(self, x: int) -> int: ...

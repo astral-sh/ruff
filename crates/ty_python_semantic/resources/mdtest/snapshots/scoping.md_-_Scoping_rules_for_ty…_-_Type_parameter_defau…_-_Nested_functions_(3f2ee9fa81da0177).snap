@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Invalid default for type parameter `U`
- --> src/mdtest_snippet.py:1:11
+ --> src/mdtest_snippet.py:3:19
   |
 1 | def outer[T]():
   |           - `T` defined here

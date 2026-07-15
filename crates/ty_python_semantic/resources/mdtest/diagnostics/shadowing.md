@@ -13,7 +13,7 @@ C = 1  # snapshot: invalid-assignment
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<class 'C'>`
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:5
   |
 3 | C = 1  # snapshot: invalid-assignment
   | -   ^ Incompatible value of type `Literal[1]`
@@ -32,7 +32,7 @@ f = 1  # snapshot: invalid-assignment
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `def f() -> Unknown`
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:5
   |
 3 | f = 1  # snapshot: invalid-assignment
   | -   ^ Incompatible value of type `Literal[1]`

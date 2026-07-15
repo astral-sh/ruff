@@ -879,7 +879,7 @@ class Child(FrozenBase):
 
 ```snapshot
 error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
- --> src/foo.py:7:1
+ --> src/foo.py:9:7
   |
 7 | @dataclass
   | ---------- `Child` dataclass parameters
@@ -888,7 +888,7 @@ error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit fr
   |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
 info: This causes the class creation to fail
 info: Base class definition
- --> src/foo.py:3:1
+ --> src/foo.py:4:7
   |
 3 | @dataclass(frozen=True)
   | ----------------------- `FrozenBase` dataclass parameters

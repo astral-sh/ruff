@@ -4173,7 +4173,7 @@ iterable: Iterable[int] = DirectIterable  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
-  --> src/mdtest_snippet.py:20:11
+  --> src/mdtest_snippet.py:20:27
    |
 20 | iterable: Iterable[int] = DirectIterable  # snapshot
    |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`

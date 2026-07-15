@@ -28,7 +28,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Invalid use of type variable `T2`
- --> src/mdtest_snippet.py:4:1
+ --> src/mdtest_snippet.py:8:25
   |
 4 | T2 = TypeVar("T2", default=T1)
   | ------------------------------ `T2` defined here

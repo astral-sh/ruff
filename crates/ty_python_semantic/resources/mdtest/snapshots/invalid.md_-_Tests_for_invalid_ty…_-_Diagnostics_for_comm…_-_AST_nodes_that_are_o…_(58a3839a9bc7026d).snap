@@ -62,7 +62,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 ```
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
- --> src/mdtest_snippet.py:9:9
+ --> src/mdtest_snippet.py:9:17
   |
 9 |     d: "invalid syntax",
   |         --------^^^^^^

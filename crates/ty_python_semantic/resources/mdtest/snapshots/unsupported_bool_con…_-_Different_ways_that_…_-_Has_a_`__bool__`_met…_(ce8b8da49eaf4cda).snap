@@ -32,7 +32,7 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
 8 | 10 and a and True
   |        ^
 info: `__bool__` methods must only have a `self` parameter
- --> src/mdtest_snippet.py:2:9
+ --> src/mdtest_snippet.py:2:17
   |
 2 |     def __bool__(self, foo):
   |         --------^^^^^^^^^^^ Incorrect parameters
