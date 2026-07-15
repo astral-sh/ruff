@@ -182,8 +182,7 @@ if sys.platform == "win32":
     if sys.version_info >= (3, 14):
         COPY_FILE_DIRECTORY: Final = 0x00000080
 
-    def CloseHandle(handle: int, /) -> None:
-        """Close handle."""
+    def CloseHandle(handle: int, /) -> None: ...
 
     @overload
     def ConnectNamedPipe(handle: int, overlapped: Literal[True]) -> Overlapped: ...
@@ -217,15 +216,7 @@ if sys.platform == "win32":
         security_attributes: int,
         /,
     ) -> int: ...
-    def CreatePipe(pipe_attrs: Any, size: int, /) -> tuple[int, int]:
-        """Create an anonymous pipe.
-
-          pipe_attrs
-            Ignored internally, can be None.
-
-        Returns a 2-tuple of handles, to the read and write ends of the pipe.
-        """
-
+    def CreatePipe(pipe_attrs: Any, size: int, /) -> tuple[int, int]: ...
     def CreateProcess(
         application_name: str | None,
         command_line: str | None,
@@ -237,20 +228,7 @@ if sys.platform == "win32":
         current_directory: str | None,
         startup_info: Any,
         /,
-    ) -> tuple[int, int, int, int]:
-        """Create a new process and its primary thread.
-
-          command_line
-            Can be str or None
-          proc_attrs
-            Ignored internally, can be None.
-          thread_attrs
-            Ignored internally, can be None.
-
-        The return value is a tuple of the process handle, thread handle,
-        process ID, and thread ID.
-        """
-
+    ) -> tuple[int, int, int, int]: ...
     def DuplicateHandle(
         source_process_handle: int,
         source_handle: int,
@@ -259,60 +237,20 @@ if sys.platform == "win32":
         inherit_handle: bool,
         options: int = 0,
         /,
-    ) -> int:
-        """Return a duplicate handle object.
-
-        The duplicate handle refers to the same object as the original
-        handle. Therefore, any changes to the object are reflected
-        through both handles.
-        """
-
+    ) -> int: ...
     def ExitProcess(ExitCode: int, /) -> NoReturn: ...
-    def GetACP() -> int:
-        """Get the current Windows ANSI code page identifier."""
-
+    def GetACP() -> int: ...
     if sys.version_info >= (3, 15):
-        def DeregisterEventSource(handle: int, /) -> None:
-            """Closes the specified event log.
-
-            handle
-              The handle to the event log to be deregistered.
-            """
-
-        def GetOEMCP() -> int:
-            """Get the current Windows ANSI code page identifier."""
+        def DeregisterEventSource(handle: int, /) -> None: ...
+        def GetOEMCP() -> int: ...
 
     def GetFileType(handle: int) -> int: ...
-    def GetCurrentProcess() -> int:
-        """Return a handle object for the current process."""
-
-    def GetExitCodeProcess(process: int, /) -> int:
-        """Return the termination status of the specified process."""
-
+    def GetCurrentProcess() -> int: ...
+    def GetExitCodeProcess(process: int, /) -> int: ...
     def GetLastError() -> int: ...
-    def GetModuleFileName(module_handle: int, /) -> str:
-        """Return the fully-qualified path for the file that contains module.
-
-        The module must have been loaded by the current process.
-
-        The module parameter should be a handle to the loaded module
-        whose path is being requested. If this parameter is 0,
-        GetModuleFileName retrieves the path of the executable file
-        of the current process.
-        """
-
-    def GetStdHandle(std_handle: int, /) -> int:
-        """Return a handle to the specified standard device.
-
-          std_handle
-            One of STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, or STD_ERROR_HANDLE.
-
-        The integer associated with the handle object is returned.
-        """
-
-    def GetVersion() -> int:
-        """Return the version number of the current operating system."""
-
+    def GetModuleFileName(module_handle: int, /) -> str: ...
+    def GetStdHandle(std_handle: int, /) -> int: ...
+    def GetVersion() -> int: ...
     def MapViewOfFile(
         file_map: int, desired_access: int, file_offset_high: int, file_offset_low: int, number_bytes: int, /
     ) -> int: ...
@@ -320,30 +258,8 @@ if sys.platform == "win32":
     def PeekNamedPipe(handle: int, size: int = 0, /) -> tuple[int, int] | tuple[bytes, int, int]: ...
     def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
     if sys.version_info >= (3, 15):
-        def RegisterEventSource(unc_server_name: str | None, source_name: str, /) -> int:
-            """Retrieves a registered handle to the specified event log.
-
-            unc_server_name
-              The UNC name of the server on which the event source should be registered.
-              If None, registers the event source on the local computer.
-            source_name
-              The name of the event source to register.
-            """
-
-        def ReportEvent(handle: int, type: int, category: int, event_id: int, string: str, /) -> None:
-            """Writes an entry at the end of the specified event log.
-
-            handle
-              The handle to the event log.
-            type
-              The type of event being reported.
-            category
-              The event category.
-            event_id
-              The event identifier.
-            string
-              A string to be inserted into the event message.
-            """
+        def RegisterEventSource(unc_server_name: str | None, source_name: str, /) -> int: ...
+        def ReportEvent(handle: int, type: int, category: int, event_id: int, string: str, /) -> None: ...
 
     def UnmapViewOfFile(address: int, /) -> None: ...
 
@@ -357,19 +273,10 @@ if sys.platform == "win32":
     def SetNamedPipeHandleState(
         named_pipe: int, mode: int | None, max_collection_count: int | None, collect_data_timeout: int | None, /
     ) -> None: ...
-    def TerminateProcess(handle: int, exit_code: int, /) -> None:
-        """Terminate the specified process and all of its threads."""
-
+    def TerminateProcess(handle: int, exit_code: int, /) -> None: ...
     def VirtualQuerySize(address: int, /) -> int: ...
     def WaitForMultipleObjects(handle_seq: Sequence[int], wait_flag: bool, milliseconds: int = 0xFFFFFFFF, /) -> int: ...
-    def WaitForSingleObject(handle: int, milliseconds: int, /) -> int:
-        """Wait for a single object.
-
-        Wait until the specified object is in the signaled state or
-        the time-out interval elapses. The timeout value is specified
-        in milliseconds.
-        """
-
+    def WaitForSingleObject(handle: int, milliseconds: int, /) -> int: ...
     def WaitNamedPipe(name: str, timeout: int, /) -> None: ...
 
     @overload
@@ -381,53 +288,19 @@ if sys.platform == "win32":
 
     @final
     class Overlapped:
-        """OVERLAPPED structure wrapper"""
-
         event: int
-        """overlapped event handle"""
-
         def GetOverlappedResult(self, wait: bool, /) -> tuple[int, int]: ...
         def cancel(self) -> None: ...
         def getbuffer(self) -> bytes | None: ...
 
     if sys.version_info >= (3, 13):
-        def BatchedWaitForMultipleObjects(handle_seq: Sequence[int], wait_all: bool, milliseconds: int = 0xFFFFFFFF) -> list[int]:
-            """Supports a larger number of handles than WaitForMultipleObjects
-
-            Note that the handles may be waited on other threads, which could cause
-            issues for objects like mutexes that become associated with the thread
-            that was waiting for them. Objects may also be left signalled, even if
-            the wait fails.
-
-            It is recommended to use WaitForMultipleObjects whenever possible, and
-            only switch to BatchedWaitForMultipleObjects for scenarios where you
-            control all the handles involved, such as your own thread pool or
-            files, and all wait objects are left unmodified by a wait (for example,
-            manual reset events, threads, and files/pipes).
-
-            Overlapped handles returned from this module use manual reset events.
-            """
-
+        def BatchedWaitForMultipleObjects(
+            handle_seq: Sequence[int], wait_all: bool, milliseconds: int = 0xFFFFFFFF
+        ) -> list[int]: ...
         def CreateEventW(security_attributes: int, manual_reset: bool, initial_state: bool, name: str | None) -> int: ...
         def CreateMutexW(security_attributes: int, initial_owner: bool, name: str) -> int: ...
-        def GetLongPathName(path: str) -> str:
-            """Return the long version of the provided path.
-
-            If the path is already in its long form, returns the same value.
-
-            The path must already be a 'str'. If the type is not known, use
-            os.fsdecode before calling this function.
-            """
-
-        def GetShortPathName(path: str) -> str:
-            """Return the short version of the provided path.
-
-            If the path is already in its short form, returns the same value.
-
-            The path must already be a 'str'. If the type is not known, use
-            os.fsdecode before calling this function.
-            """
-
+        def GetLongPathName(path: str) -> str: ...
+        def GetShortPathName(path: str) -> str: ...
         def OpenEventW(desired_access: int, inherit_handle: bool, name: str) -> int: ...
         def OpenMutexW(desired_access: int, inherit_handle: bool, name: str) -> int: ...
         def ReleaseMutex(mutex: int) -> None: ...
@@ -437,14 +310,5 @@ if sys.platform == "win32":
     def OpenFileMapping(desired_access: int, inherit_handle: bool, name: str, /) -> int: ...
 
     if sys.version_info >= (3, 12):
-        def CopyFile2(existing_file_name: str, new_file_name: str, flags: int, progress_routine: int | None = None) -> int:
-            """Copies a file from one name to a new name.
-
-            This is implemented using the CopyFile2 API, which preserves all stat
-            and metadata information apart from security attributes.
-
-            progress_routine is reserved for future use, but is currently not
-            implemented. Its value is ignored.
-            """
-
+        def CopyFile2(existing_file_name: str, new_file_name: str, flags: int, progress_routine: int | None = None) -> int: ...
         def NeedCurrentDirectoryForExePath(exe_name: str, /) -> bool: ...

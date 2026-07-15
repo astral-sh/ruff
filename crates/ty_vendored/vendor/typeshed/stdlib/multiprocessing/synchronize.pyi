@@ -57,12 +57,7 @@ class RLock(SemLock):
 
 class Semaphore(SemLock):
     def __init__(self, value: int = 1, *, ctx: BaseContext) -> None: ...
-    def get_value(self) -> int:
-        """Returns current value of Semaphore.
-
-        Raises NotImplementedError on Mac OSX
-        because of broken sem_getvalue().
-        """
+    def get_value(self) -> int: ...
 
 class BoundedSemaphore(Semaphore):
     def __init__(self, value: int = 1, *, ctx: BaseContext) -> None: ...
