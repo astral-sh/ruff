@@ -207,6 +207,7 @@ __all__ = [
 ]
 
 _T = _TypeVar("_T")
+_ValueT = _TypeVar("_ValueT")
 _F = _TypeVar("_F", bound=Callable[..., Any])
 _TC = _TypeVar("_TC", bound=type[object])
 _T_co = _TypeVar("_T_co", covariant=True)  # Any type covariant containers.
@@ -436,6 +437,12 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     __closed__: ClassVar[bool | None]
     __extra_items__: ClassVar[AnnotationForm]
     def copy(self) -> Self: ...
+    @staticmethod
+    @overload
+    def fromkeys(iterable: Iterable[_T], value: None = None, /) -> dict[_T, Any | None]: ...
+    @staticmethod
+    @overload
+    def fromkeys(iterable: Iterable[_T], value: _ValueT, /) -> dict[_T, _ValueT]: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
     # can go through.
     def setdefault(self, k: Never, default: object) -> object: ...
@@ -445,6 +452,8 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     def items(self) -> dict_items[str, object]: ...
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
+    if sys.version_info >= (3, 8):
+        def __reversed__(self) -> Iterator[str]: ...
     def __delitem__(self, k: Never) -> None: ...
 
     @overload
