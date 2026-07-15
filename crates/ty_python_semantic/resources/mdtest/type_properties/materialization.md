@@ -1158,6 +1158,66 @@ def property_deletion(
         del value.property  # error: [invalid-assignment]
 ```
 
+The read and write types exposed by a descriptor-decorated property are materialized with their
+respective variance:
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object] | None = None) -> Any: ...
+    def __set__(self, instance: object, value: Any) -> None: ...
+
+def descriptor(function: Callable[..., Any]) -> Descriptor:
+    raise NotImplementedError
+
+class DescriptorProperty(Protocol):
+    @descriptor
+    def value(self) -> Any: ...
+
+class TopDescriptorProperty:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: Never) -> None: ...
+
+class NarrowBottomDescriptorProperty:
+    @property
+    def value(self) -> Never:
+        raise RuntimeError
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+static_assert(is_subtype_of(TopDescriptorProperty, Top[DescriptorProperty]))
+static_assert(not is_subtype_of(NarrowBottomDescriptorProperty, Bottom[DescriptorProperty]))
+```
+
+Materializing a property with fully static exposed types is a no-op. The accessor's implicit
+receiver and the setter's return type do not contribute to the property requirement:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class FullyStaticProperty(Protocol):
+    @property
+    def value(self) -> int: ...
+    @value.setter
+    def value(self, value: int) -> Any: ...
+
+def fully_static_property(
+    top: Top[FullyStaticProperty],
+    bottom: Bottom[FullyStaticProperty],
+) -> None:
+    reveal_type(top)  # revealed: FullyStaticProperty
+    reveal_type(bottom)  # revealed: FullyStaticProperty
+```
+
 A property setter may transform the assigned value. Assigning a literal therefore must not narrow
 subsequent reads to that literal:
 

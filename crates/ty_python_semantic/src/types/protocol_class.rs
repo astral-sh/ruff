@@ -1177,6 +1177,30 @@ impl<'db> ProtocolMemberKind<'db> {
                 member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 kind,
             ),
+            Self::Property { read, write }
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Materialize(_)
+                        | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                ) =>
+            {
+                let resolved_read = read.and_then(|read| read.resolve(db));
+                let resolved_write = write.and_then(|write| write.resolve(db));
+                let mapped_read = resolved_read
+                    .map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let mapped_write = resolved_write.map(|write| {
+                    write.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)
+                });
+
+                if mapped_read == resolved_read && mapped_write == resolved_write {
+                    Self::Property { read, write }
+                } else {
+                    Self::Property {
+                        read: mapped_read,
+                        write: mapped_write,
+                    }
+                }
+            }
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
