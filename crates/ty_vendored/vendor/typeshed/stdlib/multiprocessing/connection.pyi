@@ -60,7 +60,12 @@ a socket handle (Windows).
 """
 
 if sys.platform == "win32":
-    class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]): ...
+    class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]):
+        """
+Connection class based on a Windows named pipe.
+Overlapped I/O is used, so the handles must have been created
+with FILE_FLAG_OVERLAPPED.
+"""
 
 class Listener:
     """
@@ -80,7 +85,12 @@ Accept a connection on the bound socket or named pipe of `self`.
 Returns a `Connection` object.
 """
     else:
-        def accept(self) -> Connection[Incomplete, Incomplete] | PipeConnection[Incomplete, Incomplete]: ...
+        def accept(self) -> Connection[Incomplete, Incomplete] | PipeConnection[Incomplete, Incomplete]:
+            """
+Accept a connection on the bound socket or named pipe of `self`.
+
+Returns a `Connection` object.
+"""
 
     def close(self) -> None:
         """
@@ -121,7 +131,10 @@ Returns a connection to the address of a `Listener`
 else:
     def Client(
         address: _Address, family: str | None = None, authkey: bytes | None = None
-    ) -> Connection[Any, Any] | PipeConnection[Any, Any]: ...
+    ) -> Connection[Any, Any] | PipeConnection[Any, Any]:
+        """
+Returns a connection to the address of a `Listener`
+"""
 
 # N.B. Keep this in sync with multiprocessing.context.BaseContext.Pipe.
 # _ConnectionBase is the common base class of Connection and PipeConnection
@@ -136,4 +149,7 @@ Returns pair of connection objects at either end of a pipe
 """
 
 else:
-    def Pipe(duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]: ...
+    def Pipe(duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
+        """
+Returns pair of connection objects at either end of a pipe
+"""
