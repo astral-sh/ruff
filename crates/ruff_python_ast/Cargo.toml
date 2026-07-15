@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [lib]
 
 [dependencies]

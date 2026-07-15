@@ -3,7 +3,6 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -12,7 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashSet;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -41,7 +40,7 @@ mod tests;
 
 #[derive(Debug, Default)]
 struct NameInterner {
-    names: HashSet<Name, FxBuildHasher>,
+    names: FxHashSet<Name>,
 }
 
 impl NameInterner {
@@ -51,9 +50,13 @@ impl NameInterner {
             return Name::new(text);
         }
 
-        self.names
-            .get_or_insert_with(text, |text| Name::new(text))
-            .clone()
+        if let Some(name) = self.names.get(text) {
+            return name.clone();
+        }
+
+        let name = Name::new(text);
+        self.names.insert(name.clone());
+        name
     }
 
     /// Interns a name that has already been allocated, such as a normalized identifier.
@@ -62,7 +65,12 @@ impl NameInterner {
             return name;
         }
 
-        self.names.get_or_insert(name).clone()
+        if let Some(interned) = self.names.get(&name) {
+            return interned.clone();
+        }
+
+        self.names.insert(name.clone());
+        name
     }
 }
 

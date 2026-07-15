@@ -3186,6 +3186,7 @@ dependencies = [
 name = "ruff_cache"
 version = "0.0.5"
 dependencies = [
+ "char_str",
  "filetime",
  "glob",
  "globset",
@@ -3608,7 +3609,6 @@ dependencies = [
  "datatest-stable",
  "drop_bomb",
  "get-size2",
- "hashbrown 0.17.1",
  "insta",
  "itertools 0.15.0",
  "memchr",

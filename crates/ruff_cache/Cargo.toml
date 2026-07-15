@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+char_str = { workspace = true }
 filetime = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }

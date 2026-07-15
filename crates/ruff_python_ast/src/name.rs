@@ -36,6 +36,7 @@ use crate::generated::ExprName;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
@@ -184,13 +185,6 @@ impl From<CharString> for Name {
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
-    }
-}
-
-#[cfg(feature = "cache")]
-impl ruff_cache::CacheKey for Name {
-    fn cache_key(&self, state: &mut ruff_cache::CacheKeyHasher) {
-        ruff_cache::CacheKey::cache_key(self.as_str(), state);
     }
 }
 

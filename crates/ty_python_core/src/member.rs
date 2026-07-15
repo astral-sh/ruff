@@ -213,24 +213,6 @@ pub(super) struct MemberExprBuilder {
     segments: SmallVec<[SegmentInfo; 8]>,
 }
 
-/// A borrowed or owned fragment collected while building an immutable member path.
-///
-/// AST-backed text is borrowed directly, while formatted subscripts use a temporary [`CharString`].
-/// The complete set of fragments is concatenated once into the builder's [`CharStr`].
-enum MemberPathPart<'a> {
-    Borrowed(&'a str),
-    Owned(CharString),
-}
-
-impl AsRef<str> for MemberPathPart<'_> {
-    fn as_ref(&self) -> &str {
-        match self {
-            MemberPathPart::Borrowed(text) => text,
-            MemberPathPart::Owned(text) => text.as_str(),
-        }
-    }
-}
-
 impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
@@ -387,6 +369,24 @@ impl MemberExprBuilder {
                 ))
             }
             _ => None,
+        }
+    }
+}
+
+/// A borrowed or owned fragment collected while building an immutable member path.
+///
+/// AST-backed text is borrowed directly, while formatted subscripts use a temporary [`CharString`].
+/// The complete set of fragments is concatenated once into the builder's [`CharStr`].
+enum MemberPathPart<'a> {
+    Borrowed(&'a str),
+    Owned(CharString),
+}
+
+impl AsRef<str> for MemberPathPart<'_> {
+    fn as_ref(&self) -> &str {
+        match self {
+            MemberPathPart::Borrowed(text) => text,
+            MemberPathPart::Owned(text) => text.as_str(),
         }
     }
 }
