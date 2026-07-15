@@ -249,6 +249,10 @@ python-version = "3.11"
 ```
 
 ```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
 t1: tuple[int, ...]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
 t2: tuple[int, int, ...]
@@ -262,6 +266,13 @@ t5: tuple[int, ..., int]
 t6: tuple[*tuple[str], ...]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
 t7: tuple[*tuple[str, ...], ...]
+
+def invalid_typevartuple_ellipsis(
+    # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+    starred: tuple[*Ts, ...],
+    # TODO: This should emit the same `invalid-type-form` diagnostic as the starred spelling.
+    unpacked: tuple[Unpack[Ts], ...],
+) -> None: ...
 ```
 
 ## Invalid AST nodes in string annotations

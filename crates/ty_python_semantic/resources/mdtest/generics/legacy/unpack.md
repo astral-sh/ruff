@@ -162,8 +162,19 @@ from typing import Generic, TypeVar, TypeVarTuple, Unpack
 
 U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
+Xs = TypeVarTuple("Xs")
+Ys = TypeVarTuple("Ys")
 
 class Pair(Generic[Unpack[Ts], U]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class MultipleUnpack(Generic[Unpack[Xs], Unpack[Ys]]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class StarThenUnpack(Generic[*Xs, Unpack[Ys]]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class UnpackThenStar(Generic[Unpack[Xs], *Ys]): ...
 
 def invalid(
     # error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"

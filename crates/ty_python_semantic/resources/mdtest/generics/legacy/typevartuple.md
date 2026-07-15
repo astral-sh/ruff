@@ -252,12 +252,18 @@ from typing import Generic, TypeVarTuple
 Xs = TypeVarTuple("Xs")
 Ys = TypeVarTuple("Ys")
 Zs = TypeVarTuple("Zs")
+# error: [invalid-legacy-type-variable]
+Invalid = TypeVarTuple("Invalid", int, float)
 
 # error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Ambiguous(Generic[*Xs, *Ys]): ...
 
 # error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class VeryAmbiguous(Generic[*Xs, *Ys, *Zs]): ...
+
+# TODO: This should also emit an `invalid-generic-class` diagnostic even though `Invalid` did not
+# produce a recognized type variable tuple.
+class InvalidAmbiguous(Generic[*Xs, *Invalid]): ...
 ```
 
 ### Explicit specialization
@@ -425,17 +431,19 @@ reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 
 ```toml
 [environment]
-python-version = "3.11"
+python-version = "3.10"
 ```
 
 ```py
 from typing import Generic
 from typing_extensions import TypeVarTuple, Unpack
 
-Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+# TODO: This should not emit an `invalid-legacy-type-variable` diagnostic because
+# `typing_extensions.TypeVarTuple` backports `default` to Python 3.10.
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])  # error: [invalid-legacy-type-variable]
 
-class WithBackportedDefault(Generic[*Ts]):
-    attr: tuple[*Ts]
+class WithBackportedDefault(Generic[Unpack[Ts]]):
+    attr: tuple[Unpack[Ts]]
 
 reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```

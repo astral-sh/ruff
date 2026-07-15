@@ -255,6 +255,33 @@ def middle_pack[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, str]:
     return value  # error: [invalid-return-type]
 ```
 
+### Assignability involving type variable tuples
+
+A symbolic type variable tuple can be erased to a homogeneous `object` tuple, but a homogeneous
+tuple cannot be used to construct an arbitrary symbolic pack. Two independently bound packs are also
+not interchangeable.
+
+```py
+def erase_pack[*Ts](values: tuple[*Ts]) -> tuple[object, ...]:
+    return values
+
+def preserve_pack[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
+    return values
+
+def reject_object_pack[*Ts](values: tuple[object, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
+    # TODO: This should emit an `invalid-return-type` diagnostic.
+    return values
+
+def reject_int_pack[*Ts](values: tuple[int, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
+    # TODO: This should emit an `invalid-return-type` diagnostic.
+    return values
+
+class Outer[*Ts]:
+    def reject_unrelated_pack[*Us](self, values: tuple[*Ts]) -> tuple[*Us]:
+        # TODO: This should emit an `invalid-return-type` diagnostic.
+        return values
+```
+
 ### Starred variadic parameters
 
 An unpacked `TypeVarTuple` can annotate `*args`. Inferring the `TypeVarTuple` from arguments matched
@@ -422,6 +449,24 @@ reveal_type(invoke(standard, x=1, y="a"))  # revealed: tuple[int, str]
 reveal_type(invoke(positional_variadic, 1, "a", "b"))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(invoke(positional_variadic, 1))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
+
+def accept_forwarded[*Ts](callback: Callable[[*Ts], object], args: tuple[*Ts]) -> None: ...
+def forward[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None:
+    # TODO: This should not emit an `invalid-argument-type` diagnostic. The captured variadic
+    # parameter should remain a symbolic `TypeVarTuple` segment rather than `tuple[Ts, ...]`.
+    accept_forwarded(callback, args)  # error: [invalid-argument-type]
+
+def accept_mixed_forwarded[*Ts](
+    callback: Callable[[int, *Ts, str], object],
+    args: tuple[int, *Ts, str],
+) -> None: ...
+def forward_mixed[*Ts](
+    callback: Callable[[int, *Ts, str], object],
+    *args: *tuple[int, *Ts, str],
+) -> None:
+    # TODO: This should not emit an `invalid-argument-type` diagnostic. Expanding the mixed tuple
+    # annotation loses the starred-annotation flag but must preserve the nested symbolic segment.
+    accept_mixed_forwarded(callback, args)  # error: [invalid-argument-type]
 ```
 
 ### Unsupported callable checks are deferred
@@ -908,6 +953,44 @@ def boundaries[*Ts](values: tuple[int, *Ts, str]) -> None:
     reveal_type(values[0])  # revealed: int
     reveal_type(values[-1])  # revealed: str
     reveal_type(values[:])  # revealed: tuple[int, *Ts@boundaries, str]
+
+def materialize[*Ts](values: tuple[*Ts]) -> None:
+    # TODO: should reveal `list[object]`
+    reveal_type(list(values))  # revealed: list[Ts@materialize]
+
+    runtime_elements: list[object] = list(values)
+
+    # TODO: This should emit an `invalid-assignment` diagnostic. The elements are not themselves
+    # tuples.
+    tuple_elements: list[tuple[object, ...]] = list(values)
+```
+
+### Slicing
+
+A slice preserves a symbolic pack only when it retains the complete pack in its original order.
+
+```py
+def slices[*Ts](values: tuple[*Ts]) -> None:
+    reveal_type(values[:])  # revealed: tuple[*Ts@slices]
+
+    # TODO: should reveal `tuple[object, ...]`
+    reveal_type(values[1:])  # revealed: tuple[*Ts@slices]
+    # TODO: should reveal `tuple[object, ...]`
+    reveal_type(values[::-1])  # revealed: tuple[*Ts@slices]
+    # TODO: should reveal `tuple[object, ...]`
+    reveal_type(values[::2])  # revealed: tuple[*Ts@slices]
+
+def trim_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[*Ts]:
+    reveal_type(values[1:-1])  # revealed: tuple[*Ts@trim_boundaries]
+    return values[1:-1]
+
+def reverse[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
+    # TODO: This should emit an `invalid-return-type` diagnostic.
+    return values[::-1]
+
+def stride[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
+    # TODO: This should emit an `invalid-return-type` diagnostic.
+    return values[::2]
 ```
 
 ## Accessing Individual Types
