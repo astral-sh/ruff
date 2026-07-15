@@ -1009,6 +1009,26 @@ def _(top: Top[InheritedAny]) -> None:
 
 ### Class-side access
 
+Materialization preserves whether a protocol member is available through the class object. Ordinary
+instance attributes remain unavailable through the class object after materialization:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class InstanceOnlyAny(Protocol):
+    value: Any
+
+def instance_only_class_access(
+    top: Top[InstanceOnlyAny],
+    bottom: Bottom[InstanceOnlyAny],
+) -> None:
+    type(top).value  # error: [unresolved-attribute]
+    type(bottom).value  # error: [unresolved-attribute]
+    type(top).value = 1  # error: [invalid-assignment]
+    type(bottom).value = 1  # error: [invalid-assignment]
+```
+
 Class variables have separate read and write types. `Top` permits every read and no writes, while
 `Bottom` permits every write and no reads:
 
