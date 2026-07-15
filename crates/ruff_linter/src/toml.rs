@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use pyproject_toml::PyProjectToml;
+use toml::de::DeTable;
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::TomlSourceType;
@@ -29,14 +29,16 @@ pub fn lint_toml(
 ) -> Vec<Diagnostic> {
     let context = LintContext::new(path, contents, settings);
 
-    if let Err(err) = toml::from_str::<PyProjectToml>(contents) {
-        if source_type.is_pyproject() && context.is_rule_enabled(Rule::InvalidPyprojectToml) {
-            invalid_pyproject_toml(&context, &err);
-        }
+    let document = DeTable::parse(contents);
+
+    if context.is_rule_enabled(Rule::RuleCodesInSelectors)
+        && let Ok(document) = &document
+    {
+        rule_codes_in_selectors(&context, document.get_ref(), source_type);
     }
 
-    if context.is_rule_enabled(Rule::RuleCodesInSelectors) {
-        rule_codes_in_selectors(&context, source_type);
+    if source_type.is_pyproject() && context.is_rule_enabled(Rule::InvalidPyprojectToml) {
+        invalid_pyproject_toml(&context, document);
     }
 
     context.into_diagnostics()

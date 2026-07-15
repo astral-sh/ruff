@@ -61,23 +61,21 @@ impl AlwaysFixableViolation for RuleCodesInSelectors {
 }
 
 /// RUF201
-pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSourceType) {
+pub(crate) fn rule_codes_in_selectors(
+    context: &LintContext,
+    document: &DeTable<'_>,
+    source_type: TomlSourceType,
+) {
     if !is_human_readable_names_enabled(context.settings().preview) {
         return;
     }
 
-    let source = context.source_file().source_text();
-    let Ok(document) = DeTable::parse(source) else {
-        return;
-    };
-
-    let root = document.get_ref();
     let ruff = match source_type {
-        TomlSourceType::Pyproject => root
+        TomlSourceType::Pyproject => document
             .get("tool")
             .and_then(|tool| tool.get_ref().get("ruff"))
             .and_then(|ruff| ruff.get_ref().as_table()),
-        TomlSourceType::Ruff => Some(root),
+        TomlSourceType::Ruff => Some(document),
         _ => None,
     };
 
