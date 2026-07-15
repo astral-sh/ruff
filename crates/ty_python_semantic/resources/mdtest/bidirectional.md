@@ -464,6 +464,41 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Generic calls with type-variable return contexts
+
+A return context containing outer type variables can constrain the inner type variables:
+
+```py
+from typing import overload
+
+@overload
+def f[A, B](x: tuple[A, B]) -> list[A]: ...
+@overload
+def f[A, B, C](x: tuple[A, B, C]) -> list[A]: ...
+def f[A, B, C](x: tuple[A, B] | tuple[A, B, C]) -> list[A | B | C]:
+    return f(x)
+```
+
+An outer constrained type variable is also a valid declared candidate for an inner generic call:
+
+```py
+import tempfile
+from typing import IO, Literal
+
+class AsyncFile[T: (str, bytes)]:
+    def __init__(self, file: IO[T]) -> None:
+        self.file = file
+
+class TemporaryFile[T: (str, bytes)]:
+    _async_file: AsyncFile[T]
+    mode: Literal["w", "wb"]
+
+    def enter(self) -> AsyncFile[T]:
+        file = tempfile.TemporaryFile(self.mode)
+        self._async_file = AsyncFile(file)
+        return self._async_file
+```
+
 ## Generic constructors
 
 The same applies to constructors of generic classes:
@@ -694,12 +729,13 @@ def _():
 
 ## Prefer the declared type of generic classes and callables
 
-When inferring a generic call, we only use the declared type as type context if it is in
-non-covariant position. The final annotated assignment binding still uses the declared type if the
-inferred and declared types are mutually assignable:
+The inferred and declared constraint sets are solved independently using the solver's normal
+heuristics. We keep the inferred type if adding the declared constraints does not change the
+solver's default solution. Otherwise, we prefer the declared type. The preferred type must still
+satisfy the combined constraints; otherwise, the solver chooses another valid solution.
 
 ```py
-from typing import Any
+from typing import Any, Callable
 
 class Bivariant[T]:
     pass
@@ -756,6 +792,23 @@ reveal_type(x9)  # revealed: Bivariant[Any]
 reveal_type(x10)  # revealed: Covariant[Any]
 reveal_type(x11)  # revealed: Contravariant[Any]
 reveal_type(x12)  # revealed: Invariant[Any]
+
+# The argument-only solution `object` does not satisfy the combined constraints, so the solver
+# chooses `int` instead.
+def f[T](callback: Callable[[T], None]) -> Covariant[T]:
+    raise NotImplementedError
+
+def accepts_object(_: object) -> None: ...
+
+x13: Covariant[int] = f(accepts_object)
+reveal_type(x13)  # revealed: Covariant[int]
+
+# The inferred and declared constraints are combined before selecting the final solution.
+def make_callable[T](x: T) -> Callable[[T], bool]:
+    raise NotImplementedError
+
+def _(a: int | None):
+    x14: Callable[[str], bool] = make_callable(a)
 ```
 
 This behavior also applies to invariant collection types:
@@ -806,7 +859,7 @@ x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
 ```
 
-We also prefer the declared type of `Callable` parameters, which are in contravariant position:
+The same declared-vs-inferred preference applies to `Callable` parameter types:
 
 ```py
 from typing import Callable
@@ -840,8 +893,9 @@ reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 
 ## Declared type preference sees through subtyping
 
-Additionally, if the inferred type is a subtype of the declared type, we prefer declared type
-assignments that are in non-covariant position. This behavior applies to collection literals:
+The declared constraint set can also produce the only candidate that satisfies the combined
+constraints, even when the inferred candidate is a subtype of it. This behavior applies to
+collection literals:
 
 ```py
 import builtins
@@ -884,6 +938,15 @@ reveal_type(x11)  # revealed: list[Iterable[Any]]
 
 x12: Iterable[list[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x12)  # revealed: list[list[Any]]
+
+def make_list[T](x: T) -> list[T]:
+    return [x]
+
+generic_sequence: Sequence[Any] = make_list(1)
+reveal_type(generic_sequence)  # revealed: list[int]
+
+generic_mutable_sequence: MutableSequence[Any] = make_list(1)
+reveal_type(generic_mutable_sequence)  # revealed: list[Any]
 ```
 
 As well as generic calls, and constructors of generic classes:
@@ -1181,7 +1244,7 @@ x2: list[A | bool] = [{"bar": 1}, 1]
 However, the declared type should be ignored if the specialization is not solvable:
 
 ```py
-from typing import Any, Callable
+from typing import Callable
 
 def g[T](x: list[T]) -> T:
     return x[0]
@@ -1193,12 +1256,12 @@ def _(a: int | None):
     # error: [invalid-assignment] "Object of type `int | None` is not assignable to `str`"
     x2: str = g(f(a))
 
-def make_callable[T](x: T) -> Callable[[T], bool]:
+def make_identity_callable[T](x: T) -> Callable[[T], T]:
     raise NotImplementedError
 
 def _(a: int | None):
-    # error: [invalid-assignment] "Object of type `(int | None, /) -> bool` is not assignable to `(str, /) -> bool`"
-    x1: Callable[[str], bool] = make_callable(a)
+    # error: [invalid-assignment] "Object of type `(int | None, /) -> int | None` is not assignable to `(str, /) -> str`"
+    x3: Callable[[str], str] = make_identity_callable(a)
 ```
 
 ## Instance attributes

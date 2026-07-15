@@ -2299,6 +2299,7 @@ impl<'db> Type<'db> {
                         element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
+                Type::TypeVar(_) => f(self, polarity),
                 Type::TypeAlias(alias) => visitor.visit(self, || {
                     alias
                         .value_type(db)

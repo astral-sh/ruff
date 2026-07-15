@@ -204,27 +204,49 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
-## Generic builtins should not overfit upper-bound-only callback constraints
+## Generic builtins preserve gradual callback constraints
 
-These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
-`object` bounds through the constraint solver. The current solver picks callback parameter upper
-bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
-result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
-return type would still be used where possible.
+These examples are minimized from ecosystem regressions involving explicit `Never` and `object`
+bounds. An unknown iterable contributes gradual evidence rather than leaving generic parameters
+unconstrained. Callable inference can still propagate that evidence into a result type; ideally it
+would preserve a statically known callback return type where possible.
 
 ```py
 from ty_extensions import Unknown
 
 def _(xs: Unknown):
-    # TODO: should be `list[Unknown]`
-    reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
+    reveal_type(sorted(xs, key=len))  # revealed: list[Unknown]
 
     # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str | Unknown]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    # TODO: should be `LiteralString`
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+```
+
+## Generic builtin call context preserves gradual types
+
+```py
+from collections.abc import Sequence
+from typing import Any, Union
+
+class Vector:
+    length: float
+
+def relative_error(x: Any, y: Any, values: Sequence[float]) -> float:
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Any | int | float
+    return largest * 1.0
+
+def relative_error_unknown(x, y, values: Sequence[Union[float, Vector]]) -> float:
+    largest = max(
+        abs(x),
+        abs(y),
+        *(abs(value) for value in values if isinstance(value, float)),
+        *(value.length for value in values if isinstance(value, Vector)),
+    )
+    reveal_type(largest)  # revealed: Unknown | int | float
+    return largest * 1.0
 ```
 
 ## Mapping methods accept arbitrary object types

@@ -16,7 +16,7 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    DisjointnessChecker, GradualConstraints, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
@@ -1536,6 +1536,53 @@ impl<'db> Specialization<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// A gradual type is assignable to every target regardless of its type arguments. To use that
+    /// fact as inference evidence, specialize the target's inferable type variables to the gradual
+    /// type and compare that specialization to the original target.
+    pub(super) fn distribute_gradual_constraints(
+        &self,
+        db: &'db dyn Db,
+        gradual: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        debug_assert_eq!(self.relation, TypeRelation::Assignability);
+        debug_assert_eq!(self.typevar_evaluation, TypeVarEvaluation::Lazy);
+
+        if let Type::Union(union) = target {
+            // Specialize union elements independently so that the gradual replacement cannot
+            // absorb the other elements before we extract their constraints. An unconditionally
+            // satisfied element contains no inference evidence; including its `true` result in
+            // the disjunction would erase the evidence from other elements.
+            let constraints = union
+                .elements(db)
+                .iter()
+                .map(|&element| self.distribute_gradual_constraints(db, gradual, element))
+                .filter(|constraints| !constraints.is_always_satisfied(db))
+                .when_any(db, self.constraints, |constraints| constraints);
+
+            // The retained gradual specializations are satisfiable, so `never` is only the
+            // identity produced by `when_any` when every element was filtered out.
+            return if constraints.is_never_satisfied(db) {
+                self.always()
+            } else {
+                constraints
+            };
+        }
+
+        let source = target.apply_type_mapping(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Inferable(
+                InferableTypeVarSpecialization::new(self.inferable, gradual),
+            )),
+            TypeContext::default(),
+        );
+
+        // Reuse this checker so recursive structural relations share its cycle detector. Starting
+        // a new relation here would let a recursive protocol repeatedly compare the same
+        // specialized pair without observing the active comparison.
+        self.check_type_pair(db, source, target)
+    }
+
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,
@@ -1862,6 +1909,28 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     }
 }
 
+/// Replaces every type variable in an inference domain with the same type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub struct InferableTypeVarSpecialization<'db> {
+    inferable: InferableTypeVars<'db>,
+    replacement: Type<'db>,
+}
+
+impl<'db> InferableTypeVarSpecialization<'db> {
+    fn new(inferable: InferableTypeVars<'db>, replacement: Type<'db>) -> Self {
+        Self {
+            inferable,
+            replacement,
+        }
+    }
+
+    fn get(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> Option<Type<'db>> {
+        bound_typevar
+            .is_inferable(db, self.inferable)
+            .then_some(self.replacement)
+    }
+}
+
 /// A mapping between type variables and types.
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
@@ -1878,6 +1947,8 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    /// Maps every type variable in the current inference domain to the same type.
+    Inferable(InferableTypeVarSpecialization<'db>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
@@ -1912,6 +1983,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::Inferable(specialization) => specialization.get(db, bound_typevar),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
@@ -1951,7 +2023,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::Inferable(_)
+            | ApplySpecialization::Single(_, _) => None,
         }
     }
 }
@@ -1981,6 +2055,10 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'db>,
     pending: ConstraintSet<'db, 'c>,
+    /// Argument-derived constraints, retained only to rank solutions of `pending`.
+    inferred_pending: ConstraintSet<'db, 'c>,
+    /// Context-derived constraints, retained only to rank solutions of `pending`.
+    declared_pending: Option<ConstraintSet<'db, 'c>>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
@@ -2046,9 +2124,34 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             constraints,
             inferable,
             pending: ConstraintSet::from_bool(constraints, true),
+            inferred_pending: ConstraintSet::from_bool(constraints, true),
+            declared_pending: None,
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
+    }
+
+    /// Conjoin an additional constraint set with the pending inference constraints.
+    pub(crate) fn add_constraints(&mut self, constraints: ConstraintSet<'db, 'c>) {
+        if constraints.is_always_satisfied(self.db) {
+            return;
+        }
+        self.pending
+            .intersect(self.db, self.constraints, constraints);
+        if let Some(declared_pending) = &mut self.declared_pending {
+            declared_pending.intersect(self.db, self.constraints, constraints);
+        } else {
+            self.declared_pending = Some(constraints);
+        }
+    }
+
+    /// Return `true` if the pending inference constraints have at least one solution.
+    pub(crate) fn constraints_are_satisfiable(&self) -> bool {
+        !matches!(
+            self.pending
+                .solutions(self.db, self.constraints, self.inferable),
+            Solutions::Unsatisfiable
+        )
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each
@@ -2087,7 +2190,51 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> TypeVarInference<'db> {
-        let types = self.solve_pending_with(generic_context, &mut choose);
+        let declared = self.constraint_set_types(self.declared_pending);
+        let inferred = self.constraint_set_types(Some(self.inferred_pending));
+        let db = self.db;
+        let constraints = self.constraints;
+        // Keep the inferred candidate when the declared constraints do not change the solver's
+        // default solution. Otherwise, prefer the declared candidate.
+        let mut choose_valid = |typevar: BoundTypeVarInstance<'db>,
+                                bounds: Option<&PathBound<'db>>| {
+            let identity = typevar.identity(db);
+            let inferred = inferred.get(&identity).copied();
+            let declared = declared.get(&identity).copied();
+            let candidate = match (inferred, declared) {
+                (Some(inferred), Some(_))
+                    if bounds
+                        .and_then(|bounds| {
+                            PathBounds::default_solve(db, constraints, bounds)
+                                .ok()
+                                .flatten()
+                        })
+                        .is_some_and(|combined| combined.is_equivalent_to(db, inferred)) =>
+                {
+                    Some(inferred)
+                }
+                (Some(_), Some(declared)) => Some(declared),
+                (Some(inferred), _) => Some(inferred),
+                (None, declared) => declared,
+            }
+            .filter(|candidate| !candidate.has_unspecialized_type_var(db));
+
+            if let (Some(candidate), Some(bounds)) = (candidate, bounds) {
+                let candidate_bound = PathBound::exact(typevar, candidate);
+                let candidate = choose(typevar, Some(&candidate_bound)).unwrap_or(candidate);
+                if let Some(valid) = bounds.valid_preferred_solution(db, constraints, candidate) {
+                    return Some(valid);
+                }
+            }
+
+            let chosen = choose(typevar, bounds)?;
+            if let Some(bounds) = bounds {
+                bounds.valid_preferred_solution(db, constraints, chosen)
+            } else {
+                Some(chosen)
+            }
+        };
+        let types = self.solve_pending_with(generic_context, &mut choose_valid);
         let inferred: Box<[_]> = generic_context
             .variables_inner(self.db)
             .keys()
@@ -2097,15 +2244,50 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         TypeVarInference::new(self.db, generic_context, inferred)
     }
 
+    fn constraint_set_types(
+        &self,
+        constraints: Option<ConstraintSet<'db, 'c>>,
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        let Some(constraints) = constraints else {
+            return FxHashMap::default();
+        };
+        let solutions = constraints.solutions(self.db, self.constraints, self.inferable);
+        let Solutions::Constrained(solutions) = solutions else {
+            return FxHashMap::default();
+        };
+
+        let mut types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
+            FxHashMap::default();
+        for solution in solutions {
+            for binding in solution {
+                let identity = binding.bound_typevar.identity(self.db);
+                let ty = self.remove_inferable_typevar_artifacts_from_solution(
+                    binding.bound_typevar,
+                    binding.solution,
+                );
+                types
+                    .entry(identity)
+                    .and_modify(|existing| existing.add(self.db, ty))
+                    .or_insert_with(|| UnionAccumulator::new(ty));
+            }
+        }
+
+        types
+            .into_iter()
+            .map(|(identity, ty)| (identity, ty.into_type(self.db)))
+            .collect()
+    }
+
     fn solve_pending_with(
         &mut self,
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
-        if generic_context
-            .variables_inner(self.db)
-            .values()
-            .any(|typevar| typevar.is_paramspec(self.db))
+        if self.declared_pending.is_none()
+            && generic_context
+                .variables_inner(self.db)
+                .values()
+                .any(|typevar| typevar.is_paramspec(self.db))
         {
             return self.solve_hash_map_with(generic_context, choose);
         }
@@ -2395,22 +2577,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             bounds.lower,
             bounds.upper,
         );
-        self.pending
-            .intersect(self.db, self.constraints, constraint);
+        self.intersect_inferred_constraint(constraint);
     }
 
-    pub(crate) fn inferred_type_is_assignable_to(
-        &mut self,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-        ty: Type<'db>,
-    ) -> bool {
-        self.types
-            .get_mut(&bound_typevar)
-            .is_some_and(|inferred_ty| {
-                inferred_ty
-                    .get_or_build(self.db)
-                    .is_assignable_to(self.db, ty)
-            })
+    fn intersect_inferred_constraint(&mut self, constraint: ConstraintSet<'db, 'c>) {
+        self.pending
+            .intersect(self.db, self.constraints, constraint);
+        if self.declared_pending.is_some() {
+            self.inferred_pending
+                .intersect(self.db, self.constraints, constraint);
+        }
     }
 
     /// Add a type mapping for a bound typevar using the given variance to determine how the
@@ -2566,7 +2742,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
                 self.add_type_mappings_from_constraint_set(when)?;
-                self.pending.intersect(self.db, self.constraints, when);
+                self.intersect_inferred_constraint(when);
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
@@ -2591,7 +2767,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let Some(combined) = combined else {
                     return Err(());
                 };
-                self.pending.intersect(self.db, self.constraints, combined);
+                self.intersect_inferred_constraint(combined);
             }
         }
         Ok(())
@@ -2649,6 +2825,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
+            }
+
+            (formal, gradual @ Type::Dynamic(_)) => {
+                let when = gradual.has_relation_to_with_options(
+                    self.db,
+                    formal,
+                    self.constraints,
+                    self.inferable,
+                    TypeRelation::Assignability,
+                    TypeVarEvaluation::Lazy,
+                    GradualConstraints::Distribute,
+                );
+                if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                    self.intersect_inferred_constraint(when);
+                }
             }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
@@ -3127,7 +3318,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // false positives for callable-wrapper patterns while this path is still
                         // a hybrid of old and new solver logic.
                         if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                            self.pending.intersect(self.db, self.constraints, when);
+                            self.intersect_inferred_constraint(when);
                         }
                         return Ok(());
                     }
@@ -3177,7 +3368,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.pending.intersect(self.db, self.constraints, when);
+                    self.intersect_inferred_constraint(when);
                 }
                 return Ok(());
             }
@@ -3189,7 +3380,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.
                 if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.pending.intersect(self.db, self.constraints, when);
+                    self.intersect_inferred_constraint(when);
                 }
                 return Ok(());
             }

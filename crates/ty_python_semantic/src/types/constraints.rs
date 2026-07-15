@@ -715,6 +715,23 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Remove constraints that involve the marker for an as-yet unspecialized type variable.
+    ///
+    /// The marker carries no type-variable identity or concrete type information. Treating those
+    /// constraints existentially preserves any independent concrete constraints on the same path.
+    pub(crate) fn remove_unspecialized_type_var_constraints(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        Self::from_node(
+            builder,
+            self.node
+                .remove_unspecialized_type_var_constraints(db, builder),
+        )
+    }
+
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
@@ -3044,6 +3061,20 @@ impl NodeId {
         }
     }
 
+    fn remove_unspecialized_type_var_constraints<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Self {
+        match self.node() {
+            Node::AlwaysTrue => ALWAYS_TRUE,
+            Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::Interior(interior) => {
+                interior.remove_unspecialized_type_var_constraints(db, builder)
+            }
+        }
+    }
+
     fn abstract_one_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -3615,6 +3646,31 @@ impl<'db> PathBound<'db> {
 
     fn has_only_gradual_evidence(&self) -> bool {
         self.has_only_gradual_evidence
+    }
+
+    /// Return the valid specialization obtained by preferring `candidate` on this path.
+    ///
+    /// The candidate must be above the path's existing lower bound. The default solver then
+    /// validates it against the path's upper bound and the type variable's declared bound or
+    /// constraints.
+    pub(crate) fn valid_preferred_solution(
+        &self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if self
+            .lower
+            .is_some_and(|lower| !is_possibly_constraint_set_assignable(db, lower, candidate))
+        {
+            return None;
+        }
+
+        let mut candidate_bound = self.clone();
+        candidate_bound.lower = Some(candidate);
+        PathBounds::default_solve(db, builder, &candidate_bound)
+            .ok()
+            .flatten()
     }
 }
 
@@ -4320,6 +4376,30 @@ impl InteriorNode {
                         .bounds
                         .upper
                         .is_some_and(is_bare_inferable_typevar)
+            },
+            &mut path,
+        )
+    }
+
+    fn remove_unspecialized_type_var_constraints<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> NodeId {
+        let mut path = self.path_assignments(builder);
+        self.abstract_one_inner(
+            db,
+            builder,
+            &mut |constraint| {
+                let constraint = builder.constraint_data(constraint);
+                constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|lower| lower.has_unspecialized_type_var(db))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| upper.has_unspecialized_type_var(db))
             },
             &mut path,
         )
