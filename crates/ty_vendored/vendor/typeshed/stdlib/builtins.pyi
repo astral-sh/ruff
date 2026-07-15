@@ -3250,7 +3250,6 @@ if sys.version_info >= (3, 15):
             cls: type[frozendict[str, _VT]], iterable: Iterable[tuple[str, _VT]], /, **kwargs: _VT
         ) -> frozendict[str, _VT]: ...
 
-        def __init__(self) -> None: ...
         def copy(self) -> frozendict[_KT, _VT]:
             """Return a shallow copy of the frozendict."""
 
