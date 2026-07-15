@@ -380,12 +380,12 @@ impl<'a> SarifResult<'a> {
     #[allow(clippy::unnecessary_wraps)]
     fn uri(diagnostic: &Diagnostic) -> Result<String> {
         let path = normalize_path(&*diagnostic.expect_ruff_filename());
-        #[cfg(not(target_arch = "wasm32"))]
-        return url::Url::from_file_path(&path)
-            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
-            .map(|u| u.to_string());
-        #[cfg(target_arch = "wasm32")]
-        return Ok(format!("file://{}", path.display()));
+        cfg_select! {
+            target_arch = "wasm32" => Ok(format!("file://{}", path.display())),
+            _ => url::Url::from_file_path(&path)
+                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
+                .map(|url| url.to_string()),
+        }
     }
 
     fn from_message(
