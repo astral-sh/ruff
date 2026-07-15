@@ -8,7 +8,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
-    OwnedConstraintSet,
+    OwnedConstraintSet, TypeVarSolution, UniqueSolutionError,
 };
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
@@ -16,14 +16,16 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, ClassBase, ClassLiteral,
+    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, Materialization, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, FxIndexMap,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -219,6 +221,28 @@ pub(crate) enum TypeVarEvaluation {
     Lazy,
 }
 
+/// Determines when assignability comparisons involving gradual types are evaluated.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum GradualEvaluation {
+    /// Check immediately whether the relation holds for some materialization of the gradual type,
+    /// collapsing the result to `true`.
+    Eager,
+
+    /// Produce constraints based on the possible materializations of the gradual type.
+    ///
+    /// Note that constraints on the materialization of the gradual type itself are represented
+    /// by [`TypeRelationChecker::gradual`], a sentinel value which is neither `true` nor `false`,
+    /// as gradual types are non-inferable, and so such constraints are not very useful. However,
+    /// constraints on other inferable type variables involving the gradual type are preserved.
+    /// As such, this mode is only useful when paired with [`TypeVarEvaluation::Lazy`].
+    Lazy,
+}
+
+enum GradualBounds<'db> {
+    Satisfiable(FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>),
+    Unsatisfiable,
+}
+
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
@@ -365,6 +389,7 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             context_tree: None,
             given: assuming,
             perform_expensive_checks: true,
@@ -387,7 +412,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_assignable_to(db, env, target, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db, env)
+            .is_gradually_satisfied(db, env)
     }
 
     /// Re-run the assignability check with error context collection enabled.
@@ -410,6 +435,7 @@ impl<'db> Type<'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
             perform_expensive_checks: true,
@@ -431,7 +457,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
+            .is_gradually_satisfied(db, env)
     }
 
     /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
@@ -441,9 +467,23 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_subtype_of(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| true,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn is_constraint_set_subtype_of_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+            let program = types.program(db);
+            let env = ProgramEnvironment::from_program(program);
+            let constraints = ConstraintSetBuilder::new();
+            types
+                .first(db)
+                .when_constraint_set_subtype_of(db, &env, types.second(db), &constraints)
+                .is_always_satisfied(db, &env)
+        }
+
+        let program = env.program(db);
+        is_constraint_set_subtype_of_impl(db, TypePair::new(db, program, self, target))
     }
 
     pub(super) fn when_assignable_to<'c>(
@@ -464,36 +504,44 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Returns whether constraint-set assignability is known to be unconditionally satisfied
-    /// before constructing the relation checker.
-    fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    /// Returns whether constraint-set assignability is known without constructing the relation
+    /// checker.
+    fn is_trivially_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> Option<OwnedConstraintSet<'db>> {
         if self.materialized_divergent_fallback().is_none() && self == target {
-            return true;
+            return Some(OwnedConstraintSet::always());
         }
 
         // Type variables must be converted into constraints before applying the remaining
         // relation shortcuts.
         if self.is_type_var() || target.is_type_var() {
-            return false;
+            return None;
         }
 
         match (self, target) {
-            (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
-            (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
+            (Type::Never, _) => Some(OwnedConstraintSet::always()),
+            (_, Type::NominalInstance(target)) if target.is_object() => {
+                Some(OwnedConstraintSet::always())
             }
+            (_, Type::Union(union)) => (self.materialized_divergent_fallback().is_none()
+                && union.elements(db).contains(&self))
+            .then(OwnedConstraintSet::always),
             (Type::Intersection(intersection), _) => {
-                target.materialized_divergent_fallback().is_none()
-                    && intersection.positive(db).contains(&target)
+                (target.materialized_divergent_fallback().is_none()
+                    && intersection.positive(db).contains(&target))
+                .then(OwnedConstraintSet::always)
             }
-            _ => false,
+            _ => None,
         }
     }
 
     /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
     /// constraint-set assignable to `target`.
+    ///
+    /// Gradual assignability is evaluated lazily.
     ///
     /// Recursive relations are evaluated coinductively: a cycle is provisionally satisfied until
     /// another part of the relation produces a contradiction.
@@ -519,7 +567,7 @@ impl<'db> Type<'db> {
                 let source = types.first(db);
                 let target = types.second(db);
 
-                source.has_relation_to_with_typevar_evaluation(
+                source.has_relation_to_with(
                     db,
                     &env,
                     target,
@@ -527,12 +575,13 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
+                    GradualEvaluation::Lazy,
                 )
             })
         }
 
-        if self.is_trivially_constraint_set_assignable_to(db, target) {
-            return Cow::Owned(OwnedConstraintSet::always());
+        if let Some(result) = self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Cow::Owned(result);
         }
 
         let program = env.program(db);
@@ -549,7 +598,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to_with_typevar_evaluation(
+        self.has_relation_to_with(
             db,
             env,
             target,
@@ -557,6 +606,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Assignability,
             TypeVarEvaluation::Lazy,
+            GradualEvaluation::Lazy,
         )
     }
 
@@ -567,7 +617,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to_with_typevar_evaluation(
+        self.has_relation_to_with(
             db,
             env,
             target,
@@ -575,6 +625,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
+            GradualEvaluation::Eager,
         )
     }
 
@@ -621,7 +672,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to_with_typevar_evaluation(
+        self.has_relation_to_with(
             db,
             env,
             target,
@@ -629,11 +680,12 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             TypeVarEvaluation::Eager,
+            GradualEvaluation::Eager,
         )
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn has_relation_to_with_typevar_evaluation<'c>(
+    pub(super) fn has_relation_to_with<'c>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -642,6 +694,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
+        gradual_evaluation: GradualEvaluation,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -653,6 +706,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             typevar_evaluation,
+            gradual_evaluation,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
@@ -822,21 +876,49 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
-    'db,
+type RelationCycleKey<'db> = (
+    Type<'db>,
+    Type<'db>,
     TypeRelation,
-    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
-    ConstraintSet<'db, 'c>,
+    TypeVarEvaluation,
+    GradualEvaluation,
+);
+
+type RelationCycleDetector<'db, 'c> =
+    CycleDetector<'db, TypeRelation, RelationCycleKey<'db>, ConstraintSet<'db, 'c>, 1>;
+
+#[derive(Debug)]
+struct GradualProjection;
+
+type GradualProjectionCycleDetector<'db, 'c> = CycleDetector<
+    'db,
+    GradualProjection,
+    (Type<'db>, GradualRangePosition, Type<'db>),
+    Option<ConstraintSet<'db, 'c>>,
     1,
 >;
 
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
+/// A [`CycleDetector`] that is used in `has_relation_to` methods.
+pub(crate) struct HasRelationToVisitor<'db, 'c> {
+    relations: RelationCycleDetector<'db, 'c>,
+    gradual_projections: GradualProjectionCycleDetector<'db, 'c>,
+}
+
+impl<'db> HasIdentity<'db>
+    for (
+        Type<'db>,
+        Type<'db>,
+        TypeRelation,
+        TypeVarEvaluation,
+        GradualEvaluation,
+    )
+{
     type Id = (
         TypeIdentity<'db>,
         TypeIdentity<'db>,
         TypeRelation,
         TypeVarEvaluation,
+        GradualEvaluation,
     );
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
@@ -852,13 +934,35 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             self.1.to_type_identity(db),
             self.2,
             self.3,
+            self.4,
         )
     }
 }
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
+        Self {
+            relations: RelationCycleDetector::new(ConstraintSet::from_bool(constraints, true)),
+            gradual_projections: GradualProjectionCycleDetector::new(None),
+        }
+    }
+
+    fn try_visit(
+        &self,
+        db: &'db dyn Db,
+        item: RelationCycleKey<'db>,
+        compute: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> Result<ConstraintSet<'db, 'c>, RelationCycleKey<'db>> {
+        self.relations.try_visit(db, item, compute)
+    }
+
+    fn visit_gradual_projection(
+        &self,
+        db: &'db dyn Db,
+        item: (Type<'db>, GradualRangePosition, Type<'db>),
+        compute: impl FnOnce() -> Option<ConstraintSet<'db, 'c>>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        self.gradual_projections.visit(db, item, compute)
     }
 }
 
@@ -881,6 +985,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
+    pub(super) gradual_evaluation: GradualEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
@@ -895,6 +1000,12 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum GradualRangePosition {
+    Source,
+    Target,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
@@ -913,6 +1024,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
@@ -937,6 +1049,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            gradual_evaluation: GradualEvaluation::Lazy,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
@@ -961,6 +1074,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            gradual_evaluation: GradualEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
@@ -985,6 +1099,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
@@ -1028,6 +1143,534 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
     }
 
+    const fn is_lazy_gradual_assignability(&self) -> bool {
+        self.relation.is_assignability()
+            && matches!(self.typevar_evaluation, TypeVarEvaluation::Lazy)
+            && matches!(self.gradual_evaluation, GradualEvaluation::Lazy)
+    }
+
+    /// Infers the constraints when assigning the top or bottom materialization of a given gradual
+    /// type to the target type.
+    fn infer_gradual_bounds(
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<GradualBounds<'db>> {
+        source
+            .when_constraint_set_assignable_to_owned(db, target)
+            .query(|builder, when| {
+                // TODO: When there are multiple solutions, we could take the Cartesian product
+                // of all lower and upper bounds and attempt to find a satisfiable materialization.
+                let solution = match when
+                    .solutions_unquantified(db, builder)
+                    .unique_solution(db, builder)
+                {
+                    Ok(solution) => solution,
+                    Err(UniqueSolutionError::Unsatisfiable) => {
+                        return Some(GradualBounds::Unsatisfiable);
+                    }
+                    Err(UniqueSolutionError::Ambiguous) => return None,
+                };
+
+                if solution.values().any(|candidate| {
+                    candidate.solution.has_typevar(db)
+                        || candidate.solution.has_provisional_marker(db)
+                }) {
+                    None
+                } else {
+                    Some(GradualBounds::Satisfiable(solution))
+                }
+            })
+    }
+
+    /// Chooses a materialization for the provided gradual type under the assumption that it
+    /// materializes to an instance of the target type, while preserving the upper and lower
+    /// bounds of the gradual type.
+    ///
+    /// For example, projecting `Any` onto the target type `tuple[T]` produces `tuple[Any]`,
+    /// while projecting `bool | (Any & int)` produces `tuple[bool | (Any & int)]`.
+    fn choose_gradual_materialization(
+        db: &'db dyn Db,
+        mut target: Type<'db>,
+        range: Materialization<'db>,
+        bottom: &FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>,
+        top: &FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>,
+    ) -> Type<'db> {
+        for mapping in bottom
+            .values()
+            .chain(top.values())
+            .unique_by(|mapping| mapping.bound_typevar.identity(db))
+        {
+            let identity = mapping.bound_typevar.identity(db);
+            let variance = target.variance_of(db, identity);
+
+            // Variance reverses the upper and lower bound of a gradual type.
+            let (lower, upper) = match variance {
+                TypeVarVariance::Bivariant => continue,
+                TypeVarVariance::Covariant | TypeVarVariance::Invariant => (
+                    bottom
+                        .get(&identity)
+                        .map_or(Type::Never, |mapping| mapping.solution),
+                    top.get(&identity)
+                        .map_or_else(Type::object, |mapping| mapping.solution),
+                ),
+                TypeVarVariance::Contravariant => (
+                    top.get(&identity)
+                        .map_or(Type::Never, |mapping| mapping.solution),
+                    bottom
+                        .get(&identity)
+                        .map_or_else(Type::object, |mapping| mapping.solution),
+                ),
+            };
+
+            let projected = if lower == upper || lower.is_equivalent_to(db, upper) {
+                lower
+            } else {
+                let dynamic_type = Type::Dynamic(range.dynamic);
+                let dynamic_upper = IntersectionType::from_two_elements(db, dynamic_type, upper);
+                UnionType::from_two_elements(db, lower, dynamic_upper)
+            };
+
+            target = target.substitute_one_typevar(db, mapping.bound_typevar, projected);
+        }
+
+        // A variable absent from both endpoint constraint sets is unbounded.
+        target.specialize_all(db, Type::Dynamic(range.dynamic))
+    }
+
+    fn check_gradual_source(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        range: Materialization<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        // Expand unions and intersections in the target type before choosing a materialization for
+        // the gradual type.
+        if target.materialize_once(db).is_none() {
+            match target {
+                Type::Union(union) => {
+                    return Some(self.check_target_union_with(
+                        db,
+                        source,
+                        union,
+                        target,
+                        |element| {
+                            self.check_gradual_source(db, source, range, element)
+                                .unwrap_or_else(|| self.check_type_pair(db, source, element))
+                        },
+                    ));
+                }
+                Type::Intersection(intersection) => {
+                    return Some(self.check_target_intersection_with(
+                        db,
+                        source,
+                        intersection,
+                        target,
+                        |positive| {
+                            self.check_gradual_source(db, source, range, positive)
+                                .unwrap_or_else(|| self.check_type_pair(db, source, positive))
+                        },
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        let bottom = match Self::infer_gradual_bounds(db, range.bottom, target)? {
+            GradualBounds::Satisfiable(bottom) => bottom,
+            // The bottom materialization of the gradual type must be assignable to the target type.
+            GradualBounds::Unsatisfiable => return Some(self.never()),
+        };
+
+        // A disjoint upper bound can only satisfy the relation through an inconsequential
+        // materialization such as `Never`.
+        if range.top.is_disjoint_from(db, target) {
+            return Some(self.gradual());
+        }
+
+        let top = match Self::infer_gradual_bounds(db, range.top, target)? {
+            GradualBounds::Satisfiable(top) => top,
+            // TODO: Preserve partial constraints from the top materialization.
+            GradualBounds::Unsatisfiable => FxIndexMap::default(),
+        };
+
+        let projected_source =
+            Self::choose_gradual_materialization(db, target, range, &bottom, &top);
+        if projected_source.is_equivalent_to(db, source) {
+            return None;
+        }
+
+        Some(
+            self.check_type_pair(db, projected_source, target)
+                .and(db, self.constraints, || self.gradual()),
+        )
+    }
+
+    fn check_gradual_target(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        range: Materialization<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        // Expand unions and intersections in the source type before choosing a materialization for
+        // the gradual type.
+        if source.materialize_once(db).is_none() {
+            match source {
+                Type::Union(union) => {
+                    return Some(self.check_source_union_with(
+                        db,
+                        source,
+                        union,
+                        target,
+                        |element| {
+                            self.check_gradual_target(db, element, target, range)
+                                .unwrap_or_else(|| self.check_type_pair(db, element, target))
+                        },
+                    ));
+                }
+                Type::Intersection(intersection) => {
+                    return Some(self.check_source_intersection_with(
+                        db,
+                        source,
+                        intersection,
+                        target,
+                        |element| {
+                            self.check_gradual_target(db, element, target, range)
+                                .unwrap_or_else(|| self.check_type_pair(db, element, target))
+                        },
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        let top = match Self::infer_gradual_bounds(db, source, range.top)? {
+            GradualBounds::Satisfiable(top) => top,
+            // The source type must be assignable to the top materialization of the gradual type.
+            GradualBounds::Unsatisfiable => return Some(self.never()),
+        };
+
+        let bottom = match Self::infer_gradual_bounds(db, source, range.bottom)? {
+            GradualBounds::Satisfiable(bottom) => bottom,
+            // TODO: Preserve partial constraints from the bottom materialization.
+            GradualBounds::Unsatisfiable => FxIndexMap::default(),
+        };
+
+        let projected_target =
+            Self::choose_gradual_materialization(db, source, range, &bottom, &top);
+        if projected_target.is_equivalent_to(db, target) {
+            return None;
+        }
+
+        Some(
+            self.check_type_pair(db, source, projected_target)
+                .and(db, self.constraints, || self.gradual()),
+        )
+    }
+
+    fn should_expand_intersection(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+    ) -> bool {
+        intersection
+            .positive(db)
+            .iter()
+            .any(|element| match element {
+                Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                _ => false,
+            })
+    }
+
+    fn check_source_union(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        union: UnionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_source_union_with(db, source, union, target, |element| {
+            self.check_type_pair(db, element, target)
+        })
+    }
+
+    fn check_source_union_with(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        union: UnionType<'db>,
+        target: Type<'db>,
+        mut check_element: impl FnMut(Type<'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Some(supertype) = union.common_literal_supertype(db) {
+            // Use the broader supertype only as a positive proof. If it has the requested
+            // relation to the target, then every literal in the union does too. Otherwise,
+            // check each literal individually.
+            let supertype_result =
+                self.without_context_collection(|| self.check_type_pair(db, supertype, target));
+            if supertype_result.is_trivially_always_satisfied() {
+                return supertype_result;
+            }
+        }
+
+        union
+            .elements(db)
+            .iter()
+            .when_all(db, self.constraints, |&element| {
+                let constraint_set = check_element(element);
+                if let Some(context) = self.report_context()
+                    && constraint_set.is_never_satisfied(db)
+                {
+                    context.push(ErrorContext::NotAllUnionElementsAssignable {
+                        element,
+                        union: source,
+                        target,
+                    });
+                }
+                constraint_set
+            })
+    }
+
+    fn check_target_union(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        union: UnionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_target_union_with(db, source, union, target, |element| {
+            self.check_type_pair(db, source, element)
+        })
+    }
+
+    fn check_target_union_with(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        union: UnionType<'db>,
+        target: Type<'db>,
+        mut check_element: impl FnMut(Type<'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Type::Intersection(intersection) = source
+            && let Some(alternatives) = intersection.finite_alternative_union(db)
+        {
+            return self.check_type_pair(db, alternatives, target);
+        }
+
+        let is_new_type_of_union = || {
+            // Normally non-unions cannot directly contain unions in our model due to the fact that
+            // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
+            // there to be a newtype of a union, for an intersection to contain a newtype of a
+            // union, or for a non-inferable typevar (possibly inside an intersection) to widen to a
+            // bound or set of constraints that exposes a union; this requires special handling.
+            match source {
+                Type::Intersection(intersection)
+                    if self.should_expand_intersection(db, intersection) =>
+                {
+                    self.check_type_pair(
+                        db,
+                        intersection.with_expanded_typevars_and_newtypes(db),
+                        target,
+                    )
+                }
+                Type::NewTypeInstance(newtype) => {
+                    let concrete_base = newtype.concrete_base_type(db);
+                    if concrete_base.is_union() {
+                        self.check_type_pair(db, concrete_base, target)
+                    } else {
+                        self.never()
+                    }
+                }
+                _ => self.never(),
+            }
+        };
+
+        let mut elements_context = vec![];
+        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
+
+        let elements = union.elements(db);
+        let result = elements
+            .iter()
+            .when_any(db, self.constraints, |&element| {
+                let result = check_element(element);
+                if let Some(context_tree) = context_tree {
+                    let context = context_tree.take();
+                    if !context.is_empty() {
+                        elements_context.push(context);
+                    }
+                }
+                result
+            })
+            .or(db, self.constraints, is_new_type_of_union);
+
+        if context_tree.is_some() && !elements_context.is_empty() && result.is_never_satisfied(db) {
+            let elements_without_context = elements.len() - elements_context.len();
+            if elements_without_context > 0 && elements_without_context < elements.len() {
+                elements_context.push(
+                    ErrorContext::NotAssignableToNOtherUnionElements {
+                        n: elements_without_context,
+                    }
+                    .into(),
+                );
+            }
+            self.set_context(
+                ErrorContext::NotAssignableToAnyUnionElement {
+                    source,
+                    union: target,
+                },
+                elements_context,
+            );
+        }
+
+        result
+    }
+
+    fn check_target_intersection(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_target_intersection_with(db, source, intersection, target, |positive| {
+            self.check_type_pair(db, source, positive)
+        })
+    }
+
+    fn check_target_intersection_with(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+        mut check_positive: impl FnMut(Type<'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        intersection
+            .positive(db)
+            .iter()
+            .when_all(db, self.constraints, |&positive| {
+                let constraint_set = check_positive(positive);
+                if let Some(context) = self.report_context()
+                    && constraint_set.is_never_satisfied(db)
+                {
+                    context.push(ErrorContext::NotAssignableToIntersectionElement {
+                        source,
+                        element: positive,
+                        intersection: target,
+                    });
+                }
+                constraint_set
+            })
+            .and(db, self.constraints, || {
+                // For subtyping, we would want to check whether the *top materialization* of
+                // `source` is disjoint from the *top materialization* of `negative`. As an
+                // optimization, however, we can avoid this explicit transformation here, since
+                // our `Type::is_disjoint_from` implementation already only returns true for
+                // `T.is_disjoint_from(U)` if the *top materialization* of `T` is disjoint from the
+                // *top materialization* of `U`.
+                //
+                // Note that the implementation of redundancy here may be too strict from a
+                // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
+                // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
+                // could be improved. For now, however, we err on the side of strictness for our
+                // redundancy implementation: a fully complete implementation of redundancy may
+                // lead to non-transitivity (highly undesirable); and pragmatically, a full
+                // implementation of redundancy may not generally lead to simpler types in many
+                // situations.
+                let source_ty = match self.relation {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy { .. }
+                    | TypeRelation::SubtypingAssuming => source,
+                    TypeRelation::Assignability => source.bottom_materialization(db),
+                };
+                intersection
+                    .negative(db)
+                    .iter()
+                    .when_all(db, self.constraints, |&negative| {
+                        let negative = match self.relation {
+                            TypeRelation::Subtyping
+                            | TypeRelation::Redundancy { .. }
+                            | TypeRelation::SubtypingAssuming => negative,
+                            TypeRelation::Assignability => negative.bottom_materialization(db),
+                        };
+                        self.as_disjointness_checker()
+                            .check_type_pair(db, source_ty, negative)
+                    })
+            })
+    }
+
+    fn check_source_intersection(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_source_intersection_with(db, source, intersection, target, |element| {
+            self.check_type_pair(db, element, target)
+        })
+    }
+
+    fn check_source_intersection_with(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+        mut check_element: impl FnMut(Type<'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        if matches!(target, Type::LiteralValue(_))
+            && let Some(alternatives) = intersection.finite_alternative_union(db)
+        {
+            return self.check_type_pair(db, alternatives, target);
+        }
+
+        // An intersection type is a subtype of another type if at least one of its positive
+        // elements is a subtype of that type. If there are no positive elements, we treat `object`
+        // as the implicit positive element (e.g., `~str` is semantically `object & ~str`).
+        let mut elements_context = vec![];
+        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
+
+        let result = intersection
+            .positive_elements_or_object(db)
+            .when_any(db, self.constraints, |element| {
+                let result = check_element(element);
+                if let Some(context_tree) = context_tree {
+                    let context = context_tree.take();
+                    if !context.is_empty() {
+                        elements_context.push(context);
+                    }
+                }
+                result
+            })
+            .or(db, self.constraints, || {
+                if self.should_expand_intersection(db, intersection) {
+                    self.check_type_pair(
+                        db,
+                        intersection.with_expanded_typevars_and_newtypes(db),
+                        target,
+                    )
+                } else {
+                    self.never()
+                }
+            });
+
+        if context_tree.is_some() && !elements_context.is_empty() && result.is_never_satisfied(db) {
+            self.set_context(
+                ErrorContext::NoIntersectionElementAssignableToTarget {
+                    intersection: source,
+                    target,
+                },
+                elements_context,
+            );
+        }
+
+        result
+    }
+
     /// Return the collected error context, or an empty tree if collection was disabled.
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
         self.context_tree.unwrap_or_else(ErrorContextTree::new)
@@ -1039,6 +1682,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn never(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, false)
+    }
+
+    pub(super) fn gradual(&self) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::gradual(self.constraints)
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -1108,7 +1755,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.relation_visitor
             .try_visit(
                 db,
-                (source, target, self.relation, self.typevar_evaluation),
+                (
+                    source,
+                    target,
+                    self.relation,
+                    self.typevar_evaluation,
+                    self.gradual_evaluation,
+                ),
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
@@ -1258,9 +1911,83 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .implies_subtype_of(db, env, self.constraints, source, target);
         }
 
+        // Under eager gradual assignability, we do not produce any constraints for gradual types.
+        if self.relation.is_assignability()
+            && !self.is_lazy_gradual_assignability()
+            && (source.is_dynamic() || target.is_dynamic())
+        {
+            return self.always();
+        }
+
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
+            if self.is_lazy_gradual_assignability() {
+                if let Type::TypeVar(target_typevar) = target
+                    && let Some(range) = source.materialize_once(db)
+                {
+                    // The bottom materialization of the gradual type forms a lower-bound on
+                    // the type variable.
+                    let dynamic = Type::Dynamic(range.dynamic);
+                    let projected = UnionType::from_two_elements(db, range.bottom, dynamic);
+                    let lower_bound = || {
+                        if range.bottom.is_never() {
+                            self.always()
+                        } else {
+                            self.check_type_pair(db, range.bottom, target)
+                        }
+                    };
+
+                    // Preserve the order of unions and intersections in the original type.
+                    if projected.is_equivalent_to(db, source) {
+                        return ConstraintSet::constrain_typevar_lower_bound(
+                            db,
+                            self.constraints,
+                            target_typevar,
+                            source,
+                        )
+                        .and(db, self.constraints, lower_bound);
+                    }
+
+                    return lower_bound().and(db, self.constraints, || {
+                        self.check_type_pair(db, dynamic, target)
+                    });
+                }
+
+                if let Type::TypeVar(source_typevar) = source
+                    && let Some(range) = target.materialize_once(db)
+                {
+                    // The top materialization of the gradual type forms an upper-bound on
+                    // the type variable.
+                    let dynamic = Type::Dynamic(range.dynamic);
+                    let projected = IntersectionType::from_two_elements(db, dynamic, range.top);
+                    let upper_bound = || {
+                        if range.top.is_object() {
+                            self.always()
+                        } else {
+                            self.check_type_pair(db, source, range.top)
+                        }
+                    };
+
+                    // Preserve the order of unions and intersections in the original type.
+                    if projected.is_equivalent_to(db, target) {
+                        return ConstraintSet::constrain_typevar_upper_bound(
+                            db,
+                            self.constraints,
+                            source_typevar,
+                            target,
+                        )
+                        .and(db, self.constraints, upper_bound);
+                    }
+
+                    return self.check_type_pair(db, source, dynamic).and(
+                        db,
+                        self.constraints,
+                        upper_bound,
+                    );
+                }
+            }
+
             // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
             // tautology! We're moving the caller's subtyping/assignability requirement into a
             // constraint set. If the typevar has an upper bound or constraints, then the relation
@@ -1295,16 +2022,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
-        let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
-                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
-                    _ => false,
-                })
-        };
+        if self.is_lazy_gradual_assignability() {
+            if let Some(range) = source.materialize_once(db)
+                && let Some(constraints) = self.relation_visitor.visit_gradual_projection(
+                    db,
+                    (source, GradualRangePosition::Source, target),
+                    || self.check_gradual_source(db, source, range, target),
+                )
+            {
+                return constraints;
+            }
+            if let Some(range) = target.materialize_once(db)
+                && let Some(constraints) = self.relation_visitor.visit_gradual_projection(
+                    db,
+                    (source, GradualRangePosition::Target, target),
+                    || self.check_gradual_target(db, source, target, range),
+                )
+            {
+                return constraints;
+            }
+        }
 
         match (source, target) {
             // Everything is a subtype of `object`.
@@ -1503,18 +2240,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
-                self.constraints,
-                match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
-                    TypeRelation::Assignability => true,
-                    TypeRelation::Redundancy { .. } => match target {
-                        Type::Dynamic(_) => true,
-                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                        _ => false,
+            (Type::Dynamic(_dynamic), _) if !self.is_lazy_gradual_assignability() => {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    match self.relation {
+                        TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                        TypeRelation::Assignability => true,
+                        TypeRelation::Redundancy { .. } => match target {
+                            Type::Dynamic(_) => true,
+                            Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                            _ => false,
+                        },
                     },
-                },
-            ),
+                )
+            }
+            (_, Type::Dynamic(_)) if self.is_lazy_gradual_assignability() => self.gradual(),
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
@@ -1726,223 +2466,30 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
 
-            (Type::Union(union), _) => {
-                if let Some(supertype) = union.common_literal_supertype(db, env) {
-                    // Use the broader supertype only as a positive proof. If it has the requested
-                    // relation to the target, then every literal in the union does too. Otherwise,
-                    // check each literal individually.
-                    let supertype_result = self
-                        .without_context_collection(|| self.check_type_pair(db, supertype, target));
-                    if supertype_result.is_trivially_always_satisfied() {
-                        return supertype_result;
-                    }
-                }
+            (Type::Union(union), _) => self.check_source_union(db, source, union, target),
 
-                union
-                    .elements(db)
-                    .iter()
-                    .when_all(db, self.constraints, |&elem_ty| {
-                        let constraint_set = self.check_type_pair(db, elem_ty, target);
-                        if let Some(context) = self.report_context()
-                            && constraint_set.is_never_satisfied(db, env)
-                        {
-                            context.push(ErrorContext::NotAllUnionElementsAssignable {
-                                element: elem_ty,
-                                union: source,
-                                target,
-                            });
-                        }
-                        constraint_set
-                    })
-            }
-
-            (_, Type::Union(union)) => {
-                if let Type::Intersection(intersection) = source
-                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
-                {
-                    return self.check_type_pair(db, alternatives, target);
-                }
-
-                let is_new_type_of_union = || {
-                    // Normally non-unions cannot directly contain unions in our model due to the fact that we
-                    // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
-                    // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
-                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
-                    // constraints that exposes a union; this requires special handling.
-                    match source {
-                        Type::Intersection(intersection)
-                            if should_expand_intersection(intersection) =>
-                        {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db, env),
-                                target,
-                            )
-                        }
-                        Type::NewTypeInstance(newtype) => {
-                            let concrete_base = newtype.concrete_base_type(db);
-                            if concrete_base.is_union() {
-                                self.check_type_pair(db, concrete_base, target)
-                            } else {
-                                self.never()
-                            }
-                        }
-                        _ => self.never(),
-                    }
-                };
-
-                let mut elements_context = vec![];
-                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
-
-                let elements = union.elements(db);
-                let result = elements
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        let result = self.check_type_pair(db, source, elem_ty);
-                        if let Some(context_tree) = context_tree {
-                            let env = context_tree.take();
-                            if !env.is_empty() {
-                                elements_context.push(env);
-                            }
-                        }
-                        result
-                    })
-                    .or(db, self.constraints, is_new_type_of_union);
-
-                if context_tree.is_some()
-                    && !elements_context.is_empty()
-                    && result.is_never_satisfied(db, env)
-                {
-                    let elements_without_context = elements.len() - elements_context.len();
-                    if elements_without_context > 0 && elements_without_context < elements.len() {
-                        elements_context.push(
-                            ErrorContext::NotAssignableToNOtherUnionElements {
-                                n: elements_without_context,
-                            }
-                            .into(),
-                        );
-                    }
-                    self.set_context(
-                        ErrorContext::NotAssignableToAnyUnionElement {
-                            source,
-                            union: target,
-                        },
-                        elements_context,
-                    );
-                }
-
-                result
-            }
+            (_, Type::Union(union)) => self.check_target_union(db, source, union, target),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => intersection
-                .positive(db)
-                .iter()
-                .when_all(db, self.constraints, |&pos_ty| {
-                    let constraint_set = self.check_type_pair(db, source, pos_ty);
-                    if let Some(context) = self.report_context()
-                        && constraint_set.is_never_satisfied(db, env)
-                    {
-                        context.push(ErrorContext::NotAssignableToIntersectionElement {
-                            source,
-                            element: pos_ty,
-                            intersection: target,
-                        });
-                    }
-                    constraint_set
-                })
-                .and(db, self.constraints, || {
-                    // For subtyping, we would want to check whether the *top materialization* of `source`
-                    // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
-                    // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
-                    // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
-                    // materialization* of `T` is disjoint from the *top materialization* of `U`.
-                    //
-                    // Note that the implementation of redundancy here may be too strict from a
-                    // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
-                    // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
-                    // could be improved. For now, however, we err on the side of strictness for our
-                    // redundancy implementation: a fully complete implementation of redundancy may lead
-                    // to non-transitivity (highly undesirable); and pragmatically, a full implementation
-                    // of redundancy may not generally lead to simpler types in many situations.
-                    let source_ty = match self.relation {
-                        TypeRelation::Subtyping
-                        | TypeRelation::Redundancy { .. }
-                        | TypeRelation::SubtypingAssuming => source,
-                        TypeRelation::Assignability => source.bottom_materialization(db, env),
-                    };
-                    intersection
-                        .negative(db)
-                        .iter()
-                        .when_all(db, self.constraints, |&neg_ty| {
-                            let neg_ty = match self.relation {
-                                TypeRelation::Subtyping
-                                | TypeRelation::Redundancy { .. }
-                                | TypeRelation::SubtypingAssuming => neg_ty,
-                                TypeRelation::Assignability => {
-                                    neg_ty.bottom_materialization(db, env)
-                                }
-                            };
-                            self.as_disjointness_checker()
-                                .check_type_pair(db, source_ty, neg_ty)
-                        })
-                }),
+            (_, Type::Intersection(intersection)) => {
+                self.check_target_intersection(db, source, intersection, target)
+            }
+
+            // Given the assignability check `Any <: tuple[T]`, `Any` may materialize to a type
+            // that is not a subtype of `tuple`, in which case the constraints collapse to
+            // `GRADUAL`. More interestingly, it may materialize to a subtype of `tuple`, giving
+            // us `tuple[Any] <: tuple[T]`. In other words, we distribute the gradual type across
+            // the type variables in the target.
+            (gradual @ Type::Dynamic(_), _) => {
+                let source = target.specialize_all(db, gradual);
+                self.check_type_pair(db, source, target)
+                    .and(db, self.constraints, || self.gradual())
+            }
 
             (Type::Intersection(intersection), _) => {
-                if matches!(target, Type::LiteralValue(_))
-                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
-                {
-                    return self.check_type_pair(db, alternatives, target);
-                }
-
-                // An intersection type is a subtype of another type if at least one of its
-                // positive elements is a subtype of that type. If there are no positive elements,
-                // we treat `object` as the implicit positive element (e.g., `~str` is semantically
-                // `object & ~str`).
-
-                let mut elements_context = vec![];
-                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
-
-                let result = intersection
-                    .positive_elements_or_object(db)
-                    .when_any(db, self.constraints, |elem_ty| {
-                        let result = self.check_type_pair(db, elem_ty, target);
-                        if let Some(context_tree) = context_tree {
-                            let env = context_tree.take();
-                            if !env.is_empty() {
-                                elements_context.push(env);
-                            }
-                        }
-                        result
-                    })
-                    .or(db, self.constraints, || {
-                        if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db, env),
-                                target,
-                            )
-                        } else {
-                            self.never()
-                        }
-                    });
-
-                if context_tree.is_some()
-                    && !elements_context.is_empty()
-                    && result.is_never_satisfied(db, env)
-                {
-                    self.set_context(
-                        ErrorContext::NoIntersectionElementAssignableToTarget {
-                            intersection: source,
-                            target,
-                        },
-                        elements_context,
-                    );
-                }
-
-                result
+                self.check_source_intersection(db, source, intersection, target)
             }
 
             // `Never` is the bottom type, the empty set.
@@ -2657,6 +3204,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             env: self.env,
             relation: TypeRelation::Redundancy { pure: true },
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
@@ -2749,6 +3297,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             env: self.env,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            gradual_evaluation: GradualEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,

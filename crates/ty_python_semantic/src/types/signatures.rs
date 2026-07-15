@@ -1416,7 +1416,7 @@ impl<'db> Signature<'db> {
                 &constraints,
                 self.inferable_typevars(db),
             )
-            .is_always_satisfied(db, env)
+            .is_gradually_satisfied(db, env)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1756,7 +1756,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env);
+            .is_gradually_satisfied(db, env);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -1792,7 +1792,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env);
+            .is_gradually_satisfied(db, env);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
@@ -5150,7 +5150,7 @@ impl ParameterNamePrefix {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Parameter<'db> {
-    /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    /// Declared or inferred type of the parameter. Without either, this is `Unknown`.
     annotated_type: Type<'db>,
 
     /// The source definition represented by this parameter, if any.
@@ -5268,6 +5268,12 @@ impl<'db> Parameter<'db> {
     pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
         self.annotated_type = annotated_type;
         self.inferred_annotation = false;
+        self
+    }
+
+    /// Set an inferred type without marking the parameter as explicitly annotated.
+    pub(crate) fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
+        self.annotated_type = inferred_type;
         self
     }
 

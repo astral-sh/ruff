@@ -1364,7 +1364,8 @@ def value[T](items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-reveal_type(value(items))  # revealed: Any
+# TODO: Preserve the gradual nominal evidence alongside the static structural proof.
+reveal_type(value(items))  # revealed: object
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times
