@@ -192,7 +192,7 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
             diag.into_diagnostic(format_args!(
                 "Invalid `{kind}` comment: {reason}",
                 kind = invalid.kind,
-                reason = &invalid.error
+                reason = invalid.error
             ));
         }
     }

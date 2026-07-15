@@ -580,7 +580,7 @@ impl TestServer {
             {
                 panic!(
                     "Received multiple publish diagnostic notifications for {uri}: ({existing:#?})",
-                    uri = &notification.uri
+                    uri = notification.uri
                 );
             }
         }

@@ -101,14 +101,14 @@ impl Violation for CustomTypeVarForSelf {
     fn message(&self) -> String {
         format!(
             "Use `Self` instead of custom TypeVar `{}`",
-            &self.typevar_name
+            self.typevar_name
         )
     }
 
     fn fix_title(&self) -> Option<String> {
         Some(format!(
             "Replace TypeVar `{}` with `Self`",
-            &self.typevar_name
+            self.typevar_name
         ))
     }
 }

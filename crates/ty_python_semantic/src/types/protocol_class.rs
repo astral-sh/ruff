@@ -866,10 +866,10 @@ impl<'db> ProtocolMemberData<'db> {
                     ProtocolMemberKind::Property { read, write } => {
                         let mut d = f.debug_struct("PropertyMember");
                         if let Some(read) = read.and_then(|read| read.resolve(self.db)) {
-                            d.field("read", &format_args!("`{}`", &read.ty().display(self.db)));
+                            d.field("read", &format_args!("`{}`", read.ty().display(self.db)));
                         }
                         if let Some(write) = write.and_then(|write| write.resolve(self.db)) {
-                            d.field("write", &format_args!("`{}`", &write.ty().display(self.db)));
+                            d.field("write", &format_args!("`{}`", write.ty().display(self.db)));
                         }
                         d.finish()
                     }

@@ -235,8 +235,8 @@ impl std::fmt::Display for SourceKindDiff<'_> {
                         || (format!("cell {idx}"), format!("cell {idx}")),
                         |path| {
                             (
-                                format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                format!("{}:cell {}", fs::relativize_path(path), idx),
+                                format!("{}:cell {}", fs::relativize_path(path), idx),
                             )
                         },
                     );

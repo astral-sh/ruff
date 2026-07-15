@@ -111,7 +111,7 @@ pub(crate) fn check_overloaded_function<'db>(
         if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` requires at least two overloads",
-                &function_node.name
+                function_node.name
             ));
             diagnostic.set_primary_message("Only one overload defined here");
             if let Some(decorator) =
@@ -158,11 +158,11 @@ pub(crate) fn check_overloaded_function<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Overloads for function `{}` must be followed by a \
                     non-`@overload`-decorated implementation function",
-                    &function_node.name
+                    function_node.name
                 ));
                 diagnostic.info(format_args!(
                     "Attempting to call `{}` will raise `TypeError` at runtime",
-                    &function_node.name
+                    function_node.name
                 ));
                 diagnostic.info("Overloaded functions without implementations are only permitted:");
                 diagnostic.info(" - in stub files");
@@ -183,7 +183,7 @@ pub(crate) fn check_overloaded_function<'db>(
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` does not use the `@{}` decorator \
                     consistently",
-                &function_node.name, inconsistency.decorator_name
+                function_node.name, inconsistency.decorator_name
             ));
             for function in inconsistency.missing {
                 diagnostic.annotate(
