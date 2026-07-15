@@ -628,19 +628,12 @@ pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
     if let Type::ProtocolInstance(protocol) = constraint {
         let dict = KnownClass::Dict
             .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-        let all_members_present = protocol.interface(db).members(db).all(|protocol_member| {
-            dict.member(db, protocol_member.name())
-                .place
-                .ignore_possibly_undefined()
-                .is_some_and(|member_ty| !protocol_member.is_method() || !member_ty.is_none(db))
-        });
+        let all_members_present = protocol
+            .interface(db)
+            .members(db)
+            .all(|member| member.is_present_on_runtime_dict(db));
 
-        return if !all_members_present {
-            IntersectionBuilder::new(db)
-                .add_positive(constraint)
-                .add_negative(open_empty_typed_dict)
-                .build()
-        } else if dict.is_disjoint_from(db, constraint) {
+        return if all_members_present && dict.is_disjoint_from(db, constraint) {
             UnionType::from_two_elements(db, constraint, open_empty_typed_dict)
         } else {
             constraint

@@ -501,6 +501,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if matches!(ty, Type::TypedDict(_))
+            && protocol
+                .interface(db)
+                .members(db)
+                .any(|member| !member.is_present_on_runtime_dict(db))
+        {
+            return self.never();
+        }
+
         // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `ty` has the protocol class in its MRO. This is a much cheaper check than the
         // structural check we perform below, so we do it first to avoid the structural check when

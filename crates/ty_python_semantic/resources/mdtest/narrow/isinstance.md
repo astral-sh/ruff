@@ -511,7 +511,6 @@ def f(a: Foo, b: Any):
 
     if isinstance(a, b):
         reveal_type(a)  # revealed: Foo & Any
-
 ```
 
 ## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
@@ -862,6 +861,7 @@ class HasMissingMember(Protocol):
 @runtime_checkable
 class HasHash(Protocol):
     def __hash__(self) -> int: ...
+    def keys(self) -> object: ...
 
 def preserve_empty_typed_dict_protocol(value: object) -> None:
     if isinstance(value, dict) and isinstance(value, HasClear):
