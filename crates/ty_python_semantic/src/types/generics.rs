@@ -1116,14 +1116,14 @@ pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
-    /// The materialization of the specialization. For example, given an invariant
-    /// generic type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`,
-    /// and is represented here with a top materialization. Similarly,
-    /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
-    /// with a bottom materialization.
-    /// The `materialization` field may be non-`None` if the specialization contains
-    /// dynamic types in invariant positions, or if a deferred materialization is being applied
-    /// to a generic type.
+    /// The materialization of the specialization. For example, given an invariant generic
+    /// type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`, and is
+    /// represented here with [`MaterializationKind::Top`]. Similarly, `Bottom[A[Any]]` is
+    /// a subtype of all materializations of `A[Any]`, and is represented with
+    /// [`MaterializationKind::Bottom`].
+    ///
+    /// The `materialization` field may be non-`None` only if the specialization contains
+    /// dynamic types in invariant positions.
     #[returns(copy)]
     pub(crate) materialization: Option<Materialization>,
 
@@ -1508,6 +1508,9 @@ impl<'db> Specialization<'db> {
         // A deferred materialization retains the gradual arguments and marks the specialization as
         // a whole. Relations materialize a temporary copy to the corresponding ordinary top or
         // bottom materialization, while the stored type can later be restored by removing the tag.
+        //
+        // For example, `Sequence[Unknown]` becomes `DeferredTop[Sequence[Unknown]]` when deferred,
+        // and `Sequence[object]` when non-deferred.
         if materialization.is_deferred() {
             if self.materialization(db).is_none() {
                 return self.with_materialization(db, Some(materialization));
