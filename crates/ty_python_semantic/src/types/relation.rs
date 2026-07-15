@@ -470,10 +470,11 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let source = types.first(db);
-            let target = types.second(db);
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
+                let source = types.first(db);
+                let target = types.second(db);
+
                 source.has_relation_to_with_typevar_evaluation(
                     db,
                     target,
