@@ -658,7 +658,10 @@ fn displayed_parameters_for_signature<'db>(
     let parameters = signature.parameters();
 
     match parameters.kind() {
-        ParametersKind::Standard | ParametersKind::Gradual | ParametersKind::Concatenate(_) => {
+        ParametersKind::Standard
+        | ParametersKind::Gradual
+        | ParametersKind::Concatenate(_)
+        | ParametersKind::Narrowing(crate::types::MaterializationKind::Bottom) => {
             let mut displayed_parameters = Vec::new();
             let mut parameter_to_displayed_parameter_mapping = vec![None; parameters.len()];
 
@@ -732,7 +735,9 @@ fn displayed_parameters_for_signature<'db>(
                 vec![Some(0); parameters.len()],
             )
         }
-        ParametersKind::Top => (Vec::new(), vec![None; parameters.len()]),
+        ParametersKind::Top | ParametersKind::Narrowing(crate::types::MaterializationKind::Top) => {
+            (Vec::new(), vec![None; parameters.len()])
+        }
     }
 }
 

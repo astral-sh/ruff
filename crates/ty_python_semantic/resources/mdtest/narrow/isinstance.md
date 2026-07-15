@@ -311,7 +311,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: Top[(...) -> object]
+        reveal_type(y)  # revealed: (...) -> Unknown
 ```
 
 ## Class types
@@ -609,14 +609,19 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
 
 ## Narrowing with generics
 
+### Strict mode
+
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
-Narrowing to a generic class using `isinstance()` uses the top materialization of the generic. With
-a covariant generic, this is equivalent to using the upper bound of the type parameter (by default,
-`object`):
+In `strict` mode, narrowing to a generic class using `isinstance()` uses the top materialization of
+the generic. With a covariant generic, this is equivalent to using the upper bound of the type
+parameter (by default, `object`):
 
 ```py
 from typing import Self
@@ -744,6 +749,321 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+### Relaxed mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+In `relaxed` mode, narrowing to a generic class using `isinstance()` intersects with its top
+materialization, using specially tagged `object*`/`Never*` bounds for gradual type arguments. These
+bounds behave like `object`/`Never` while the intersection is simplified and are then mapped to
+`Unknown`. For example, in the case below, we build the intersection `object & Covariant[object*]`.
+This simplifies to `Covariant[object*]`, which is then mapped to `Covariant[Unknown]`:
+
+```py
+from typing import Self
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[Unknown]
+        reveal_type(x.get())  # revealed: Unknown
+```
+
+For contravariant generics, we can now `.push` objects of an arbitrary type:
+
+```py
+class Contravariant[T]:
+    def push(self, x: T) -> None: ...
+
+def _(x: object):
+    if isinstance(x, Contravariant):
+        reveal_type(x)  # revealed: Contravariant[Unknown]
+        x.push(42)
+        x.push("foo")
+```
+
+For invariant generics, we have both of these behaviors:
+
+```py
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Invariant):
+        reveal_type(x)  # revealed: Invariant[Unknown]
+        reveal_type(x.get())  # revealed: Unknown
+        x.push(42)
+        x.push("foo")
+```
+
+The behavior of `issubclass()` is similar.
+
+```py
+def _(x: type[object], y: type[object], z: type[object]):
+    if issubclass(x, Covariant):
+        reveal_type(x)  # revealed: type[Covariant[Unknown]]
+    if issubclass(y, Contravariant):
+        reveal_type(y)  # revealed: type[Contravariant[Unknown]]
+    if issubclass(z, Invariant):
+        reveal_type(z)  # revealed: type[Invariant[Unknown]]
+```
+
+The mapping only affects the tagged bounds introduced by narrowing, not existing static type
+arguments:
+
+```py
+from typing import Never
+
+def _(x: Covariant[object], y: Contravariant[Never], z: Invariant[object]):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[object]
+    if isinstance(y, Contravariant):
+        reveal_type(y)  # revealed: Contravariant[Never]
+    if isinstance(z, Invariant):
+        reveal_type(z)  # revealed: Invariant[object]
+```
+
+## Use cases: `isinstance` narrowing and generics
+
+### Strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[object]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[object]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[object]) | Sequence[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: Top[list[Unknown]]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+
+        # This is an error in strict mode:
+        # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
+        xs.append(1)
+
+    else:
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: object
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
+```
+
+#### Exhaustiveness checking
+
+```py
+def _(xs: list[str] | set[str]) -> str:
+    if isinstance(xs, list):
+        return "it's a list!"
+    elif isinstance(xs, set):
+        return "it's a set!"
+```
+
+### Relaxed mode
+
+With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified using tagged
+`object*`/`Never*` bounds, which are mapped to `Unknown` afterwards. The negative branch still
+excludes the ordinary top materialization because a negative `isinstance` result excludes every
+specialization of the class:
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+#### Covariance
+
+Narrowing from `object` via `isinstance(.., Sequence)`:
+
+```py
+from typing import Sequence, final
+
+def _(xs: object):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(xs)  # revealed: ~Sequence[object]
+```
+
+Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
+
+```py
+@final
+class Item: ...
+
+def _(xs: Item | Sequence[Item]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: Sequence[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | Sequence[OpenItem]):
+    if isinstance(xs, Sequence):
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | Sequence[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown | OpenItem
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
+```
+
+#### Invariance
+
+Narrowing from `object` via `isinstance(.., list)`:
+
+```py
+def _(xs: object):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Unknown]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown
+
+        # In relaxed mode, this is fine
+        xs.append(1)
+
+    else:
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+
+def _(xs: Item | list[Item]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[Item]
+        for x in xs:
+            reveal_type(x)  # revealed: Item
+    else:
+        reveal_type(xs)  # revealed: Item
+```
+
+Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
+
+```py
+class OpenItem: ...
+
+def _(xs: OpenItem | list[OpenItem]):
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
+        for x in xs:
+            reveal_type(x)  # revealed: Unknown | OpenItem
+    else:
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
+```
+
+#### Exhaustiveness checking
+
+```py
+def _(xs: list[str] | set[str]) -> str:
+    if isinstance(xs, list):
+        return "it's a list!"
+    elif isinstance(xs, set):
+        return "it's a set!"
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
@@ -763,7 +1083,7 @@ class WithAnyDefault[T = Any]:
 
 def _(x: object):
     if isinstance(x, WithAnyDefault):
-        reveal_type(x.y)  # revealed: tuple[Any, object]
+        reveal_type(x.y)  # revealed: tuple[Any, Unknown]
 ```
 
 Type alias defaults substituted into type parameters still need to be materialized when narrowing:
@@ -778,7 +1098,7 @@ class WithAliasDefault[T = A]:
 
 def _(x: object):
     if isinstance(x, WithAliasDefault):
-        reveal_type(x.y)  # revealed: tuple[A, object]
+        reveal_type(x.y)  # revealed: tuple[A, Unknown]
 ```
 
 ## Narrowing generic `classmethod`

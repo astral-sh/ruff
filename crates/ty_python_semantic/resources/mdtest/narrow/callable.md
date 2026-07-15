@@ -54,7 +54,15 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type `Top[Callable[..., object]]` represents the set of all possible callable types
+### Strict generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+In strict generic narrowing mode, an `isinstance(.., Callable)` check intersects the type with
+`Top[Callable[..., object]]`. This type represents the set of all possible callable types
 (including, e.g., functions that take no arguments and functions that require arguments). While such
 objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
 be valid.
@@ -78,6 +86,28 @@ def resolve(value: str):
         reveal_type(value)  # revealed: str & Top[(...) -> object]
         # error: [call-top-callable]
         reveal_type(value())  # revealed: object
+```
+
+### Relaxed generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+In relaxed generic narrowing mode, an `isinstance(.., Callable)` check narrows the type to
+`Callable[..., Unknown]` which is callable with any arguments and returns an unknown type:
+
+```py
+from typing import Callable
+
+def call_with_args(y: object):
+    if isinstance(y, Callable):
+        reveal_type(y)  # revealed: (...) -> Unknown
+
+        y()
+        y(1, "foo")
+        y(1, "foo", keyword_arg="bar")
 ```
 
 ## Narrowing with named expressions (walrus operator)
@@ -139,9 +169,14 @@ import collections.abc
 
 def f(x: object):
     if isinstance(x, typing.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+    else:
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
+
     if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+    else:
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
 ```
 
 ## `Callable` special-form identity
