@@ -12,7 +12,7 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
-use self::typed_dict::synthesize_typed_dict_merge;
+use self::typed_dict::synthesize_runtime_dict_merge;
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, open_empty_typed_dict_member,
 };
@@ -1634,13 +1634,16 @@ impl<'db> ClassType<'db> {
                 let class_literal = generic.origin(db);
                 let specialization = generic.specialization(db);
 
+                // The invariant parameters of the top `dict` materialization make the ordinary
+                // merge signatures unusable: input positions become `Never`.
                 if matches!(name, "__or__" | "__ror__")
-                    && Self::is_top_dict_specialization(db, class_literal, specialization)
+                    && specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+                    && specialization.types(db).iter().all(Type::is_unknown)
+                    && class_literal.known(db) == Some(KnownClass::Dict)
                 {
-                    return Member::definitely_declared(synthesize_typed_dict_merge(
+                    return Member::definitely_declared(synthesize_runtime_dict_merge(
                         db,
                         Type::instance(db, self),
-                        name,
                     ))
                     .inner;
                 }
@@ -2021,20 +2024,6 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
         }
-    }
-
-    /// Return whether this is the top materialization used for runtime `dict` narrowing.
-    ///
-    /// Its invariant type parameters make the ordinary materialized merge signatures unusable:
-    /// input positions become `Never`, so `__or__` and `__ror__` require synthesized signatures.
-    fn is_top_dict_specialization(
-        db: &'db dyn Db,
-        class_literal: StaticClassLiteral<'db>,
-        specialization: Specialization<'db>,
-    ) -> bool {
-        specialization.materialization_kind(db) == Some(MaterializationKind::Top)
-            && specialization.types(db).iter().all(Type::is_unknown)
-            && class_literal.known(db) == Some(KnownClass::Dict)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on

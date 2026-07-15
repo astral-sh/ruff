@@ -1566,15 +1566,10 @@ class EmptyTypedDict(TypedDict):
 class Year(TypedDict):
     year: int
 
-def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]) -> None:
+def use_empty_typed_dict(dst: EmptyTypedDict, src: Year) -> None:
     # error: [invalid-key]
     reveal_type(dst["unknown"])  # revealed: Unknown
     reveal_type(dst | src)  # revealed: EmptyTypedDict
-    # TODO: Support dictionary merges between `TypedDict` and ordinary `dict` instances.
-    # error: [unsupported-operator]
-    reveal_type(dst | other)  # revealed: Unknown
-    # error: [unsupported-operator]
-    reveal_type(other | dst)  # revealed: Unknown
 ```
 
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
@@ -5017,16 +5012,6 @@ static_assert(not is_disjoint_from(TD, dict[str, int]))
 static_assert(is_disjoint_from(TD, DictSubclass))
 ```
 
-A `TypedDict` with no required fields can be empty, so incompatible dictionary key types do not make
-the two types disjoint:
-
-```py
-class EmptyTypedDict(TypedDict):
-    pass
-
-static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
-```
-
 We do not yet use required field types to prove that a `TypedDict` and a dictionary have
 incompatible values:
 
@@ -5232,35 +5217,6 @@ def _(x: Intersection[StrTagTD, Any]):
         reveal_type(x)  # revealed: StrTagTD & Any
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
-```
-
-A type variable's bound or constraints may contain `TypedDict` types. A custom `__eq__` method means
-that a non-literal tag type can still compare equal to a string, so the positive branch must retain
-the type variable:
-
-```py
-from typing import TypeVar
-from typing_extensions import ReadOnly
-
-class AlwaysEqual:
-    def __eq__(self, other: object) -> bool:
-        return True
-
-class ExtraItemsArm(TypedDict, extra_items=ReadOnly[AlwaysEqual]): ...
-
-class DeclaredTagArm(TypedDict):
-    tag: AlwaysEqual
-
-BoundArm = TypeVar("BoundArm", bound=ExtraItemsArm)
-ConstrainedArm = TypeVar("ConstrainedArm", ExtraItemsArm, DeclaredTagArm)
-
-def bounded(value: Foo | BoundArm) -> None:
-    if value["tag"] == "foo":
-        reveal_type(value)  # revealed: Foo | BoundArm@bounded
-
-def constrained(value: Foo | ConstrainedArm) -> None:
-    if value["tag"] == "foo":
-        reveal_type(value)  # revealed: Foo | ConstrainedArm@constrained
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:

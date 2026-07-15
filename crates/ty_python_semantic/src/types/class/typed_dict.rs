@@ -361,6 +361,11 @@ fn synthesize_typed_dict_get<'db>(
     } else {
         typed_dict.value_type(db)
     };
+    let fallback_key_ty = if typed_dict == TypedDictType::open_empty(db) {
+        Type::object()
+    } else {
+        KnownClass::Str.to_instance(db)
+    };
     let overloads = fields
         .iter()
         .flat_map(|(field_name, field)| {
@@ -434,7 +439,7 @@ fn synthesize_typed_dict_get<'db>(
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(Type::object()),
+                    .with_annotated_type(fallback_key_ty),
             ]),
             UnionType::from_two_elements(db, fallback_value_ty, Type::none(db)),
         )))
@@ -449,7 +454,7 @@ fn synthesize_typed_dict_get<'db>(
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(Type::object()),
+                    .with_annotated_type(fallback_key_ty),
                 Parameter::positional_only(Some(Name::new_static("default")))
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
@@ -683,26 +688,11 @@ fn synthesize_typed_dict_view_method<'db>(
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_merge<'db>(
+fn synthesize_typed_dict_merge<'db>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
-    let top_dict_ty = KnownClass::Dict
-        .to_instance_unknown(db)
-        .top_materialization(db);
-    let open_empty_typed_dict_ty = Type::open_empty_typed_dict(db);
-    let is_runtime_dict_top = instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty;
-    let runtime_dict_return_ty =
-        KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
-    // `__or__` and `__ror__` create a fresh `dict` for the types synthesized by
-    // `isinstance(..., dict)` narrowing, while `__ior__` preserves the receiver.
-    let instance_return_ty = if name != "__ior__" && is_runtime_dict_top {
-        runtime_dict_return_ty
-    } else {
-        instance_ty
-    };
-
     let first_overload_value_ty = if name == "__ior__"
         && let Type::TypedDict(typed_dict) = instance_ty
     {
@@ -717,10 +707,10 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             .with_annotated_type(first_overload_value_ty),
     ];
 
-    let mut overloads: smallvec::SmallVec<[Signature<'db>; 4]> =
+    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]> =
         smallvec::smallvec![Signature::new(
             Parameters::standard(first_overload_parameters),
-            instance_return_ty,
+            instance_ty,
         )];
 
     if name != "__ior__" {
@@ -749,7 +739,7 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
         ];
         overloads.push(Signature::new(
             Parameters::standard(overload_two_parameters),
-            instance_return_ty,
+            instance_ty,
         ));
 
         let overload_three_parameters = [
@@ -762,21 +752,6 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             Parameters::standard(overload_three_parameters),
             dict_return_ty,
         ));
-
-        if is_runtime_dict_top {
-            let runtime_dict_top =
-                UnionType::from_elements(db, [top_dict_ty, open_empty_typed_dict_ty]);
-            let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("value")))
-                    .with_annotated_type(runtime_dict_top),
-            ];
-            overloads.push(Signature::new(
-                Parameters::standard(parameters),
-                runtime_dict_return_ty,
-            ));
-        }
     }
 
     Type::Callable(CallableType::new(
@@ -785,6 +760,40 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
     ))
+}
+
+/// Synthesize `__or__` or `__ror__` for the runtime dictionary narrowing types.
+///
+/// The invariant parameters of top-materialized `dict` make its normal merge input type `Never`.
+/// Both runtime constraint arms therefore need a shared signature that accepts either arm.
+pub(super) fn synthesize_runtime_dict_merge<'db>(
+    db: &'db dyn Db,
+    instance_ty: Type<'db>,
+) -> Type<'db> {
+    let runtime_dict_top = UnionType::from_elements(
+        db,
+        [
+            KnownClass::Dict
+                .to_instance_unknown(db)
+                .top_materialization(db),
+            Type::open_empty_typed_dict(db),
+        ],
+    );
+    let return_ty =
+        KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
+
+    Type::function_like_callable(
+        db,
+        Signature::new(
+            Parameters::standard([
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("value")))
+                    .with_annotated_type(runtime_dict_top),
+            ]),
+            return_ty,
+        ),
+    )
 }
 
 /// Represents a `TypedDict` created via the functional form:
@@ -1092,9 +1101,23 @@ pub(crate) fn open_empty_typed_dict_member<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let typed_dict = TypedDictType::open_empty(db);
 
-    if let Some(member) = synthesize_typed_dict_method(db, typed_dict, name, || {
-        TypedDictFields::Dynamic(typed_dict.items(db))
-    }) {
+    if matches!(name, "__or__" | "__ror__") {
+        return Member::definitely_declared(synthesize_runtime_dict_merge(
+            db,
+            Type::TypedDict(typed_dict),
+        ))
+        .inner;
+    }
+
+    // Unlike other synthesized mutation methods, `pop` and `setdefault` represent their legal
+    // operations entirely as overloads. The open empty `TypedDict` has no legal overloads for
+    // either method, so use the fallback signatures with a `Never` key instead of exposing an
+    // empty overload set.
+    if !matches!(name, "pop" | "setdefault")
+        && let Some(member) = synthesize_typed_dict_method(db, typed_dict, name, || {
+            TypedDictFields::Dynamic(typed_dict.items(db))
+        })
+    {
         return Member::definitely_declared(member).inner;
     }
 

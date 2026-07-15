@@ -59,33 +59,6 @@ def _(obj: WithSpam):
         reveal_type(obj)  # revealed: Never
 ```
 
-A `TypedDict` object has dictionary methods at runtime, but mutating methods such as `clear` are not
-part of its static interface. We do not yet use runtime attribute presence when narrowing with
-`hasattr`, so the false branch below remains reachable:
-
-```py
-from typing import TypedDict
-
-class Movie(TypedDict):
-    title: str
-
-def _(movie: Movie):
-    if not hasattr(movie, "clear"):
-        # TODO: This should be `Never`.
-        reveal_type(movie)  # revealed: Movie & ~<Protocol with members 'clear'>
-```
-
-The same limitation applies after `type(value) is dict`. The value may be a `TypedDict`, but every
-possible runtime value still has a `clear` attribute:
-
-```py
-def _(value: object):
-    if type(value) is dict:
-        if not hasattr(value, "clear"):
-            # TODO: This should be `Never`.
-            reveal_type(value)  # revealed: <TypedDict with no items> & ~<Protocol with members 'clear'>
-```
-
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
 the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch:
 

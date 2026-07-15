@@ -15,7 +15,6 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::typed_dict::TypedDictField;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -217,14 +216,6 @@ pub(crate) enum TypeVarEvaluation {
     ///
     /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
     Lazy,
-}
-
-/// Return the mutable `dict` approximation used only to reason about runtime overlap.
-///
-/// `TypedDict` remains statically distinct from mutable dictionaries; this projection captures
-/// that every inhabitant is nevertheless a `dict` with string keys at runtime.
-fn typed_dict_runtime_dict(db: &dyn Db) -> Type<'_> {
-    KnownClass::Dict.to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
 }
 
 impl TypeRelation {
@@ -2523,27 +2514,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             })
     }
 
-    /// Test protocol disjointness using runtime member presence only.
-    ///
-    /// Runtime-checkable protocols ignore member types, so an incompatible annotation cannot prove
-    /// disjointness here; only a member absent from the runtime `dict` surface can.
-    fn any_protocol_members_absent(
-        &self,
-        db: &'db dyn Db,
-        protocol: ProtocolInstanceType<'db>,
-        other: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        protocol
-            .interface(db)
-            .members(db)
-            .when_any(db, self.constraints, |member| {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    other.member(db, member.name()).place.is_undefined(),
-                )
-            })
-    }
-
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(self.constraints, true)
     }
@@ -2924,16 +2894,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // TypedDict inhabitants have exact runtime type `dict`. Protocol member types cannot
-            // prove disjointness here because runtime protocol checks only inspect attribute
-            // presence.
-            (Type::ProtocolInstance(protocol), Type::TypedDict(_))
-            | (Type::TypedDict(_), Type::ProtocolInstance(protocol)) => {
-                self.with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent(db, protocol, typed_dict_runtime_dict(db))
-                })
-            }
-
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(left, right, || {
@@ -3286,22 +3246,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::TypedDict(typed_dict), other) | (other, Type::TypedDict(typed_dict)) => {
-                // A TypedDict with no required fields contains `{}`, so its runtime key type cannot
-                // prove disjointness from any generic instantiation of a `dict` supertype.
-                let key_ty = if typed_dict
-                    .items(db)
-                    .values()
-                    .any(TypedDictField::is_required)
-                {
-                    KnownClass::Str.to_instance(db)
-                } else {
-                    Type::any()
-                };
-                let dict = KnownClass::Dict.to_specialized_instance(db, &[key_ty, Type::any()]);
+            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
+                // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all
+                // `TypedDict` types will always be disjoint from `T`. This doesn't cover all
+                // cases -- in fact `dict` *itself* is almost always disjoint from `TypedDict` --
+                // but it's a good approximation, and some false negatives are acceptable.
+                let dict_str_any = KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
 
                 self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict, other)
+                    .check_type_pair(db, dict_str_any, other)
                     .negate(db, self.constraints)
             }
         }

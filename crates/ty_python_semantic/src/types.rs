@@ -6344,7 +6344,6 @@ impl<'db> Type<'db> {
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown),
-            Type::TypeAlias(alias) => alias.value_type(db).dunder_class(db),
             _ => self.to_meta_type(db),
         }
     }

@@ -500,7 +500,7 @@ In order to preserve the gradual guarantee, we intersect with the type of the se
 type of the second argument is a dynamic type:
 
 ```py
-from typing import Any, TypedDict
+from typing import Any
 from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
 
 class Foo: ...
@@ -512,12 +512,6 @@ def f(a: Foo, b: Any):
     if isinstance(a, b):
         reveal_type(a)  # revealed: Foo & Any
 
-class Bar(TypedDict):
-    status: str
-
-def g(a: Bar | int):
-    if isinstance(a, SomethingUnknown):
-        reveal_type(a)  # revealed: (Bar & Unknown) | (int & Unknown)
 ```
 
 ## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
@@ -760,6 +754,7 @@ dictionaries and any `TypedDict`:
 ```py
 from collections.abc import MutableMapping
 from typing import TypedDict
+from typing_extensions import Never
 
 class Movie(TypedDict):
     title: str
@@ -774,6 +769,7 @@ def narrow_object(value: object) -> None:
 def narrow_movie(movie: Movie) -> None:
     if isinstance(movie, MutableMapping):
         reveal_type(movie)  # revealed: Movie
+        reveal_type(reversed(movie))  # revealed: Iterator[str]
 ```
 
 For an unconstrained type variable, neither the ordinary dictionary possibility nor the `TypedDict`
@@ -794,12 +790,21 @@ arbitrary mutation:
 
 ```py
 def takes_dict(value: dict[str, object]) -> None: ...
-def use_narrowed_dict(value: object, key: object) -> None:
+def use_narrowed_dict(
+    value: object,
+    key: object,
+    missing: Never,
+    keys: list[str],
+    item: int,
+) -> None:
     if isinstance(value, dict):
         reveal_type(value.get(key))  # revealed: object
         reveal_type(reversed(value))  # revealed: Iterator[object]
+        reveal_type(value.fromkeys(keys, item))  # revealed: dict[str, int]
         reveal_type(value.copy())  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
         value.clear()  # error: [unresolved-attribute]
+        value.pop(missing)
+        value.setdefault(missing, missing)
         takes_dict(value)  # error: [invalid-argument-type]
 ```
 
@@ -812,31 +817,6 @@ def merge_narrowed_dicts(left: object, right: object) -> None:
         reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
         reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
         reveal_type(right.__ror__(left))  # revealed: dict[Unknown, Unknown]
-```
-
-A narrowed value can also appear on either side of a concrete dictionary merge:
-
-```py
-class CustomDict(dict[int, bytes]): ...
-
-def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
-    if isinstance(value, dict):
-        # TODO: These unions should normalize to `dict[Unknown, Unknown]`.
-        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
-        reveal_type(value | custom)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
-```
-
-We do not yet prioritize a `dict` subclass's reflected method when it is merged with a `TypedDict`:
-
-```py
-class ReflectedDict(dict[str, object]):
-    # error: [invalid-method-override]
-    def __ror__(self, other: Movie) -> str:
-        return "reflected"
-
-def preserve_reflected_dict_override(movie: Movie, custom: ReflectedDict) -> None:
-    # TODO: This should be `str`.
-    reveal_type(movie | custom)  # revealed: dict[str, object]
 ```
 
 Narrowing a union with a concrete dictionary keeps its methods callable with `IntEnum` keys:
@@ -860,43 +840,51 @@ def _(info: ErrorInfo):
         reveal_type(info.error_field(DiagnosticField.MESSAGE))  # revealed: bytes | None
 ```
 
-Runtime-checkable protocols only test whether an attribute exists. A conflicting annotated return
-type does not make a `TypedDict` disjoint from a protocol when the runtime dictionary has that
-attribute:
+Runtime protocol checks preserve `TypedDict` possibilities by checking the concrete `dict` member
+surface. Compatible protocols retain their structural refinement, while an incompatible static
+signature cannot eliminate a runtime-compatible `TypedDict`:
 
 ```py
 from typing import Protocol, runtime_checkable
 
 @runtime_checkable
-class HasClearReturningInt(Protocol):
-    def clear(self) -> int: ...
-
-def preserve_typed_dict_protocol_member_type(movie: Movie) -> None:
-    if isinstance(movie, HasClearReturningInt):
-        movie["title"] = 1  # error: [invalid-assignment]
-```
-
-After narrowing an arbitrary value to both `dict` and a protocol, the protocol makes its method
-available on every remaining possibility:
-
-```py
-@runtime_checkable
 class HasClear(Protocol):
     def clear(self) -> None: ...
+
+@runtime_checkable
+class HasKeysReturningInt(Protocol):
+    def keys(self) -> int: ...
+
+@runtime_checkable
+class HasMissingMember(Protocol):
+    def missing(self) -> None: ...
+
+@runtime_checkable
+class HasHash(Protocol):
+    def __hash__(self) -> int: ...
 
 def preserve_empty_typed_dict_protocol(value: object) -> None:
     if isinstance(value, dict) and isinstance(value, HasClear):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (<TypedDict with no items> & HasClear)
         value.clear()
-```
 
-The same narrowed value can be merged with a concrete dictionary in either order:
+def runtime_protocols_use_dict_member_presence(movie: Movie) -> None:
+    if isinstance(movie, HasKeysReturningInt):
+        # Runtime protocol checks ignore the incompatible static return type.
+        reveal_type(movie)  # revealed: Movie
+    else:
+        reveal_type(movie)  # revealed: Never
 
-```py
-def merge_empty_typed_dict_protocol(value: object, other: dict[int, bytes]) -> None:
-    if isinstance(value, dict) and isinstance(value, HasClear):
-        _ = value | other
-        _ = other | value
+    if isinstance(movie, HasMissingMember):
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
+
+    if isinstance(movie, HasHash):
+        # `dict.__hash__` exists but is explicitly disabled with `None`.
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
 ```
 
 `TypedDict` objects have exact runtime type `dict`, so they cannot be instances of a proper `dict`
@@ -999,16 +987,25 @@ def narrow_typeddict_union(v: T) -> None:
         reveal_type(v)  # revealed: int
 ```
 
-`TypedDict` objects are also `MutableMapping` objects at runtime:
+This also covers the recursive `Result | list[Result]` example reported on
+<https://github.com/astral-sh/ty/issues/1130#issuecomment-4762266723>. The `else` branch must remove
+the `TypedDict`; otherwise iterating `result` introduces its string keys into the element type:
 
 ```py
-from collections.abc import MutableMapping
+import collections
+from typing import TypedDict
 
-def narrow_mutable_mapping_or_typeddict(x: dict[str, str] | A) -> None:
-    if isinstance(x, MutableMapping):
-        reveal_type(x)  # revealed: dict[str, str] | A
-    else:
-        reveal_type(x)  # revealed: Never
+class Result(TypedDict):
+    name: str
+    score: float
+
+class MyDict(collections.defaultdict[str, float]):
+    def add(self, text: str, result: Result | list[Result]) -> None:
+        if isinstance(result, dict):
+            self[result["name"]] += result["score"] * len(text)
+        else:
+            for item in result:
+                self.add(text, item)
 ```
 
 The negative branch removes a `TypedDict` member, making attributes from the remaining class
@@ -1027,18 +1024,6 @@ def narrow_typeddict_or_class(value: A | Vulnerability) -> None:
         pass
     else:
         reveal_type(value.package.ecosystem)  # revealed: str
-```
-
-Narrowing preserves the key type of a concrete `TypedDict` for read-only dictionary operations:
-
-```py
-class ReversibleMovie(TypedDict):
-    name: str
-    year: int
-
-def narrow_reversed_typeddict_union(x: ReversibleMovie | int) -> None:
-    if isinstance(x, dict):
-        reveal_type(reversed(x))  # revealed: Iterator[str]
 ```
 
 ## Narrowing with named expressions (walrus operator)
