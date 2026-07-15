@@ -2785,6 +2785,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::Intersection(intersection) => intersection.map_positive(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
             }),
+            Type::TypeVar(typevar) => {
+                let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
+                else {
+                    return ty;
+                };
+
+                let upper_bound = bound_or_constraints.as_type(db);
+                let narrowed_upper_bound = match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        Self::narrow_type_by_exact_len(db, bound, length, is_equality)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        UnionType::from_elements(
+                            db,
+                            constraints.elements(db).iter().map(|constraint| {
+                                Self::narrow_type_by_exact_len(db, *constraint, length, is_equality)
+                            }),
+                        )
+                    }
+                };
+
+                if narrowed_upper_bound == upper_bound {
+                    resolved
+                } else {
+                    IntersectionType::from_two_elements(db, resolved, narrowed_upper_bound)
+                }
+            }
             _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(db, TupleLength::Fixed(length)) {
