@@ -1310,13 +1310,16 @@ fn constraint_set_order_index(index: usize) -> usize {
     }
 
     static ORDER: LazyLock<Order> = LazyLock::new(|| {
-        let Ok(value) = std::env::var(EnvVars::TY_CONSTRAINT_SET_ORDER) else {
+        let Some(value) = std::env::var_os(EnvVars::TY_CONSTRAINT_SET_ORDER) else {
             return Order::Normal;
         };
         if value == "reverse" {
             return Order::Reverse;
         }
-        value.parse::<u32>().map_or(Order::Normal, Order::Rotate)
+        value
+            .to_str()
+            .and_then(|value| value.parse::<u32>().ok())
+            .map_or(Order::Normal, Order::Rotate)
     });
 
     match *ORDER {
@@ -3742,8 +3745,8 @@ impl<'db> PathBounds<'db> {
         });
 
         let mut result = Vec::with_capacity(sorted_paths.len());
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
 
         for path in sorted_paths {
             mappings.clear();
@@ -3772,7 +3775,7 @@ impl<'db> PathBounds<'db> {
             }
 
             let path_bounds = mappings
-                .drain()
+                .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
             result.push(path_bounds);
@@ -3832,8 +3835,8 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
@@ -3846,7 +3849,7 @@ impl<'db> PathBounds<'db> {
         }
 
         let path = mappings
-            .drain()
+            .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
@@ -7767,16 +7770,16 @@ mod tests {
             actual,
             FxIndexSet::from_iter([
                 String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes]"
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]"
                 ),
                 String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes, T=list[int]; V=bytes]"
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]"
                 ),
                 String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; U=int, V=bytes; V=bytes]"
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]"
                 ),
                 String::from(
-                    "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes, T=list[U]; V=bytes]"
+                    "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]"
                 ),
             ])
         );
@@ -7821,10 +7824,10 @@ mod tests {
             FxIndexSet::from_iter([
                 String::from("never=false always=false merged=[U=bytes] paths=[; U=bytes]"),
                 String::from(
-                    "never=false always=false merged=[T=str, U=bytes] paths=[; U=bytes, T=str; U=bytes]"
+                    "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]"
                 ),
                 String::from(
-                    "never=false always=false merged=[T=int, U=bytes] paths=[; U=bytes, T=int; U=bytes]"
+                    "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]"
                 ),
             ])
         );
@@ -7888,7 +7891,7 @@ mod tests {
     }
 
     #[test]
-    fn salsa_typevar_order_changes_solution_binding_order() {
+    fn salsa_typevar_order_preserves_solution_binding_order() {
         let mut actual = FxIndexSet::default();
         for order in (0..3).permutations(3) {
             let db = setup_db();
@@ -7932,14 +7935,9 @@ mod tests {
             );
         }
 
-        // TODO: `PathBounds::compute*` drains an `FxHashMap` keyed by Salsa-backed typevars. All
-        // creation orders should produce one binding order before we migrate more caching to Salsa.
         assert_eq!(
             actual,
-            FxIndexSet::from_iter([
-                String::from("U=str, T=int, V=bytes"),
-                String::from("T=int, U=str, V=bytes"),
-            ])
+            FxIndexSet::from_iter([String::from("T=int, U=str, V=bytes")])
         );
     }
 

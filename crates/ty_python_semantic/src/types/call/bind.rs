@@ -65,8 +65,9 @@ use crate::types::{
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    TypeAliasType, TypeContext, TypeFormType, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -2729,6 +2730,43 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(db, tracked.constraints(db));
                         let result = set.satisfied_by_all_typevars(db, &constraints, inferable);
                         overload.set_return_type(Type::bool_literal(result));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutionsFor(
+                        tracked,
+                    )) => {
+                        let [Some(typevar), Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::TypeVar(typevar) = typevar.project_type_form(db) else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, &inferable) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(db, tracked.constraints(db));
+                        let result = match set.solutions(db, &constraints, inferable) {
+                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                                db,
+                                paths.into_iter().filter_map(|path| {
+                                    path.into_iter()
+                                        .find(|binding| binding.bound_typevar == typevar)
+                                        .map(|binding| {
+                                            TypeFormType::from_type_expression(db, binding.solution)
+                                        })
+                                }),
+                            ),
+                            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                                Type::empty_tuple(db)
+                            }
+                        };
+                        overload.set_return_type(result);
                     }
 
                     Type::KnownBoundMethod(

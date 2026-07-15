@@ -129,6 +129,19 @@ class ConstraintSet:
         constraint set will be considered non-inferable.
         """
 
+    def solutions_for(
+        self,
+        typevar: TypeForm[object],
+        *,
+        inferable: TypeForm[tuple[object, ...]],
+    ) -> tuple[TypeForm[object], ...]:
+        """
+        Returns the explicit solutions inferred for `typevar` across all paths.
+
+        `inferable` specifies all typevars that should be solved for. Paths that
+        do not infer a solution for `typevar` do not contribute an element.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
