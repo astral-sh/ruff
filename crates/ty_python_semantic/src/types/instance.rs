@@ -1108,21 +1108,33 @@ impl<'db> ProtocolInstanceType<'db> {
         })
     }
 
+    /// Return a materialized protocol's effective interface member when it should override
+    /// nominal-origin lookup.
+    ///
+    /// Members omitted from the interface, or whose origin has a `Todo` type, continue to use the
+    /// nominal origin.
+    pub(super) fn materialized_interface_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        let Protocol::Materialized(materialized) = self.inner else {
+            return None;
+        };
+        let interface = materialized.interface(db);
+        let origin = materialized.origin(db);
+        (interface.includes_member(db, name)
+            && !origin.interface(db).member_has_todo_type(db, name))
+        .then(|| interface.instance_member(db, name))
+    }
+
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized.interface().instance_member(db, name),
-            Protocol::Materialized(materialized) => {
-                let protocol_interface = materialized.interface(db);
-                let origin = materialized.origin(db);
-                if protocol_interface.includes_member(db, name)
-                    && !origin.interface(db).member_has_todo_type(db, name)
-                {
-                    protocol_interface.instance_member(db, name)
-                } else {
-                    origin.instance_member(db, name)
-                }
-            }
+            Protocol::Materialized(materialized) => self
+                .materialized_interface_member(db, name)
+                .unwrap_or_else(|| materialized.origin(db).instance_member(db, name)),
         }
     }
 
