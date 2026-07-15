@@ -502,9 +502,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_protocol = ty.as_protocol_instance();
         let source_protocol_as_nominal =
             source_protocol.and_then(|protocol| protocol.to_nominal_instance(db));
-        let materialized_source_changes_target = source_protocol.is_some_and(|source| {
-            source.materialization_changes_requirements(db, protocol.interface(db))
-        });
+        let materialized_source_changes_target = source_protocol
+            .is_some_and(|source| source.materialization_changes_requirements(db, protocol));
 
         if !protocol.is_materialized()
             && !materialized_source_changes_target
@@ -1044,7 +1043,7 @@ impl<'db> ProtocolInstanceType<'db> {
     fn materialization_changes_requirements(
         self,
         db: &'db dyn Db,
-        target: ProtocolInterface<'db>,
+        target: ProtocolInstanceType<'db>,
     ) -> bool {
         let Protocol::Materialized(materialized) = self.inner else {
             return false;
@@ -1052,7 +1051,7 @@ impl<'db> ProtocolInstanceType<'db> {
         materialized.interface(db).differs_for_members_required_by(
             db,
             materialized.origin(db).interface(db),
-            target,
+            target.interface(db),
         )
     }
 
