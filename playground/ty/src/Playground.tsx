@@ -241,6 +241,20 @@ export default function Playground() {
     restoreWorkspace(session, DEFAULT_WORKSPACE, dispatchFiles, setError);
   }, [session, files]);
 
+  const handleKeyPress = (event: KeyboardEvent) => {
+    // Swallow command-s or ctrl-s to prevent browser save.
+    if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyPress);
+
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, []);
+
   return (
     <main className="flex flex-col h-full bg-white dark:bg-ayu-background-dark">
       <Header
