@@ -39,8 +39,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1072,9 +1072,23 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
-            receiver
-                .when_constraint_set_assignable_to_owned(db, annotation)
-                .into_owned()
+            let receiver_typevar = match annotation {
+                Type::TypeVar(typevar) => Some(typevar),
+                Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
+                _ => None,
+            };
+            if let Some(typevar) = receiver_typevar
+                && let Some(constraints) = Self::direct_receiver_domain_constraints(
+                    db,
+                    receiver,
+                    typevar,
+                    &parameters,
+                    return_ty,
+                )
+            {
+                return std::borrow::Cow::Owned(constraints);
+            }
+            receiver.when_constraint_set_assignable_to_owned(db, annotation)
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
@@ -1103,6 +1117,49 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
+    }
+
+    #[cold]
+    fn direct_receiver_domain_constraints(
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        parameters: &Parameters<'db>,
+        return_ty: Type<'db>,
+    ) -> Option<OwnedConstraintSet<'db>> {
+        let domain = typevar.typevar(db).bound_or_constraints(db)?;
+        if receiver.has_typevar(db) {
+            return None;
+        }
+
+        let identity = typevar.typevar(db).identity(db);
+        if return_ty.references_typevar(db, identity)
+            || parameters
+                .iter()
+                .any(|parameter| parameter.annotated_type().references_typevar(db, identity))
+        {
+            return None;
+        }
+
+        let receiver_is_assignable_to = |target| {
+            receiver
+                .when_constraint_set_assignable_to_owned(db, target)
+                .query(|_builder, constraints| constraints.is_always_satisfied(db))
+        };
+        let receiver_is_in_domain = match domain {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                receiver_is_assignable_to(bound.top_materialization(db))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .elements(db)
+                .iter()
+                .any(|constraint| receiver_is_assignable_to(constraint.top_materialization(db))),
+        };
+        Some(if receiver_is_in_domain {
+            OwnedConstraintSet::always()
+        } else {
+            OwnedConstraintSet::default()
+        })
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1255,33 +1312,6 @@ impl<'db> Signature<'db> {
             return checker.always();
         };
         checker.constraints.load(db, constraints)
-    }
-
-    fn receiver_constraint_typevar_domain<'c>(
-        &self,
-        db: &'db dyn Db,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
-        let generic_context = self.generic_context?;
-        self.receiver_constraints
-            .as_ref()
-            .is_some_and(|constraints| {
-                generic_context.variables(db).any(|typevar| {
-                    constraints.types().any(|ty| {
-                        ty.as_typevar()
-                            .is_some_and(|candidate| candidate == typevar)
-                    })
-                })
-            })
-            // Bounds can refer to other variables in the same generic context, so include every
-            // remaining domain once the receiver relation constrains one of them.
-            .then(|| {
-                ConstraintSet::valid_typevar_specializations(
-                    db,
-                    constraints,
-                    generic_context.variables(db),
-                )
-            })
     }
 
     fn map_receiver_constraints(
@@ -2046,33 +2076,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         });
 
-        // Apply and eliminate each signature's declared receiver domain separately. This is
-        // equivalent to existentially quantifying both domains together, but avoids recursively
-        // relating two protocol bounds while the constraint diagram is being simplified.
-        if source.generic_context == target.generic_context {
-            let domain = source
-                .receiver_constraint_typevar_domain(db, self.constraints)
-                .or_else(|| target.receiver_constraint_typevar_domain(db, self.constraints))
-                .unwrap_or_else(|| ConstraintSet::from_bool(self.constraints, true));
-            domain.and(db, self.constraints, || when).reduce_inferable(
-                db,
-                self.constraints,
-                signature_inferable,
-            )
-        } else {
-            let source_domain = source
-                .receiver_constraint_typevar_domain(db, self.constraints)
-                .unwrap_or_else(|| ConstraintSet::from_bool(self.constraints, true));
-            let when = source_domain
-                .and(db, self.constraints, || when)
-                .reduce_inferable(db, self.constraints, source_inferable);
-            let target_domain = target
-                .receiver_constraint_typevar_domain(db, self.constraints)
-                .unwrap_or_else(|| ConstraintSet::from_bool(self.constraints, true));
-            target_domain
-                .and(db, self.constraints, || when)
-                .reduce_inferable(db, self.constraints, target_inferable)
-        }
+        // But the caller does not need to consider those extra typevars. Whatever constraint set
+        // we produce, we reduce it back down to the inferable set that the caller asked about.
+        // If we introduced new inferable typevars, those will be existentially quantified away
+        // before returning.
+        when.reduce_inferable(db, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(

@@ -85,11 +85,18 @@ class InvalidConstrainedReceiver:
 class ValidConstrainedReceiver(str):
     def method[T: (int, str)](self: T) -> None: ...
 
+type ReceiverAlias[T] = T
+
+class InvalidAliasedBoundedReceiver:
+    def method[T: int](self: ReceiverAlias[T]) -> None: ...
+
 invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
 valid_bound: Callable[[], None] = ValidBoundedReceiver().method
 
 invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method  # error: [invalid-assignment]
 valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
+
+invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
