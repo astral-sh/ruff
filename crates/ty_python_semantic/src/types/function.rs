@@ -86,10 +86,10 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor,
+    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
     IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, definition_expression_type, walk_signature,
@@ -2373,12 +2373,9 @@ impl KnownFunction {
                     return;
                 };
                 let casted_type = casted_type.project_type_form(db);
-                let contains_unknown_or_todo = |ty: Type<'_>| {
-                    ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
-                };
                 if source_type.is_equivalent_to(db, casted_type)
-                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
-                    && !any_over_type(db, casted_type, true, contains_unknown_or_todo)
+                    && non_any_dynamic_content(db, *source_type).is_absent()
+                    && non_any_dynamic_content(db, casted_type).is_absent()
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();

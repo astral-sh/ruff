@@ -839,6 +839,14 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Return the class backing a class-based protocol instance.
+    pub(super) fn as_class_based(self) -> Option<ProtocolClass<'db>> {
+        match self.inner {
+            Protocol::FromClass(class) => Some(class),
+            Protocol::Synthesized(_) => None,
+        }
+    }
+
     /// If this is a class-based protocol, convert the protocol-instance into a nominal instance.
     ///
     /// If this is a synthesized protocol that does not correspond to a class definition
