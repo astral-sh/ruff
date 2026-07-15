@@ -1,4 +1,4 @@
-use compact_str::{CompactString, ToCompactString};
+use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
@@ -1816,13 +1816,17 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable string literal.
-    pub(crate) fn string_literal<T>(db: &'db dyn Db, string: T) -> Self
-    where
-        T: salsa::Lookup<CompactString> + std::hash::Hash,
-        CompactString: salsa::HashEqLike<T>,
-    {
-        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db, string,
+    pub(crate) fn string_literal(db: &'db dyn Db, string: impl AsRef<str>) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::from_str(
+            db,
+            string.as_ref(),
+        )))
+    }
+
+    /// Create a promotable string literal that shares an owned name's backing storage.
+    pub(crate) fn string_literal_from_name(db: &'db dyn Db, name: Name) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::from_name(
+            db, name,
         )))
     }
 
@@ -1838,10 +1842,7 @@ impl<'db> Type<'db> {
 
     /// Create a promotable single-character string literal.
     pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db,
-            c.to_compact_string(),
-        )))
+        Self::string_literal(db, c.to_compact_string())
     }
 
     /// Create a promotable bytes literal.
