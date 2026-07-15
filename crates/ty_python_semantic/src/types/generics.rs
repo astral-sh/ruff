@@ -3003,10 +3003,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_)),
-            ) if matches!(formal_subclass.subclass_of(), SubclassOfInner::Protocol(_)) => {
-                let SubclassOfInner::Protocol(protocol) = formal_subclass.subclass_of() else {
-                    return Ok(());
-                };
+            ) if let SubclassOfInner::Protocol(protocol) = formal_subclass.subclass_of() => {
                 let formal_protocol = Type::ProtocolInstance(protocol);
                 if let Type::Union(union) = actual {
                     for element in union.elements(self.db) {
@@ -3028,12 +3025,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var() =>
+                if let Some(type_var) = subclass_of.into_type_var()
+                    && let Some(actual_instance) = ty.to_instance(self.db) =>
             {
-                let formal_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
-                if let Some(actual_instance) = ty.to_instance(self.db) {
-                    return self.infer_map_impl(formal_instance, actual_instance, polarity, seen);
-                }
+                return self.infer_map_impl(
+                    Type::TypeVar(type_var),
+                    actual_instance,
+                    polarity,
+                    seen,
+                );
             }
 
             (
