@@ -823,25 +823,29 @@ fn types_have_existing_runtime_overlap<'db>(
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
     ordinary: SmallVec<[Type<'db>; 2]>,
-    runtime_constraint: Option<Type<'db>>,
-    /// If set, all runtime constraints have already been folded into `ordinary`.
-    has_multiple_runtime_constraints: bool,
+    runtime_constraints: RuntimeConstraints<'db>,
+}
+
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Copy, get_size2::GetSize, salsa::SalsaValue)]
+enum RuntimeConstraints<'db> {
+    None,
+    Single(Type<'db>),
+    /// All runtime constraints have been folded into `Conjunctions::ordinary`.
+    Multiple,
 }
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
             ordinary: smallvec![ty],
-            runtime_constraint: None,
-            has_multiple_runtime_constraints: false,
+            runtime_constraints: RuntimeConstraints::None,
         }
     }
 
     fn positive_runtime(ty: Type<'db>) -> Self {
         Self {
             ordinary: smallvec![],
-            runtime_constraint: Some(ty),
-            has_multiple_runtime_constraints: false,
+            runtime_constraints: RuntimeConstraints::Single(ty),
         }
     }
 
@@ -853,23 +857,23 @@ impl<'db> Conjunctions<'db> {
         for conjunct in other.ordinary {
             self.add_ordinary(conjunct);
         }
-        match (self.runtime_constraint.take(), other.runtime_constraint) {
-            (Some(left), Some(right)) => {
+        self.runtime_constraints = match (self.runtime_constraints, other.runtime_constraints) {
+            (RuntimeConstraints::None, runtime_constraints)
+            | (runtime_constraints, RuntimeConstraints::None) => runtime_constraints,
+            (RuntimeConstraints::Single(left), RuntimeConstraints::Single(right)) => {
                 self.add_ordinary(left);
                 self.add_ordinary(right);
-                self.has_multiple_runtime_constraints = true;
+                RuntimeConstraints::Multiple
             }
-            (runtime_constraint, None) | (None, runtime_constraint) => {
-                if self.has_multiple_runtime_constraints || other.has_multiple_runtime_constraints {
-                    if let Some(runtime_constraint) = runtime_constraint {
-                        self.add_ordinary(runtime_constraint);
-                    }
-                } else {
-                    self.runtime_constraint = runtime_constraint;
-                }
+            (RuntimeConstraints::Single(runtime_constraint), RuntimeConstraints::Multiple)
+            | (RuntimeConstraints::Multiple, RuntimeConstraints::Single(runtime_constraint)) => {
+                self.add_ordinary(runtime_constraint);
+                RuntimeConstraints::Multiple
             }
-        }
-        self.has_multiple_runtime_constraints |= other.has_multiple_runtime_constraints;
+            (RuntimeConstraints::Multiple, RuntimeConstraints::Multiple) => {
+                RuntimeConstraints::Multiple
+            }
+        };
         self
     }
 
@@ -881,13 +885,14 @@ impl<'db> Conjunctions<'db> {
 
     fn contains_never(&self) -> bool {
         self.ordinary.iter().any(Type::is_never)
-            || self
-                .runtime_constraint
-                .is_some_and(|constraint| constraint.is_never())
+            || matches!(
+                self.runtime_constraints,
+                RuntimeConstraints::Single(constraint) if constraint.is_never()
+            )
     }
 
     fn evaluate_constraint_type(mut self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(runtime_constraint) = self.runtime_constraint {
+        if let RuntimeConstraints::Single(runtime_constraint) = self.runtime_constraints {
             self.add_ordinary(runtime_constraint);
         }
         if self.ordinary.len() == 1 {
@@ -908,6 +913,10 @@ impl<'db> Conjunctions<'db> {
         db: &'db dyn Db,
         base_ty: Option<Type<'db>>,
     ) -> Type<'db> {
+        let runtime_constraint = match self.runtime_constraints {
+            RuntimeConstraints::Single(runtime_constraint) => Some(runtime_constraint),
+            RuntimeConstraints::None | RuntimeConstraints::Multiple => None,
+        };
         let mut constrained_base = IntersectionBuilder::new(db);
         if let Some(base_ty) = base_ty {
             constrained_base = constrained_base.add_positive(base_ty);
@@ -916,10 +925,9 @@ impl<'db> Conjunctions<'db> {
             constrained_base = constrained_base.add_positive(conjunct);
         }
         let constrained_base = constrained_base.build();
-        self.runtime_constraint
-            .map_or(constrained_base, |runtime_constraint| {
-                prefer_union_runtime_narrowing(db, constrained_base, runtime_constraint)
-            })
+        runtime_constraint.map_or(constrained_base, |runtime_constraint| {
+            prefer_union_runtime_narrowing(db, constrained_base, runtime_constraint)
+        })
     }
 }
 
