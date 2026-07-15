@@ -7575,6 +7575,343 @@ mod tests {
         });
     }
 
+    #[derive(Clone, Copy)]
+    enum OrderingAuditToken {
+        Atom(usize),
+        And,
+        Or,
+        Not,
+    }
+
+    fn solutions_for_constraint_orderings<'db>(
+        db: &'db dyn Db,
+        typevars: &[BoundTypeVarInstance<'db>],
+        atoms: &[Constraint<'db>],
+        expression: &[OrderingAuditToken],
+    ) -> FxIndexSet<String> {
+        let inferable = InferableTypeVars::from_typevars(
+            db,
+            typevars
+                .iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        );
+        let mut signatures = FxIndexSet::default();
+
+        for constraint_order in (0..atoms.len()).permutations(atoms.len()) {
+            let builder = ConstraintSetBuilder::new();
+            for typevar in typevars {
+                builder.intern_typevar(db, *typevar);
+            }
+            for index in constraint_order {
+                builder.intern_constraint(db, atoms[index]);
+            }
+
+            let mut stack = Vec::new();
+            for token in expression {
+                match *token {
+                    OrderingAuditToken::Atom(index) => {
+                        let atom = atoms[index];
+                        stack.push(Constraint::new_node_with_bounds(
+                            db,
+                            &builder,
+                            atom.typevar,
+                            atom.bounds.lower,
+                            atom.bounds.upper,
+                        ));
+                    }
+                    OrderingAuditToken::And => {
+                        let right = stack.pop().expect("rhs should exist");
+                        let left = stack.pop().expect("lhs should exist");
+                        stack.push(left.and_with_offset(&builder, right));
+                    }
+                    OrderingAuditToken::Or => {
+                        let right = stack.pop().expect("rhs should exist");
+                        let left = stack.pop().expect("lhs should exist");
+                        stack.push(left.or_with_offset(&builder, right));
+                    }
+                    OrderingAuditToken::Not => {
+                        let node = stack.pop().expect("operand should exist");
+                        stack.push(node.negate(&builder));
+                    }
+                }
+            }
+            let [node] = stack.as_slice() else {
+                panic!("expression should leave one node");
+            };
+            let set = ConstraintSet::from_node(&builder, *node);
+            let solutions = set.solutions(db, &builder, inferable);
+            let mut merged = FxHashMap::default();
+            if let Solutions::Constrained(paths) = &solutions {
+                for path in paths {
+                    for binding in path {
+                        merged
+                            .entry(binding.bound_typevar)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(db, *existing, binding.solution);
+                            })
+                            .or_insert(binding.solution);
+                    }
+                }
+            }
+            let merged = typevars
+                .iter()
+                .filter_map(|typevar| {
+                    merged.get(typevar).map(|ty| {
+                        format!("{}={}", typevar.identity(db).display(db), ty.display(db))
+                    })
+                })
+                .join(", ");
+            let paths = match &solutions {
+                Solutions::Unsatisfiable => String::from("unsatisfiable"),
+                Solutions::Unconstrained => String::from("unconstrained"),
+                Solutions::Constrained(paths) => paths
+                    .iter()
+                    .map(|path| {
+                        path.iter()
+                            .map(|binding| {
+                                format!(
+                                    "{}={}",
+                                    binding.bound_typevar.identity(db).display(db),
+                                    binding.solution.display(db)
+                                )
+                            })
+                            .join(", ")
+                    })
+                    .join("; "),
+            };
+            signatures.insert(format!(
+                "never={} always={} merged=[{merged}] paths=[{paths}]",
+                set.is_never_satisfied(db),
+                set.is_always_satisfied(db),
+            ));
+        }
+
+        signatures
+    }
+
+    #[test]
+    fn constraint_ordering_changes_nested_transitive_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let int = KnownClass::Int.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let list_u = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(u)]);
+        let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+        let atoms = [
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(list_u)),
+            },
+            Constraint {
+                typevar: u,
+                bounds: ConstraintBounds::new(None, Some(int)),
+            },
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(Some(list_int), None),
+            },
+            Constraint {
+                typevar: v,
+                bounds: ConstraintBounds::new(Some(bytes), None),
+            },
+        ];
+        let expression = [
+            OrderingAuditToken::Atom(0),
+            OrderingAuditToken::Atom(1),
+            OrderingAuditToken::And,
+            OrderingAuditToken::Atom(2),
+            OrderingAuditToken::And,
+            OrderingAuditToken::Atom(3),
+            OrderingAuditToken::Or,
+        ];
+
+        let actual = solutions_for_constraint_orderings(&db, &[t, u, v], &atoms, &expression);
+        // TODO: All permutations should produce the first result. TDD traversal currently leaks
+        // irrelevant positive constraints onto the `V = bytes` alternative.
+        assert_eq!(
+            actual,
+            FxIndexSet::from_iter([
+                String::from(
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes]"
+                ),
+                String::from(
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes, T=list[int]; V=bytes]"
+                ),
+                String::from(
+                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; U=int, V=bytes; V=bytes]"
+                ),
+                String::from(
+                    "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes, T=list[U]; V=bytes]"
+                ),
+            ])
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_negated_alternative_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let atoms = [
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(int)),
+            },
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(str)),
+            },
+            Constraint {
+                typevar: u,
+                bounds: ConstraintBounds::new(Some(bytes), None),
+            },
+        ];
+        let expression = [
+            OrderingAuditToken::Atom(0),
+            OrderingAuditToken::Atom(1),
+            OrderingAuditToken::Or,
+            OrderingAuditToken::Not,
+            OrderingAuditToken::Atom(2),
+            OrderingAuditToken::Or,
+        ];
+
+        let actual = solutions_for_constraint_orderings(&db, &[t, u], &atoms, &expression);
+        // TODO: All permutations should produce the first result. A satisfied alternative should
+        // not infer `T` from unrelated positive decisions made earlier in a BDD path.
+        assert_eq!(
+            actual,
+            FxIndexSet::from_iter([
+                String::from("never=false always=false merged=[U=bytes] paths=[; U=bytes]"),
+                String::from(
+                    "never=false always=false merged=[T=str, U=bytes] paths=[; U=bytes, T=str; U=bytes]"
+                ),
+                String::from(
+                    "never=false always=false merged=[T=int, U=bytes] paths=[; U=bytes, T=int; U=bytes]"
+                ),
+            ])
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_derived_upper_bound_display() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let atoms = [
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(int)),
+            },
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(str)),
+            },
+            Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(Some(int), None),
+            },
+            Constraint {
+                typevar: u,
+                bounds: ConstraintBounds::new(None, Some(int)),
+            },
+        ];
+        let expression = [
+            OrderingAuditToken::Atom(0),
+            OrderingAuditToken::Atom(1),
+            OrderingAuditToken::Or,
+            OrderingAuditToken::Atom(2),
+            OrderingAuditToken::And,
+            OrderingAuditToken::Atom(3),
+            OrderingAuditToken::And,
+        ];
+
+        let actual: FxIndexSet<_> =
+            solutions_for_constraint_orderings(&db, &[t, u], &atoms, &expression)
+                .into_iter()
+                .map(|signature| {
+                    signature
+                        .split_once(" paths=")
+                        .expect("solution signature should contain paths")
+                        .0
+                        .to_string()
+                })
+                .collect();
+        // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not source
+        // order. That changes which equivalent upper-bound intersection is constructed first.
+        assert_eq!(
+            actual,
+            FxIndexSet::from_iter([
+                String::from("never=false always=false merged=[T=int | U, U=T & int]"),
+                String::from("never=false always=false merged=[T=int | U, U=int & T]"),
+            ])
+        );
+    }
+
+    #[test]
+    fn salsa_typevar_order_changes_solution_binding_order() {
+        let mut actual = FxIndexSet::default();
+        for order in (0..3).permutations(3) {
+            let db = setup_db();
+            let mut typevars = [None; 3];
+            for index in order {
+                typevars[index] = Some(create_typevar(&db, ["T", "U", "V"][index]));
+            }
+            let [Some(t), Some(u), Some(v)] = typevars else {
+                panic!("all typevars should be initialized");
+            };
+            let int = KnownClass::Int.to_instance(&db);
+            let str = KnownClass::Str.to_instance(&db);
+            let bytes = KnownClass::Bytes.to_instance(&db);
+            let builder = ConstraintSetBuilder::new();
+            let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int, int);
+            let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str, str);
+            let v_bytes = ConstraintSet::constrain_typevar(&db, &builder, v, bytes, bytes);
+            let set = t_int
+                .and(&db, &builder, || u_str)
+                .and(&db, &builder, || v_bytes);
+            let inferable = InferableTypeVars::from_typevars(
+                &db,
+                [t.identity(&db), u.identity(&db), v.identity(&db)]
+                    .into_iter()
+                    .collect(),
+            );
+            let Solutions::Constrained(paths) = set.solutions(&db, &builder, inferable) else {
+                panic!("expected a constrained solution");
+            };
+            actual.insert(
+                paths[0]
+                    .iter()
+                    .map(|binding| {
+                        format!(
+                            "{}={}",
+                            binding.bound_typevar.identity(&db).display(&db),
+                            binding.solution.display(&db)
+                        )
+                    })
+                    .join(", "),
+            );
+        }
+
+        // TODO: `PathBounds::compute*` drains an `FxHashMap` keyed by Salsa-backed typevars. All
+        // creation orders should produce one binding order before we migrate more caching to Salsa.
+        assert_eq!(
+            actual,
+            FxIndexSet::from_iter([
+                String::from("U=str, T=int, V=bytes"),
+                String::from("T=int, U=str, V=bytes"),
+            ])
+        );
+    }
+
     #[track_caller]
     fn check_display_graph<'db, 'c>(
         db: &'db dyn Db,
