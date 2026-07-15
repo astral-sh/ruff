@@ -1077,16 +1077,10 @@ impl<'db> Signature<'db> {
                 Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
                 _ => None,
             };
-            if let Some(typevar) = receiver_typevar
-                && let Some(constraints) = Self::direct_receiver_domain_constraints(
-                    db,
-                    receiver,
-                    typevar,
-                    &parameters,
-                    return_ty,
-                )
-            {
-                return std::borrow::Cow::Owned(constraints);
+            if receiver_typevar.is_some_and(|typevar| {
+                Self::receiver_violates_typevar_domain(db, receiver, typevar)
+            }) {
+                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
             }
             receiver.when_constraint_set_assignable_to_owned(db, annotation)
         });
@@ -1119,59 +1113,38 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Decides whether a concrete receiver satisfies a receiver-only type variable's domain.
+    /// Returns whether a concrete receiver violates a direct receiver type variable's domain.
     ///
-    /// For a direct receiver annotation such as `self: T`, the receiver relation can be reduced to
-    /// a terminal constraint when `T` does not survive in another parameter or the return type:
-    /// `always` if the receiver satisfies `T`'s bound or constraints, and `never` otherwise. Returns
-    /// `None` when normal signature inference must retain the receiver relation.
-    ///
-    /// Transparent PEP 695 receiver aliases are resolved by the caller before this check.
+    /// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
+    /// leaving the original receiver relation available to normal inference. Transparent PEP 695
+    /// receiver aliases are resolved by the caller before this check.
     ///
     /// ```python
     /// class C:
     ///     def method[T: int](self: T) -> None: ...
     /// ```
-    fn direct_receiver_domain_constraints(
+    fn receiver_violates_typevar_domain(
         db: &'db dyn Db,
         receiver: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        parameters: &Parameters<'db>,
-        return_ty: Type<'db>,
-    ) -> Option<OwnedConstraintSet<'db>> {
-        let domain = typevar.typevar(db).bound_or_constraints(db)?;
+    ) -> bool {
+        let Some(domain) = typevar.typevar(db).bound_or_constraints(db) else {
+            return false;
+        };
         if receiver.has_typevar(db) {
-            return None;
+            return false;
         }
 
-        let identity = typevar.typevar(db).identity(db);
-        if return_ty.references_typevar(db, identity)
-            || parameters
-                .iter()
-                .any(|parameter| parameter.annotated_type().references_typevar(db, identity))
-        {
-            return None;
-        }
-
-        let receiver_is_assignable_to = |target| {
-            receiver
-                .when_constraint_set_assignable_to_owned(db, target)
-                .query(|_builder, constraints| constraints.is_always_satisfied(db))
-        };
-        let receiver_is_in_domain = match domain {
+        !match domain {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                receiver_is_assignable_to(bound.top_materialization(db))
+                receiver.is_assignable_to(db, bound.top_materialization(db))
             }
-            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                .elements(db)
-                .iter()
-                .any(|constraint| receiver_is_assignable_to(constraint.top_materialization(db))),
-        };
-        Some(if receiver_is_in_domain {
-            OwnedConstraintSet::always()
-        } else {
-            OwnedConstraintSet::default()
-        })
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                constraints.elements(db).iter().any(|constraint| {
+                    receiver.is_assignable_to(db, constraint.top_materialization(db))
+                })
+            }
+        }
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
