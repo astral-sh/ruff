@@ -33,7 +33,7 @@ pub trait Db: SemanticDb {
 
 /// Tracked so that a change to the open-file set only invalidates queries
 /// for files whose open state actually changed.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
 fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
     db.project().open_files(db).contains(file)
 }
