@@ -20,10 +20,7 @@ use crate::types::relation::{
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
-use crate::types::tuple::{
-    TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
-};
-use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
@@ -779,6 +776,10 @@ impl<'db> GenericContext<'db> {
                 false
             }
 
+            fn should_visit_type_alias_value(&self) -> bool {
+                true
+            }
+
             fn visit_bound_type_var_type(
                 &self,
                 db: &'db dyn Db,
@@ -814,20 +815,6 @@ impl<'db> GenericContext<'db> {
                     self.in_callable_type.set(None);
                 } else {
                     walk_callable_type(db, callable, self);
-                }
-            }
-
-            fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-                // The default implementation would do this for us if we returned `true` from
-                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
-                // attribute that we want to recurse into, so we do it by hand.
-                match type_alias {
-                    TypeAliasType::PEP695(type_alias) => {
-                        walk_pep_695_type_alias(db, type_alias, self);
-                    }
-                    TypeAliasType::ManualPEP695(type_alias) => {
-                        walk_manual_pep_695_type_alias(db, type_alias, self);
-                    }
                 }
             }
 

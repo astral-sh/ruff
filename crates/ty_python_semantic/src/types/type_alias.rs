@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::{cell::Cell, fmt::Write};
 
 use crate::{
     Db,
@@ -8,7 +8,7 @@ use crate::{
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
-        visitor,
+        visitor::{self, TypeKind, TypeVisitor, walk_non_atomic_type},
     },
 };
 use ty_python_core::{
@@ -219,7 +219,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
-    if !visitor.should_visit_lazy_type_attributes() {
+    if !visitor.should_visit_type_alias_value() {
         return;
     }
     match type_alias {
@@ -232,6 +232,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
+#[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
@@ -261,6 +262,41 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns whether this alias participates in a recursive alias definition.
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        self.unspecialized(db)
+            .references_alias(db, self.definition(db))
+    }
+
+    fn unspecialized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                None,
+            )),
+            TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
+    /// Returns whether this alias's value references `target` through named aliases.
+    ///
+    /// `false` seeds the least fixed point of alias reachability.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| false,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn references_alias(self, db: &'db dyn Db, target: Definition<'db>) -> bool {
+        let visitor = AliasReferenceVisitor {
+            target,
+            found: Cell::new(false),
+        };
+        visitor.visit_type(db, self.raw_value_type(db));
+        visitor.found.get()
+    }
+
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
@@ -283,17 +319,6 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    /// Returns this alias application with its default specialization filled in.
-    pub(crate) fn application(self, db: &'db dyn Db) -> Option<TypeAliasApplication<'db>> {
-        let generic_context = self.generic_context(db)?;
-        Some(TypeAliasApplication {
-            alias: self,
-            specialization: self
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None)),
-        })
-    }
-
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -313,61 +338,42 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
-/// A generic type alias together with the specialization applied at this occurrence.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct TypeAliasApplication<'db> {
-    alias: TypeAliasType<'db>,
-    specialization: Specialization<'db>,
+struct AliasReferenceVisitor<'db> {
+    target: Definition<'db>,
+    found: Cell<bool>,
 }
 
-impl<'db> TypeAliasApplication<'db> {
-    pub(crate) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        let Type::TypeAlias(alias) = ty else {
-            return None;
-        };
-        alias.application(db)
+impl<'db> TypeVisitor<'db> for AliasReferenceVisitor<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
     }
 
-    /// Returns whether a specialization argument contains `ty`, following named aliases.
-    pub(crate) fn contains_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        self.specialization
-            .types(db)
-            .iter()
-            .copied()
-            .any(|argument| visitor::any_over_type(db, argument, true, |nested| nested == ty))
-    }
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
 
-    pub(crate) fn is_nested_within(
-        self,
-        db: &'db dyn Db,
-        active: Type<'db>,
-        current: Type<'db>,
-    ) -> bool {
-        let Some(active) = Self::from_type(db, active) else {
-            return false;
-        };
-        active.alias.definition(db) == self.alias.definition(db)
-            && active.contains_type(db, current)
-    }
+        if let Type::TypeAlias(alias) = ty {
+            if alias.definition(db) == self.target {
+                self.found.set(true);
+                return;
+            }
 
-    pub(crate) fn contains_recursive_identity_from(
-        self,
-        db: &'db dyn Db,
-        active: &[Type<'db>],
-    ) -> bool {
-        self.specialization
-            .types(db)
-            .iter()
-            .copied()
-            .any(|argument| {
-                visitor::any_over_type(db, argument, false, |nested| {
-                    nested.recursive_identity(db).is_some_and(|identity| {
-                        active
-                            .iter()
-                            .any(|active| active.recursive_identity(db) == Some(identity))
-                    })
-                })
-            })
+            if let Some(specialization) = alias.specialization(db) {
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
+            if !self.found.get() && alias.unspecialized(db).references_alias(db, self.target) {
+                self.found.set(true);
+            }
+            return;
+        }
+
+        if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
+            walk_non_atomic_type(db, non_atomic, self);
+        }
     }
 }
 

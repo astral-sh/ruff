@@ -25,10 +25,10 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, DynamicType,
-    InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
-    Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeCycleDetector, TypeVarBoundOrConstraints, UnionType,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
+    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
     UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -64,7 +64,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
         type TypedDictKeyExpectedTypeVisitor<'db> =
-            TypeCycleDetector<'db, TypedDictKeyExpectedType, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
 
         fn imp<'db>(
             db: &'db dyn Db,

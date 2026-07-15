@@ -18,8 +18,8 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    SpecialFormType, Type, TypeCycleDetector, TypeQualifiers, binding_type,
-    infer_complete_scope_types, inferred_declaration,
+    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
@@ -530,9 +530,10 @@ impl<'db> SemanticModel<'db> {
         string_expr: &ast::ExprStringLiteral,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
-        type StringLiteralCandidatesVisitor<'db> = TypeCycleDetector<
+        type StringLiteralCandidatesVisitor<'db> = CycleDetector<
             'db,
             StringLiteralCandidates,
+            Type<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
             3,
         >;

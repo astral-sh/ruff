@@ -42,6 +42,11 @@ pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
 
+    /// Should the visitor recurse into the value of a type alias?
+    fn should_visit_type_alias_value(&self) -> bool {
+        self.should_visit_lazy_type_attributes()
+    }
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
@@ -383,6 +388,15 @@ impl<'db> RecursionGuard<'db> {
         match TypeKind::from(ty) {
             TypeKind::Atomic => None,
             TypeKind::NonAtomic(non_atomic_type) => {
+                if matches!(non_atomic_type, NonAtomicType::TypeAlias(_))
+                    && !visitor.should_visit_type_alias_value()
+                {
+                    if self.collected_types.collect_type(ty) {
+                        walk_non_atomic_type(db, non_atomic_type, visitor);
+                    }
+                    return None;
+                }
+
                 let Some(identity) = ty.recursive_identity(db) else {
                     if self.collected_types.collect_type(ty) {
                         walk_non_atomic_type(db, non_atomic_type, visitor);

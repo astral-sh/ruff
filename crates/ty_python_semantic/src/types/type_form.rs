@@ -1,6 +1,6 @@
 use super::variance::VarianceInferable;
 use super::{
-    BoundTypeVarIdentity, IntersectionType, Type, TypeCycleDetector, TypeVarVariance, UnionType,
+    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
     visitor,
 };
 use crate::Db;
@@ -39,7 +39,7 @@ impl<'db> Type<'db> {
     pub(crate) fn project_type_form(self, db: &'db dyn Db) -> Type<'db> {
         struct TypeFormArgumentVisit;
         type TypeFormArgumentVisitor<'db> =
-            TypeCycleDetector<'db, TypeFormArgumentVisit, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypeFormArgumentVisit, Type<'db>, Option<Type<'db>>, 3>;
 
         fn project<'db>(
             db: &'db dyn Db,

@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::cyclic::RecursiveTypeStack;
+use crate::types::cyclic::TypeIdentity;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
@@ -672,7 +672,7 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
-    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<TypeIdentity<'db>>) {
         let mut replace_with = vec![];
         for elem in &self.elements {
             match elem {
@@ -708,7 +708,11 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
-    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    pub(crate) fn add_in_place_impl(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<TypeIdentity<'db>>,
+    ) {
         let cycle_recovery = self.cycle_recovery;
         let uses_relations = self.normalization.uses_relations() && !cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
@@ -748,15 +752,24 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if RecursiveTypeStack::new(self.db, seen_aliases).contains_union_builder_reentry(ty)
-                {
+                let identity = ty.to_type_identity(self.db);
+                let active_occurrences = seen_aliases
+                    .iter()
+                    .filter(|active| **active == identity)
+                    .count();
+                let should_stop = match identity {
+                    // One recursive unfold is needed to expose non-recursive union elements.
+                    TypeIdentity::RecursiveTypeAlias(_) => active_occurrences > 1,
+                    _ => active_occurrences > 0,
+                };
+                if should_stop {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
-                    seen_aliases.push(ty);
+                    seen_aliases.push(identity);
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                     let popped = seen_aliases.pop();
-                    debug_assert_eq!(popped, Some(ty));
+                    debug_assert_eq!(popped, Some(identity));
                 }
             }
             Type::LiteralValue(literal) => {
@@ -1030,7 +1043,7 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<TypeIdentity<'db>>) {
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
@@ -1291,22 +1304,23 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn add_positive_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
+        seen_aliases: &mut Vec<TypeIdentity<'db>>,
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
-                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
+                let identity = ty.to_type_identity(self.db);
+                if seen_aliases.contains(&identity) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
                     return self;
                 }
-                seen_aliases.push(ty);
+                seen_aliases.push(identity);
                 let value_type = alias.value_type(self.db);
                 let result = self.add_positive_impl(value_type, seen_aliases);
                 let popped = seen_aliases.pop();
-                debug_assert_eq!(popped, Some(ty));
+                debug_assert_eq!(popped, Some(identity));
                 result
             }
             Type::Union(union) => {
@@ -1363,23 +1377,24 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn add_negative_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
+        seen_aliases: &mut Vec<TypeIdentity<'db>>,
     ) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
-                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
+                let identity = ty.to_type_identity(self.db);
+                if seen_aliases.contains(&identity) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
                     return self;
                 }
-                seen_aliases.push(ty);
+                seen_aliases.push(identity);
                 let value_type = alias.value_type(self.db);
                 let result = self.add_negative_impl(value_type, seen_aliases);
                 let popped = seen_aliases.pop();
-                debug_assert_eq!(popped, Some(ty));
+                debug_assert_eq!(popped, Some(identity));
                 result
             }
             Type::Union(union) => {

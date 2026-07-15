@@ -282,7 +282,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        visitor.visit(self, || {
+        visitor.visit(db, self, || {
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
                 TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
@@ -1807,4 +1807,12 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 pub(crate) struct TypeVarDefault;
 
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<TypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+    CycleDetector<'db, TypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+
+impl<'db> super::cyclic::HasIdentity<'db> for TypeVarInstance<'db> {
+    type Id = Self;
+
+    fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+        *self
+    }
+}
