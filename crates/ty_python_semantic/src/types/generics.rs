@@ -1236,6 +1236,27 @@ impl<'db> Specialization<'db> {
         self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
+    /// Returns the specialization to use when the builtin tuple type parameter represents an
+    /// individual runtime element.
+    ///
+    /// The builtin tuple class's type parameter describes the type produced by runtime element
+    /// access. An unpacked `TypeVarTuple` describes those elements collectively, so project it to
+    /// `object` for tuple members and base classes while retaining the symbolic pack in the tuple's
+    /// own specialization.
+    pub(crate) fn tuple_runtime_element_specialization(self, db: &'db dyn Db) -> Self {
+        let Some(tuple) = self.tuple_inner(db) else {
+            return self;
+        };
+
+        Self::new(
+            db,
+            self.generic_context(db),
+            Box::from([tuple.tuple(db).homogeneous_element_type(db)]),
+            self.materialization_kind(db),
+            None,
+        )
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(

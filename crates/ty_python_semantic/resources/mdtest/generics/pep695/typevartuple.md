@@ -268,18 +268,35 @@ def erase_pack[*Ts](values: tuple[*Ts]) -> tuple[object, ...]:
 def preserve_pack[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
     return values
 
-def reject_object_pack[*Ts](values: tuple[object, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    # TODO: This should emit an `invalid-return-type` diagnostic.
+def preserve_pack_with_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[object, *Ts, object]:
     return values
 
+def reject_object_pack[*Ts](values: tuple[object, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
+    return values  # error: [invalid-return-type]
+
 def reject_int_pack[*Ts](values: tuple[int, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    # TODO: This should emit an `invalid-return-type` diagnostic.
-    return values
+    return values  # error: [invalid-return-type]
 
 class Outer[*Ts]:
     def reject_unrelated_pack[*Us](self, values: tuple[*Ts]) -> tuple[*Us]:
-        # TODO: This should emit an `invalid-return-type` diagnostic.
-        return values
+        return values  # error: [invalid-return-type]
+```
+
+Materializing a type variable tuple can change its default without changing the identity of the
+bound type variable occurrence.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+def materialized_default[*Ts = *tuple[Any, ...]]() -> None:
+    static_assert(is_assignable_to(tuple[*Ts], Top[tuple[*Ts]]))
 ```
 
 ### Starred variadic parameters
@@ -949,19 +966,20 @@ def element_types[*Ts](values: tuple[*Ts]) -> None:
         # TODO: should reveal `Union[*Ts]` representation
         reveal_type(value)  # revealed: object
 
+    reveal_type(values.__iter__())  # revealed: Iterator[object]
+    reveal_type(values * 2)  # revealed: tuple[object, ...]
+
 def boundaries[*Ts](values: tuple[int, *Ts, str]) -> None:
     reveal_type(values[0])  # revealed: int
     reveal_type(values[-1])  # revealed: str
     reveal_type(values[:])  # revealed: tuple[int, *Ts@boundaries, str]
 
 def materialize[*Ts](values: tuple[*Ts]) -> None:
-    # TODO: should reveal `list[object]`
-    reveal_type(list(values))  # revealed: list[Ts@materialize]
+    reveal_type(list(values))  # revealed: list[object]
 
     runtime_elements: list[object] = list(values)
 
-    # TODO: This should emit an `invalid-assignment` diagnostic. The elements are not themselves
-    # tuples.
+    # error: [invalid-assignment] "Object of type `list[object]` is not assignable to `list[tuple[object, ...]]`"
     tuple_elements: list[tuple[object, ...]] = list(values)
 ```
 

@@ -625,7 +625,10 @@ impl<'db> MroIterator<'db> {
         self.subsequent_elements
             .get_or_insert_with(|| match self.class {
                 ClassLiteral::Static(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.db, self.specialization) {
+                    let specialization = self.specialization.map(|specialization| {
+                        specialization.tuple_runtime_element_specialization(self.db)
+                    });
+                    let mut full_mro_iter = match literal.try_mro(self.db, specialization) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };

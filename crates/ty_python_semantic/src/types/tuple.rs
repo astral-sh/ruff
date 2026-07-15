@@ -488,6 +488,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             Tuple::Variable(target) => {
+                if let (
+                    VariableSegment::TypeVarTuple(source_typevartuple),
+                    VariableSegment::TypeVarTuple(target_typevartuple),
+                ) = (source.variable(), target.variable())
+                    && source_typevartuple.is_same_typevar_as(db, target_typevartuple)
+                {
+                    if source.prefix_len() != target.prefix_len()
+                        || source.suffix_len() != target.suffix_len()
+                    {
+                        return self.never();
+                    }
+
+                    return source
+                        .prefix_elements()
+                        .iter()
+                        .zip(target.prefix_elements())
+                        .chain(
+                            source
+                                .suffix_elements()
+                                .iter()
+                                .zip(target.suffix_elements()),
+                        )
+                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
+                            self.check_type_pair(db, source_ty, target_ty)
+                        });
+                }
+
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
                 {
@@ -525,6 +552,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return boundary_constraints.and(db, self.constraints, || {
                         self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
                     });
+                }
+
+                if matches!(target.variable(), VariableSegment::TypeVarTuple(_)) {
+                    return self.never();
                 }
 
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
