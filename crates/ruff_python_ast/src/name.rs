@@ -9,6 +9,30 @@ use char_str::{CharStr, CharString};
 use crate::Expr;
 use crate::generated::ExprName;
 
+/// An immutable name.
+///
+/// # Choosing a string representation
+///
+/// On 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer
+/// values use an exactly-sized, reference-counted allocation, so cloning a heap-backed value
+/// reuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes
+/// inline, and remains mutable; cloning a heap-backed value copies its contents into a new
+/// allocation.
+///
+/// Prefer `CharStr` for immutable text that is retained densely or passed between owners, when
+/// either the smaller handle or structural sharing offsets the extra heap allocations for values
+/// between 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is
+/// built incrementally, mutated, or commonly falls in that 17-to-24-byte range.
+///
+/// `Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser
+/// names share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it
+/// builds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses
+/// `CompactString` because module names can be extended in place.
+///
+/// Converting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural
+/// sharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone
+/// the owned value rather than converting it through `&str`. This is especially relevant at Salsa
+/// interning boundaries.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
