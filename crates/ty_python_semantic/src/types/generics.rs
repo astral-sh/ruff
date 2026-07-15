@@ -3090,7 +3090,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // To handle classes that implicitly implement a generic protocol, we
                 // will need to check the types of the protocol members to be able to
                 // infer the specialization of the protocol that the class implements.
-                if let Some(actual_nominal) = actual_protocol.to_nominal_instance(self.db) {
+                if let Some(actual_nominal) = actual_protocol.nominal_origin_instance(self.db) {
                     return self.infer_map_impl(
                         formal,
                         Type::NominalInstance(actual_nominal),

@@ -1436,7 +1436,7 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => {
-                instance.to_nominal_instance(db).map(|i| i.class(db))
+                instance.nominal_origin_instance(db).map(|i| i.class(db))
             }
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
@@ -4608,7 +4608,7 @@ impl<'db> Type<'db> {
                 // checking it structurally again during call inference.
                 if self_instance
                     .as_protocol_instance()
-                    .is_some_and(|protocol| protocol.to_nominal_instance(db).is_some())
+                    .is_some_and(|protocol| protocol.nominal_origin_instance(db).is_some())
                     && signature
                         .overloads
                         .iter()

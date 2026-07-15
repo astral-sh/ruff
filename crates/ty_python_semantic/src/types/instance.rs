@@ -517,14 +517,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         if !protocol.is_materialized()
             && !materialized_source_changes_target
-            && let Some(nominal_instance) = protocol.to_nominal_instance(db)
+            && let Some(nominal_instance) = protocol.nominal_origin_instance(db)
         {
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
             let type_to_test = source_protocol
-                .and_then(|protocol| protocol.to_nominal_instance(db))
+                .and_then(|protocol| protocol.nominal_origin_instance(db))
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
 
@@ -546,7 +546,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if matches!(self.relation, TypeRelation::Redundancy { pure: false })
                 && ty
                     .as_protocol_instance()
-                    .and_then(ProtocolInstanceType::to_nominal_instance)
+                    .and_then(|protocol| protocol.nominal_origin_instance(db))
                     .is_some_and(|source_instance| {
                         source_instance.class(db).class_literal(db)
                             == nominal_instance.class(db).class_literal(db)
@@ -942,7 +942,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if this is the standard-library `Hashable` protocol.
     pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
-        self.to_nominal_instance(db)
+        self.nominal_origin_instance(db)
             .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
     }
 
@@ -1013,10 +1013,13 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// If this protocol corresponds to a class definition, convert it into a nominal instance.
+    /// Return a nominal instance of this protocol's class origin, if it has one.
     ///
     /// Pure synthesized protocols have no class origin and cannot be treated nominally.
-    pub(super) fn to_nominal_instance(self, db: &'db dyn Db) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn nominal_origin_instance(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<NominalInstanceType<'db>> {
         self.class_origin(db).map(|origin| {
             NominalInstanceType(NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(
                 *origin,
