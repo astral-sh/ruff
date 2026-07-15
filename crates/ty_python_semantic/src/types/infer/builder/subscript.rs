@@ -110,6 +110,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_typed_dict_key_expected_type(&mut self, slice: &ast::Expr, value_ty: Type<'db>) {
+        if !self.collects_expected_types() {
+            return;
+        }
+
         if let Some(expected_key_ty) = self.typed_dict_key_expected_type(value_ty) {
             self.store_expected_type(slice, expected_key_ty);
         }

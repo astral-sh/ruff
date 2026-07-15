@@ -5672,8 +5672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Whether this region's inference should record expected types for string-literal
-    /// completions. They're only ever read for files open in the editor, so skip the
-    /// bookkeeping everywhere else (most importantly, on every CLI run).
+    /// completions. They're only ever read for files open in the editor.
     fn collects_expected_types(&self) -> bool {
         self.db().is_open_file(self.file())
     }
@@ -5688,14 +5687,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        if !self.collects_expected_types() {
-            return;
-        }
-
         self.store_expected_type(expression, ty);
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        if !self.collects_expected_types() {
+            return;
+        }
+
         self.expected_types.insert(expression.into(), ty);
     }
 
@@ -5715,7 +5714,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
-        if !self.collects_expected_types() {
+        // Non-empty only if the producing inference collected, i.e. the file is open
+        if expected_types.is_empty() {
             return;
         }
 
@@ -6090,9 +6090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `expected_types` is IDE completion metadata. If normal set inference already has a
         // string-literal context, preserve that semantic context for inference while also offering
         // the transient `TypedDict` key fallback as a completion candidate.
-        if let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation) 
-        && self.collects_expected_types()
-        {
+        if let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation) {
             self.store_expected_type(
                 elt,
                 UnionType::from_two_elements(self.db(), elt_ty, fallback_ty),

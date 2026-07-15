@@ -35,7 +35,7 @@ pub trait Db: SemanticDb {
 /// for files whose open state actually changed.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
 fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
-    db.project().open_files(db).contains(file)
+    db.project().open_files(db).contains(&file)
 }
 
 #[salsa::db]
@@ -566,7 +566,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn is_open_file(&self, file: File) -> bool {
-        *is_open_file_impl(self, file)
+        is_open_file_impl(self, file)
     }
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
@@ -804,7 +804,7 @@ pub(crate) mod testing {
         }
 
         fn is_open_file(&self, file: File) -> bool {
-            *super::is_open_file_impl(self, file)
+            super::is_open_file_impl(self, file)
         }
 
         fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
