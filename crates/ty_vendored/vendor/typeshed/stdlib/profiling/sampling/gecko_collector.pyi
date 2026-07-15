@@ -107,5 +107,12 @@ class GeckoCollector(Collector):
     def __init__(self, sample_interval_usec: int, *, skip_idle: bool = False, opcodes: bool = False) -> None: ...
     def collect(
         self, stack_frames: Sequence[InterpreterInfo] | Sequence[AwaitedInfo], timestamps_us: _Timestamps = None
-    ) -> None: ...
-    def export(self, filename: StrOrBytesPath) -> None: ...
+    ) -> None:
+        """Collect samples from stack frames.
+
+Args:
+    stack_frames: List of interpreter/thread frame info
+    timestamps_us: List of timestamps in microseconds (None for live sampling)
+"""
+    def export(self, filename: StrOrBytesPath) -> None:
+        """Export the profile to a Gecko JSON file."""
