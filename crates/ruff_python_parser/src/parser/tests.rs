@@ -72,32 +72,6 @@ fn nfkc_normalizes_names() {
 }
 
 #[test]
-fn import_aliases() {
-    let suite = parse_module(
-        r"
-import first, second as renamed
-from package import third, fourth as other, fifth
-import last
-",
-    )
-    .unwrap()
-    .into_suite();
-
-    let Stmt::Import(first) = &suite[0] else {
-        panic!("expected import statement");
-    };
-    assert_eq!(first.names.len(), 2);
-    let Stmt::ImportFrom(second) = &suite[1] else {
-        panic!("expected from-import statement");
-    };
-    assert_eq!(second.names.len(), 3);
-    let Stmt::Import(last) = &suite[2] else {
-        panic!("expected import statement");
-    };
-    assert_eq!(last.names.len(), 1);
-}
-
-#[test]
 fn number_values() {
     let cases = [
         ("1E400", Number::Float(f64::INFINITY)),

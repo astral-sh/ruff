@@ -3454,7 +3454,7 @@ impl<'src> Parser<'src> {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parser.parameter_scratch.is_empty_since(&parameters_snapshot)
+                    if parser.parameter_scratch.is_empty(&parameters_snapshot)
                         && parameters.vararg.is_none()
                         && parameters.kwarg.is_none()
                     {

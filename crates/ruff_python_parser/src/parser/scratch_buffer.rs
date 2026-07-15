@@ -25,12 +25,8 @@ impl<T> ScratchBuffer<T> {
         self.buffer.push(value);
     }
 
-    pub(super) fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
-    }
-
     #[inline]
-    pub(super) fn is_empty_since(&self, snapshot: &ScratchSnapshot) -> bool {
+    pub(super) fn is_empty(&self, snapshot: &ScratchSnapshot) -> bool {
         debug_assert!(
             self.buffer.len() >= snapshot.len,
             "Scratch buffer snapshots must be restored in reverse order of creation."
@@ -53,7 +49,7 @@ impl<T> ScratchBuffer<T> {
 
     #[inline]
     pub(super) fn take_thin_vec(&mut self, mut snapshot: ScratchSnapshot) -> ThinVec<T> {
-        if self.is_empty_since(&snapshot) {
+        if self.is_empty(&snapshot) {
             snapshot.bomb.defuse();
             return ThinVec::new();
         }
@@ -75,6 +71,15 @@ impl<T> ScratchBuffer<T> {
     }
 }
 
+impl<T> Drop for ScratchBuffer<T> {
+    fn drop(&mut self) {
+        debug_assert!(
+            self.buffer.is_empty() || std::thread::panicking(),
+            "Scratch buffers must be empty when dropped."
+        );
+    }
+}
+
 pub(super) struct ScratchSnapshot {
     len: usize,
     bomb: DebugDropBomb,
@@ -83,6 +88,14 @@ pub(super) struct ScratchSnapshot {
 #[cfg(test)]
 mod tests {
     use super::ScratchBuffer;
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Scratch buffers must be empty when dropped.")]
+    fn buffer_must_be_empty_when_dropped() {
+        let mut buffer = ScratchBuffer::new();
+        buffer.push(1);
+    }
 
     #[test]
     #[cfg(debug_assertions)]
@@ -109,13 +122,15 @@ mod tests {
     #[test]
     fn snapshot_is_empty_relative_to_its_buffer() {
         let mut buffer = ScratchBuffer::new();
+        let outer_snapshot = buffer.snapshot();
         buffer.push(1);
         let snapshot = buffer.snapshot();
-        assert!(buffer.is_empty_since(&snapshot));
+        assert!(buffer.is_empty(&snapshot));
 
         buffer.push(2);
-        assert!(!buffer.is_empty_since(&snapshot));
+        assert!(!buffer.is_empty(&snapshot));
 
         let _: Vec<_> = buffer.take(snapshot);
+        let _: Vec<_> = buffer.take(outer_snapshot);
     }
 }

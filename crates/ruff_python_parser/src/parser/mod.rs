@@ -234,13 +234,6 @@ impl<'src> Parser<'src> {
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
-        debug_assert!(self.expr_scratch.is_empty());
-        debug_assert!(self.keyword_scratch.is_empty());
-        debug_assert!(self.parameter_scratch.is_empty());
-        debug_assert!(self.stmt_scratch.is_empty());
-        debug_assert!(self.alias_scratch.is_empty());
-        debug_assert!(self.elif_else_scratch.is_empty());
-
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
         let (tokens, lex_errors) = self.tokens.finish();
