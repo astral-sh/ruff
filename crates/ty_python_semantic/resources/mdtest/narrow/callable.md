@@ -2,7 +2,7 @@
 
 ## Basic narrowing
 
-The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows the type to the
+The `callable()` builtin returns `TypeIs[Top[Callable[..., object]]]`, which narrows the type to the
 intersection with `Top[Callable[..., object]]`. The `Top[...]` wrapper indicates this is a fully
 static type representing the top materialization of a gradual callable.
 

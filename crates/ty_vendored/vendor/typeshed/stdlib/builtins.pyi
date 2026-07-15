@@ -78,6 +78,7 @@ from typing import (  # noqa: Y022,UP035
 
 # we can't import `Literal` from typing or mypy crashes: see #11247
 from typing_extensions import Literal, LiteralString, Self, TypeIs, TypeVarTuple, deprecated, disjoint_base  # noqa: Y023, UP035
+from ty_extensions import Top
 
 if sys.version_info >= (3, 14):
     from _typeshed import AnnotateFunc
@@ -3666,7 +3667,7 @@ def breakpoint(*args: Any, **kws: Any) -> None:
     By default, this drops you into the pdb debugger.
     """
 
-def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
+def callable(obj: object, /) -> TypeIs[Top[Callable[..., object]]]:
     """Return whether the object is callable (i.e., some kind of function).
 
     Note that classes are callable, as are instances of classes with a
