@@ -433,18 +433,16 @@ impl ClassInfoConstraintFunction {
         db: &'db dyn Db,
         classinfo: Type<'db>,
         is_positive: bool,
-        strict_generic_narrowing: bool,
+        use_transient_materialization: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let (specialization, is_transient_materialization) = if is_positive
-                && !strict_generic_narrowing
-                && class.generic_context(db).is_some()
-            {
-                (class.unknown_specialization(db), true)
-            } else {
-                // A negative result excludes every specialization of the class.
-                (class.top_materialization(db), false)
-            };
+            let (specialization, is_transient_materialization) =
+                if use_transient_materialization && class.generic_context(db).is_some() {
+                    (class.unknown_specialization(db), true)
+                } else {
+                    // A negative result excludes every specialization of the class.
+                    (class.top_materialization(db), false)
+                };
 
             let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, specialization),
@@ -463,7 +461,7 @@ impl ClassInfoConstraintFunction {
                 db,
                 alias.value_type(db),
                 is_positive,
-                strict_generic_narrowing,
+                use_transient_materialization,
             ),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -516,7 +514,7 @@ impl ClassInfoConstraintFunction {
                             db,
                             *element,
                             is_positive,
-                            strict_generic_narrowing,
+                            use_transient_materialization,
                         ) {
                             builder = builder.add_positive(c);
                             any_member = true;
@@ -533,19 +531,22 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint(db, *element, is_positive, strict_generic_narrowing)
+                self.generate_constraint(db, *element, is_positive, use_transient_materialization)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, bound, is_positive, strict_generic_narrowing)
-                    }
+                    TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(
+                        db,
+                        bound,
+                        is_positive,
+                        use_transient_materialization,
+                    ),
                     TypeVarBoundOrConstraints::Constraints(constraints) => self
                         .generate_constraint(
                             db,
                             constraints.as_type(db),
                             is_positive,
-                            strict_generic_narrowing,
+                            use_transient_materialization,
                         ),
                 }
             }
@@ -564,7 +565,7 @@ impl ClassInfoConstraintFunction {
                                 db,
                                 element,
                                 is_positive,
-                                strict_generic_narrowing,
+                                use_transient_materialization,
                             )
                         }),
                 )
@@ -583,14 +584,14 @@ impl ClassInfoConstraintFunction {
                                 db,
                                 KnownClass::NoneType.to_class_literal(db),
                                 is_positive,
-                                strict_generic_narrowing,
+                                use_transient_materialization,
                             )
                         } else {
                             self.generate_constraint(
                                 db,
                                 element,
                                 is_positive,
-                                strict_generic_narrowing,
+                                use_transient_materialization,
                             )
                         }
                     }),
@@ -602,19 +603,19 @@ impl ClassInfoConstraintFunction {
                     db,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
-                    strict_generic_narrowing,
+                    use_transient_materialization,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
                     KnownClass::Tuple.to_class_literal(db),
                     is_positive,
-                    strict_generic_narrowing,
+                    use_transient_materialization,
                 ),
                 SpecialFormType::Type => self.generate_constraint(
                     db,
                     KnownClass::Type.to_class_literal(db),
                     is_positive,
-                    strict_generic_narrowing,
+                    use_transient_materialization,
                 ),
 
                 // We don't have a good meta-type for `Callable`s right now,
@@ -622,7 +623,7 @@ impl ClassInfoConstraintFunction {
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
                         let callable = Type::Callable(CallableType::unknown(db));
-                        if is_positive && !strict_generic_narrowing {
+                        if use_transient_materialization {
                             callable.transient_top_materialization(db)
                         } else {
                             callable.top_materialization(db)
@@ -1013,7 +1014,7 @@ fn positive_class_pattern_type<'db>(
                 db,
                 class_expression_ty,
                 true,
-                true,
+                false,
             )
         }
         _ => None,
@@ -3788,12 +3789,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let class_info_ty = inference.expression_type(second_arg);
 
-                let strict_generic_narrowing = self
-                    .db
-                    .analysis_settings(self.scope().file(self.db))
-                    .strict_generic_narrowing;
-                let has_transient_materialization = is_positive
-                    && !strict_generic_narrowing
+                let use_transient_materialization = is_positive
+                    && !self
+                        .db
+                        .analysis_settings(self.scope().file(self.db))
+                        .strict_generic_narrowing;
+                let has_transient_materialization = use_transient_materialization
                     && !matches!(
                         class_info_ty,
                         Type::ClassLiteral(class) if class.generic_context(self.db).is_none()
@@ -3804,7 +3805,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         self.db,
                         class_info_ty,
                         is_positive,
-                        strict_generic_narrowing,
+                        use_transient_materialization,
                     )
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
