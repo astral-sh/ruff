@@ -12,7 +12,7 @@ from typing import Any, ClassVar, Generic, TypeVar, overload
 from typing_extensions import Never
 
 _T = TypeVar("_T")
-_S = TypeVar("_S")
+_ValueT = TypeVar("_ValueT")
 
 # Used for an undocumented mypy feature. Does not exist at runtime.
 promote = object()
@@ -40,7 +40,14 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     def fromkeys(iterable: Iterable[_T], value: None = None, /) -> dict[_T, Any | None]: ...
     @staticmethod
     @overload
-    def fromkeys(iterable: Iterable[_T], value: _S, /) -> dict[_T, _S]: ...
+    def fromkeys(iterable: Iterable[_T], value: _ValueT, /) -> dict[_T, _ValueT]: ...
+    # Using Never so that only calls using mypy plugin hook that specialize the signature
+    # can go through.
+    def setdefault(self, k: Never, default: object) -> object: ...
+    # Mypy plugin hook for 'pop' expects that 'default' has a type variable type.
+    def pop(self, k: Never, default: _T = ...) -> object: ...  # pyright: ignore[reportInvalidTypeVarUse]
+    def update(self, m: typing_extensions.Self, /) -> None: ...
+    def __delitem__(self, k: Never) -> None: ...
     def items(self) -> dict_items[str, object]: ...
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
@@ -57,13 +64,6 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
 
-    # Using Never so that only calls using mypy plugin hook that specialize the signature
-    # can go through.
-    def setdefault(self, k: Never, default: object) -> object: ...
-    # Mypy plugin hook for 'pop' expects that 'default' has a type variable type.
-    def pop(self, k: Never, default: _T = ...) -> object: ...  # pyright: ignore[reportInvalidTypeVarUse]
-    def update(self, m: typing_extensions.Self, /) -> None: ...
-    def __delitem__(self, k: Never) -> None: ...
     # supposedly incompatible definitions of __or__ and __ior__
     def __ior__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...  # type: ignore[misc]
 
@@ -93,6 +93,7 @@ class NamedTupleFallback(tuple[Any, ...]):
         def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...
 
 # Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
+_S = TypeVar("_S")
 _YieldT_co = TypeVar("_YieldT_co", covariant=True)
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
