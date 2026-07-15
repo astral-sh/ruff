@@ -2411,6 +2411,28 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
+The fallback methods available on all `TypedDict` objects are the same whether the type was created
+with `typing.TypedDict` or `typing_extensions.TypedDict`:
+
+```py
+from typing import TypedDict as TypingTypedDict
+from typing_extensions import TypedDict as ExtensionsTypedDict
+
+class TypingMovie(TypingTypedDict):
+    title: str
+
+class ExtensionsMovie(ExtensionsTypedDict):
+    title: str
+
+def _(typing_movie: TypingMovie, extensions_movie: ExtensionsMovie, keys: list[str], value: int) -> None:
+    reveal_type(reversed(typing_movie))  # revealed: Iterator[str]
+    reveal_type(reversed(extensions_movie))  # revealed: Iterator[str]
+    reveal_type(typing_movie.fromkeys(keys))  # revealed: dict[str, Any | None]
+    reveal_type(extensions_movie.fromkeys(keys))  # revealed: dict[str, Any | None]
+    reveal_type(typing_movie.fromkeys(keys, value))  # revealed: dict[str, int]
+    reveal_type(extensions_movie.fromkeys(keys, value))  # revealed: dict[str, int]
+```
+
 Known-key `get()` calls also use the field type as bidirectional context when that produces a valid
 default:
 
