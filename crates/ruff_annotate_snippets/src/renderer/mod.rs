@@ -112,6 +112,7 @@ pub struct Renderer {
     stylesheet: Stylesheet,
     hyperlink: bool,
     short_message: bool,
+    cut_indicator: Option<&'static str>,
 }
 
 impl Renderer {
@@ -124,6 +125,7 @@ impl Renderer {
             stylesheet: Stylesheet::plain(),
             hyperlink: false,
             short_message: false,
+            cut_indicator: None,
         }
     }
 
@@ -278,8 +280,9 @@ impl Renderer {
 
     /// Set the string used for when a long line is cut.
     ///
-    /// The default is `...` (three `U+002E` characters).
-    pub const fn cut_indicator(self, _cut: &'static str) -> Self {
+    /// The default for [`DecorStyle::Ascii`] is `...` (three `U+002E` characters).
+    pub const fn cut_indicator(mut self, cut: &'static str) -> Self {
+        self.cut_indicator = Some(cut);
         self
     }
 }
