@@ -1860,6 +1860,10 @@ fn attrs(criterion: &mut Criterion) {
     );
 
     bench_project(&benchmark, criterion);
+
+    // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
+    let frozen_benchmark = benchmark.freeze_inputs();
+    bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -1894,10 +1898,6 @@ fn datetype(criterion: &mut Criterion) {
     );
 
     bench_project(&benchmark, criterion);
-
-    // Keep one cheap real-world benchmark frozen to catch regressions from newly added inputs.
-    let frozen_benchmark = benchmark.freeze_inputs();
-    bench_project_named(&frozen_benchmark, criterion, "DateType (frozen inputs)");
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
