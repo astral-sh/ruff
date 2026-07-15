@@ -71,26 +71,27 @@ pub fn goto_implementation(
             ruff_python_ast::ExprRef::Name(_) | ruff_python_ast::ExprRef::Attribute(_)
         ) =>
         {
-            let resolved = goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
-            let resolved = resolved
+            let resolved_definitions =
+                goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
+            let resolved_definitions = resolved_definitions
                 .as_ref()
                 .map(|definitions| definitions.iter().as_slice())
                 .unwrap_or(&[]);
 
             // A target that resolves to class objects gets class-family lookup regardless of
             // syntax: a bare name, a qualified reference like `module.Animal`, or a constructor call.
-            implementation_definitions_for_class_references(db, resolved, &candidate_files)
-                .or_else(|| match expression {
-                    // Otherwise attribute accesses fall back to member handling.
-                    ruff_python_ast::ExprRef::Attribute(attribute) => {
-                        Some(implementation_definitions_for_attribute(
-                            &model,
-                            attribute,
-                            &candidate_files,
-                        ))
-                    }
-                    _ => None,
-                })?
+            implementation_definitions_for_class_references(
+                db,
+                resolved_definitions,
+                &candidate_files,
+            )
+            .or_else(|| match expression {
+                // If the target does not resolve to class objects, fall back to member handling.
+                ruff_python_ast::ExprRef::Attribute(attribute) => Some(
+                    implementation_definitions_for_attribute(&model, attribute, &candidate_files),
+                ),
+                _ => None,
+            })?
         }
         GotoTarget::FunctionDef(function) => {
             implementation_definitions_for_method(&model, function, &candidate_files)

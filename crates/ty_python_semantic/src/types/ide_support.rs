@@ -453,40 +453,48 @@ pub fn implementation_definitions_for_class<'db>(
 /// Subclasses are discovered by scanning the classes defined in `candidate_files`.
 pub fn implementation_definitions_for_class_references<'db>(
     db: &'db dyn Db,
-    resolved: &[ResolvedDefinition<'db>],
+    resolved_definitions: &[ResolvedDefinition<'db>],
     candidate_files: &[File],
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let mut roots = Vec::new();
     let mut seen = FxHashSet::default();
-    for resolved in resolved {
-        let ResolvedDefinition::Definition(definition) = resolved else {
+
+    for def in resolved_definitions {
+        let ResolvedDefinition::Definition(definition) = def else {
             continue;
         };
+
         // Declaration-only definitions such as a bare `sound: str` annotation have no binding
         // type and cannot refer to a class object.
-        if !resolved.category(db).is_binding() {
+        if !def.category(db).is_binding() {
             continue;
         }
+
         // Only references that resolve to a class object (a base class, annotation, `Animal()`, or
         // a name bound to a class) are class implementation requests; instances resolve to their
         // own definitions, whose type is the instance rather than the class object.
         let ty = binding_type(db, *definition);
+
         let root = match ty {
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => {
                 extract_class_literal(db, ty)
             }
             _ => None,
         };
+
         let Some(root) = root else {
             continue;
         };
+
         if seen.insert(root) {
             roots.push(root);
         }
     }
+
     if roots.is_empty() {
         return None;
     }
+
     Some(class_implementation_families(db, candidate_files, roots))
 }
 
