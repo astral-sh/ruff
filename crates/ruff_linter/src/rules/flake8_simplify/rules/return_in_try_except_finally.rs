@@ -26,17 +26,18 @@ use crate::checkers::ast::Checker;
 ///         return -1  # Always returns -1.
 /// ```
 ///
-/// Use instead:
+/// Use instead (avoid `return` in `try`/`except`/`finally`; keep cleanup free of returns):
 /// ```python
 /// def squared(n):
 ///     try:
-///         return_value = n**2
+///         return n**2
 ///     except Exception:
-///         return_value = "An exception occurred"
-///     finally:
-///         return_value = -1
-///     return return_value
+///         return "An exception occurred"
 /// ```
+///
+/// Using a variable that is overwritten in `finally` and returned afterward can still be
+/// surprising (the `finally` assignment always runs), so prefer returning from `try`/`except`
+/// only and keep `finally` for true cleanup without returns or result overrides.
 ///
 /// ## References
 /// - [Python documentation: Defining Clean-up Actions](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
