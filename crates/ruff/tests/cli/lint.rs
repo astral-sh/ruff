@@ -468,6 +468,7 @@ ignore = ["D203", "D212"]
     All checks passed!
 
     ----- stderr -----
+    warning: No Python files found under the given path(s)
     ");
 
     Ok(())
