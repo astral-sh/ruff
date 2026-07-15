@@ -1033,6 +1033,20 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
                 SubclassOfType::from_protocol(self)
             }
+
+            // TODO: we can and should do better here.
+            //
+            // This is supported by mypy, and should be supported by us as well.
+            // We'll need to come up with a better solution for the meta-type of
+            // synthesized protocols to solve this:
+            //
+            // ```py
+            // from typing import Callable
+            //
+            // def foo(x: Callable[[], int]) -> None:
+            //     reveal_type(type(x))                 # mypy: "type[def (builtins.int) -> builtins.str]"
+            //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
+            // ```
             Protocol::Synthesized(_) => KnownClass::Type.to_instance(db),
         }
     }
