@@ -362,7 +362,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum UnionElement<'db> {
     Type(Type<'db>),
     // A map from integer literals to their promotability.
@@ -556,8 +556,65 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+/// Maximum number of recursive applications unfolded after the initial alias application.
+///
+/// Whether a recursive union alias has a finite complete expansion is decidable in principle for
+/// the standard type-alias calculus: alias definitions form a restricted macro grammar without
+/// type-level conditionals or arbitrary computation. A general decision procedure, however,
+/// requires substantially more expensive grammar or higher-order pushdown analysis than is
+/// suitable for the normal union-building path. Instead, the builder unfolds this many recursive
+/// applications and then asks the terminating relation checker whether the remaining application
+/// is already covered by the accumulated union. A covered remainder is a finite fixed point and is
+/// discarded; an unproved remainder is represented by `Unknown`, because discarding it would make
+/// the result unsound. This operational limit keeps construction cheap until a specialized analysis
+/// can handle the general case directly.
+const MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS: usize = 10;
+
+/// Active expansions of specialized recursive aliases and the normalized union that existed
+/// immediately before each expansion.
+#[derive(Default)]
+struct ActiveRecursiveAliasExpansions<'db> {
+    entries: Vec<RecursiveAliasExpansion<'db>>,
+}
+
+struct RecursiveAliasExpansion<'db> {
+    alias: Type<'db>,
+    union_before_expansion: Type<'db>,
+}
+
+impl<'db> ActiveRecursiveAliasExpansions<'db> {
+    /// Returns `true` if the latest expansion cycle for `alias` left the union unchanged after an
+    /// earlier cycle of the same alias grew it.
+    fn is_at_fixed_point(&self, alias: Type<'db>, current_union: Type<'db>) -> bool {
+        let mut previous_expansions = self
+            .entries
+            .iter()
+            .rev()
+            .filter(|expansion| expansion.alias == alias);
+        previous_expansions.next().is_some_and(|expansion| {
+            expansion.union_before_expansion == current_union
+                && previous_expansions.any(|earlier_expansion| {
+                    earlier_expansion.union_before_expansion != current_union
+                })
+        })
+    }
+
+    fn enter(&mut self, alias: Type<'db>, union_before_expansion: Type<'db>) {
+        self.entries.push(RecursiveAliasExpansion {
+            alias,
+            union_before_expansion,
+        });
+    }
+
+    fn exit(&mut self, alias: Type<'db>) {
+        let exited = self.entries.pop();
+        debug_assert_eq!(exited.map(|expansion| expansion.alias), Some(alias));
+    }
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
+    recursive_alias_remainder: Option<Type<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
@@ -632,6 +689,7 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
+            recursive_alias_remainder: None,
             unpack_aliases: true,
             cycle_recovery: false,
             normalization,
@@ -697,6 +755,22 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    /// Returns the normalized union elements accumulated so far, excluding any alias remainder
+    /// retained after reaching the recursive-unfold limit.
+    fn current_type(&self) -> Type<'db> {
+        Self {
+            elements: self.elements.clone(),
+            recursive_alias_remainder: None,
+            db: self.db,
+            unpack_aliases: self.unpack_aliases,
+            cycle_recovery: self.cycle_recovery,
+            normalization: self.normalization,
+            recursively_defined: self.recursively_defined,
+        }
+        .try_build_resolved()
+        .unwrap_or(Type::Never)
+    }
+
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         self.add_in_place(ty);
@@ -712,6 +786,19 @@ impl<'db> UnionBuilder<'db> {
         &mut self,
         ty: Type<'db>,
         seen_aliases: &mut Vec<TypeIdentity<'db>>,
+    ) {
+        self.add_in_place_recursive(
+            ty,
+            seen_aliases,
+            &mut ActiveRecursiveAliasExpansions::default(),
+        );
+    }
+
+    fn add_in_place_recursive(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<TypeIdentity<'db>>,
+        active_recursive_alias_expansions: &mut ActiveRecursiveAliasExpansions<'db>,
     ) {
         let cycle_recovery = self.cycle_recovery;
         let uses_relations = self.normalization.uses_relations() && !cycle_recovery;
@@ -731,7 +818,11 @@ impl<'db> UnionBuilder<'db> {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self.add_in_place_impl(*element, seen_aliases);
+                    self.add_in_place_recursive(
+                        *element,
+                        seen_aliases,
+                        active_recursive_alias_expansions,
+                    );
                 }
                 self.recursively_defined = self
                     .recursively_defined
@@ -757,17 +848,43 @@ impl<'db> UnionBuilder<'db> {
                     .iter()
                     .filter(|active| **active == identity)
                     .count();
+                let current_type = matches!(identity, TypeIdentity::RecursiveTypeAlias(_))
+                    .then(|| self.current_type());
+                // An unchanged union alone is not a fixed point: later substitutions can still
+                // expose new members, and union members after the recursive reference have not
+                // been visited yet. Stop only after this exact specialization first grew the
+                // union and then completed a subsequent cycle without changing it.
+                if let Some(current_type) = current_type
+                    && active_recursive_alias_expansions.is_at_fixed_point(ty, current_type)
+                {
+                    return;
+                }
                 let should_stop = match identity {
-                    // One recursive unfold is needed to expose non-recursive union elements.
-                    TypeIdentity::RecursiveTypeAlias(_) => active_occurrences > 1,
+                    TypeIdentity::RecursiveTypeAlias(_) => {
+                        active_occurrences > MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS
+                    }
                     _ => active_occurrences > 0,
                 };
                 if should_stop {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
+                    // Defer the fallback until all sibling union elements have been processed.
+                    // Otherwise `A | Alias` and `Alias | A` can normalize differently.
+                    self.recursive_alias_remainder =
+                        Some(self.recursive_alias_remainder.map_or(ty, |remainder| {
+                            UnionType::from_elements_leave_aliases(self.db, [remainder, ty])
+                        }));
                 } else {
                     seen_aliases.push(identity);
-                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+                    if let Some(current_type) = current_type {
+                        active_recursive_alias_expansions.enter(ty, current_type);
+                    }
+                    self.add_in_place_recursive(
+                        alias.value_type(self.db),
+                        seen_aliases,
+                        active_recursive_alias_expansions,
+                    );
+                    if current_type.is_some() {
+                        active_recursive_alias_expansions.exit(ty);
+                    }
                     let popped = seen_aliases.pop();
                     debug_assert_eq!(popped, Some(identity));
                 }
@@ -800,7 +917,10 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if uses_relations => {
+                                UnionElement::Type(existing)
+                                    if uses_relations
+                                        && !matches!(*existing, Type::TypeAlias(_)) =>
+                                {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -853,7 +973,10 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if uses_relations => {
+                                UnionElement::Type(existing)
+                                    if uses_relations
+                                        && !matches!(*existing, Type::TypeAlias(_)) =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -908,7 +1031,10 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if uses_relations => {
+                                UnionElement::Type(existing)
+                                    if uses_relations
+                                        && !matches!(*existing, Type::TypeAlias(_)) =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -984,7 +1110,10 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if uses_relations => {
+                                UnionElement::Type(existing)
+                                    if uses_relations
+                                        && !matches!(*existing, Type::TypeAlias(_)) =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -1063,7 +1192,7 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type =
-                match element.try_reduce(self.db, ty, self.cycle_recovery, uses_relations) {
+                match element.try_reduce(self.db, ty, self.cycle_recovery, should_simplify_full) {
                     ReduceResult::KeepIf(keep) => {
                         if !keep {
                             to_remove.push(i);
@@ -1178,6 +1307,58 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
+        if self.normalization.uses_relations() && !self.cycle_recovery {
+            let db = self.db;
+            self.try_build_with_recursive_alias_remainder_check(|remainder, current| {
+                remainder.is_redundant_with(db, current)
+            })
+        } else {
+            self.try_build_with_recursive_alias_remainder_check(|_, _| false)
+        }
+    }
+
+    /// Builds the union using a caller-provided semantic check for deferred recursive aliases.
+    ///
+    /// This lets a caller that already owns a type-relation checker avoid starting a nested
+    /// relation query while preserving the same recursive-alias fallback semantics.
+    pub(crate) fn build_with_recursive_alias_remainder_check(
+        self,
+        is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
+    ) -> Type<'db> {
+        self.try_build_with_recursive_alias_remainder_check(is_redundant)
+            .unwrap_or(Type::Never)
+    }
+
+    fn try_build_with_recursive_alias_remainder_check(
+        mut self,
+        mut is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
+    ) -> Option<Type<'db>> {
+        let remainder = self.recursive_alias_remainder.take();
+        let db = self.db;
+        let cycle_recovery = self.cycle_recovery;
+        let normalization = self.normalization;
+        let current = self.try_build_resolved();
+        let Some(remainder) = remainder else {
+            return current;
+        };
+        if current.is_some_and(|current| is_redundant(remainder, current)) {
+            return current;
+        }
+
+        // The unexpanded remainder may contribute union members not seen within the operational
+        // limit. Dropping it would under-approximate the alias, so retain soundness by covering
+        // those unknown members with `Unknown`.
+        let mut fallback = Self::with_normalization(db, normalization)
+            .unpack_aliases(false)
+            .cycle_recovery(cycle_recovery);
+        if let Some(current) = current {
+            fallback.add_in_place(current);
+        }
+        fallback.add_in_place(Type::unknown());
+        fallback.try_build_resolved()
+    }
+
+    fn try_build_resolved(self) -> Option<Type<'db>> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
