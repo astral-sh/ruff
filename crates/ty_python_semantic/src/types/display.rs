@@ -1770,10 +1770,13 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
-                // The following two are not user-facing, but we distinguish them here from Top/Bottom for debugging purposes.
-                Some(MaterializationKind::DeferredTop) => Some(("Top*", SpecialFormType::Top)),
+                // The following two are not user-facing, but we distinguish them here from
+                // Top/Bottom for debugging purposes.
+                Some(MaterializationKind::DeferredTop) => {
+                    Some(("DeferredTop", SpecialFormType::Top))
+                }
                 Some(MaterializationKind::DeferredBottom) => {
-                    Some(("Bottom*", SpecialFormType::Bottom))
+                    Some(("DeferredBottom", SpecialFormType::Bottom))
                 }
             };
             let suffix = match self.specialization.materialization_kind(self.db) {
@@ -2141,7 +2144,7 @@ pub(crate) struct DisplayCallableType<'a, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if self.deferred_top_materialization {
-            f.write_str("Top*[")?;
+            f.write_str("DeferredTop[")?;
         }
 
         match self.signatures.overloads.as_slice() {
