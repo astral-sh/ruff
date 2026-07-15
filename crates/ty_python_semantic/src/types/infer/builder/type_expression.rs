@@ -1224,14 +1224,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SubclassOfType::subclass_of_unknown()
         };
 
-        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
-            let slice_ty = builder.infer_type_expression(slice);
+        let subclass_of_type_argument = |builder: &Self, slice: &ast::Expr, slice_ty: Type<'db>| {
+            let slice_ty = slice_ty.resolve_type_alias(builder.db());
+            let slice_ty = match slice_ty {
+                Type::Union(union) if union.has_aliases(builder.db()) => {
+                    union.expand_aliases(builder.db())
+                }
+                _ => slice_ty,
+            };
             SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
                 match slice_ty {
                     Type::Callable(_) => invalid_type_argument(builder, slice),
                     _ => todo_type!("unsupported type[X] special form"),
                 }
             })
+        };
+
+        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
+            let slice_ty = builder.infer_type_expression(slice);
+            subclass_of_type_argument(builder, slice, slice_ty)
         };
 
         match slice {
@@ -1326,6 +1337,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             special_form,
                         );
                         invalid_type_argument(self, slice)
+                    }
+                    value_ty @ Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                        TypeAliasType::PEP695(_),
+                    )) => {
+                        let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
+                        subclass_of_type_argument(self, slice, slice_ty)
                     }
                     _ => {
                         self.infer_expression(parameters, TypeContext::default());
