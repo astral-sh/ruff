@@ -317,6 +317,7 @@ impl<'db> TupleType<'db> {
             .map(|tuple| TupleType::new_internal(db, tuple.tuple(db), deferred_top_materialization))
     }
 
+    /// Applies the tuple's deferred top materialization: `DeferredTop[..]` becomes `Top[..]`.
     fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,

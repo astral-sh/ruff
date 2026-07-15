@@ -979,6 +979,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Applies deferred materialization to a class-based protocol's specialization.
     fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
