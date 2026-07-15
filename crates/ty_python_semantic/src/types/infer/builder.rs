@@ -6090,8 +6090,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `expected_types` is IDE completion metadata. If normal set inference already has a
         // string-literal context, preserve that semantic context for inference while also offering
         // the transient `TypedDict` key fallback as a completion candidate.
-        if self.collects_expected_types()
-            && let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation)
+        if let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation) 
+        && self.collects_expected_types()
         {
             self.store_expected_type(
                 elt,
