@@ -44,7 +44,7 @@ use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_wit
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, MatchingOverloadSet, requires_overload_evaluation,
+    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -57,12 +57,11 @@ use crate::types::diagnostic::{
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
     report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -5033,22 +5032,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut max_typevar_occurrences = 0;
         let mut has_generic_context = false;
-        let mut matching_overloads = MatchingOverloadSet::new();
+        let mut overload_candidates = OverloadSet::new();
 
         // Compute the upper bound on fixpoint iteration, based on the maximum number of inferable
-        // typevar occurrences across all matching overloads. Note that the set of matching overloads
+        // typevar occurrences across all overload candidates. Note that the set of overload candidates
         // stays stable across all iterations.
         bindings.visit_type_context_callables(&mut |binding| {
-            has_generic_context |= binding
-                .matching_overloads()
-                .any(|(_, overload)| overload.signature.generic_context.is_some());
+            let candidate_overload_indices = binding.candidate_overload_indices(db, argument_types);
 
-            let matching_overload_indices: SmallVec<[usize; 1]> = binding
-                .matching_overloads()
-                .map(|(index, _)| index)
-                .collect();
+            has_generic_context |= candidate_overload_indices.iter().any(|&overload_index| {
+                binding.overloads()[overload_index]
+                    .signature
+                    .generic_context
+                    .is_some()
+            });
 
-            for overload_index in &matching_overload_indices {
+            for overload_index in &candidate_overload_indices {
                 let overload = &binding.overloads()[*overload_index];
                 if overload.signature.generic_context.is_none() {
                     continue;
@@ -5069,7 +5068,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 max_typevar_occurrences = max_typevar_occurrences.max(overload_typevar_occurrences);
             }
 
-            matching_overloads.push(matching_overload_indices);
+            overload_candidates.push(candidate_overload_indices);
         });
 
         let generic_arguments: SmallVec<_> = generic_arguments
@@ -5079,12 +5078,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .collect();
 
         // Enable the expression cache if we are going to perform multi-inference.
-        let teardown_expression_cache =
-            if !generic_arguments.is_empty() || requires_overload_evaluation(&matching_overloads) {
-                self.setup_expression_cache()
-            } else {
-                false
-            };
+        let teardown_expression_cache = if !generic_arguments.is_empty()
+            || requires_overload_evaluation(&overload_candidates)
+        {
+            self.setup_expression_cache()
+        } else {
+            false
+        };
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = call_expression_tcx
@@ -5132,7 +5132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     narrowed_tcx,
                     &generic_arguments,
                     max_typevar_occurrences,
-                    &matching_overloads,
+                    &overload_candidates,
                 )
             } else {
                 speculative_builder.infer_and_check_argument_types_simple(
@@ -5143,7 +5143,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut speculative_bindings,
                     &constraints,
                     narrowed_tcx,
-                    &matching_overloads,
+                    &overload_candidates,
                 )
             };
 
@@ -5208,7 +5208,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expression_tcx,
                 &generic_arguments,
                 max_typevar_occurrences,
-                &matching_overloads,
+                &overload_candidates,
             )
         } else {
             self.infer_and_check_argument_types_simple(
@@ -5219,7 +5219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bindings,
                 &constraints,
                 call_expression_tcx,
-                &matching_overloads,
+                &overload_candidates,
             )
         };
 
@@ -5240,19 +5240,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
-        candidates: &MatchingOverloadSet,
+        candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
+        let requires_overload_evaluation = requires_overload_evaluation(candidates);
         let arguments_tcx = self.collect_call_arguments_type_context(
             baseline_argument_types,
             bindings,
-            None,
+            requires_overload_evaluation.then_some(candidates),
             constraints,
             call_expression_tcx,
         );
 
         // If we are not inferring against multiple overloads, we can infer the arguments
         // and check the binding directly.
-        if !requires_overload_evaluation(candidates) {
+        if !requires_overload_evaluation {
             self.infer_all_argument_types(
                 ast_arguments,
                 argument_types,
@@ -5267,7 +5268,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 argument_types,
                 call_expression_tcx,
                 &self.dataclass_field_specifiers,
-                true,
+                CheckTypesMode::Finalize,
             );
         }
 
@@ -5290,7 +5291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
-            true,
+            CheckTypesMode::Finalize,
         );
 
         let checked_argument_types = argument_types.clone();
@@ -5330,7 +5331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
         generic_arguments: &SmallVec<[usize; 4]>,
         typevar_occurrences: usize,
-        candidates: &MatchingOverloadSet,
+        candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
@@ -5384,7 +5385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &next_argument_types,
                 call_expression_tcx,
                 &self.dataclass_field_specifiers,
-                false,
+                CheckTypesMode::Provisional,
             );
 
             // The number of occurrences of inferable typevars forms an upper bound for the number
@@ -5418,7 +5419,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Discard any non-matching constructors overloads now that the inferred types have converged.
-        let result = next_bindings.discard_downstream_constructors(
+        let result = next_bindings.finalize_argument_inference(
             db,
             &converged_argument_types,
             &self.dataclass_field_specifiers,
@@ -5460,7 +5461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         argument_types: &CallArguments<'_, 'db>,
         bindings: &'bindings Bindings<'db>,
-        candidates: Option<&'bindings MatchingOverloadSet>,
+        candidates: Option<&'bindings OverloadSet>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Vec<Option<MatchingArgumentTypeContext<'db>>> {
@@ -5503,10 +5504,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        // Collect the set of all matching overloads and bindings.
+        // Collect the set of candidate overloads and bindings.
         let mut overloads_with_binding: OverloadsWithBinding = Vec::new();
         if let Some(candidates) = candidates {
-            bindings.visit_matching_overload_set(candidates, &mut |overload, binding| {
+            bindings.visit_overload_set(candidates, &mut |overload, binding| {
                 let specialization = overload.argument_type_context_specialization(
                     db,
                     constraints,

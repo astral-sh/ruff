@@ -1,4 +1,4 @@
-use super::{Binding, Bindings, CallableBinding, CallableItem};
+use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -76,25 +76,24 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
-    /// Checks this constructor and, if requested, discards inactive downstream constructors.
+    /// Check types for all bindings in this constructor.
     ///
-    /// During generic call inference, the candidate overload and constructor set must remain
-    /// stable across fixpoint iterations, and so downstream constructors are not discarded
-    /// until the final round.
+    /// If `CheckTypesMode::Finalize` is provided, inactive downstream constructors will be
+    /// discarded. Otherwise, all constructor bindings are preserved after the check.
     pub(super) fn check_types(
         &mut self,
         db: &'db dyn Db,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        discard_downstream_constructors: bool,
+        mode: CheckTypesMode,
     ) {
         self.entry
             .check_types(db, constraints, argument_types, call_expression_tcx);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
-        if !discard_downstream_constructors {
+        if mode.is_provisional() {
             if let Some(downstream) = self.downstream_constructor_mut() {
                 let _ = downstream.check_types_impl(
                     db,
@@ -102,7 +101,7 @@ impl<'db> ConstructorBinding<'db> {
                     argument_types,
                     call_expression_tcx,
                     &[],
-                    false,
+                    mode,
                 );
             }
         } else if !self.should_check_downstream(db) {
@@ -170,7 +169,7 @@ impl<'db> ConstructorBinding<'db> {
                 argument_types,
                 call_expression_tcx,
                 dataclass_field_specifiers,
-                true,
+                CheckTypesMode::Finalize,
             );
         }
     }

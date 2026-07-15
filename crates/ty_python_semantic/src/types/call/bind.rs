@@ -224,19 +224,15 @@ impl<'db> CallableItem<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        discard_downstream_constructors: bool,
+        mode: CheckTypesMode,
     ) {
         match self {
             CallableItem::Regular(binding) => {
                 binding.check_types(db, constraints, argument_types, call_expression_tcx);
             }
-            CallableItem::Constructor(binding) => binding.check_types(
-                db,
-                constraints,
-                argument_types,
-                call_expression_tcx,
-                discard_downstream_constructors,
-            ),
+            CallableItem::Constructor(binding) => {
+                binding.check_types(db, constraints, argument_types, call_expression_tcx, mode);
+            }
         }
     }
 
@@ -407,16 +403,10 @@ impl<'db> BindingsElement<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        discard_downstream_constructors: bool,
+        mode: CheckTypesMode,
     ) {
         for item in &mut self.items {
-            item.check_types(
-                db,
-                constraints,
-                call_arguments,
-                call_expression_tcx,
-                discard_downstream_constructors,
-            );
+            item.check_types(db, constraints, call_arguments, call_expression_tcx, mode);
         }
     }
 
@@ -506,15 +496,39 @@ pub(crate) struct Bindings<'db> {
     enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
 }
 
-/// The set of overloads that matched the arguments at a given call-site, before argument type
-/// inference.
+/// The set of overload candidates at a given call-site, before argument type inference.
 ///
 /// This set is kept stable across fixpoint iterations during generic call inference, ensuring
 /// that all inferred argument types are available during overload evaluation.
-pub(crate) type MatchingOverloadSet = SmallVec<[SmallVec<[usize; 1]>; 1]>;
+pub(crate) type OverloadSet = SmallVec<[SmallVec<[usize; 1]>; 1]>;
 
-pub(crate) fn requires_overload_evaluation(matching_overloads: &MatchingOverloadSet) -> bool {
-    matching_overloads.iter().any(|indices| indices.len() > 1)
+/// Returns whether overload evaluation is required for the given set of overload candidates.
+pub(crate) fn requires_overload_evaluation(candidates: &OverloadSet) -> bool {
+    // TODO: This only recognizes overloads within the same callable binding, ignoring intersections
+    // that may need to be evaluated. `OverloadSet` should preserve the union-of-intersections
+    // representation of callables.
+    candidates.iter().any(|indices| indices.len() > 1)
+}
+
+/// Controls the behavior of a given call to [`Bindings::check_types`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CheckTypesMode {
+    /// After checking, retain only the callable bindings that contribute to the call
+    /// evaluation.
+    Finalize,
+
+    /// Preserve all callable bindings, regardless of whether they evaluate successfully.
+    ///
+    /// Generic call inference may perform fixpoint iteration in order to unify
+    /// type context across call arguments, and so all callable bindings should
+    /// remain candidates until the final round is finalized.
+    Provisional,
+}
+
+impl CheckTypesMode {
+    pub(crate) fn is_provisional(self) -> bool {
+        matches!(self, Self::Provisional)
+    }
 }
 
 impl<'db> Bindings<'db> {
@@ -842,14 +856,14 @@ impl<'db> Bindings<'db> {
 
     /// Visits the given set of overload candidates, invoking the provided callback for each
     /// binding.
-    pub(crate) fn visit_matching_overload_set<'a>(
+    pub(crate) fn visit_overload_set<'a>(
         &'a self,
-        candidates: &'a MatchingOverloadSet,
+        candidates: &'a OverloadSet,
         visit: &mut impl FnMut(&'a Binding<'db>, &'a CallableBinding<'db>),
     ) {
-        let mut matching_overloads = candidates.iter();
+        let mut candidate_overloads = candidates.iter();
         self.visit_type_context_callables(&mut |binding| {
-            let overloads = matching_overloads
+            let overloads = candidate_overloads
                 .next()
                 .expect("checked bindings are stable across fixpoint iterations");
 
@@ -1093,7 +1107,7 @@ impl<'db> Bindings<'db> {
             call_arguments,
             call_expression_tcx,
             dataclass_field_specifiers,
-            true,
+            CheckTypesMode::Finalize,
         ) {
             Ok(()) => Ok(self),
             Err(err) => Err(CallError(err, Box::new(self))),
@@ -1107,22 +1121,16 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
-        discard_downstream_constructors: bool,
+        mode: CheckTypesMode,
     ) -> Result<(), CallErrorKind> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
-            element.check_types(
-                db,
-                constraints,
-                call_arguments,
-                call_expression_tcx,
-                discard_downstream_constructors,
-            );
+            element.check_types(db, constraints, call_arguments, call_expression_tcx, mode);
         }
 
         // Generic call inference must maintain a stable set of overloads until the final round
         // of fixpoint iteration.
-        if !discard_downstream_constructors {
+        if mode.is_provisional() {
             return Ok(());
         }
 
@@ -1149,7 +1157,9 @@ impl<'db> Bindings<'db> {
         self.as_result(db)
     }
 
-    pub(crate) fn discard_downstream_constructors(
+    /// Finalize the bindings after a provisional check, retaining only those that contribute
+    /// to the final call evaluation.
+    pub(crate) fn finalize_argument_inference(
         &mut self,
         db: &'db dyn Db,
         call_arguments: &CallArguments<'_, 'db>,
@@ -1161,7 +1171,7 @@ impl<'db> Bindings<'db> {
             if constructor.discard_downstream_constructor(db)
                 && let Some(downstream) = constructor.downstream_constructor_mut()
             {
-                let _ = downstream.discard_downstream_constructors(
+                let _ = downstream.finalize_argument_inference(
                     db,
                     call_arguments,
                     dataclass_field_specifiers,
@@ -3366,15 +3376,7 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let (should_retry_after_provisional_arity, overloads_for_expansion) =
-            if self.overloads.len() > 1
-                && self.matching_overloads().count() < self.overloads.len()
-                && call_arguments.iter().any(|(argument, argument_types)| {
-                    matches!(argument, Argument::Variadic)
-                        && argument_types
-                            .get_default()
-                            .is_some_and(|argument_type| is_expandable_type(db, argument_type))
-                })
-            {
+            if self.should_retry_after_provisional_arity(db, call_arguments.as_ref()) {
                 // We will retry all overloads after argument expansion.
                 (true, (0..self.overloads.len()).collect())
             } else {
@@ -3686,6 +3688,38 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+    }
+
+    /// Returns the set of overload candidates that may contribute to the call evaluation.
+    ///
+    /// Overloads removed by provisional arity matching are typically ignored. However, they remain
+    /// candidates in the presence of an expandable `*args` argument, that may lead to overload
+    /// evaluation retrying with the expanded argument.
+    pub(crate) fn candidate_overload_indices(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> SmallVec<[usize; 1]> {
+        if self.should_retry_after_provisional_arity(db, call_arguments) {
+            (0..self.overloads.len()).collect()
+        } else {
+            self.matching_overloads().map(|(index, _)| index).collect()
+        }
+    }
+
+    fn should_retry_after_provisional_arity(
+        &self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        self.overloads.len() > 1
+            && self.matching_overloads().count() < self.overloads.len()
+            && call_arguments.iter().any(|(argument, argument_types)| {
+                matches!(argument, Argument::Variadic)
+                    && argument_types
+                        .get_default()
+                        .is_some_and(|argument_type| is_expandable_type(db, argument_type))
+            })
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -6152,7 +6186,7 @@ impl<'db> Binding<'db> {
             &sub_arguments,
             call_expression_tcx,
             &[],
-            true,
+            CheckTypesMode::Finalize,
         );
 
         let specialized_binding = specialized_bindings.single_element()?;

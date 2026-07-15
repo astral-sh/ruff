@@ -1166,6 +1166,22 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     reveal_type(m(*t))  # revealed: Literal[1, 2]
 ```
 
+### Retry from parameter matching with type context
+
+When retrying, arguments are inferred with the correct type context:
+
+```py
+from typing import Callable, overload
+
+@overload
+def n(callback: Callable[[int], int], value: int, /) -> int: ...
+@overload
+def n(callback: Callable[[str], str], first: str, second: str, /) -> str: ...
+def n(*args: object) -> object: ...
+def _(values: tuple[int] | tuple[str, str]):
+    reveal_type(n(lambda value: value, *values))  # revealed: int | str
+```
+
 ## Filtering based on variadic arguments
 
 This is step 4 of the overload call evaluation algorithm which specifies that:
