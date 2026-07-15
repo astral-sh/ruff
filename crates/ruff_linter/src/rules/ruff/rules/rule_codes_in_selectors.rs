@@ -1,7 +1,7 @@
 use std::iter::repeat;
-use std::ops::Range;
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_db::diagnostic::LintName;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use toml::Spanned;
@@ -61,35 +61,20 @@ pub(crate) fn rule_codes_in_selectors(context: &LintContext, source_type: TomlSo
         return;
     }
 
-    let source_file = context.source_file();
-    let Ok(Some(config_file)) = ConfigFile::from_toml_str(source_file.source_text(), source_type)
-    else {
+    let source = context.source_file().source_text();
+    let Ok(Some(config_file)) = ConfigFile::from_toml_str(source, source_type) else {
         return;
     };
 
     for (spanned, selector) in config_file.selectors() {
-        let code = spanned.get_ref();
-        let code = get_redirect_target(code).unwrap_or(code);
-        let Ok(rule) = Rule::from_code(code) else {
+        let Some(RuleCode { name, range }) = RuleCode::from_spanned(spanned, source) else {
             continue;
         };
-
-        let Some(content_range) =
-            toml_string_content_range(source_file.source_text(), spanned.span())
-        else {
-            debug_assert!(false, "a TOML string span should include its quotes");
-            continue;
-        };
-
-        let range = TextRange::new(
-            TextSize::try_from(content_range.start).unwrap(),
-            TextSize::try_from(content_range.end).unwrap(),
-        );
 
         context
             .report_diagnostic(RuleCodesInSelectors { selector }, range)
             .set_fix(Fix::safe_edit(Edit::range_replacement(
-                rule.name().to_string(),
+                name.to_string(),
                 range,
             )));
     }
@@ -251,14 +236,48 @@ impl Lint {
     }
 }
 
-fn toml_string_content_range(source: &str, range: Range<usize>) -> Option<Range<usize>> {
-    let string = source.get(range.clone())?;
-    let content = string.trim_matches(['"', '\'']);
-    if content.is_empty() || content.len() == string.len() {
-        return None;
-    }
-    let leading_quotes = string.len() - string.trim_start_matches(['"', '\'']).len();
-    let start = range.start + leading_quotes;
+struct RuleCode {
+    name: LintName,
+    range: TextRange,
+}
 
-    Some(start..start + content.len())
+impl RuleCode {
+    /// Extract a rule code and its range from a spanned TOML string.
+    ///
+    /// The range corresponds to the code itself rather than the surrounding string:
+    ///
+    /// ```toml
+    /// [lint]
+    /// select = ["F401"]
+    ///            ^^^^
+    /// ```
+    fn from_spanned(spanned: &Spanned<String>, source: &str) -> Option<Self> {
+        let code = spanned.get_ref();
+        let code = get_redirect_target(code).unwrap_or(code);
+        let rule = Rule::from_code(code).ok()?;
+
+        let span = spanned.span();
+        let range = TextRange::new(
+            TextSize::try_from(span.start).unwrap(),
+            TextSize::try_from(span.end).unwrap(),
+        );
+
+        // Note that this should be infallible because the `Spanned<String>` guarantees that the
+        // source is surrounded by valid TOML quotes, and `Rule::from_code` above guarantees that
+        // the string content is a valid rule code. This means that we don't have to worry about
+        // stripping nested quotes like `"'F401'"` or similar.
+        let range = {
+            let string = &source[range];
+            let content = string.trim_start_matches(['"', '\'']);
+            let quote_len = string.text_len() - content.text_len();
+            let start = range.start() + quote_len;
+            let end = range.end() - quote_len;
+            TextRange::new(start, end)
+        };
+
+        Some(Self {
+            name: rule.name(),
+            range,
+        })
+    }
 }
