@@ -303,13 +303,13 @@ type MaterializationEquivalenceVisitor<'db> =
 /// reuse the result of another.
 #[derive(Default)]
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    default: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    top_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    top_specialization_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    bottom_specialization_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    promotion: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
-    skip_promotion: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -342,7 +342,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             _ => &self.default,
         };
         type_transformer
-            .get_or_init(TypeTransformer::default)
+            .get_or_init(Box::default)
             .visit_type(db, ty, func)
     }
 

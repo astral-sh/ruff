@@ -913,3 +913,26 @@ def _(top: Top[AliasedCallable[Any]], bottom: Bottom[AliasedCallable[Any]]) -> N
     reveal_type(top)  # revealed: (Never, /) -> object
     reveal_type(bottom)  # revealed: (object, /) -> Never
 ```
+
+When a materialized class specialization is applied to an attribute, the same function-literal type
+can be visited through both the parameter and return positions of a nested callable. Those positions
+use opposite materialization polarities and must not share a transformation cache.
+
+```py
+from ty_extensions import Top, Bottom
+from typing import Any, Callable
+from ty_extensions._internal import TypeOf
+
+class FunctionHolder[T]:
+    def shared(self, value: T) -> T:
+        raise NotImplementedError
+
+    nested: Callable[[TypeOf[shared]], TypeOf[shared]]
+
+def _(top: Top[FunctionHolder[Any]], bottom: Bottom[FunctionHolder[Any]]) -> None:
+    # revealed: (def shared(self, value: object) -> Never, /) -> def shared(self, value: Never) -> object
+    reveal_type(top.nested)
+
+    # revealed: (def shared(self, value: Never) -> object, /) -> def shared(self, value: object) -> Never
+    reveal_type(bottom.nested)
+```
