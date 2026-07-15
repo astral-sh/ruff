@@ -619,6 +619,14 @@ impl ClassInfoConstraintFunction {
 ///
 /// This intentionally does not change global disjointness. If no union member definitely matches
 /// the runtime constraint, the fully conservative intersection is preserved.
+///
+/// ```python
+/// class Area: ...
+///
+/// def visit(value: Area | list[Area]) -> None:
+///     if isinstance(value, list):
+///         reveal_type(value)  # list[Area]
+/// ```
 fn prefer_union_runtime_narrowing<'db>(
     db: &'db dyn Db,
     base_ty: Type<'db>,
@@ -641,6 +649,8 @@ fn prefer_union_runtime_narrowing<'db>(
     .unwrap_or_else(full_intersection)
 }
 
+/// Narrow one union arm, preserving dynamic and existing structural or inheritance overlaps.
+/// Arms that could only match through a new unrelated subclass become `Never`.
 fn narrow_runtime_union_arm<'db>(
     db: &'db dyn Db,
     base_ty: Type<'db>,
@@ -698,12 +708,9 @@ fn is_definite_runtime_match<'db>(
     if type_is_runtime_dynamic(ty) || type_is_runtime_dynamic(runtime_constraint) {
         return false;
     }
-    if matches!(ty, Type::TypedDict(_))
-        && typed_dict_matches_runtime_constraint(db, runtime_constraint)
-    {
-        return true;
-    }
-    ty.is_subtype_of(db, runtime_constraint)
+    (matches!(ty, Type::TypedDict(_))
+        && typed_dict_matches_runtime_constraint(db, runtime_constraint))
+        || ty.is_subtype_of(db, runtime_constraint)
 }
 
 fn type_is_runtime_dynamic(ty: Type<'_>) -> bool {
@@ -734,6 +741,10 @@ fn typed_dict_matches_runtime_constraint(db: &dyn Db, runtime_constraint: Type<'
     }
 }
 
+/// Return whether a union arm should remain after preferring definite runtime matches.
+///
+/// Besides definite matches, this retains dynamic arms and overlaps already supported by the
+/// declared inheritance or structural relationships.
 fn runtime_union_arm_is_relevant<'db>(
     db: &'db dyn Db,
     arm: Type<'db>,
@@ -746,6 +757,10 @@ fn runtime_union_arm_is_relevant<'db>(
             && types_have_existing_runtime_overlap(db, arm, runtime_constraint))
 }
 
+/// Narrow the relevant arms of `union`, but only if at least one arm definitely matches.
+///
+/// Returning `None` preserves the conservative intersection when the runtime constraint would
+/// otherwise select arms based only on possible future subclass relationships.
 fn preferred_runtime_union<'db>(
     db: &'db dyn Db,
     union: UnionType<'db>,
@@ -826,6 +841,10 @@ struct Conjunctions<'db> {
     runtime_constraints: RuntimeConstraints<'db>,
 }
 
+/// Tracks whether a conjunction contains zero, one, or multiple positive runtime constraints.
+///
+/// Arm preference is only order-independent for a single constraint. Once constraints are
+/// `Multiple`, their types are stored in `Conjunctions::ordinary` and evaluated conservatively.
 #[derive(Hash, PartialEq, Debug, Eq, Clone, Copy, get_size2::GetSize, salsa::SalsaValue)]
 enum RuntimeConstraints<'db> {
     None,
@@ -908,6 +927,8 @@ impl<'db> Conjunctions<'db> {
             .build()
     }
 
+    /// Apply this conjunction to `base_ty`, using union-relative narrowing for a single runtime
+    /// constraint and conservative intersection semantics otherwise.
     fn evaluate_with_runtime_preference(
         self,
         db: &'db dyn Db,
@@ -1385,6 +1406,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         constraints.map(FrozenNarrowingConstraints::from)
     }
 
+    /// Record positive runtime provenance unless strict subclass narrowing requests the
+    /// conservative intersection behavior.
     fn runtime_intersection_constraint(
         &self,
         constraint: Type<'db>,

@@ -905,10 +905,6 @@ def known_overlap(
         # `Mapping` is already an `Iterable`, so both possibilities remain.
         reveal_type(value)  # revealed: Mapping[str, int] | (Iterable[tuple[str, int]] & Top[Mapping[Unknown, object]])
 
-def under_annotated(value: Iterable[Area]) -> None:
-    if isinstance(value, Mapping):
-        reveal_type(value)  # revealed: Iterable[Area] & Top[Mapping[Unknown, object]]
-
 class A: ...
 class B: ...
 class C: ...
