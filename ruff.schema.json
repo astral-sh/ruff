@@ -1188,7 +1188,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "function-names": {
@@ -1198,7 +1198,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -1418,7 +1418,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "ignore-names": {
@@ -1428,7 +1428,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -2666,6 +2666,10 @@
         }
       },
       "additionalProperties": false
+    },
+    "Name": {
+      "description": "An immutable name.\n\n# Choosing a string representation\n\nOn 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer\nvalues use an exactly-sized, reference-counted allocation, so cloning a heap-backed value\nreuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes\ninline, and remains mutable; cloning a heap-backed value copies its contents into a new\nallocation.\n\nPrefer `CharStr` for immutable text that is retained densely or passed between owners, when\neither the smaller handle or structural sharing offsets the extra heap allocations for values\nbetween 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is\nbuilt incrementally, mutated, or commonly falls in that 17-to-24-byte range.\n\n`Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser\nnames share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it\nbuilds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses\n`CompactString` because module names can be extended in place.\n\nConverting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural\nsharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone\nthe owned value rather than converting it through `&str`. This is especially relevant at Salsa\ninterning boundaries.",
+      "type": "string"
     },
     "NameImports": {
       "type": "string"
