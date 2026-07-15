@@ -1071,14 +1071,12 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
-            receiver
-                .when_constraint_set_assignable_to_owned(db, annotation)
-                .into_owned()
+            receiver.when_constraint_set_assignable_to_owned(db, annotation)
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
             self.receiver_constraints.as_ref(),
-            receiver_constraint.as_ref(),
+            receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, removed_receiver)
