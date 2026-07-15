@@ -1190,33 +1190,11 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Self {
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
-            db,
-            receiver_type,
-            Some(BindingContext::Synthetic),
-        ));
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
-        let receiver_visitor = ApplyTypeMappingVisitor::default();
         let self_visitor = ApplyTypeMappingVisitor::default();
-        let receiver_constraints = self
-            .map_receiver_constraints(
-                db,
-                &receiver_mapping,
-                TypeContext::default(),
-                &receiver_visitor,
-            )
-            .map(|constraints| {
-                Self::map_constraints(
-                    db,
-                    &constraints,
-                    &self_mapping,
-                    TypeContext::default(),
-                    &self_visitor,
-                )
-            })
-            .filter(|constraints| {
-                !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db))
-            });
+        let receiver_constraints = self.receiver_constraints.as_ref().and_then(|constraints| {
+            constraints.apply_self_bindings(db, receiver_type, self_type, binding_context)
+        });
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_constraints,
@@ -1270,8 +1248,7 @@ impl<'db> Signature<'db> {
             tcx,
             visitor,
         );
-        (!constraints.query(|_builder, constraints| constraints.is_always_satisfied(db)))
-            .then_some(constraints)
+        (!constraints.is_always_satisfied(db)).then_some(constraints)
     }
 
     fn map_constraints(
@@ -1281,18 +1258,7 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> OwnedConstraintSet<'db> {
-        if !constraints
-            .types()
-            .any(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != ty)
-        {
-            return constraints.clone();
-        }
-
-        let builder = ConstraintSetBuilder::new();
-        builder.into_owned(|builder| {
-            let constraints = builder.load(db, constraints);
-            constraints.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-        })
+        constraints.apply_type_mapping(db, type_mapping, tcx, visitor)
     }
 
     fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {

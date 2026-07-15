@@ -110,8 +110,8 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, IntersectionType, SelfBinding,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -238,14 +238,23 @@ where
 /// [`InternedConstraintSet`][crate::types::InternedConstraintSet] wrapper that lets us create and
 /// operate on constraint sets in mdtests.
 ///
-/// Note that you cannot interrogate an owned constraint set directly. Instead, use
-/// [`query`][OwnedConstraintSet::query] to query it in a builder with matching arenas, or
+/// Most operations on an owned constraint set require a builder. Use
+/// [`query`][OwnedConstraintSet::query] to operate in a builder with matching arenas, or
 /// [`load`][ConstraintSetBuilder::load] to remap it into an existing builder.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
 }
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct InternedOwnedConstraintSet<'db> {
+    #[returns(ref)]
+    constraints: OwnedConstraintSet<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InternedOwnedConstraintSet<'_> {}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnedConstraintSetInner<'db> {
@@ -283,6 +292,25 @@ impl<'db> OwnedConstraintSet<'db> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Returns `true` if this constraint set is always satisfied.
+    pub(crate) fn is_always_satisfied(&self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| false,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn is_always_satisfied_impl<'db>(
+            db: &'db dyn Db,
+            constraints: InternedOwnedConstraintSet<'db>,
+        ) -> bool {
+            constraints
+                .constraints(db)
+                .query(|_builder, constraints| constraints.is_always_satisfied(db))
+        }
+
+        is_always_satisfied_impl(db, InternedOwnedConstraintSet::new(db, self.clone()))
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -312,6 +340,188 @@ impl<'db> OwnedConstraintSet<'db> {
             })
         })
     }
+
+    fn map_simple_constraint_with(
+        &self,
+        db: &'db dyn Db,
+        mut map_type: impl FnMut(Type<'db>) -> Type<'db>,
+    ) -> Option<Self> {
+        let inner = self.inner.as_ref()?;
+        let [interior] = inner.nodes.as_ref() else {
+            return None;
+        };
+        if self.node != NodeId::from_usize(inner.node_indices.iter_ones().next()?)
+            || interior.if_true != ALWAYS_TRUE
+            || interior.if_uncertain != ALWAYS_FALSE
+            || interior.if_false != ALWAYS_FALSE
+        {
+            return None;
+        }
+
+        let constraint = inner.constraints[inner.retained_constraint_index(interior.constraint)];
+        let subject = map_type(Type::TypeVar(constraint.typevar));
+        if subject.is_type_var() {
+            return None;
+        }
+
+        let when_assignable = |source: Type<'db>, target: Type<'db>| {
+            if source.is_type_var() || target.is_type_var() {
+                let builder = ConstraintSetBuilder::new();
+                builder.into_owned(|builder| {
+                    source.when_constraint_set_assignable_to(db, target, builder)
+                })
+            } else {
+                source
+                    .when_constraint_set_assignable_to_owned(db, target)
+                    .into_owned()
+            }
+        };
+        match (constraint.bounds.lower, constraint.bounds.upper) {
+            (Some(lower), None) => Some(when_assignable(map_type(lower), subject)),
+            (None, Some(upper)) => Some(when_assignable(subject, map_type(upper))),
+            _ => None,
+        }
+    }
+
+    /// Applies a type mapping without rebuilding when this set consists of one positive,
+    /// one-sided constraint whose subject becomes concrete.
+    fn map_simple_constraint(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Option<Self> {
+        self.map_simple_constraint_with(db, |ty| {
+            ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        })
+    }
+
+    /// Applies a type mapping to this constraint set.
+    pub(crate) fn apply_type_mapping(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        if !self
+            .types()
+            .any(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != ty)
+        {
+            return self.clone();
+        }
+
+        if let Some(mapped) = self.map_simple_constraint(db, type_mapping, tcx, visitor) {
+            return mapped;
+        }
+
+        let builder = ConstraintSetBuilder::new();
+        builder.into_owned(|builder| {
+            let constraints = builder.load(db, self);
+            constraints.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        })
+    }
+
+    /// Applies a `Self` binding, caching the mapped owned constraint set.
+    fn apply_self_binding(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        apply_self_binding_to_owned_constraints(
+            db,
+            InternedOwnedConstraintSet::new(db, self.clone()),
+            self_type,
+            binding_context,
+        )
+        .clone()
+    }
+
+    /// Applies the receiver binding followed by the ordinary `Self` binding.
+    pub(crate) fn apply_self_bindings(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+        binding_context: Option<BindingContext<'db>>,
+    ) -> Option<Self> {
+        apply_self_bindings_to_owned_constraints(
+            db,
+            InternedOwnedConstraintSet::new(db, self.clone()),
+            receiver_type,
+            self_type,
+            binding_context,
+        )
+        .clone()
+    }
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _, _, _| OwnedConstraintSet::always(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn apply_self_binding_to_owned_constraints<'db>(
+    db: &'db dyn Db,
+    constraints: InternedOwnedConstraintSet<'db>,
+    self_type: Type<'db>,
+    binding_context: Option<BindingContext<'db>>,
+) -> OwnedConstraintSet<'db> {
+    let type_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
+    constraints.constraints(db).apply_type_mapping(
+        db,
+        &type_mapping,
+        TypeContext::default(),
+        &ApplyTypeMappingVisitor::default(),
+    )
+}
+
+/// Applies both bindings to a simple constraint before evaluating its relation. This avoids
+/// materializing the intermediate receiver-only relation while preserving the binding order.
+/// Cycles are provisionally satisfied and therefore have no residual receiver constraints.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn apply_self_bindings_to_owned_constraints<'db>(
+    db: &'db dyn Db,
+    constraints: InternedOwnedConstraintSet<'db>,
+    receiver_type: Type<'db>,
+    self_type: Type<'db>,
+    binding_context: Option<BindingContext<'db>>,
+) -> Option<OwnedConstraintSet<'db>> {
+    let constraints = constraints.constraints(db);
+    let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
+        db,
+        receiver_type,
+        Some(BindingContext::Synthetic),
+    ));
+    let self_mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
+    let receiver_visitor = ApplyTypeMappingVisitor::default();
+    let self_visitor = ApplyTypeMappingVisitor::default();
+
+    if let Some(mapped) = constraints.map_simple_constraint_with(db, |ty| {
+        ty.apply_type_mapping_impl(
+            db,
+            &receiver_mapping,
+            TypeContext::default(),
+            &receiver_visitor,
+        )
+        .apply_type_mapping_impl(db, &self_mapping, TypeContext::default(), &self_visitor)
+    }) {
+        return (!mapped.is_always_satisfied(db)).then_some(mapped);
+    }
+
+    let constraints =
+        constraints.apply_self_binding(db, receiver_type, Some(BindingContext::Synthetic));
+    if constraints.is_always_satisfied(db) {
+        return None;
+    }
+    let constraints = constraints.apply_self_binding(db, self_type, binding_context);
+    (!constraints.is_always_satisfied(db)).then_some(constraints)
 }
 
 impl OwnedConstraintSetInner<'_> {
@@ -675,22 +885,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 let mapped = if let Type::TypeVar(typevar) = subject {
                     Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
                 } else {
-                    let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
-                        builder
-                            .load(
-                                db,
-                                &lower.when_constraint_set_assignable_to_owned(db, subject),
-                            )
-                            .node
-                    });
-                    let upper_holds = upper.map_or(ALWAYS_TRUE, |upper| {
-                        builder
-                            .load(
-                                db,
-                                &subject.when_constraint_set_assignable_to_owned(db, upper),
-                            )
-                            .node
-                    });
+                    let when_assignable = |source: Type<'db>, target: Type<'db>| {
+                        if source.is_type_var() || target.is_type_var() {
+                            source
+                                .when_constraint_set_assignable_to(db, target, builder)
+                                .node
+                        } else {
+                            builder
+                                .load(
+                                    db,
+                                    &source.when_constraint_set_assignable_to_owned(db, target),
+                                )
+                                .node
+                        }
+                    };
+                    let lower_holds =
+                        lower.map_or(ALWAYS_TRUE, |lower| when_assignable(lower, subject));
+                    let upper_holds =
+                        upper.map_or(ALWAYS_TRUE, |upper| when_assignable(subject, upper));
                     lower_holds.and_with_offset(builder, upper_holds)
                 };
                 mapped_constraints.insert(constraint_id, mapped);
@@ -7352,6 +7564,32 @@ mod tests {
         );
 
         assert!(mapped.is_always_satisfied(&db));
+    }
+
+    #[test]
+    fn owned_constraint_set_caches_ordered_self_bindings() {
+        let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let self_typevar =
+            BoundTypeVarInstance::synthetic_self(&db, int, BindingContext::Synthetic);
+        let constraints = ConstraintSetBuilder::new().into_owned(|builder| {
+            ConstraintSet::constrain_typevar_upper_bound(&db, builder, self_typevar, int)
+        });
+
+        let accepted =
+            constraints.apply_self_bindings(&db, int, int, Some(BindingContext::Synthetic));
+        assert!(accepted.is_none());
+        assert_eq!(
+            accepted,
+            constraints.apply_self_bindings(&db, int, int, Some(BindingContext::Synthetic))
+        );
+
+        let rejected =
+            constraints.apply_self_bindings(&db, str, str, Some(BindingContext::Synthetic));
+        assert!(rejected.is_some_and(|constraints| {
+            constraints.query(|_builder, constraints| constraints.is_never_satisfied(&db))
+        }));
     }
 
     #[test]
