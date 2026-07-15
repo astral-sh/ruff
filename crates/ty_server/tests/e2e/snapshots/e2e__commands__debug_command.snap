@@ -163,6 +163,7 @@ Settings: Settings {
         },
     },
     analysis: AnalysisSettings {
+        strict_generic_narrowing: false,
         strict_equality_semantics: false,
         respect_type_ignore_comments: true,
         allowed_unresolved_imports: ModuleGlobSet {
@@ -173,7 +174,6 @@ Settings: Settings {
             regex_set: RegexSet([]),
             globs: [],
         },
-        strict_generic_narrowing: false,
     },
     overrides: [],
 }

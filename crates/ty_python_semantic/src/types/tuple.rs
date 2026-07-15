@@ -243,6 +243,7 @@ impl<'db> TupleType<'db> {
         TupleType::new_internal(
             db,
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
+            false,
         )
     }
 

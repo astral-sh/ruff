@@ -1122,7 +1122,7 @@ pub struct Specialization<'db> {
     /// a subtype of all materializations of `A[Any]`, and is represented with
     /// [`MaterializationKind::Bottom`].
     ///
-    /// The `materialization` field may be non-`None` only if the specialization contains
+    /// A non-transient materialization may be present only if the specialization contains
     /// dynamic types in invariant positions.
     #[returns(copy)]
     pub(crate) materialization: Option<Materialization>,
@@ -1273,7 +1273,7 @@ impl<'db> Specialization<'db> {
             db,
             self.generic_context(db),
             [tuple.tuple(db).homogeneous_element_type(db)].as_slice(),
-            self.materialization_kind(db),
+            self.materialization(db),
             None,
         )
     }

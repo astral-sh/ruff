@@ -558,16 +558,14 @@ impl ClassInfoConstraintFunction {
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db) => {
                 UnionType::try_from_elements(
                     db,
-                    tuple
-                        .iter_element_types(db)
-                        .map(|element| {
-                            self.generate_constraint(
-                                db,
-                                element,
-                                is_positive,
-                                use_transient_materialization,
-                            )
-                        }),
+                    tuple.iter_element_types(db).map(|element| {
+                        self.generate_constraint(
+                            db,
+                            element,
+                            is_positive,
+                            use_transient_materialization,
+                        )
+                    }),
                 )
             }
 
