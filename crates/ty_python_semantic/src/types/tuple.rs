@@ -1179,12 +1179,21 @@ enum FixedPositionOrigin {
     Back,
 }
 
+/// How the source tuple's variable segment contributes to the slice.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VariableSliceKind {
+    /// The variable segment does not contribute to the slice.
+    Excluded,
+    /// The variable segment contributes its runtime element type to a homogeneous approximation.
+    ElementType,
+    /// The complete variable segment is retained in its original order.
+    Preserved,
+}
+
 /// The elements folded into the variable part of a sliced variable-length tuple.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct VariableSlice {
-    include_variable: bool,
-    /// Whether the complete variable segment is retained in its original order.
-    preserve_variable: bool,
+    kind: VariableSliceKind,
     suffix_start: usize,
     suffix_stop: usize,
 }
@@ -1285,8 +1294,7 @@ impl ForwardSliceStop {
 impl VariableSlice {
     fn variable_only() -> Self {
         Self {
-            include_variable: true,
-            preserve_variable: true,
+            kind: VariableSliceKind::Preserved,
             suffix_start: 0,
             suffix_stop: 0,
         }
@@ -1294,8 +1302,7 @@ impl VariableSlice {
 
     fn suffix(start: usize, stop: usize) -> Option<Self> {
         (start < stop).then_some(Self {
-            include_variable: false,
-            preserve_variable: false,
+            kind: VariableSliceKind::Excluded,
             suffix_start: start,
             suffix_stop: stop,
         })
@@ -1308,15 +1315,18 @@ impl VariableSlice {
     ) -> Type<'db> {
         UnionType::from_elements_leave_aliases(
             db,
-            self.include_variable
-                .then_some(tuple.variable().element_type(db))
-                .into_iter()
-                .chain(
-                    tuple
-                        .iter_suffix_elements()
-                        .skip(self.suffix_start)
-                        .take(self.suffix_stop.saturating_sub(self.suffix_start)),
-                ),
+            matches!(
+                self.kind,
+                VariableSliceKind::ElementType | VariableSliceKind::Preserved
+            )
+            .then_some(tuple.variable().element_type(db))
+            .into_iter()
+            .chain(
+                tuple
+                    .iter_suffix_elements()
+                    .skip(self.suffix_start)
+                    .take(self.suffix_stop.saturating_sub(self.suffix_start)),
+            ),
         )
     }
 }
@@ -1341,10 +1351,11 @@ impl VariableTupleSlicePlan {
                 variable,
                 fixed_suffix,
             } => {
-                let variable_segment = if variable.preserve_variable {
-                    tuple.variable()
-                } else {
-                    VariableSegment::Homogeneous(variable.ty(db, tuple))
+                let variable_segment = match variable.kind {
+                    VariableSliceKind::Preserved => tuple.variable(),
+                    VariableSliceKind::Excluded | VariableSliceKind::ElementType => {
+                        VariableSegment::Homogeneous(variable.ty(db, tuple))
+                    }
                 };
                 Type::tuple(TupleType::new(
                     db,
@@ -1782,8 +1793,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             fixed_prefix: prefix_start
                 .and_then(|prefix_start| self.fixed_prefix_slice(Some(prefix_start), None, step)),
             variable: VariableSlice {
-                include_variable: true,
-                preserve_variable: false,
+                kind: VariableSliceKind::ElementType,
                 suffix_start: 0,
                 suffix_stop: suffix_stop.unwrap_or_else(|| self.suffix_len()),
             },
@@ -1803,8 +1813,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             return VariableTupleSlicePlan::Mixed {
                 fixed_prefix: self.fixed_prefix_slice(Some(start), None, step),
                 variable: VariableSlice {
-                    include_variable: true,
-                    preserve_variable: false,
+                    kind: VariableSliceKind::ElementType,
                     suffix_start: 0,
                     suffix_stop,
                 },
@@ -1822,8 +1831,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         VariableTupleSlicePlan::Mixed {
             fixed_prefix: None,
             variable: VariableSlice {
-                include_variable: true,
-                preserve_variable: false,
+                kind: VariableSliceKind::ElementType,
                 suffix_start: 0,
                 suffix_stop: variable_suffix_stop,
             },
