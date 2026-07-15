@@ -1,5 +1,5 @@
 import ruffSchema from "../../../../ruff.schema.json";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Header, useTheme, setupMonaco, downloadZip } from "shared";
 import {
   copyAsMarkdown,
