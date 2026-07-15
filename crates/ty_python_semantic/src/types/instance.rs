@@ -1074,6 +1074,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
+                visitor.notify_skipped_lazy_type_attributes();
                 if let Some((_, Some(specialization))) = protocol
                     .class_origin(db)
                     .and_then(|class| class.static_class_literal(db))

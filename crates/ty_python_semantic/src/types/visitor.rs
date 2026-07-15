@@ -42,6 +42,9 @@ pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
 
+    /// Notify the visitor that lazily-inferred type attributes were not visited.
+    fn notify_skipped_lazy_type_attributes(&self) {}
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
@@ -573,7 +576,7 @@ fn any_over_type_impl<'db, F, T>(
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: F,
-) -> T
+) -> TypeTraversalResult<T>
 where
     T: Copy + Default + PartialEq,
     F: Fn(Type<'db>) -> T,
@@ -583,6 +586,7 @@ where
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
+        skipped_lazy_type_attributes: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
 
@@ -596,6 +600,10 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.should_visit_lazy_type_attributes
+        }
+
+        fn notify_skipped_lazy_type_attributes(&self) {
+            self.skipped_lazy_type_attributes.set(true);
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -618,10 +626,50 @@ where
         query: &query,
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
+        skipped_lazy_type_attributes: Cell::new(false),
         should_visit_lazy_type_attributes,
     };
     visitor.visit_type(db, ty);
-    visitor.found_matching_type.get()
+    TypeTraversalResult {
+        value: visitor.found_matching_type.get(),
+        skipped_lazy_type_attributes: visitor.skipped_lazy_type_attributes.get(),
+    }
+}
+
+struct TypeTraversalResult<T> {
+    value: T,
+    skipped_lazy_type_attributes: bool,
+}
+
+/// The result of searching a type without evaluating lazily-inferred type attributes.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum AnyOverTypeResult {
+    /// A matching type was found.
+    Match,
+    /// No matching type was found and the type was fully inspected.
+    NoMatch,
+    /// No matching type was found, but lazily-inferred attributes were not inspected.
+    SkippedLazyTypeAttributes,
+}
+
+/// Return whether `ty`, or any eagerly available nested type, matches `query`.
+///
+/// Unlike [`any_over_type`], this reports when the traversal is incomplete because evaluating a
+/// lazy type attribute would be required.
+pub(super) fn try_any_over_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> AnyOverTypeResult {
+    let result = any_over_type_impl(db, env, ty, false, query);
+    if result.value {
+        AnyOverTypeResult::Match
+    } else if result.skipped_lazy_type_attributes {
+        AnyOverTypeResult::SkippedLazyTypeAttributes
+    } else {
+        AnyOverTypeResult::NoMatch
+    }
 }
 
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
@@ -639,7 +687,7 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query).value
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -665,7 +713,7 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query).value
 }
 
 #[cfg(test)]
