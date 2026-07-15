@@ -501,13 +501,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_protocol = ty.as_protocol_instance();
         let source_protocol_as_nominal =
-            source_protocol.and_then(|protocol| protocol.to_nominal_instance(db));
+            source_protocol.and_then(|protocol| protocol.nominal_origin_instance(db));
         let materialized_source_changes_target = source_protocol
             .is_some_and(|source| source.materialization_changes_requirements(db, protocol));
 
         if !protocol.is_materialized()
             && !materialized_source_changes_target
-            && let Some(nominal_instance) = protocol.to_nominal_instance(db)
+            && let Some(nominal_instance) = protocol.nominal_origin_instance(db)
         {
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
@@ -739,7 +739,7 @@ fn non_recursive_protocol_interface<'db>(
 
             if ty
                 .as_protocol_instance()
-                .and_then(|protocol| protocol.to_nominal_instance(db))
+                .and_then(|protocol| protocol.nominal_origin_instance(db))
                 .is_some_and(|instance| instance.class_literal(db) == self.origin)
             {
                 self.found.set(true);
@@ -1057,7 +1057,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if this is the standard-library `Hashable` protocol.
     pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
-        self.to_nominal_instance(db)
+        self.nominal_origin_instance(db)
             .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
     }
 
@@ -1128,10 +1128,13 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// If this protocol corresponds to a class definition, convert it into a nominal instance.
+    /// Return a nominal instance of this protocol's class origin, if it has one.
     ///
     /// Pure synthesized protocols have no class origin and cannot be treated nominally.
-    pub(super) fn to_nominal_instance(self, db: &'db dyn Db) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn nominal_origin_instance(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<NominalInstanceType<'db>> {
         self.class_origin(db).map(|origin| {
             NominalInstanceType(NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(
                 *origin,
