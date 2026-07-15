@@ -92,7 +92,7 @@ use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use indexmap::map::Entry;
 use itertools::Itertools;
@@ -100,6 +100,7 @@ use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
+use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::generics::InferableTypeVars;
@@ -1291,7 +1292,37 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        builder.typevar_id(db, self).index() < builder.typevar_id(db, typevar).index()
+        constraint_set_order_index(builder.typevar_id(db, self).index())
+            < constraint_set_order_index(builder.typevar_id(db, typevar).index())
+    }
+}
+
+/// Returns a builder-local ID in the process-wide constraint-set audit ordering.
+///
+/// This is intentionally shared by constraint and typevar IDs: changing either ordering can
+/// change the TDD shape and the orientation of derived typevar-to-typevar constraints.
+fn constraint_set_order_index(index: usize) -> usize {
+    #[derive(Clone, Copy)]
+    enum Order {
+        Normal,
+        Reverse,
+        Rotate(u32),
+    }
+
+    static ORDER: LazyLock<Order> = LazyLock::new(|| {
+        let Ok(value) = std::env::var(EnvVars::TY_CONSTRAINT_SET_ORDER) else {
+            return Order::Normal;
+        };
+        if value == "reverse" {
+            return Order::Reverse;
+        }
+        value.parse::<u32>().map_or(Order::Normal, Order::Rotate)
+    });
+
+    match *ORDER {
+        Order::Normal => index,
+        Order::Reverse => !index,
+        Order::Rotate(bits) => index.rotate_left(bits),
     }
 }
 
@@ -1918,7 +1949,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(self.index())
+        std::cmp::Reverse(constraint_set_order_index(self.index()))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that

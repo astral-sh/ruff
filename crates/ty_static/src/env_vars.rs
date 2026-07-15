@@ -32,6 +32,12 @@ impl EnvVars {
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
 
+    /// Perturbs constraint-set variable ordering to help detect order-dependent inference.
+    ///
+    /// Set to `reverse` to reverse builder-local IDs, or to an integer to rotate their bits left.
+    #[attr_hidden]
+    pub const TY_CONSTRAINT_SET_ORDER: &'static str = "TY_CONSTRAINT_SET_ORDER";
+
     /// Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
     ///
     /// For example, how many files should be checked in parallel.
