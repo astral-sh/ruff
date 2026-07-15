@@ -3785,6 +3785,15 @@ class RecursiveCopyImplementation:
     def copy[T: RecursiveCopyImplementation](self: T) -> T:
         return self
 
+class RecursiveOperatorProtocol(Protocol):
+    def __add__[T: RecursiveOperatorProtocol](self: T, other: T) -> T: ...
+
+class RecursiveOperatorImplementation:
+    def __add__(self, other: "RecursiveOperatorImplementation") -> "RecursiveOperatorImplementation":
+        return self
+
+recursive_operator: type[RecursiveOperatorProtocol] = RecursiveOperatorImplementation
+
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))

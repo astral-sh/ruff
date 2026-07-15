@@ -396,9 +396,8 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is assignable to type `target` using constraint-set typevar rules.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, target, &constraints)
-            .is_always_satisfied(db)
+        self.when_constraint_set_assignable_to_owned(db, target)
+            .query(|_builder, constraints| constraints.is_always_satisfied(db))
     }
 
     /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
