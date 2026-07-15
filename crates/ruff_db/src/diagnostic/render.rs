@@ -721,6 +721,7 @@ impl<'r> RenderableSnippet<'r> {
         AnnotateSnippet::source(self.snippet.as_ref())
             .path(path)
             .line_start(self.line_start.get())
+            .fold(false)
             .annotations(
                 self.annotations
                     .iter()
