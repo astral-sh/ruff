@@ -1007,6 +1007,23 @@ def _(top: Top[InheritedAny]) -> None:
     requires_int_base(top)  # error: [invalid-argument-type]
 ```
 
+Materializing an unrelated member does not erase explicit protocol inheritance, even when an
+override is structurally incompatible with the base protocol:
+
+```py
+class NominalBase(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class NominalChild(NominalBase, Protocol):
+    marker: Any
+
+    @property
+    def value(self) -> str: ...
+
+static_assert(is_subtype_of(Top[NominalChild], NominalBase))
+```
+
 ### Class-side access
 
 Materialization preserves whether a protocol member is available through the class object. Ordinary

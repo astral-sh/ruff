@@ -493,15 +493,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
-        // `ty` has the protocol class in its MRO. This is a much cheaper check than the
-        // structural check we perform below, so we do it first to avoid the structural check when
-        // we can.
+        // Explicit inheritance from a class-based protocol is nominal, even if the subclass
+        // overrides one of its members incompatibly. A materialized source can use that nominal
+        // relation only if materialization left every requirement of the target unchanged.
         let mut result = self.never();
 
         let source_protocol = ty.as_protocol_instance();
         let source_protocol_as_nominal =
             source_protocol.and_then(|protocol| protocol.nominal_origin_instance(db));
+        let is_generator_pair = source_protocol
+            .and_then(|protocol| protocol.class_origin(db))
+            .is_some_and(|class| class.is_known(db, KnownClass::Generator))
+            && protocol
+                .class_origin(db)
+                .is_some_and(|class| class.is_known(db, KnownClass::Generator));
         let materialized_source_changes_target = source_protocol
             .is_some_and(|source| source.materialization_changes_requirements(db, protocol));
 
@@ -527,13 +532,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return result;
             }
 
-            if let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
-                db,
-                ty,
-                protocol,
-                source_protocol_as_nominal,
-                nominal_instance,
-            ) {
+            if !is_generator_pair
+                && let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
+                    db,
+                    ty,
+                    protocol,
+                    source_protocol_as_nominal,
+                    nominal_instance,
+                )
+            {
                 return result.or(db, self.constraints, || structurally_satisfied);
             }
 
@@ -543,11 +550,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // member even though a failed redundancy check only means that we preserve a
             // potentially redundant union arm.
             if matches!(self.relation, TypeRelation::Redundancy { pure: false })
-                && source_protocol_as_nominal
-                    .is_some_and(|source_instance| {
-                        source_instance.class(db).class_literal(db)
-                            == nominal_instance.class(db).class_literal(db)
-                    })
+                && source_protocol_as_nominal.is_some_and(|source_instance| {
+                    source_instance.class(db).class_literal(db)
+                        == nominal_instance.class(db).class_literal(db)
+                })
             {
                 return nominally_satisfied;
             }
@@ -558,12 +564,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // structurally inferring through `close() -> ReturnT | None` can spuriously infer `None`.
         // TODO: Remove the Python 3.13+ extension of this special case once
         // https://github.com/astral-sh/ty/issues/3596 is fixed.
-        if let Some(source_protocol) = ty.as_protocol_instance()
-            && let Some(source_class) = source_protocol.class_origin(db)
-            && let Some(proto_class) = protocol.class_origin(db)
-            && source_class.is_known(db, KnownClass::Generator)
-            && proto_class.is_known(db, KnownClass::Generator)
-        {
+        if is_generator_pair {
             return result;
         }
 
