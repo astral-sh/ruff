@@ -6,6 +6,50 @@
 reveal_type({})  # revealed: dict[Unknown, Unknown]
 ```
 
+## Empty dictionaries with an expected type
+
+An empty dictionary can use the key and value types from an expected `Mapping`. If it matches more
+than one union member, ty keeps a key or value type only when all matching members agree. `Any` is
+preserved as a key type, and different `NewType`s remain distinct:
+
+```py
+from collections.abc import Mapping
+from typing import Any, NewType
+
+def default_to_empty(value: Mapping[str, int] | None = None) -> None:
+    if value is None:
+        value = {}
+        reveal_type(value)  # revealed: dict[str, int]
+
+annotated: Mapping[str, int] = {}
+reveal_type(annotated)  # revealed: dict[str, int]
+
+def same_key(value: Mapping[str, int] | Mapping[str, bytes] | None = None) -> None:
+    if value is None:
+        value = {}
+        reveal_type(value)  # revealed: dict[str, Unknown]
+
+def same_value(
+    value: Mapping[bytes, int] | Mapping[str, int] | None = None,
+) -> None:
+    if value is None:
+        value = {}
+        reveal_type(value)  # revealed: dict[Unknown, int]
+
+def any_key(value: Mapping[Any, int] | None = None) -> None:
+    if value is None:
+        value = {}
+        reveal_type(value)  # revealed: dict[Any, int]
+
+A = NewType("A", int)
+B = NewType("B", int)
+
+def distinct_newtypes(value: Mapping[A, int] | Mapping[B, bytes] | None = None) -> None:
+    if value is None:
+        value = {}
+        reveal_type(value)  # revealed: dict[Unknown, Unknown]
+```
+
 ## Basic dict
 
 ```py

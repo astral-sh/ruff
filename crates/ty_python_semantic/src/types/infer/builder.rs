@@ -191,6 +191,11 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 
+struct CollectionLiteralInference<'db> {
+    ty: Type<'db>,
+    empty_covariant_context: bool,
+}
+
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
@@ -6292,6 +6297,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
+    /// Returns whether `collection_expr` is the expression owned by the current inference region.
+    ///
+    /// This lets collection inference use an expected type for a directly assigned empty literal
+    /// without applying the same rule to empty literals nested inside another expression. An
+    /// annotated assignment uses a definition inference region, so its right-hand side also counts
+    /// as the root expression.
+    ///
+    /// ```python
+    /// from collections.abc import Sequence
+    ///
+    /// items: Sequence[int] = []
+    /// nested: Sequence[Sequence[int]] = [[]]  # The inner `[]` is not an inference root.
+    /// ```
+    fn is_collection_literal_inference_root(&self, collection_expr: ast::ExprRef<'_>) -> bool {
+        let db = self.db();
+        match self.region {
+            InferenceRegion::Expression(current_expr, _) => {
+                current_expr.node_ref(db).index() == *collection_expr.node_index()
+            }
+            InferenceRegion::Definition(definition) => matches!(
+                definition.kind(db),
+                DefinitionKind::AnnotatedAssignment(assignment)
+                    if assignment.value(self.module()).is_some_and(|value| {
+                        value.node_index().load() == collection_expr.node_index().load()
+                    })
+            ),
+            _ => false,
+        }
+    }
+
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
@@ -6302,60 +6337,138 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let is_inference_root =
+            collection_expr.is_some_and(|expr| self.is_collection_literal_inference_root(expr));
+        let use_empty_collection_consensus =
+            matches!(collection_class, KnownClass::List | KnownClass::Dict)
+                && elts.is_empty()
+                && is_inference_root;
 
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
-            let inferred_ty = speculative_builder.infer_collection_literal_impl(
+            let inference = speculative_builder.infer_collection_literal_impl(
                 collection_class,
-                collection_expr,
+                is_inference_root,
                 elts,
                 infer_elt_expression,
                 TypeContext::new(Some(narrowed_ty)),
             )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
-            if !inferred_ty.is_assignable_to(db, narrowed_ty) {
+            if !inference.ty.is_assignable_to(db, narrowed_ty) {
                 return None;
             }
 
-            // Successfully narrowed to an element of the union.
-            self.extend(speculative_builder);
-            Some(inferred_ty)
+            Some((inference, speculative_builder))
         };
 
         // If the type context is a union, attempt to narrow to a specific element.
-        for narrowed_ty in tcx
-            .narrow_targets(db)
+        let narrow_targets = tcx.narrow_targets(db);
+        let has_dynamic_narrow_target = use_empty_collection_consensus
+            && narrow_targets
+                .as_deref()
+                .is_some_and(|targets| targets.iter().any(Type::is_dynamic));
+        let narrow_targets = narrow_targets
             .as_deref()
             .into_iter()
             .flatten()
-            .filter(|ty| ty.class_specialization(db).is_some())
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return Some(result);
+            .filter(|ty| ty.class_specialization(db).is_some());
+
+        if use_empty_collection_consensus {
+            let mut narrowed_result: Option<(Type<'db>, Self)> = None;
+            let mut common_types: Option<SmallVec<[Type<'db>; 2]>> = None;
+            let mut replaced_candidate_type = false;
+            let mut empty_covariant_context = false;
+
+            for narrowed_ty in narrow_targets {
+                let Some((inference, speculative_builder)) = try_narrow(*narrowed_ty) else {
+                    continue;
+                };
+
+                let Some(specialization) = inference.ty.known_specialization(db, collection_class)
+                else {
+                    continue;
+                };
+                let candidate_types: SmallVec<[Type<'db>; 2]> =
+                    specialization.types(db).iter().copied().collect();
+
+                if let Some(common_types) = &mut common_types {
+                    for (common_ty, candidate_ty) in common_types.iter_mut().zip(candidate_types) {
+                        let candidates_agree =
+                            if common_ty.has_dynamic(db) || candidate_ty.has_dynamic(db) {
+                                *common_ty == candidate_ty
+                            } else {
+                                common_ty.is_equivalent_to(db, candidate_ty)
+                            };
+                        if !candidates_agree {
+                            *common_ty = Type::unknown();
+                            replaced_candidate_type = true;
+                        }
+                    }
+                } else {
+                    common_types = Some(candidate_types);
+                }
+                empty_covariant_context |= inference.empty_covariant_context;
+                narrowed_result.get_or_insert((inference.ty, speculative_builder));
+            }
+
+            if let Some((inferred_ty, speculative_builder)) = narrowed_result {
+                if has_dynamic_narrow_target && let Some(common_types) = &mut common_types {
+                    common_types.fill(Type::unknown());
+                    replaced_candidate_type = true;
+                }
+
+                if empty_covariant_context
+                    && replaced_candidate_type
+                    && let Some(common_types) = common_types
+                {
+                    let common_ty =
+                        collection_class.to_specialized_instance(db, common_types.as_slice());
+                    return self
+                        .infer_collection_literal_impl(
+                            collection_class,
+                            is_inference_root,
+                            elts,
+                            infer_elt_expression,
+                            TypeContext::new(Some(common_ty)),
+                        )
+                        .map(|inference| inference.ty);
+                }
+
+                self.extend(speculative_builder);
+                return Some(inferred_ty);
+            }
+        } else {
+            for narrowed_ty in narrow_targets {
+                if let Some((inference, speculative_builder)) = try_narrow(*narrowed_ty) {
+                    self.extend(speculative_builder);
+                    return Some(inference.ty);
+                }
             }
         }
 
         self.infer_collection_literal_impl(
             collection_class,
-            collection_expr,
+            is_inference_root,
             elts,
             infer_elt_expression,
             tcx,
         )
+        .map(|inference| inference.ty)
     }
 
-    // Infer the type of a collection literal expression.
+    // Infer the type of a collection literal expression and whether it uses a fully static,
+    // covariant context for a directly contextualized empty list or dictionary.
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
+        is_inference_root: bool,
         elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<CollectionLiteralInference<'db>> {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
             let collection_alias = collection_class
@@ -6525,6 +6638,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && elts
                 .iter()
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
+        let has_empty_collection_context =
+            matches!(collection_class, KnownClass::List | KnownClass::Dict)
+                && elts.is_empty()
+                && is_inference_root;
+        let db = self.db();
+        let allows_empty_covariant_context = |identity| {
+            has_empty_collection_context
+                && elt_tcx_constraints
+                    .get(&identity)
+                    .is_some_and(|ty| !ty.has_dynamic(db))
+                && elt_tcx_variance
+                    .get(&identity)
+                    .is_some_and(|variance| variance.is_covariant())
+        };
+        let empty_covariant_context = elt_tys
+            .clone()
+            .any(|typevar| allows_empty_covariant_context(typevar.identity(self.db())));
 
         let mut pre_inferred_elt_tys = None;
 
@@ -6543,6 +6673,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if elt_tcx_variance
                         .get(&identity)
                         .is_some_and(|variance| variance.is_covariant())
+                        && !allows_empty_covariant_context(identity)
                     {
                         return None;
                     }
@@ -6586,7 +6717,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .specialize_recursive(self.db(), specialization.into_iter().map(Some))
                     },
                 );
-                return Type::from(class_type).to_instance(self.db());
+                return Type::from(class_type).to_instance(self.db()).map(|ty| {
+                    CollectionLiteralInference {
+                        ty,
+                        empty_covariant_context,
+                    }
+                });
             }
 
             pre_inferred_elt_tys = Some(inferred_elts);
@@ -6619,6 +6755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if elt_tcx_variance
                 .get(&elt_ty_identity)
                 .is_some_and(|variance| variance.is_covariant())
+                && !allows_empty_covariant_context(elt_ty_identity)
             {
                 continue;
             }
@@ -6633,9 +6770,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if tcx.annotation.is_none()
-            && let Some(collection_expr) = collection_expr
+            && is_inference_root
             && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
             && let Some(assignment) = current_expr.assigned_to(self.db())
             && let Ok(collection_def) =
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
@@ -6825,7 +6961,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        Type::from(class_type).to_instance(self.db())
+        Type::from(class_type)
+            .to_instance(self.db())
+            .map(|ty| CollectionLiteralInference {
+                ty,
+                empty_covariant_context,
+            })
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
