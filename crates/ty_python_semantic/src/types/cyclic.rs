@@ -106,9 +106,6 @@ pub(crate) struct TypeTransformer<'db, Tag> {
     /// Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[Type<'db>; 3]>>,
 
-    /// Memoized transformations from earlier visits in the current recursive operation.
-    cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
-
     _tag: PhantomData<fn() -> Tag>,
 }
 
@@ -116,7 +113,6 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
         Self {
             seen: RefCell::default(),
-            cache: RefCell::default(),
             _tag: PhantomData,
         }
     }
@@ -131,19 +127,16 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            BeginVisit::Ready(result) => result,
-            BeginVisit::Pending(ty) => {
+            Some(result) => result,
+            None => {
                 let result = compute();
-                self.finish_visit(ty, result)
+                self.seen.borrow_mut().pop();
+                result
             }
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> BeginVisit<Type<'db>, Type<'db>> {
-        if let Some(result) = self.cache.borrow().get(&ty) {
-            return BeginVisit::Ready(*result);
-        }
-
+    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
         if self
             .seen
             .borrow()
@@ -152,17 +145,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         {
             // When a cycle is encountered, the type being visited is returned as a fallback
             // (typically a recursive type alias).
-            return BeginVisit::Ready(ty);
+            return Some(ty);
         }
 
         self.seen.borrow_mut().push(ty);
-        BeginVisit::Pending(ty)
-    }
-
-    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
-        self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert_new(ty, result);
-        result
+        None
     }
 
     fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {

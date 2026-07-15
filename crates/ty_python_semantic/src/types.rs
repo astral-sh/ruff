@@ -299,8 +299,8 @@ type MaterializationEquivalenceVisitor<'db> =
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
-/// single call chain. Keep separate cycle caches for those modes so one transformation cannot
-/// reuse the result of another.
+/// single call chain. Keep separate recursion stacks for those modes so one transformation is not
+/// mistaken for a cycle in another.
 #[derive(Default)]
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
