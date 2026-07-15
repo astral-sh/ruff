@@ -82,6 +82,110 @@ fn code_actions_for_python() -> Result<()> {
 }
 
 #[test]
+fn code_actions_for_toml() -> Result<()> {
+    let source = r#"
+[lint]
+preview = true
+select = ["rule-codes-in-selectors"]
+extend-select = ["F401"]
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", source)?
+        .build();
+
+    server.open_text_document_with_language_id("ruff.toml", "toml", source, 1);
+
+    let diagnostics = match server.document_diagnostic_request("ruff.toml", None) {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
+            report.full_document_diagnostic_report.items
+        }
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("Expected a full diagnostic report");
+        }
+    };
+    let actions = server
+        .code_action_request("ruff.toml", diagnostics)
+        .expect("Expected code actions");
+
+    assert_json_snapshot!(actions, @r#"
+    [
+      {
+        "title": "Ruff (rule-codes-in-selectors): Replace rule code with name",
+        "kind": "quickfix",
+        "diagnostics": [
+          {
+            "range": {
+              "start": {
+                "line": 4,
+                "character": 18
+              },
+              "end": {
+                "line": 4,
+                "character": 22
+              }
+            },
+            "severity": 2,
+            "code": "rule-codes-in-selectors",
+            "codeDescription": {
+              "href": "https://docs.astral.sh/ruff/rules/rule-codes-in-selectors"
+            },
+            "source": "Ruff",
+            "message": "Rule code used instead of name in `lint.extend-select`\n\nhelp: Replace rule code with name",
+            "tags": []
+          }
+        ],
+        "edit": {
+          "changes": {
+            "file://<temp_dir>/ruff.toml": [
+              {
+                "range": {
+                  "start": {
+                    "line": 4,
+                    "character": 18
+                  },
+                  "end": {
+                    "line": 4,
+                    "character": 22
+                  }
+                },
+                "newText": "unused-import"
+              }
+            ]
+          }
+        },
+        "data": "file://<temp_dir>/ruff.toml"
+      },
+      {
+        "title": "Ruff: Fix all auto-fixable problems",
+        "kind": "source.fixAll.ruff",
+        "edit": {
+          "changes": {
+            "file://<temp_dir>/ruff.toml": [
+              {
+                "range": {
+                  "start": {
+                    "line": 4,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 5,
+                    "character": 0
+                  }
+                },
+                "newText": "extend-select = [\"unused-import\"]\n"
+              }
+            ]
+          }
+        }
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn human_readable_rule_names() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(".")?
