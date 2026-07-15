@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::cyclic::TypeIdentity;
+use crate::types::cyclic::{MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS, TypeIdentity};
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
@@ -556,20 +556,6 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
-/// Maximum number of recursive applications unfolded after the initial alias application.
-///
-/// Whether a recursive union alias has a finite complete expansion is decidable in principle for
-/// the standard type-alias calculus: alias definitions form a restricted macro grammar without
-/// type-level conditionals or arbitrary computation. A general decision procedure, however,
-/// requires substantially more expensive grammar or higher-order pushdown analysis than is
-/// suitable for the normal union-building path. Instead, the builder unfolds this many recursive
-/// applications and then asks the terminating relation checker whether the remaining application
-/// is already covered by the accumulated union. A covered remainder is a finite fixed point and is
-/// discarded; an unproved remainder is represented by `Unknown`, because discarding it would make
-/// the result unsound. This operational limit keeps construction cheap until a specialized analysis
-/// can handle the general case directly.
-const MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS: usize = 10;
-
 /// Active expansions of specialized recursive aliases and the normalized union that existed
 /// immediately before each expansion.
 #[derive(Default)]
@@ -859,6 +845,15 @@ impl<'db> UnionBuilder<'db> {
                 {
                     return;
                 }
+                // Whether a recursive union alias has a finite complete expansion is decidable in
+                // principle for the standard type-alias calculus: alias definitions form a
+                // restricted macro grammar without type-level conditionals or arbitrary
+                // computation. A general decision procedure, however, requires substantially more
+                // expensive grammar or higher-order pushdown analysis than is suitable for normal
+                // union construction. Instead, unfold up to the shared operational limit and ask
+                // the terminating relation checker whether the remainder is already covered by the
+                // accumulated union. Preserve an unproved remainder so that it can be replaced with
+                // `Unknown`; discarding it would make the result unsound.
                 let should_stop = match identity {
                     TypeIdentity::RecursiveTypeAlias(_) => {
                         active_occurrences > MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS

@@ -660,8 +660,60 @@ activates to interrupt the handling halfway to ensure termination.
 TODO: The current behavior where dynamic types remain in types after materialization is undesirable.
 
 ```py
+from collections.abc import Callable
 from typing import Any
 from ty_extensions import Bottom, Top
+
+type MaterializeShift[T1, T2, T3] = T1 | tuple[MaterializeShift[T2, T3, None]]
+
+def finite_recursive_materialization(
+    top: Top[MaterializeShift[int, str, Any]],
+    bottom: Bottom[MaterializeShift[int, str, Any]],
+) -> None:
+    reveal_type(top)  # revealed: int | tuple[str | tuple[object]]
+    reveal_type(bottom)  # revealed: int | tuple[str | tuple[tuple[MaterializeShift[None, None, None]]]]
+
+type MaterializeShift10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] = tuple[
+    T1, MaterializeShift10[T2, T3, T4, T5, T6, T7, T8, T9, T10, None]
+]
+type MaterializeShift11[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11] = tuple[
+    T1, MaterializeShift11[T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, None]
+]
+
+def recursive_materialization_within_limit(
+    bottom: Bottom[MaterializeShift10[None, None, None, None, None, None, None, None, None, Any]],
+) -> None:
+    reveal_type(bottom)  # revealed: Never
+
+def recursive_materialization_beyond_limit(
+    bottom: Bottom[MaterializeShift11[None, None, None, None, None, None, None, None, None, None, Any]],
+) -> None:
+    # revealed: tuple[None, MaterializeShift11[None, None, None, None, None, None, None, None, None, Any, None]]
+    reveal_type(bottom)
+
+type BranchOuter[T] = T | tuple[BranchInner[list[T]], BranchInner[list[T]]]
+type BranchInner[T] = T | tuple[BranchOuter[list[T]], BranchOuter[list[T]]]
+
+def branching_mutual_recursion(
+    top: Top[BranchOuter[Any]],
+    bottom: Bottom[BranchOuter[Any]],
+) -> None:
+    reveal_type(top)  # revealed: object
+    # revealed: tuple[BranchInner[list[Any]], BranchInner[list[Any]]]
+    reveal_type(bottom)
+
+type ContravariantBranchOuter[T] = (
+    T | tuple[Callable[[ContravariantBranchInner[list[T]], ContravariantBranchInner[list[T]]], None]]
+)
+type ContravariantBranchInner[T] = (
+    T | tuple[Callable[[ContravariantBranchOuter[list[T]], ContravariantBranchOuter[list[T]]], None]]
+)
+
+def wants_int(x: int): ...
+def branching_mutual_recursion_across_variance(
+    bottom: Bottom[ContravariantBranchOuter[Any]],
+) -> None:
+    wants_int(bottom)  # error: [invalid-argument-type]
 
 type Stable[T] = T | tuple[Stable[T]]
 
@@ -671,7 +723,7 @@ def _(x: Bottom[Stable[Any]]) -> None:
 type Grow[T] = T | tuple[Grow[list[T]]]
 
 def _(x: Bottom[Grow[Any]]) -> None:
-    reveal_type(x)  # revealed: tuple[Bottom[list[Any]] | tuple[Grow[list[list[Any]]]]]
+    reveal_type(x)  # revealed: tuple[Grow[list[Any]]]
 ```
 
 ## Invalid use

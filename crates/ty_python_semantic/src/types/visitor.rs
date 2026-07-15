@@ -535,7 +535,7 @@ impl DynamicContent {
 /// because each recursive edge creates a new specialization.
 pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
     struct DynamicContentVisitor<'db> {
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: RecursionGuard<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         content: Cell<DynamicContent>,
     }
@@ -563,7 +563,13 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
                 return;
             }
 
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            if self
+                .recursion_guard
+                .walk_with_fallback(db, ty, self)
+                .is_some()
+            {
+                self.record(DynamicContent::Indeterminate);
+            }
         }
 
         fn visit_protocol_instance_type(
@@ -601,7 +607,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
     }
 
     let visitor = DynamicContentVisitor {
-        recursion_guard: TypeCollector::default(),
+        recursion_guard: RecursionGuard::default(),
         active_class_protocols: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
     };
