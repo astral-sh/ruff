@@ -1461,12 +1461,10 @@ impl<'src> Parser<'src> {
             self.elif_else_scratch.push(clause);
         }
 
-        let elif_else_clauses = self.elif_else_scratch.take(elif_else_snapshot);
-
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
-            elif_else_clauses,
+            elif_else_clauses: self.elif_else_scratch.take(elif_else_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -3126,27 +3124,24 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            if let Some(statements) = self.with_recursion(Parser::parse_block_statements) {
-                statements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                Suite::new()
-            };
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            let snapshot = parser.stmt_scratch.snapshot();
+            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+                let statement = parser.parse_statement();
+                parser.stmt_scratch.push(statement);
+            });
+
+            parser.stmt_scratch.take_thin_vec(snapshot)
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Suite::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
         statements
-    }
-
-    fn parse_block_statements(&mut self) -> Suite {
-        let snapshot = self.stmt_scratch.snapshot();
-        self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
-            let statement = parser.parse_statement();
-            parser.stmt_scratch.push(statement);
-        });
-
-        self.stmt_scratch.take_thin_vec(snapshot)
     }
 
     /// Parses a single parameter for the given function kind.
@@ -3345,9 +3340,8 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    if kwonlyargs_snapshot.is_none() {
-                        kwonlyargs_snapshot = Some(parser.parameter_scratch.snapshot());
-                    }
+                    kwonlyargs_snapshot
+                        .get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
                     if parser.at_name_or_soft_keyword() {
                         let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
