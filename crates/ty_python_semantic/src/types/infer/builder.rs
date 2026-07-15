@@ -5022,7 +5022,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     callable.signatures(db),
                     kind,
                     provenance,
-                    callable.deferred_top_materialization(db),
+                    callable.transient_top_materialization(db),
                 ))),
                 Type::Union(union) => union.try_map(db, |element| {
                     propagate_callable_kind(db, *element, kind, provenance)
@@ -6249,7 +6249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 signatures,
                 callable.kind(db),
                 callable.provenance(db),
-                callable.deferred_top_materialization(db),
+                callable.transient_top_materialization(db),
             )
         });
         let inferable = class_generic_context.inferable_typevars(db);
