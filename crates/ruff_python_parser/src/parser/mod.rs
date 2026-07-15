@@ -6,8 +6,8 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression, ModModule,
-    ParameterWithDefault, Stmt, StringFlags,
+    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    ModModule, ParameterWithDefault, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -83,6 +83,12 @@ pub(crate) struct Parser<'src> {
 
     /// Reusable, nesting-safe scratch storage for statement lists.
     stmt_scratch: Vec<Stmt>,
+
+    /// Reusable scratch storage for import aliases.
+    alias_scratch: Vec<Alias>,
+
+    /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
+    elif_else_scratch: Vec<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -117,6 +123,8 @@ impl<'src> Parser<'src> {
             keyword_scratch: Vec::new(),
             parameter_scratch: Vec::new(),
             stmt_scratch: Vec::with_capacity(32),
+            alias_scratch: Vec::new(),
+            elif_else_scratch: Vec::new(),
         }
     }
 
@@ -230,6 +238,8 @@ impl<'src> Parser<'src> {
         debug_assert!(self.keyword_scratch.is_empty());
         debug_assert!(self.parameter_scratch.is_empty());
         debug_assert!(self.stmt_scratch.is_empty());
+        debug_assert!(self.alias_scratch.is_empty());
+        debug_assert!(self.elif_else_scratch.is_empty());
 
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;

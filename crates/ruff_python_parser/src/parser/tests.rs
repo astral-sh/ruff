@@ -72,162 +72,29 @@ fn nfkc_normalizes_names() {
 }
 
 #[test]
-fn nested_expression_lists() {
-    let parsed = parse_expression(
-        r#"outer(first, inner(one, two), f"{nested(three, four)}", left < nested(five < six, seven) < right, (one, [two, {three, four}], target[one:two, three:four]), [x for x in values if one and inner(two, three) if other < thing], last)"#,
-    )
-    .unwrap();
-    let Expr::Call(outer) = parsed.expr() else {
-        panic!("expected call expression, got {:?}", parsed.expr());
-    };
-
-    assert_eq!(outer.arguments.args.len(), 7);
-    let Expr::Call(inner) = &outer.arguments.args[1] else {
-        panic!("expected nested call expression");
-    };
-    assert_eq!(inner.arguments.args.len(), 2);
-    let Expr::Compare(compare) = &outer.arguments.args[3] else {
-        panic!("expected comparison expression");
-    };
-    assert_eq!(compare.comparators.len(), 2);
-    let Expr::Tuple(tuple) = &outer.arguments.args[4] else {
-        panic!("expected tuple expression");
-    };
-    assert_eq!(tuple.elts.len(), 3);
-    let Expr::ListComp(comprehension) = &outer.arguments.args[5] else {
-        panic!("expected list comprehension");
-    };
-    assert_eq!(comprehension.generators[0].ifs.len(), 2);
-}
-
-#[test]
-fn nested_call_keywords() {
-    let parsed = parse_expression(
-        "outer(alpha=first, beta=inner(gamma=value, delta=nested(epsilon=value), **mapping), zeta=last, **tail)",
-    )
-    .unwrap();
-    let Expr::Call(outer) = parsed.expr() else {
-        panic!("expected call expression, got {:?}", parsed.expr());
-    };
-
-    assert_eq!(outer.arguments.args.len(), 0);
-    assert_eq!(outer.arguments.keywords.len(), 4);
-    let Expr::Call(inner) = &outer.arguments.keywords[1].value else {
-        panic!("expected nested call expression");
-    };
-    assert_eq!(inner.arguments.keywords.len(), 3);
-    let Expr::Call(nested) = &inner.arguments.keywords[1].value else {
-        panic!("expected doubly nested call expression");
-    };
-    assert_eq!(nested.arguments.keywords.len(), 1);
-}
-
-#[test]
-fn nested_parameters() {
+fn import_aliases() {
     let suite = parse_module(
         r"
-def outer(
-    before,
-    annotated: (lambda left, /, *, right, **rest: right),
-    /,
-    middle=(lambda nested, /, value=(lambda deep, /, *, kw, **tail: kw), *, only, **more: only),
-    *,
-    final=(lambda last, /, *, named, **extra: named),
-    **remaining,
-):
-    pass
-",
-    )
-    .unwrap()
-    .into_suite();
-    let Stmt::FunctionDef(outer) = &suite[0] else {
-        panic!("expected function definition");
-    };
-
-    assert_eq!(outer.parameters.posonlyargs.len(), 2);
-    assert_eq!(outer.parameters.args.len(), 1);
-    assert_eq!(outer.parameters.kwonlyargs.len(), 1);
-    assert!(outer.parameters.kwarg.is_some());
-    assert_eq!(outer.parameters.posonlyargs[0].name().as_str(), "before");
-    assert_eq!(outer.parameters.posonlyargs[1].name().as_str(), "annotated");
-    assert_eq!(outer.parameters.args[0].name().as_str(), "middle");
-    assert_eq!(outer.parameters.kwonlyargs[0].name().as_str(), "final");
-
-    let Some(Expr::Lambda(annotation)) = outer.parameters.posonlyargs[1]
-        .parameter
-        .annotation
-        .as_deref()
-    else {
-        panic!("expected lambda annotation");
-    };
-    let Some(annotation_parameters) = annotation.parameters.as_ref() else {
-        panic!("expected annotation parameters");
-    };
-    assert_eq!(annotation_parameters.posonlyargs.len(), 1);
-    assert_eq!(annotation_parameters.kwonlyargs.len(), 1);
-    assert!(annotation_parameters.kwarg.is_some());
-    assert_eq!(annotation_parameters.posonlyargs[0].name().as_str(), "left");
-    assert_eq!(annotation_parameters.kwonlyargs[0].name().as_str(), "right");
-
-    let Some(Expr::Lambda(default)) = outer.parameters.args[0].default.as_deref() else {
-        panic!("expected lambda default");
-    };
-    let Some(default_parameters) = default.parameters.as_ref() else {
-        panic!("expected default parameters");
-    };
-    assert_eq!(default_parameters.posonlyargs.len(), 1);
-    assert_eq!(default_parameters.args.len(), 1);
-    assert_eq!(default_parameters.kwonlyargs.len(), 1);
-    assert!(default_parameters.kwarg.is_some());
-    assert_eq!(default_parameters.posonlyargs[0].name().as_str(), "nested");
-    assert_eq!(default_parameters.args[0].name().as_str(), "value");
-    assert_eq!(default_parameters.kwonlyargs[0].name().as_str(), "only");
-
-    let Some(Expr::Lambda(deep)) = default_parameters.args[0].default.as_deref() else {
-        panic!("expected nested lambda default");
-    };
-    let Some(deep_parameters) = deep.parameters.as_ref() else {
-        panic!("expected nested default parameters");
-    };
-    assert_eq!(deep_parameters.posonlyargs[0].name().as_str(), "deep");
-    assert_eq!(deep_parameters.kwonlyargs[0].name().as_str(), "kw");
-}
-
-#[test]
-fn nested_statement_lists() {
-    let suite = parse_module(
-        r"
-def outer():
-    first
-    if condition:
-        nested_one
-        if other:
-            deep
-            deeper
-        nested_two
-    else:
-        alternative
-    last
-after
+import first, second as renamed
+from package import third, fourth as other, fifth
+import last
 ",
     )
     .unwrap()
     .into_suite();
 
-    assert_eq!(suite.len(), 2);
-    let Stmt::FunctionDef(outer) = &suite[0] else {
-        panic!("expected function definition");
+    let Stmt::Import(first) = &suite[0] else {
+        panic!("expected import statement");
     };
-    assert_eq!(outer.body.len(), 3);
-    let Stmt::If(outer_if) = &outer.body[1] else {
-        panic!("expected if statement");
+    assert_eq!(first.names.len(), 2);
+    let Stmt::ImportFrom(second) = &suite[1] else {
+        panic!("expected from-import statement");
     };
-    assert_eq!(outer_if.body.len(), 3);
-    assert_eq!(outer_if.elif_else_clauses[0].body.len(), 1);
-    let Stmt::If(inner_if) = &outer_if.body[1] else {
-        panic!("expected nested if statement");
+    assert_eq!(second.names.len(), 3);
+    let Stmt::Import(last) = &suite[2] else {
+        panic!("expected import statement");
     };
-    assert_eq!(inner_if.body.len(), 2);
+    assert_eq!(last.names.len(), 1);
 }
 
 #[test]

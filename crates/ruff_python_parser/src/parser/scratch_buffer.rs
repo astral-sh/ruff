@@ -1,3 +1,5 @@
+use std::vec::Drain;
+
 use drop_bomb::DebugDropBomb;
 use thin_vec::ThinVec;
 
@@ -8,6 +10,8 @@ pub(super) trait ScratchBufferExt<T> {
     fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C;
 
     fn take_thin_vec(&mut self, snapshot: ScratchSnapshot) -> ThinVec<T>;
+
+    fn drain_snapshot(&mut self, snapshot: ScratchSnapshot) -> Drain<'_, T>;
 }
 
 impl<T> ScratchBufferExt<T> for Vec<T> {
@@ -21,21 +25,30 @@ impl<T> ScratchBufferExt<T> for Vec<T> {
 
     #[inline]
     fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C {
-        let start = snapshot.restore(self.len());
-        self.drain(start..).collect()
+        self.drain_snapshot(snapshot).collect()
     }
 
     #[inline]
-    fn take_thin_vec(&mut self, snapshot: ScratchSnapshot) -> ThinVec<T> {
-        let start = snapshot.restore(self.len());
-        let len = self.len() - start;
-        if len == 0 {
+    fn take_thin_vec(&mut self, mut snapshot: ScratchSnapshot) -> ThinVec<T> {
+        if snapshot.is_empty(self) {
+            snapshot.bomb.defuse();
             return ThinVec::new();
         }
 
-        let mut result = ThinVec::with_capacity(len);
-        result.extend(self.drain(start..));
+        let drain = self.drain_snapshot(snapshot);
+        let mut result = ThinVec::with_capacity(drain.len());
+        result.extend(drain);
         result
+    }
+
+    #[inline]
+    fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
+        debug_assert!(
+            self.len() >= snapshot.len,
+            "Scratch buffer snapshots must be restored in reverse order of creation."
+        );
+        snapshot.bomb.defuse();
+        self.drain(snapshot.len..)
     }
 }
 
@@ -45,13 +58,12 @@ pub(super) struct ScratchSnapshot {
 }
 
 impl ScratchSnapshot {
-    fn restore(mut self, buffer_len: usize) -> usize {
+    pub(super) fn is_empty<T>(&self, buffer: &[T]) -> bool {
         debug_assert!(
-            buffer_len >= self.len,
-            "Scratch buffers must not shrink before a snapshot is restored."
+            buffer.len() >= self.len,
+            "Scratch buffer snapshots must be restored in reverse order of creation."
         );
-        self.bomb.defuse();
-        self.len
+        buffer.len() == self.len
     }
 }
 
@@ -69,11 +81,25 @@ mod tests {
 
     #[test]
     #[cfg(debug_assertions)]
-    #[should_panic(expected = "Scratch buffers must not shrink before a snapshot is restored.")]
-    fn buffer_must_not_shrink_before_restore() {
+    #[should_panic(
+        expected = "Scratch buffer snapshots must be restored in reverse order of creation."
+    )]
+    fn snapshot_must_be_restored_in_reverse_order() {
         let mut buffer = vec![1];
         let snapshot = buffer.snapshot();
         buffer.clear();
+
+        let _: Vec<_> = buffer.take(snapshot);
+    }
+
+    #[test]
+    fn snapshot_is_empty_relative_to_its_buffer() {
+        let mut buffer = vec![1];
+        let snapshot = buffer.snapshot();
+        assert!(snapshot.is_empty(&buffer));
+
+        buffer.push(2);
+        assert!(!snapshot.is_empty(&buffer));
 
         let _: Vec<_> = buffer.take(snapshot);
     }
