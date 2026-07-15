@@ -1105,6 +1105,98 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_updates_empty_same_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # ty: ignore[unresolved-reference]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_groups_diagnostics_for_same_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f() -> str: return ""
+
+                result: int = f(missing)  # ty: ignore[division-by-zero]
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f() -> str: return ""
+
+        result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'division-by-zero'
+         --> test.py:3:40
+          |
+        1 | def f() -> str: return ""
+        2 |
+        3 | result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+          |                                        ^^^^^^^^^^^^^^^^
+          |
+        help: Remove the unused suppression code
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_update_inner_own_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                values = [
+                    # ty: ignore[]
+                    missing,
+                ]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        values = [
+            # ty: ignore[]
+            missing,  # ty:ignore[unresolved-reference]
+        ]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:3:5
+          |
+        1 | seen_code = True
+        2 | values = [
+        3 |     # ty: ignore[]
+          |     ^^^^^^^^^^^^^^
+        4 |     missing,  # ty:ignore[unresolved-reference]
+        5 | ]
+          |
+        help: Remove the unused suppression comment
+        "
+        );
+    }
+
+    #[test]
     fn add_ignore_does_not_update_preceding_own_line_suppressions() {
         assert_snapshot!(
             suppress_all_in(r#"

@@ -56,6 +56,16 @@ pub fn suppress_all(
     // but also the diagnostic with the wider range (because the suppression is on its start line).
     ids_full_range.sort_unstable_by_key(|(_, range)| (range.start(), range.end()));
 
+    // 1. Group the diagnostics by their line-start position and try to add
+    //    the suppression to an existing `ty: ignore` comment on that line.
+    let mut by_start: BTreeMap<_, (BTreeSet<LintName>, usize)> = BTreeMap::new();
+
+    for &(id, range) in &ids_full_range {
+        let (lints, suppressed_diagnostics) = by_start.entry(range.start()).or_default();
+        lints.insert(id);
+        *suppressed_diagnostics += 1;
+    }
+
     let mut fixes = Vec::with_capacity(ids_full_range.len());
 
     // Tracks which lints get inserted by line. The offset is the line's start offset.
@@ -66,36 +76,20 @@ pub fn suppress_all(
     // (see the example with the wider range above).
     let mut by_line = BTreeMap::<TextSize, BTreeMap<LintName, SuppressionPosition>>::new();
 
-    let mut by_suppression = BTreeMap::<TextSize, ExistingSuppressionGroup>::new();
-
-    // 1. Try to add each diagnostic to an existing applicable `ty: ignore` comment, grouping
-    //    diagnostics that resolve to the same comment into a single fix.
-    for &(id, range) in &ids_full_range {
-        let start_offset = range.start();
+    for (start_offset, (lints, suppressed_diagnostics)) in by_start {
+        let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
         if let Some(existing) = find_existing_suppression(suppressions, &source, start_offset) {
-            by_line
-                .entry(start_offset)
-                .or_default()
-                .insert(id, SuppressionPosition::StartLine);
-
-            let group = by_suppression
-                .entry(existing.insertion_offset)
-                .or_insert_with(|| ExistingSuppressionGroup {
-                    existing,
-                    codes: BTreeSet::new(),
-                    suppressed_diagnostics: 0,
-                });
-            group.codes.insert(id);
-            group.suppressed_diagnostics += 1;
+            by_line.entry(start_offset).or_default().extend(
+                codes
+                    .iter()
+                    .copied()
+                    .map(|code| (code, SuppressionPosition::StartLine)),
+            );
+            fixes.push(SuppressFix {
+                fix: add_to_existing_suppression(existing, &codes),
+                suppressed_diagnostics,
+            });
         }
-    }
-
-    for group in by_suppression.into_values() {
-        let codes: SmallVec<[LintName; 2]> = group.codes.into_iter().collect();
-        fixes.push(SuppressFix {
-            fix: add_to_existing_suppression(group.existing, &codes),
-            suppressed_diagnostics: group.suppressed_diagnostics,
-        });
     }
 
     // 2. Group the diagnostics by their end position and try to add the code to an
@@ -155,16 +149,6 @@ pub fn suppress_all(
 enum SuppressionPosition {
     StartLine,
     EndLine(TextSize),
-}
-
-/// Diagnostics that can be suppressed by a single edit to an existing suppression.
-///
-/// `codes` is deduplicated for insertion, while `suppressed_diagnostics` counts every diagnostic,
-/// including multiple diagnostics with the same lint code.
-struct ExistingSuppressionGroup {
-    existing: ExistingSuppression,
-    codes: BTreeSet<LintName>,
-    suppressed_diagnostics: usize,
 }
 
 /// Fix to suppress one or more diagnostics.
@@ -285,15 +269,13 @@ fn find_existing_suppression(
     source: &str,
     offset: TextSize,
 ) -> Option<ExistingSuppression> {
-    let line_start = source.line_start(offset);
     let existing = suppressions
-        .inline_suppressions(TextRange::empty(offset))
+        .inline_suppressions_on_line(source.line_range(offset))
         .find(|suppression| {
-            source.line_start(suppression.comment_range.start()) == line_start
-                && matches!(
-                    suppression.target,
-                    SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
-                )
+            matches!(
+                suppression.target,
+                SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
+            )
         })?;
     let comment_text = &source[existing.comment_range];
 

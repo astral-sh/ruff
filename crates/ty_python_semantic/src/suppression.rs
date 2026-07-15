@@ -367,6 +367,23 @@ impl Suppressions {
         })
     }
 
+    /// Returns the inline suppressions whose comments are on `line_range`.
+    fn inline_suppressions_on_line(
+        &self,
+        line_range: TextRange,
+    ) -> impl Iterator<Item = &Suppression> + '_ {
+        // The interval index retains source order, so comment ranges are also ordered by start.
+        let start = self
+            .inline
+            .entries
+            .partition_point(|entry| entry.value.comment_range.start() < line_range.start());
+
+        self.inline.entries[start..]
+            .iter()
+            .map(|entry| &entry.value)
+            .take_while(move |suppression| suppression.comment_range.start() < line_range.end())
+    }
+
     fn iter(&self) -> impl Iterator<Item = &Suppression> {
         self.file.iter().chain(self.inline.iter())
     }
