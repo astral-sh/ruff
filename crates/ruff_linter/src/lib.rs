@@ -38,7 +38,6 @@ mod noqa;
 pub mod package;
 pub mod packaging;
 pub mod preview;
-pub mod pyproject_toml;
 pub mod registry;
 mod renamer;
 mod rule_redirects;
@@ -48,6 +47,7 @@ pub mod settings;
 pub mod source_kind;
 pub mod suppression;
 mod text_helpers;
+pub mod toml;
 pub mod upstream_categories;
 mod violation;
 
