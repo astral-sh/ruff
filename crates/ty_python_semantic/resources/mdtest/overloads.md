@@ -163,6 +163,47 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
+## Aliased overloaded methods
+
+Accessing an overloaded method through a class-level alias (which is promoted to a `Callable`) must
+apply the same receiver-based overload pruning as accessing the original method. Here the overloads
+differ only in their `self` annotation, so an empty argument list cannot disambiguate them: without
+pruning, every call through the alias would incorrectly resolve to the first overload (`int`).
+
+```py
+from typing import overload
+
+class Base:
+    @overload
+    def answer(self: "IntChild") -> int: ...
+    @overload
+    def answer(self: "StrChild") -> str: ...
+    @overload
+    def answer(self: "BoolChild") -> bool: ...
+    def answer(self) -> int | str | bool:
+        return 0
+
+    aliased = answer
+
+class IntChild(Base):
+    a: int = 0
+
+class StrChild(Base):
+    b: str = ""
+
+class BoolChild(Base):
+    c: bytes = b""
+
+# Each receiver matches a single overload, so the alias prunes the other two.
+reveal_type(IntChild().aliased)  # revealed: () -> int
+reveal_type(StrChild().aliased)  # revealed: () -> str
+reveal_type(BoolChild().aliased)  # revealed: () -> bool
+
+reveal_type(IntChild().aliased())  # revealed: int
+reveal_type(StrChild().aliased())  # revealed: str
+reveal_type(BoolChild().aliased())  # revealed: bool
+```
+
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.

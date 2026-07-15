@@ -564,12 +564,27 @@ impl<'db> CallableType<'db> {
             return self.into_regular(db);
         }
 
-        CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, self_type),
-            self.kind(db),
-            self.provenance(db),
-        )
+        let signatures = self.signatures(db);
+        // Mirror `BoundMethodType::bound_signatures`: when a promoted callable (such as an
+        // aliased method) carries multiple overloads with explicit `self` annotations, prune the
+        // overloads whose receiver annotation cannot accept the bound `self` before binding.
+        let bound = if let Some(self_type) = self_type
+            && signatures.overloads.len() > 1
+            && signatures
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+        {
+            CallableSignature::from_overloads(
+                signatures
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, self_type))
+                    .map(|signature| signature.bind_self(db, Some(self_type))),
+            )
+        } else {
+            signatures.bind_self(db, self_type)
+        };
+
+        CallableType::new(db, bound, self.kind(db), self.provenance(db))
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
