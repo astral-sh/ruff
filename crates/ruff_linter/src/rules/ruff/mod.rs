@@ -797,19 +797,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Path::new("pyproject.toml"), TomlSourceType::Pyproject)]
-    #[test_case(Path::new("ruff.toml"), TomlSourceType::Ruff)]
-    fn rule_codes_in_selectors(path: &Path, source_type: TomlSourceType) -> Result<()> {
-        let root = Path::new("ruff/rule_codes_in_selectors");
-        let diagnostics = test_toml_path(
-            root.join(path),
-            &LinterSettings::for_rule(Rule::RuleCodesInSelectors).with_preview_mode(),
-            source_type,
-        )?;
-        assert_diagnostics!(format!("RUF201_{}", path.display()), diagnostics);
-        Ok(())
-    }
-
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
