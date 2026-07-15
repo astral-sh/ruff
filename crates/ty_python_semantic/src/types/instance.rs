@@ -907,7 +907,12 @@ pub(crate) struct SliceLiteral {
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
-        self.class(db).variance_of(db, typevar)
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => tuple.variance_of(db, typevar),
+            NominalInstanceInner::Object
+            | NominalInstanceInner::NonTuple(_)
+            | NominalInstanceInner::SysVersionInfo => self.class(db).variance_of(db, typevar),
+        }
     }
 }
 

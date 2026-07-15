@@ -97,26 +97,25 @@ def _[T]() -> None:
     ConstraintSet.range(Base, T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper bounds are not eagerly simplified to their bottom and top materializations.
 
 ```py
 def _[T]() -> None:
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
     expected = ConstraintSet.range(Never, T, Base)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 ```
 
 ### Negated range
@@ -187,26 +186,25 @@ def _[T]() -> None:
     ~ConstraintSet.range(Base, T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper bounds are not eagerly simplified to their bottom and top materializations.
 
 ```pyi
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ~ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
     expected = ~ConstraintSet.range(Never, T, Base)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 ```
 
 A negated _type_ is not the same thing as a negated _range_.
@@ -909,6 +907,246 @@ def quantifier_order[S, T]() -> None:
     forall_target = equal.for_all(tuple[T])
     exists_source_forall_target = ~((~forall_target).for_all(tuple[S]))
     static_assert(exists_source_forall_target == ConstraintSet.never())
+```
+
+## Gradual constraints
+
+Constraint-set assignability preserves gradual types. While constraints on the materializations
+gradual types themselves are flattened to sentinel value, they may contribute to constraints to
+other inferable type variables.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import (
+    ConstraintSet,
+    is_assignable_to,
+    is_constraint_set_assignable_to,
+)
+
+gradual = is_constraint_set_assignable_to(Any, int)
+
+# revealed: ConstraintSet[bool]
+reveal_type(gradual)
+
+# revealed: ConstraintSet[gradual]
+reveal_type(gradual.with_detailed_display())
+
+static_assert(gradual == gradual)
+static_assert(gradual != ConstraintSet.always())
+static_assert(gradual != ConstraintSet.never())
+static_assert(gradual.satisfies(gradual))
+static_assert((gradual | ConstraintSet.never()) == gradual)
+static_assert((ConstraintSet.never() | gradual) == gradual)
+static_assert((gradual & ConstraintSet.always()) == gradual)
+static_assert((ConstraintSet.always() & gradual) == gradual)
+static_assert(~gradual == gradual)
+static_assert(gradual)
+static_assert(is_assignable_to(Any, int))
+
+def _[T]() -> None:
+    informative = ConstraintSet.range(int, T, object)
+    static_assert((gradual | informative) == informative)
+    static_assert((informative | gradual) == informative)
+    static_assert((gradual & informative) == informative)
+    static_assert((informative & gradual) == informative)
+```
+
+We record constraints under all possible materializations of the gradual type, based on its upper
+and lower bound.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable
+from ty_extensions import Intersection, Top, Unknown, static_assert
+from ty_extensions._internal import (
+    ConstraintSet,
+    is_constraint_set_assignable_to,
+    is_subtype_of,
+)
+
+type LowerBounded = Iterable[str] | Any
+type UpperBounded = Intersection[Any, Iterable[int]]
+type Bounded = Iterable[bool] | Intersection[Any, Iterable[int]]
+type InvariantUpperBounded = Intersection[Any, Top[list[Unknown]]]
+type ConsumerLowerBounded = Callable[[str], None] | Any
+type ConsumerUpperBounded = Intersection[Any, Callable[[int], None]]
+type ConsumerBounded = Callable[[int], None] | Intersection[Any, Callable[[bool], None]]
+type StableProjection = tuple[int, str] | Intersection[Any, tuple[int, object]]
+
+def infer_from_source[T](value: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def infer_from_target[T](value: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def unbounded(source: Any, target: Callable[[Any], None]) -> None:
+    reveal_type(infer_from_source(source))  # revealed: Any
+    reveal_type(infer_from_target(target))  # revealed: Any
+
+def bare_ranges[T]() -> None:
+    source_unbounded = is_constraint_set_assignable_to(Any, T)
+    source_lower = is_constraint_set_assignable_to(str | Any, T)
+    source_upper = is_constraint_set_assignable_to(Intersection[Any, int], T)
+    source_bounded = is_constraint_set_assignable_to(bool | Intersection[Any, int], T)
+    target_unbounded = is_constraint_set_assignable_to(T, Any)
+    target_lower = is_constraint_set_assignable_to(T, str | Any)
+    target_upper = is_constraint_set_assignable_to(T, Intersection[Any, int])
+    target_bounded = is_constraint_set_assignable_to(T, bool | Intersection[Any, int])
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(source_unbounded.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=str | Any]]
+    reveal_type(source_lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(source_upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=bool | Any]]
+    reveal_type(source_bounded.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(target_unbounded.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(target_lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any & int]]
+    reveal_type(target_upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any & int]]
+    reveal_type(target_bounded.solutions_for(T, inferable=tuple[T]))
+
+def source_ranges[T]() -> None:
+    lower = is_constraint_set_assignable_to(LowerBounded, Iterable[T])
+    upper = is_constraint_set_assignable_to(UpperBounded, Iterable[T])
+    bounded = is_constraint_set_assignable_to(Bounded, Iterable[T])
+    invariant = is_constraint_set_assignable_to(InvariantUpperBounded, list[T])
+    stable = is_constraint_set_assignable_to(StableProjection, tuple[T, object])
+
+    # revealed: tuple[Solution[T=str | Any]]
+    reveal_type(lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=bool | Any]]
+    reveal_type(bounded.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(invariant.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(stable.solutions_for(T, inferable=tuple[T]))
+
+def quantify_noninferable[T, U]() -> None:
+    constraints = is_constraint_set_assignable_to(tuple[str, int] | Any, tuple[T, U])
+
+    # revealed: tuple[Solution[T=str | Any]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[U=int | Any]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[U]))
+
+def nested_ranges[T]() -> None:
+    fixed_point = is_constraint_set_assignable_to(Any | str, T | int)
+    nested = is_constraint_set_assignable_to(tuple[Any | str] | Any, tuple[T | int])
+    recursive = is_constraint_set_assignable_to(Intersection[Any, list[int]], T | bytes)
+
+    # revealed: tuple[Solution[T=str | Any]]
+    reveal_type(fixed_point.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=str | Any]]
+    reveal_type(nested.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(recursive.solutions_for(T, inferable=tuple[T]))
+
+def target_ranges[T]() -> None:
+    lower = is_constraint_set_assignable_to(Iterable[T], LowerBounded)
+    upper = is_constraint_set_assignable_to(Iterable[T], UpperBounded)
+    bounded = is_constraint_set_assignable_to(Iterable[T], Bounded)
+    stable = is_constraint_set_assignable_to(tuple[T, str], StableProjection)
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any & int]]
+    reveal_type(upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any & int]]
+    reveal_type(bounded.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(stable.solutions_for(T, inferable=tuple[T]))
+
+def contravariant_source_ranges[T]() -> None:
+    lower = is_constraint_set_assignable_to(ConsumerLowerBounded, Callable[[T], None])
+    upper = is_constraint_set_assignable_to(ConsumerUpperBounded, Callable[[T], None])
+    bounded = is_constraint_set_assignable_to(ConsumerBounded, Callable[[T], None])
+
+    # revealed: tuple[Solution[T=Any & str]]
+    reveal_type(lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any & int]]
+    reveal_type(bounded.solutions_for(T, inferable=tuple[T]))
+
+def contravariant_target_ranges[T]() -> None:
+    lower = is_constraint_set_assignable_to(Callable[[T], None], ConsumerLowerBounded)
+    upper = is_constraint_set_assignable_to(Callable[[T], None], ConsumerUpperBounded)
+    bounded = is_constraint_set_assignable_to(Callable[[T], None], ConsumerBounded)
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type(lower.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=int | Any]]
+    reveal_type(upper.solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=bool | Any]]
+    reveal_type(bounded.solutions_for(T, inferable=tuple[T]))
+
+# Subtyping still compares the static endpoints of a gradual range.
+static_assert(is_subtype_of(Iterable[bool], Bounded))
+static_assert(is_subtype_of(Bounded, Iterable[int]))
+static_assert(is_subtype_of(UpperBounded, Iterable[int]))
+static_assert(not is_subtype_of(LowerBounded, Iterable[object]))
+static_assert(is_subtype_of(Any, object))
+static_assert(not is_subtype_of(object, Any))
+
+# Unsatisifable ranges collapse to never.
+def unsatisfiable[T]() -> None:
+    source = is_constraint_set_assignable_to(str | Any, list[T])
+    target = is_constraint_set_assignable_to(list[T], Intersection[Any, int])
+    static_assert(source == ConstraintSet.never())
+    static_assert(target == ConstraintSet.never())
+```
+
+Constraint implication uses strict subtyping, and does not make assumptions about the
+materialization of a given gradual type.
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class A(Any): ...
+class B(Any): ...
+
+def _[T]() -> None:
+    a = ConstraintSet.range(A, T, A)
+    b = ConstraintSet.range(B, T, B)
+    static_assert(not a.satisfies(b))
+    static_assert(not b.satisfies(a))
+
+def gradual_bounds_are_not_materialized[T]() -> None:
+    gradual_lower = ConstraintSet.range(Any, T, object)
+    int_lower = ConstraintSet.range(int, T, object)
+    object_lower = ConstraintSet.range(object, T, object)
+    static_assert(not int_lower.satisfies(gradual_lower))
+    static_assert(not gradual_lower.satisfies(int_lower))
+    static_assert(object_lower.satisfies(gradual_lower))
+    static_assert((gradual_lower | object_lower) == gradual_lower)
+
+    gradual_upper = ConstraintSet.range(Never, T, Any)
+    int_upper = ConstraintSet.range(Never, T, int)
+    static_assert(not int_upper.satisfies(gradual_upper))
+    static_assert(not gradual_upper.satisfies(int_upper))
+```
+
+Unrelated instances of gradual types may materialize to distinct types, and so cannot establish
+transitive subtyping relationships.
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def independent_gradual_pivots[T, U]() -> None:
+    constraints = ConstraintSet.range(Never, T, Any) & ConstraintSet.range(Any, U, object)
+    static_assert(not constraints.implies_subtype_of(T, U))
 ```
 
 ## Displaying constraints

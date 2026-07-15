@@ -1214,7 +1214,7 @@ impl<'db> Signature<'db> {
                 &constraints,
                 self.inferable_typevars(db),
             )
-            .is_always_satisfied(db)
+            .is_gradually_satisfied(db)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1541,7 +1541,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db);
+            .is_gradually_satisfied(db);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -1575,7 +1575,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db);
+            .is_gradually_satisfied(db);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent

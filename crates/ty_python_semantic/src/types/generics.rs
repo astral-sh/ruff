@@ -16,7 +16,7 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    DisjointnessChecker, GradualEvaluation, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
@@ -32,10 +32,10 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
-    binding_type, infer_definition_types, inferred_declaration,
+    ClassLiteral, DynamicType, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator,
+    UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1929,7 +1929,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
-pub enum ApplySpecialization<'a, 'db> {
+pub(crate) enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
     TypeAlias(Specialization<'db>),
     Partial {
@@ -1940,8 +1940,9 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
-    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
-    /// substitute a typevar nested inside another constraint's bound.
+    /// Maps every type variable to the provided type.
+    All(Type<'db>),
+    /// Maps a single type variable to the provided type.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
@@ -1974,6 +1975,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::All(replacement) => Some(*replacement),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
@@ -2013,7 +2015,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::All(_)
+            | ApplySpecialization::Single(_, _) => None,
         }
     }
 }
@@ -2848,6 +2852,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
 
+            (formal, gradual @ Type::Dynamic(dynamic))
+                if dynamic != DynamicType::UnspecializedTypeVar =>
+            {
+                let when = gradual.has_relation_to_with(
+                    self.db,
+                    formal,
+                    self.constraints,
+                    self.inferable,
+                    TypeRelation::Assignability,
+                    TypeVarEvaluation::Lazy,
+                    GradualEvaluation::Lazy,
+                );
+                if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                    self.pending.intersect(self.db, self.constraints, when);
+                }
+            }
+
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 return self.infer_map_impl(
@@ -3056,7 +3077,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         if !ty
                             .when_assignable_to(self.db, bound, self.constraints, self.inferable)
-                            .is_always_satisfied(self.db)
+                            .is_gradually_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -3114,7 +3135,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(self.db)
+                                    .is_gradually_satisfied(self.db)
                             } else {
                                 ty.when_assignable_to(
                                     self.db,
@@ -3122,7 +3143,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(self.db)
+                                .is_gradually_satisfied(self.db)
                             };
 
                             if is_satisfied {
@@ -3424,7 +3445,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let when = self
                     .common_typed_dict_protocol_constraints(formal, actual_union)
                     .unwrap_or_else(|| {
-                        actual.when_constraint_set_assignable_to(self.db, formal, self.constraints)
+                        actual.has_relation_to_with(
+                            self.db,
+                            formal,
+                            self.constraints,
+                            self.inferable,
+                            TypeRelation::Assignability,
+                            TypeVarEvaluation::Lazy,
+                            GradualEvaluation::Lazy,
+                        )
                     });
                 self.infer_from_constraint_set(when)?;
                 return Ok(());

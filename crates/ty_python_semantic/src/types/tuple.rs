@@ -30,9 +30,11 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ErrorContext,
+    FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, TypeVarVariance,
+    UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -166,6 +168,25 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
+
+impl<'db> VarianceInferable<'db> for TupleType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+        // The tuple class parameter unions all element types, which can erase a type variable
+        // when another element subsumes it. Inspect the heterogeneous elements directly.
+        match self.tuple(db) {
+            Tuple::Fixed(tuple) => tuple
+                .iter_all_elements()
+                .map(|element| element.variance_of(db, typevar))
+                .collect(),
+            Tuple::Variable(tuple) => tuple
+                .iter_prefix_elements()
+                .chain(std::iter::once(tuple.variable().tuple_class_type()))
+                .chain(tuple.iter_suffix_elements())
+                .map(|element| element.variance_of(db, typevar))
+                .collect(),
+        }
+    }
+}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {

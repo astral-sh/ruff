@@ -68,24 +68,15 @@ def nested_transitive[T, U, V]() -> None:
         ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
     ) | ConstraintSet.range(bytes, V, object)
 
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[], Solution[]]
     # revealed: tuple[Solution[T=list[int]], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[U=int], Solution[U=Never], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[U=int], Solution[], Solution[]]
     # revealed: tuple[Solution[U=int], Solution[]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[], Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
@@ -107,15 +98,12 @@ def negated_alternative[T, U]() -> None:
         bytes, U, object
     )
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never], Solution[]]
     # revealed: tuple[Solution[], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never, U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```

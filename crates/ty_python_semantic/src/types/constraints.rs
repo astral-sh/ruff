@@ -44,6 +44,9 @@
 //! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
 //! all operations have zero overhead compared to the binary case.
 //!
+//! Relation checks can also produce `GRADUAL` for materialization constraints on non-inferable
+//! gradual types that are not necessarily `ALWAYS_FALSE` or `ALWAYS_TRUE`.
+//!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
@@ -378,6 +381,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, ALWAYS_TRUE)
     }
 
+    /// Returns the sentinel for non-inferable gradual constraints.
+    pub(crate) fn gradual(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::from_node(builder, GRADUAL)
+    }
+
     pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
         if b {
             Self::always(builder)
@@ -437,14 +445,19 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
-    /// Returns whether this constraint set never holds
+    /// Returns whether this constraint set never holds.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied(db, self.builder)
     }
 
-    /// Returns whether this constraint set always holds
+    /// Returns whether this constraint set always holds.
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db, self.builder)
+    }
+
+    /// Returns whether this constraint set holds under some materialization of any gradual types.
+    pub(crate) fn is_gradually_satisfied(self, db: &'db dyn Db) -> bool {
+        self.node.is_gradually_satisfied(db, self.builder)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -570,11 +583,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// nodes.
     pub(crate) fn implies(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: impl FnOnce() -> Self,
+        other: Self,
     ) -> Self {
-        self.negate(db, builder).or(db, builder, other)
+        self.verify_builder(builder);
+        other.verify_builder(builder);
+        Self::from_node(builder, self.node.implies(builder, other.node))
     }
 
     /// Returns a constraint set encoding that this constraint set is equivalent to another.
@@ -762,6 +777,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.solutions_with(db, builder, inferable, |_variance, path_bound| {
             PathBounds::default_solve(db, builder, path_bound)
         })
+    }
+
+    /// Computes path bounds without quantifying out any type variables.
+    pub(crate) fn solutions_unquantified(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> PathBounds<'db> {
+        self.verify_builder(builder);
+        PathBounds::compute_unquantified(db, builder, self.node)
     }
 
     pub(crate) fn solutions_with(
@@ -2027,14 +2052,18 @@ impl ConstraintId {
         {
             return false;
         }
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
-            && self_constraint
-                .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+
+        // Implication cannot not make assumptions about the materialization of gradual types,
+        // and so must use subtyping.
+        builder.cached_is_constraint_set_subtype_of(
+            db,
+            other_constraint.bounds.materialized_lower(),
+            self_constraint.bounds.materialized_lower(),
+        ) && builder.cached_is_constraint_set_subtype_of(
+            db,
+            self_constraint.bounds.materialized_upper(),
+            other_constraint.bounds.materialized_upper(),
+        )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -2137,11 +2166,15 @@ const ALWAYS_TRUE: NodeId = NodeId(0xffff_ffff);
 /// A special ID that is used for an "always false" / "never visible" constraint.
 const ALWAYS_FALSE: NodeId = NodeId(0xffff_fffe);
 
-const SMALLEST_TERMINAL: NodeId = ALWAYS_FALSE;
+/// Constraints on the materialization of non-inferable gradual types.
+const GRADUAL: NodeId = NodeId(0xffff_fffd);
+
+const SMALLEST_TERMINAL: NodeId = GRADUAL;
 
 enum Node {
     AlwaysTrue,
     AlwaysFalse,
+    Gradual,
     Interior(InteriorNode),
 }
 
@@ -2314,6 +2347,7 @@ impl NodeId {
         match self {
             ALWAYS_TRUE => Node::AlwaysTrue,
             ALWAYS_FALSE => Node::AlwaysFalse,
+            GRADUAL => Node::Gradual,
             _ => Node::Interior(InteriorNode(self)),
         }
     }
@@ -2346,7 +2380,7 @@ impl NodeId {
             return self;
         }
         match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Gradual => self,
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
                 NodeId::with_uncertain(
@@ -2382,6 +2416,7 @@ impl NodeId {
             match current {
                 Node::AlwaysTrue => return true,
                 Node::AlwaysFalse => return false,
+                Node::Gradual => return true,
                 Node::Interior(interior) => {
                     let data = builder.interior_node_data(interior.node());
 
@@ -2414,13 +2449,38 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        self.is_always_satisfied_with(db, builder, false)
+    }
+
+    /// Returns whether this constraint set holds under some materialization of any gradual types.
+    fn is_gradually_satisfied<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        self.is_always_satisfied_with(db, builder, true)
+    }
+
+    fn is_always_satisfied_with<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        gradual_satisfied: bool,
+    ) -> bool {
         match self.node() {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
+            Node::Gradual => gradual_satisfied,
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(builder);
-                path.visit_negated(db, builder, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
+                path.visit_negated(
+                    db,
+                    builder,
+                    self,
+                    gradual_satisfied,
+                    &mut IsNeverSatisfiedVisitor,
+                )
+                .is_continue()
             }
         }
     }
@@ -2430,6 +2490,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
+            Node::Gradual => false,
             Node::Interior(interior) => {
                 if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&self) {
                     return *result;
@@ -2465,6 +2526,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_FALSE,
             Node::AlwaysFalse => ALWAYS_TRUE,
+            Node::Gradual => GRADUAL,
             Node::Interior(interior) => interior.negate(builder),
         }
     }
@@ -2525,6 +2587,8 @@ impl NodeId {
             }
             (Node::AlwaysFalse, _) => other.with_adjusted_source_order(builder, other_offset),
             (_, Node::AlwaysFalse) => self,
+            (Node::Gradual, _) => other.with_adjusted_source_order(builder, other_offset),
+            (_, Node::Gradual) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
                 self_interior.or(builder, other_interior, other_offset)
             }
@@ -2685,6 +2749,8 @@ impl NodeId {
             }
             (Node::AlwaysTrue, _) => other.with_adjusted_source_order(builder, other_offset),
             (_, Node::AlwaysTrue) => self,
+            (Node::Gradual, _) => other.with_adjusted_source_order(builder, other_offset),
+            (_, Node::Gradual) => self,
             (Node::Interior(self_interior), Node::Interior(other_interior)) => {
                 self_interior.and(builder, other_interior, other_offset)
             }
@@ -2692,8 +2758,12 @@ impl NodeId {
     }
 
     fn implies(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
+        if self == other {
+            return ALWAYS_TRUE;
+        }
+
         // p → q == ¬p ∨ q
-        self.negate(builder).or(builder, other)
+        self.negate(builder).or_with_offset(builder, other)
     }
 
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
@@ -2718,6 +2788,13 @@ impl NodeId {
         other: Self,
         other_offset: usize,
     ) -> Self {
+        if self == other {
+            return ALWAYS_TRUE;
+        }
+        if self == GRADUAL || other == GRADUAL {
+            return ALWAYS_FALSE;
+        }
+
         // iff(a, b) = (a ∧ b) ∨ (¬a ∧ ¬b)
         let a_and_b = self.and_inner(builder, other, other_offset);
         let not_a_and_not_b =
@@ -2747,9 +2824,19 @@ impl NodeId {
             return ALWAYS_TRUE;
         }
 
+        // For compound conditions, or when the new builder's variable ordering requires one of
+        // the branches to move above `self`, fall back to the semantic expansion:
+        // `(self ∧ then_node) ∨ uncertain_node ∨ (¬self ∧ else_node)`.
+        let expand = || {
+            self.and(builder, then_node)
+                .or(builder, uncertain_node)
+                .or(builder, self.negate(builder).and(builder, else_node))
+        };
+
         match self.node() {
             Node::AlwaysTrue => then_node.or(builder, uncertain_node),
             Node::AlwaysFalse => else_node.or(builder, uncertain_node),
+            Node::Gradual => expand(),
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
                 // Fast path for a bare positive constraint whose branches are still later in the
@@ -2778,12 +2865,7 @@ impl NodeId {
                     );
                 }
 
-                // For compound conditions, or when the new builder's variable ordering requires
-                // one of the branches to move above `self`, fall back to the semantic expansion:
-                // `(self ∧ then_node) ∨ uncertain_node ∨ (¬self ∧ else_node)`.
-                self.and(builder, then_node)
-                    .or(builder, uncertain_node)
-                    .or(builder, self.negate(builder).and(builder, else_node))
+                expand()
             }
         }
     }
@@ -2833,6 +2915,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => return true,
             Node::AlwaysFalse => return false,
+            Node::Gradual => return true,
             Node::Interior(_) => {}
         }
 
@@ -2940,6 +3023,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
+            Node::Gradual => GRADUAL,
             Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
         }
     }
@@ -2975,7 +3059,7 @@ impl NodeId {
         assignment: ConstraintAssignment,
     ) -> (Self, bool) {
         match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => (self, false),
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Gradual => (self, false),
             Node::Interior(interior) => interior.restrict_one(db, builder, assignment),
         }
     }
@@ -3159,7 +3243,7 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
     ) -> Self {
         match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Gradual => self,
             Node::Interior(interior) => interior.simplify(db, builder),
         }
     }
@@ -3176,7 +3260,9 @@ impl NodeId {
             fn visit_node(&mut self, builder: &ConstraintSetBuilder<'_>, node: NodeId) {
                 match node.node() {
                     Node::AlwaysFalse => {}
-                    Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
+                    Node::AlwaysTrue | Node::Gradual => {
+                        self.clauses.push(self.current_clause.clone());
+                    }
                     Node::Interior(_) => {
                         let interior = builder.interior_node_data(node);
                         self.current_clause.push(interior.constraint.when_true());
@@ -3219,6 +3305,7 @@ impl NodeId {
                 match self.node.node() {
                     Node::AlwaysTrue => f.write_str("always"),
                     Node::AlwaysFalse => f.write_str("never"),
+                    Node::Gradual => f.write_str("gradual"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.builder);
                         clauses.simplify(self.db, self.builder);
@@ -3278,6 +3365,7 @@ impl NodeId {
             match node.node() {
                 Node::AlwaysTrue => write!(f, "always"),
                 Node::AlwaysFalse => write!(f, "never"),
+                Node::Gradual => write!(f, "gradual"),
                 Node::Interior(_) => {
                     let (index, is_new) = seen.borrow_mut().insert_full(node);
                     if !is_new {
@@ -3350,6 +3438,7 @@ impl Debug for NodeId {
             // ScopedReachabilityConstraintId("AlwaysTrue").
             Node::AlwaysTrue => f.field(&format_args!("AlwaysTrue")),
             Node::AlwaysFalse => f.field(&format_args!("AlwaysFalse")),
+            Node::Gradual => f.field(&format_args!("Gradual")),
             Node::Interior(_) => f.field(&self.0),
         };
         f.finish()
@@ -3550,6 +3639,12 @@ pub(crate) enum PathBounds<'db> {
     Constrained(Box<[Box<[PathBound<'db>]>]>),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum UniqueSolutionError {
+    Unsatisfiable,
+    Ambiguous,
+}
+
 impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
@@ -3560,6 +3655,39 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        if let Some(path_bounds) =
+            Self::compute_simple_bound_conjunction(db, builder, node, |typevar| {
+                typevar.is_inferable(db, inferable)
+            })
+        {
+            return path_bounds;
+        }
+
+        let node = node.remove_noninferable(db, builder, inferable);
+        Self::compute_from_node(db, builder, node)
+    }
+
+    /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path,
+    /// with respect to all type variables.
+    fn compute_unquantified(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+    ) -> Self {
+        if let Some(path_bounds) =
+            Self::compute_simple_bound_conjunction(db, builder, node, |_| true)
+        {
+            return path_bounds;
+        }
+
+        Self::compute_from_node(db, builder, node)
+    }
+
+    fn compute_from_node(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
     ) -> Self {
         #[derive(Default)]
         struct CollectVisitor {
@@ -3612,38 +3740,34 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        if let Some(path_bounds) =
-            Self::compute_simple_bound_conjunction(db, builder, node, inferable)
-        {
-            return path_bounds;
-        }
-
-        let node = node.remove_noninferable(db, builder, inferable);
         let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
+            Node::Gradual => return PathBounds::Unconstrained,
             Node::Interior(interior) => interior,
         };
+
+        let mut collect_visitor = CollectVisitor::default();
+        let mut path = interior.path_assignments(builder);
+        let _ = path.visit(db, builder, node, &mut collect_visitor);
+        let mut sorted_paths = collect_visitor.sorted_paths;
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let mut collect_visitor = CollectVisitor::default();
-        let mut path = interior.path_assignments(builder);
-        let _ = path.visit(db, builder, node, &mut collect_visitor);
-        collect_visitor.sorted_paths.sort_by(|path1, path2| {
+        sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
-        let mut result = Vec::with_capacity(collect_visitor.sorted_paths.len());
+        let mut result = Vec::with_capacity(sorted_paths.len());
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
-        for path in collect_visitor.sorted_paths {
+        for path in sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = builder.constraint_data(constraint);
@@ -3669,7 +3793,7 @@ impl<'db> PathBounds<'db> {
                 }
             }
 
-            let path_bounds = mappings
+            let path_bounds: Box<[_]> = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
@@ -3689,11 +3813,12 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
-        inferable: InferableTypeVars<'db>,
+        include: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> Option<Self> {
         match node.node() {
             Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
             Node::AlwaysFalse => return Some(PathBounds::Unsatisfiable),
+            Node::Gradual => return Some(PathBounds::Unconstrained),
             Node::Interior(_) => {}
         }
 
@@ -3703,6 +3828,7 @@ impl<'db> PathBounds<'db> {
             match current.node() {
                 Node::AlwaysTrue => break,
                 Node::AlwaysFalse => return None,
+                Node::Gradual => break,
                 Node::Interior(_) => {
                     let interior = builder.interior_node_data(current);
                     if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
@@ -3710,7 +3836,7 @@ impl<'db> PathBounds<'db> {
                     }
 
                     let constraint = builder.constraint_data(interior.constraint);
-                    if !constraint.typevar.is_inferable(db, inferable) {
+                    if !include(constraint.typevar) {
                         return None;
                     }
 
@@ -3766,7 +3892,7 @@ impl<'db> PathBounds<'db> {
     /// - `Err(())` to invalidate the entire path
     pub(crate) fn solve_with(
         &self,
-        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
+        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let paths = match self {
             PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
@@ -3774,7 +3900,80 @@ impl<'db> PathBounds<'db> {
             PathBounds::Constrained(paths) => paths,
         };
 
-        let mut solutions = Vec::with_capacity(paths.len());
+        Self::solve_paths_with(paths.iter().map(AsRef::as_ref), choose)
+    }
+
+    /// Solves each path, returning a unique solution for all type variables.
+    ///
+    /// If there are multiple, or no valid solutions, returns an error.
+    pub(crate) fn unique_solution(
+        &self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Result<FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>, UniqueSolutionError>
+    {
+        let paths = match self {
+            PathBounds::Unsatisfiable => return Err(UniqueSolutionError::Unsatisfiable),
+            PathBounds::Unconstrained => return Ok(FxIndexMap::default()),
+            PathBounds::Constrained(paths) => paths,
+        };
+
+        let mut unique_solution: Option<
+            FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>,
+        > = None;
+        'paths: for path in paths {
+            let mut path_solution = FxIndexMap::default();
+            for path_bound in path {
+                let candidate = match Self::default_solve(db, builder, path_bound) {
+                    Ok(Some(candidate)) => candidate,
+                    Ok(None) => continue,
+                    Err(()) => continue 'paths,
+                };
+                if path_solution
+                    .insert(
+                        path_bound.bound_typevar.identity(db),
+                        TypeVarSolution {
+                            bound_typevar: path_bound.bound_typevar,
+                            solution: candidate,
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(UniqueSolutionError::Ambiguous);
+                }
+            }
+
+            if let Some(unique_solution) = &unique_solution {
+                if unique_solution.len() != path_solution.len() {
+                    return Err(UniqueSolutionError::Ambiguous);
+                }
+                for (identity, candidate) in path_solution {
+                    let Some(existing) = unique_solution.get(&identity) else {
+                        return Err(UniqueSolutionError::Ambiguous);
+                    };
+                    if existing.solution != candidate.solution
+                        && !existing.solution.is_equivalent_to(db, candidate.solution)
+                    {
+                        return Err(UniqueSolutionError::Ambiguous);
+                    }
+                }
+            } else {
+                unique_solution = Some(path_solution);
+            }
+        }
+
+        unique_solution.ok_or(UniqueSolutionError::Unsatisfiable)
+    }
+
+    fn solve_paths_with<'a>(
+        paths: impl IntoIterator<Item = &'a [PathBound<'db>]>,
+        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<'db>
+    where
+        'db: 'a,
+    {
+        let paths = paths.into_iter();
+        let mut solutions = Vec::with_capacity(paths.size_hint().0);
         'paths: for path in paths {
             let mut solution = Vec::with_capacity(path.len());
             for path_bound in path {
@@ -5460,7 +5659,7 @@ impl SequentMap {
 
         loop {
             match node.node() {
-                Node::AlwaysTrue | Node::AlwaysFalse => break,
+                Node::AlwaysTrue | Node::AlwaysFalse | Node::Gradual => break,
                 Node::Interior(interior) => {
                     let interior = builder.interior_node_data(interior.node());
                     if interior.if_true != ALWAYS_FALSE {
@@ -5739,6 +5938,12 @@ impl SequentMap {
                     .upper
                     .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
         };
+        // Avoid introducing redundant transitive bounds. This is especially important for
+        // structural types such as recursive protocols, where expanding inconsequential type
+        // variables can cause unnecessary recursive expansion and lead to less precise results.
+        let is_distinct_bound = |original: Type<'db>, derived: Type<'db>| {
+            original != derived && !original.is_equivalent_to(db, derived)
+        };
         if !has_typevar_bound(builder.constraint_data(left_constraint).bounds)
             && !has_typevar_bound(builder.constraint_data(right_constraint).bounds)
         {
@@ -5824,7 +6029,7 @@ impl SequentMap {
                 if let Some(replacement) = upper_replacement {
                     let new_upper =
                         constrained_upper.substitute_one_typevar(db, bound_typevar, replacement);
-                    if new_upper != constrained_upper {
+                    if is_distinct_bound(constrained_upper, new_upper) {
                         let post = ConstraintId::new_with_bounds(
                             db,
                             builder,
@@ -5885,7 +6090,7 @@ impl SequentMap {
                 if let Some(replacement) = lower_replacement {
                     let new_lower =
                         constrained_lower.substitute_one_typevar(db, bound_typevar, replacement);
-                    if new_lower != constrained_lower {
+                    if is_distinct_bound(constrained_lower, new_lower) {
                         let post = ConstraintId::new_with_bounds(
                             db,
                             builder,
@@ -5978,7 +6183,7 @@ impl SequentMap {
                             nested_typevar,
                             replacement,
                         );
-                        if new_upper != constrained_upper {
+                        if is_distinct_bound(constrained_upper, new_upper) {
                             let post = ConstraintId::new_with_bounds(
                                 db,
                                 builder,
@@ -6016,7 +6221,7 @@ impl SequentMap {
                             nested_typevar,
                             replacement,
                         );
-                        if new_lower != constrained_lower {
+                        if is_distinct_bound(constrained_lower, new_lower) {
                             let post = ConstraintId::new_with_bounds(
                                 db,
                                 builder,
@@ -6714,7 +6919,7 @@ impl PathAssignments {
     where
         V: PathVisitor,
     {
-        self.visit_inner(db, builder, node, visitor, false)
+        self.visit_inner(db, builder, node, visitor, false, false)
     }
 
     /// Visits the paths of the negation of `node`, without constructing that negation eagerly.
@@ -6723,12 +6928,13 @@ impl PathAssignments {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
+        gradual_satisfied: bool,
         visitor: &mut V,
     ) -> ControlFlow<V::Break, V::Result>
     where
         V: PathVisitor,
     {
-        self.visit_inner(db, builder, node, visitor, true)
+        self.visit_inner(db, builder, node, visitor, true, gradual_satisfied)
     }
 
     fn visit_inner<'db, V>(
@@ -6738,6 +6944,7 @@ impl PathAssignments {
         node: NodeId,
         visitor: &mut V,
         negated: bool,
+        gradual_satisfied: bool,
     ) -> ControlFlow<V::Break, V::Result>
     where
         V: PathVisitor,
@@ -6748,6 +6955,11 @@ impl PathAssignments {
 
             Node::AlwaysFalse if negated => visitor.visit_satisfied(db, builder, self),
             Node::AlwaysFalse => visitor.visit_unsatisfied(db, builder, self),
+
+            Node::Gradual if negated && gradual_satisfied => {
+                visitor.visit_unsatisfied(db, builder, self)
+            }
+            Node::Gradual => visitor.visit_satisfied(db, builder, self),
 
             Node::Interior(interior) => {
                 let interior_value = visitor.enter_interior(db, builder, interior)?;
@@ -6767,7 +6979,14 @@ impl PathAssignments {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, builder, path)
                         } else {
-                            path.visit_inner(db, builder, true_subtree, visitor, negated)
+                            path.visit_inner(
+                                db,
+                                builder,
+                                true_subtree,
+                                visitor,
+                                negated,
+                                gradual_satisfied,
+                            )
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -6796,7 +7015,14 @@ impl PathAssignments {
                             let subtree = if found_conflict {
                                 visitor.visit_impossible(db, builder, path)
                             } else {
-                                path.visit_inner(db, builder, interior.if_uncertain, visitor, false)
+                                path.visit_inner(
+                                    db,
+                                    builder,
+                                    interior.if_uncertain,
+                                    visitor,
+                                    false,
+                                    gradual_satisfied,
+                                )
                             };
                             match subtree {
                                 ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -6827,7 +7053,14 @@ impl PathAssignments {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, builder, path)
                         } else {
-                            path.visit_inner(db, builder, false_subtree, visitor, negated)
+                            path.visit_inner(
+                                db,
+                                builder,
+                                false_subtree,
+                                visitor,
+                                negated,
+                                gradual_satisfied,
+                            )
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -8454,7 +8687,7 @@ mod tests {
 
     fn path_assignments_for(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> PathAssignments {
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::AlwaysTrue | Node::AlwaysFalse | Node::Gradual => PathAssignments::new([]),
             Node::Interior(interior) => interior.path_assignments(builder),
         }
     }

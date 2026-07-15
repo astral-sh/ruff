@@ -1199,6 +1199,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::MaterializeOnce { .. }
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {

@@ -79,6 +79,53 @@ str("Müsli", "utf-8")
 str(b"M\xc3\xbcsli", b"utf-8")
 ```
 
+## Gradual constraints after narrowing
+
+Generic collection operations should preserve both the static and gradual parts of a type after
+runtime narrowing.
+
+```py
+from typing import Any
+
+def copy_narrowed_list(value: list[str] | Any) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[str] | (Any & Top[list[Unknown]])
+        reveal_type(list(value))  # revealed: list[str | Any]
+
+def iterate_narrowed_dict(
+    value: dict[str, Any] | dict[str, list[Any]] | Any,
+) -> None:
+    if not isinstance(value, dict):
+        return
+
+    key, item = next(iter(value.items()))
+    reveal_type(key)  # revealed: str | Any
+    reveal_type(item)  # revealed: Any | list[Any]
+
+    for element in item:
+        reveal_type(element)  # revealed: Any
+```
+
+Distinct overload solutions remain available to generic inference. A narrower implementation type
+must not replace the useful abstract return type supplied by another overload.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Manager(Generic[T]):
+    def __init__(self, opener: Callable[..., T]) -> None:
+        self.opener = opener
+
+    def acquire(self) -> T:
+        return self.opener()
+
+manager = Manager(open)
+reveal_type(manager.acquire())  # revealed: TextIOWrapper[_WrappedBuffer] | BinaryIO | IO[Any]
+```
+
 ## Calls to `isinstance`
 
 We infer `Literal[True]` for a limited set of cases where we can be sure that the answer is correct,
@@ -397,27 +444,38 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
         return True
 ```
 
-## Generic builtins should not overfit upper-bound-only callback constraints
+## Generic builtins preserve gradual callback constraints
 
-These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
-`object` bounds through the constraint solver. The current solver picks callback parameter upper
-bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
-result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
-return type would still be used where possible.
+These examples are minimized from ecosystem regressions involving explicit `Never` and `object`
+bounds. The constraint solver should preserve gradual `Unknown` types instead of falling back to the
+upper bounds of `Sized` or `object`.
 
 ```py
+from typing import Any
 from ty_extensions import Unknown
 
-def _(xs: Unknown):
-    # TODO: should be `list[Unknown]`
-    reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
+def _(xs: Unknown, values: list[tuple[Any, ...]]):
+    reveal_type(sorted(xs, key=len))  # revealed: list[Unknown]
 
     # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str | Unknown]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    # TODO: should be `LiteralString`
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+
+    reveal_type(map(min, values))  # revealed: map[Any]
+```
+
+```py
+from typing import Any, Sequence
+
+def _(x: Any, y: Any, values: Sequence[float]):
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Any | int | float
+
+def _(x, y, values: Sequence[float]):
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Unknown | int | float
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -488,12 +546,12 @@ import re
 
 def _(s: Unknown | str):
     escaped = map(re.escape, s)
-    reveal_type(escaped)  # revealed: map[str]
+    reveal_type(escaped)  # revealed: map[str | Unknown]
     "".join(escaped)
 
 def _(xs: Unknown | list[str]):
     escaped = map(re.escape, xs)
-    reveal_type(escaped)  # revealed: map[str]
+    reveal_type(escaped)  # revealed: map[str | Unknown]
     tokens: list[Unknown | str] = []
     tokens.extend(escaped)
 ```
