@@ -110,21 +110,24 @@ pub struct CallableSignature<'db> {
 
 fn merge_receiver_constraints<'db>(
     db: &'db dyn Db,
-    first: Option<OwnedConstraintSet<'db>>,
-    second: Option<OwnedConstraintSet<'db>>,
+    first: Option<&OwnedConstraintSet<'db>>,
+    second: Option<&OwnedConstraintSet<'db>>,
 ) -> Option<OwnedConstraintSet<'db>> {
+    // Only discard sets whose root is the `always` terminal. A false negative from this cheap check
+    // merely falls through to the merge below. Retaining such a nonterminal set is also important:
+    // its presence makes signature comparison use lazy typevar evaluation.
     match (
-        first.filter(|constraints| !constraints.is_always()),
-        second.filter(|constraints| !constraints.is_always()),
+        first.filter(|constraints| !constraints.is_trivially_always_satisfied()),
+        second.filter(|constraints| !constraints.is_trivially_always_satisfied()),
     ) {
         (None, None) => None,
-        (Some(constraints), None) | (None, Some(constraints)) => Some(constraints),
+        (Some(constraints), None) | (None, Some(constraints)) => Some((*constraints).clone()),
         (Some(first), Some(second)) => {
             let constraints = ConstraintSetBuilder::new();
             Some(constraints.into_owned(|builder| {
                 builder
-                    .load(db, &first)
-                    .and(db, builder, || builder.load(db, &second))
+                    .load(db, first)
+                    .and(db, builder, || builder.load(db, second))
             }))
         }
     }
@@ -347,16 +350,19 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
-                            receiver_constraints: merge_receiver_constraints(
-                                db,
-                                signature.receiver_constraints.clone(),
-                                self_signature.map_receiver_constraints(
+                            receiver_constraints: {
+                                let mapped = self_signature.map_receiver_constraints(
                                     db,
                                     type_mapping,
                                     tcx,
                                     visitor,
-                                ),
-                            ),
+                                );
+                                merge_receiver_constraints(
+                                    db,
+                                    signature.receiver_constraints.as_ref(),
+                                    mapped.as_ref(),
+                                )
+                            },
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -1069,8 +1075,11 @@ impl<'db> Signature<'db> {
                 .when_constraint_set_assignable_to_owned(db, annotation)
                 .into_owned()
         });
-        let receiver_constraints =
-            merge_receiver_constraints(db, self.receiver_constraints.clone(), receiver_constraint);
+        let receiver_constraints = merge_receiver_constraints(
+            db,
+            self.receiver_constraints.as_ref(),
+            receiver_constraint.as_ref(),
+        );
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, removed_receiver)
         {
@@ -1152,6 +1161,8 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
+        // Keep the overload if any specialization of its receiver typevars permits binding. The
+        // resulting receiver constraint is retained and checked during callable comparison.
         !self_type
             .when_assignable_to(
                 db,
@@ -1205,7 +1216,9 @@ impl<'db> Signature<'db> {
                     &self_visitor,
                 )
             })
-            .filter(|constraints| !constraints.is_always());
+            .filter(|constraints| {
+                !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db))
+            });
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_constraints,
@@ -1252,15 +1265,15 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<OwnedConstraintSet<'db>> {
-        let constraints = self.receiver_constraints.as_ref()?;
-        Some(Self::map_constraints(
+        let constraints = Self::map_constraints(
             db,
-            constraints,
+            self.receiver_constraints.as_ref()?,
             type_mapping,
             tcx,
             visitor,
-        ))
-        .filter(|constraints| !constraints.is_always())
+        );
+        (!constraints.query(|_builder, constraints| constraints.is_always_satisfied(db)))
+            .then_some(constraints)
     }
 
     fn map_constraints(
@@ -1277,10 +1290,10 @@ impl<'db> Signature<'db> {
             return constraints.clone();
         }
 
-        constraints.query(|_builder, constraints| {
-            constraints
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                .into_owned(db)
+        let builder = ConstraintSetBuilder::new();
+        builder.into_owned(|builder| {
+            let constraints = builder.load(db, constraints);
+            constraints.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
         })
     }
 
@@ -4841,10 +4854,10 @@ mod tests {
     fn always_satisfied_receiver_constraints_are_discarded() {
         let db = setup_db();
         assert!(
-            merge_receiver_constraints(&db, Some(OwnedConstraintSet::always()), None).is_none()
+            merge_receiver_constraints(&db, Some(&OwnedConstraintSet::always()), None).is_none()
         );
         assert!(
-            merge_receiver_constraints(&db, None, Some(OwnedConstraintSet::always())).is_none()
+            merge_receiver_constraints(&db, None, Some(&OwnedConstraintSet::always())).is_none()
         );
     }
 

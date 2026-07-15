@@ -62,6 +62,8 @@ class GenericReceiver:
 
 receiver = GenericReceiver()
 
+# Binding adds `GenericReceiver <= T`. `T = object` satisfies that constraint, but `T = int` does
+# not.
 accepts_object: Callable[[object], object] = receiver.method
 accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
 ```
@@ -73,13 +75,13 @@ method with another callable:
 from typing import Callable
 
 class InvalidBoundedReceiver:
+    # TODO: Binding should reject this method because the receiver is outside `T`'s declared bound.
     def method[T: int](self: T) -> None: ...
 
 class InvalidConstrainedReceiver:
+    # TODO: Binding should reject this method because the receiver is outside `T`'s constraints.
     def method[T: (int, str)](self: T) -> None: ...
 
-# TODO: These assignments should be rejected because the concrete receiver is outside the
-# TypeVar's declared domain.
 invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method
 invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method
 ```

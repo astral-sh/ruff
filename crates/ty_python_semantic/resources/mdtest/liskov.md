@@ -940,8 +940,8 @@ class G3(A3):
     def method(self: object) -> Self: ...  # fine
 
 class H3(A3):
-    # `A3.method()` can be called on any instance of `A3`, but `H3.method()` can only be called on
-    # objects that are instances of `str`.
+    # `A3.method()` can be called on any subtype of `A3`, but `H3.method()` can only be called on
+    # objects that are subtypes of `str`.
     def method(self: str) -> Self: ...  # error: [invalid-method-override]
 
 class I3(A3):

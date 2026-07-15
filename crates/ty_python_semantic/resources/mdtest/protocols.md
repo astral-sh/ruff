@@ -3188,9 +3188,11 @@ class ReceiverOnly(Protocol):
     def method(self) -> None: ...
 
 class InvalidBoundedReceiver:
+    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
     def method[T: int](self: T) -> None: ...
 
 class InvalidConstrainedReceiver:
+    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
     def method[T: (int, str)](self: T) -> None: ...
 
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
@@ -3244,8 +3246,6 @@ static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol
 static_assert(not is_assignable_to(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 static_assert(not is_subtype_of(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 
-# TODO: These relations should be rejected because the concrete receiver is outside the
-# receiver TypeVar's declared domain. Bound callable comparison does not enforce that domain yet.
 static_assert(is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
 static_assert(is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
 static_assert(is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
