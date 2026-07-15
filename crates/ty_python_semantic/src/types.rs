@@ -6835,6 +6835,13 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization) => {
                     Type::Divergent(divergent.materialized(*materialization))
                 }
+                TypeMapping::EraseTransientMaterialization
+                    if divergent
+                        .materialization()
+                        .is_some_and(Materialization::is_transient) =>
+                {
+                    Type::Divergent(DivergentType::new(divergent.id))
+                }
                 _ => self,
             },
 
