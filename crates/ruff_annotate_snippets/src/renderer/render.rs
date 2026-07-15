@@ -1433,7 +1433,10 @@ fn render_source_line(
         let width = annotation.end.display - annotation.start.display;
 
         static MIN_PAD: usize = 5;
-        let margin_width = str_width(renderer.decor_style.margin());
+        let cut_indicator = renderer
+            .cut_indicator
+            .unwrap_or(renderer.decor_style.margin());
+        let margin_width = str_width(cut_indicator);
         if width > margin.term_width * 2 && width > (MIN_PAD * 2 + margin_width) {
             // If the terminal is *too* small, we keep at least a tiny bit of the span for
             // display.
@@ -1443,14 +1446,14 @@ fn render_source_line(
                 line_offset,
                 code_offset + (annotation.start.display + pad).saturating_sub(left),
                 code_offset + (annotation.end.display - pad).saturating_sub(left),
-                renderer.decor_style.margin(),
+                cut_indicator,
             );
             // Underline line
             buffer.replace(
                 line_offset + 1,
                 code_offset + (annotation.start.display + pad).saturating_sub(left),
                 code_offset + (annotation.end.display - pad).saturating_sub(left),
-                renderer.decor_style.margin(),
+                cut_indicator,
             );
         }
     }
@@ -1616,12 +1619,14 @@ fn emit_suggestion_default(
                     );
                 }
 
-                let placeholder = renderer.decor_style.margin();
-                let padding = str_width(placeholder);
+                let cut_indicator = renderer
+                    .cut_indicator
+                    .unwrap_or(renderer.decor_style.margin());
+                let padding = str_width(cut_indicator);
                 buffer.puts(
                     row_num,
                     max_line_num_len.saturating_sub(padding),
-                    placeholder,
+                    cut_indicator,
                     ElementStyle::LineNumber,
                 );
                 row_num += 1;
@@ -1737,12 +1742,14 @@ fn emit_suggestion_default(
 
     // if we elided some lines, add an ellipsis
     if lines.next().is_some() {
-        let placeholder = renderer.decor_style.margin();
-        let padding = str_width(placeholder);
+        let cut_indicator = renderer
+            .cut_indicator
+            .unwrap_or(renderer.decor_style.margin());
+        let padding = str_width(cut_indicator);
         buffer.puts(
             row_num,
             max_line_num_len.saturating_sub(padding),
-            placeholder,
+            cut_indicator,
             ElementStyle::LineNumber,
         );
     } else {
@@ -2033,8 +2040,10 @@ fn draw_line(
     if skipped > left {
         left += skipped - left;
     }
-    let placeholder = renderer.decor_style.margin();
-    let padding = str_width(placeholder);
+    let cut_indicator = renderer
+        .cut_indicator
+        .unwrap_or(renderer.decor_style.margin());
+    let padding = str_width(cut_indicator);
     let (width_taken, bytes_taken) = if margin.was_cut_left() {
         // We have stripped some code/whitespace from the beginning, make it clear.
         let mut bytes_taken = 0;
@@ -2051,7 +2060,7 @@ fn draw_line(
         buffer.puts(
             line_offset,
             code_offset,
-            placeholder,
+            cut_indicator,
             ElementStyle::LineNumber,
         );
         (width_taken, bytes_taken)
@@ -2082,7 +2091,7 @@ fn draw_line(
         buffer.puts(
             line_offset,
             code_offset + width_taken + code[bytes_taken..].chars().count() - char_taken,
-            placeholder,
+            cut_indicator,
             ElementStyle::LineNumber,
         );
     }

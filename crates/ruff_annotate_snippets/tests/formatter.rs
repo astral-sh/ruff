@@ -5334,7 +5334,7 @@ fn long_line_cut_custom() {
     let expected = str![[r#"
 error: 
   |
-1 | abcd abcd a...
+1 | abcd abcd abc…
   | ^^^^
 "#]];
     let renderer = Renderer::plain().term_width(18).cut_indicator("…");
