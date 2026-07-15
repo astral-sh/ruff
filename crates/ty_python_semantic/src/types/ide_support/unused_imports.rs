@@ -39,7 +39,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
     let index = semantic_index(db, file);
     let mut string_annotation_definitions = None;
     let mut explicit_exports = None;
-    let mut member_attribute_names: Option<FxHashSet<&str>> = None;
+    let mut member_attribute_uses = None;
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -86,23 +86,24 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
                 continue;
             }
 
-            // Class-body imports can be used as attributes (`self.os`), which records
-            // a member place without marking the class-scope symbol used.
+            // Class-body imports can be used as attributes (`self.os` or `C.os.path`),
+            // which records a member place without marking the class-scope symbol used.
             // TODO: Match by the accessed object's type instead of by name alone.
+            let imported_path = multipart_import_name.unwrap_or(display_name.as_str());
             if scope.kind().is_class()
-                && member_attribute_names
+                && member_attribute_uses
                     .get_or_insert_with(|| {
                         index
                             .scope_ids()
                             .flat_map(|scope_id| {
-                                index
-                                    .place_table(scope_id.file_scope_id(db))
-                                    .members()
-                                    .filter_map(|member| member.leading_attribute_segments().next())
+                                index.place_table(scope_id.file_scope_id(db)).members()
                             })
-                            .collect()
+                            .collect::<Vec<_>>()
                     })
-                    .contains(display_name.as_str())
+                    .iter()
+                    .any(|member| {
+                        dotted_starts_with(member.leading_attribute_segments(), imported_path)
+                    })
             {
                 continue;
             }
@@ -1105,6 +1106,36 @@ mod tests {
         )?;
 
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_multipart_import_used_via_class_attribute() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os.path
+
+            C.os.path.join("a", "b")
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_class_scope_multipart_import_when_only_similar_path_is_used() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os.path
+
+            print(C.os.pathsep)
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["os.path"]);
         Ok(())
     }
 
