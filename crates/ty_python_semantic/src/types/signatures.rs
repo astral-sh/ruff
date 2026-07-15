@@ -1681,7 +1681,6 @@ impl<'db> Signature<'db> {
                 })),
                 CallableTypeKind::ParamSpecValue,
                 CallableFunctionProvenance::None,
-                false,
             ));
             let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
@@ -1932,7 +1931,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -1985,7 +1983,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2409,7 +2406,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2440,7 +2436,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2567,7 +2562,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
-                            false,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_lower_bound(
@@ -2593,7 +2587,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
-                            false,
                         ));
                         let param_spec_prefix_matches =
                             ConstraintSet::constrain_typevar_upper_bound(
@@ -2629,7 +2622,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2776,7 +2768,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
@@ -2801,7 +2792,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -2916,7 +2906,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
-                        false,
                     ));
                     let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
@@ -3748,6 +3737,9 @@ pub(crate) enum ParametersKind<'db> {
     /// union of all possible parameter signatures.
     Top,
 
+    /// A top/bottom materialization of gradual parameters introduced by narrowing.
+    Narrowing(MaterializationKind),
+
     /// Represents a parameter list containing a `ParamSpec` as the _only_ parameter.
     ///
     /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
@@ -3994,7 +3986,10 @@ impl<'db> Parameters<'db> {
                 ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar))
             }
             ParametersKind::Concatenate(tail) => ParametersKind::Concatenate(tail),
-            ParametersKind::Top => return self.clone(),
+            ParametersKind::Top | ParametersKind::Narrowing(MaterializationKind::Top) => {
+                return self.clone();
+            }
+            ParametersKind::Narrowing(MaterializationKind::Bottom) => ParametersKind::Standard,
         };
 
         prefix_parameters.extend(self.iter().cloned());
@@ -4023,6 +4018,9 @@ impl<'db> Parameters<'db> {
             }
             ParametersKind::Gradual => ParametersKind::Standard,
             ParametersKind::Top => ParametersKind::Top,
+            ParametersKind::Narrowing(materialization_kind) => {
+                ParametersKind::Narrowing(materialization_kind)
+            }
             ParametersKind::ParamSpec(typevar) => {
                 if matches!((variadic_index, keyword_variadic_index), (Some(0), Some(1)))
                     && parameters.len() == 2
@@ -4088,7 +4086,10 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) fn is_top(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Top)
+        matches!(
+            self.data.kind,
+            ParametersKind::Top | ParametersKind::Narrowing(MaterializationKind::Top)
+        )
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
@@ -4248,6 +4249,18 @@ impl<'db> Parameters<'db> {
         )
     }
 
+    fn narrowing(materialization_kind: MaterializationKind) -> Self {
+        Self::new(
+            [
+                Parameter::variadic(Name::new_static("args"))
+                    .with_annotated_type(Type::narrowing_bound(MaterializationKind::Top)),
+                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    .with_annotated_type(Type::narrowing_bound(MaterializationKind::Top)),
+            ],
+            ParametersKind::Narrowing(materialization_kind),
+        )
+    }
+
     fn from_parameters(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -4371,6 +4384,21 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if matches!(type_mapping, TypeMapping::EraseNarrowingBounds)
+            && matches!(self.data.kind, ParametersKind::Narrowing(_))
+        {
+            return Parameters::unknown();
+        }
+
+        if let TypeMapping::MaterializeForNarrowing(materialization_kind) = type_mapping
+            && matches!(
+                self.data.kind,
+                ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
+            )
+        {
+            return Parameters::narrowing(*materialization_kind);
+        }
+
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
                 self.data.kind,
@@ -4378,12 +4406,12 @@ impl<'db> Parameters<'db> {
             )
         {
             match materialization_kind {
-                MaterializationKind::Bottom | MaterializationKind::DeferredBottom => {
+                MaterializationKind::Bottom => {
                     // The bottom materialization of the `...` parameters is `(*object, **object)`,
                     // which accepts any call and is thus a subtype of all other parameters.
                     return Parameters::bottom();
                 }
-                MaterializationKind::Top | MaterializationKind::DeferredTop => {
+                MaterializationKind::Top => {
                     return Parameters::top();
                 }
             }

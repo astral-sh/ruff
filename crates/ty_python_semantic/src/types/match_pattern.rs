@@ -133,7 +133,6 @@ fn sequence_pattern_getitem_method<'db>(
         CallableSignature::from_overloads(overloads.chain(fallback_overload)),
         CallableTypeKind::FunctionLike,
         CallableFunctionProvenance::None,
-        false,
     )
 }
 

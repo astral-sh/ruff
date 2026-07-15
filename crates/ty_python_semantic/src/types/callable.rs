@@ -7,9 +7,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MaterializationKind, MemberLookupPolicy, Parameter, Parameters,
-        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -177,7 +176,6 @@ impl<'db> Type<'db> {
                                 CallableSignature::from_overloads(signatures),
                                 callable.kind(db),
                                 callable.provenance(db),
-                                callable.deferred_top_materialization(db),
                             )
                         }))
                     }
@@ -199,7 +197,6 @@ impl<'db> Type<'db> {
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
                                     callable.provenance(db),
-                                    callable.deferred_top_materialization(db),
                                 ));
                             }
                         }
@@ -248,7 +245,6 @@ impl<'db> Type<'db> {
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
-                false,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -257,7 +253,6 @@ impl<'db> Type<'db> {
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
-                    false,
                 )))
             }
 
@@ -447,10 +442,6 @@ pub struct CallableType<'db> {
     /// ```
     #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
-
-    /// Whether this callable is a deferred top materialization.
-    #[returns(copy)]
-    pub(crate) deferred_top_materialization: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -473,7 +464,6 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
-            false,
         )
     }
 
@@ -483,7 +473,6 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::None,
-            false,
         )
     }
 
@@ -496,7 +485,6 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
             CallableFunctionProvenance::None,
-            false,
         )
     }
 
@@ -541,7 +529,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::Regular,
             self.provenance(db),
-            self.deferred_top_materialization(db),
         )
     }
 
@@ -555,7 +542,6 @@ impl<'db> CallableType<'db> {
             CallableSignature::partially_apply(db, overloads)?,
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
-            false,
         ))
     }
 
@@ -590,7 +576,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
         )
     }
 
@@ -600,7 +585,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::FunctionLike,
             self.provenance(db),
-            self.deferred_top_materialization(db),
         )
     }
 
@@ -610,7 +594,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db),
             CallableTypeKind::DunderParamSpec,
             self.provenance(db),
-            self.deferred_top_materialization(db),
         )
     }
 
@@ -630,7 +613,6 @@ impl<'db> CallableType<'db> {
                 .apply_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
         )
     }
 
@@ -644,7 +626,6 @@ impl<'db> CallableType<'db> {
             CallableSignature::bottom(),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
-            false,
         )
     }
 
@@ -660,44 +641,7 @@ impl<'db> CallableType<'db> {
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db),
         ))
-    }
-
-    fn with_deferred_top_materialization(
-        self,
-        db: &'db dyn Db,
-        deferred_top_materialization: bool,
-    ) -> Self {
-        if self.deferred_top_materialization(db) == deferred_top_materialization {
-            self
-        } else {
-            Self::new(
-                db,
-                self.signatures(db),
-                self.kind(db),
-                self.provenance(db),
-                deferred_top_materialization,
-            )
-        }
-    }
-
-    fn apply_deferred_materialization(
-        self,
-        db: &'db dyn Db,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        if !self.deferred_top_materialization(db) {
-            return self;
-        }
-
-        self.with_deferred_top_materialization(db, false)
-            .apply_type_mapping_impl(
-                db,
-                &TypeMapping::Materialize(MaterializationKind::Top),
-                TypeContext::default(),
-                visitor,
-            )
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -707,19 +651,6 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if matches!(
-            type_mapping,
-            TypeMapping::Materialize(MaterializationKind::DeferredTop)
-        ) {
-            return self.with_deferred_top_materialization(db, true);
-        }
-
-        if self.deferred_top_materialization(db)
-            && matches!(type_mapping, TypeMapping::Materialize(_))
-        {
-            return self;
-        }
-
         if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
             return replacements.get(&self).copied().unwrap_or(self);
         }
@@ -730,8 +661,6 @@ impl<'db> CallableType<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
             self.provenance(db),
-            self.deferred_top_materialization(db)
-                && !matches!(type_mapping, TypeMapping::EraseDeferredMaterialization),
         )
     }
 
@@ -827,7 +756,6 @@ impl<'db> CallableTypes<'db> {
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
-            false,
         )
         .into_precise_functools_partial_instance(db, wrapped)
     }
@@ -852,8 +780,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source = source.apply_deferred_materialization(db, self.materialization_visitor);
-        let target = target.apply_deferred_materialization(db, self.materialization_visitor);
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
