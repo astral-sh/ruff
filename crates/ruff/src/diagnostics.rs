@@ -217,7 +217,7 @@ pub(crate) fn lint_path(
             let (diagnostics, fixed) = if settings
                 .rules
                 .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                .any(|rule_code| rule_code.lint_source().is_toml())
             {
                 let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
                     Ok(contents) => contents,
@@ -397,7 +397,7 @@ pub(crate) fn lint_stdin(
                 .linter
                 .rules
                 .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                .any(|rule_code| rule_code.lint_source().is_toml())
             {
                 return Ok(Diagnostics::default());
             }
