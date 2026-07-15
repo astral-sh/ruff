@@ -378,6 +378,13 @@ def _(c: Consumer[Intersection[A, Not[AlwaysFalsy]]], p: Producer[Intersection[A
     reveal_type(p)  # revealed: Producer[A & ~AlwaysFalsy]
     reveal_type([c])  # revealed: list[Consumer[A & ~AlwaysFalsy]]
     reveal_type([p])  # revealed: list[Producer[A]]
+
+type NarrowA = Intersection[A, Not[AlwaysFalsy]]
+
+def transform(value: NarrowA) -> NarrowA:
+    return value
+
+reveal_type([transform])  # revealed: list[(value: NarrowA) -> A]
 ```
 
 ## Literal annotations are respected
