@@ -1030,6 +1030,8 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Applies a generic class's deferred materialization: `DeferredTop[..]` becomes `Top[..]`,
+    /// and `DeferredBottom[..]` becomes `Bottom[..]`.
     pub(crate) fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,

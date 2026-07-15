@@ -1514,6 +1514,8 @@ impl<'db> Specialization<'db> {
         }
     }
 
+    /// Applies the specialization's deferred materialization: `DeferredTop[..]` becomes
+    /// `Top[..]`, and `DeferredBottom[..]` becomes `Bottom[..]`.
     pub(crate) fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,

@@ -676,6 +676,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
+    /// Top-materializes the callable and removes the deferred-materialization marker.
     fn apply_deferred_materialization(
         self,
         db: &'db dyn Db,
