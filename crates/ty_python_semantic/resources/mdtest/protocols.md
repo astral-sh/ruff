@@ -4683,11 +4683,12 @@ def f(x: PGconn):
     isinstance(x, Connection)
 ```
 
-### Recursive protocols used as the first argument to `cast()`
+### Class-based protocols used as the first argument to `cast()`
 
-These caused issues in an early version of our `Protocol` implementation due to the fact that we use
-a recursive function in our `cast()` implementation to check whether a type contains `Unknown` or
-`Todo`. Recklessly recursing into a type causes stack overflows if the type is recursive:
+A redundant cast is reported only if neither type contains `Unknown` nor `Todo`. Protocol interfaces
+are lazily inferred and can be recursive, so this check does not inspect them. Encountering a
+class-based protocol therefore conservatively suppresses the diagnostic, even when its visible type
+arguments contain no dynamic types.
 
 ```toml
 [environment]
@@ -4702,7 +4703,141 @@ class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
 def f(value: Iterator[Any]):
-    cast(Iterator[Any], value)  # error: [redundant-cast]
+    cast(Iterator[Any], value)
+```
+
+### Protocol methods and properties in `cast()`
+
+The protocol interface is skipped as a unit, regardless of whether a method or property would expose
+a dynamic type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, cast
+
+from ty_extensions import Unknown
+
+class UnknownMethod[T](Protocol):
+    def method(self) -> Unknown: ...
+
+def method(value: UnknownMethod[int]) -> None:
+    cast(UnknownMethod[int], value)
+```
+
+Property getters follow the same rule: their implicit receiver is ignored, but their return type is
+checked.
+
+```py
+from typing import Protocol, cast
+
+from ty_extensions import Unknown
+
+class IntProperty[T](Protocol):
+    @property
+    def value(self) -> int: ...
+
+class UnknownProperty[T](Protocol):
+    @property
+    def value(self) -> Unknown: ...
+
+def properties(known: IntProperty[int], unknown: UnknownProperty[int]) -> None:
+    cast(IntProperty[int], known)
+    cast(UnknownProperty[int], unknown)
+```
+
+### Specialized protocol type parameters in `cast()`
+
+A type variable's bound does not remain part of a specialized protocol. The eager `int`
+specialization is inspected, but the lazily inferred protocol interface is still skipped, so the
+diagnostic is conservatively suppressed.
+
+```py
+from typing import Protocol, TypeVar, cast
+
+from ty_extensions import Unknown
+
+T = TypeVar("T", bound=Unknown)
+
+class BoundedProtocol(Protocol[T]):
+    value: T
+
+def bounded(value: BoundedProtocol[int]) -> None:
+    cast(BoundedProtocol[int], value)
+```
+
+### Recursive protocol specializations in `cast()`
+
+A protocol can refer to itself with a different type argument on every step. Since the sequence
+`Linked[int]`, `Linked[list[int]]`, and so on never repeats exactly, the inspection stops when it
+sees the same protocol definition again. The diagnostic is not reported because a later
+specialization could expose `Unknown`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, cast
+
+class Linked[T](Protocol):
+    value: T
+    next: "Linked[list[T]]"
+
+def linked(value: Linked[int]) -> None:
+    cast(Linked[int], value)
+```
+
+An explicit `self` annotation is part of the method's type, so recursion through that annotation
+must also terminate.
+
+```py
+from typing import Protocol, cast
+
+class ExplicitReceiver[T](Protocol):
+    def method(self: "ExplicitReceiver[list[T]]") -> int: ...
+
+def explicit_receiver(value: ExplicitReceiver[int]) -> None:
+    cast(ExplicitReceiver[int], value)
+```
+
+The diagnostic must be withheld because member lookup can depend on the type argument. In this
+example, descriptor overload resolution exposes `Unknown` only through the nested protocol.
+
+```py
+from typing import Protocol, cast, overload
+
+from ty_extensions import Unknown
+
+class Descriptor:
+    @overload
+    def __get__(
+        self,
+        instance: "DescriptorProtocol[list[int]]",
+        owner: type["DescriptorProtocol[list[int]]"],
+    ) -> Unknown: ...
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> int: ...
+    def __get__(self, instance: object, owner: type[object]) -> object:
+        return object()
+
+def descriptor(_function: object) -> Descriptor:
+    return Descriptor()
+
+class DescriptorProtocol[T](Protocol):
+    marker: T
+    next: "DescriptorProtocol[list[T]]"
+
+    @descriptor
+    def value(self) -> object: ...
+
+def descriptor_specialization(value: DescriptorProtocol[int]) -> None:
+    reveal_type((value.value, value.next.value))  # revealed: tuple[int, Unknown]
+    cast(DescriptorProtocol[int], value)
 ```
 
 ### Recursive generic protocols
