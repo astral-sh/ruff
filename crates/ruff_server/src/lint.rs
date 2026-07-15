@@ -3,7 +3,7 @@
 use std::fmt::Write;
 use std::path::Path;
 
-use ruff_python_ast::SourceType;
+use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -24,10 +24,10 @@ use ruff_linter::{
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
     settings::{LinterSettings, flags},
-    source_kind::SourceKind,
     suppression::Suppressions,
+    toml::lint_toml,
 };
-use ruff_notebook::Notebook;
+use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::LineIndex;
@@ -76,13 +76,6 @@ pub(crate) fn check(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type_for_lint() else {
-        return DiagnosticsMap::default();
-    };
-    let source_kind = query.make_python_source_kind(source_type);
-    let document_uri = query.make_key().into_uri();
-    let notebook = query.as_notebook();
-
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
         &document_path,
@@ -92,6 +85,38 @@ pub(crate) fn check(
     ) {
         return DiagnosticsMap::default();
     }
+
+    match query.source_type_for_lint() {
+        SourceType::Python(source_type) => check_python(
+            query,
+            source_type,
+            encoding,
+            show_syntax_errors,
+            supports_related_information,
+        ),
+        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
+            check_toml(
+                query,
+                source_type,
+                encoding,
+                show_syntax_errors,
+                supports_related_information,
+            )
+        }
+        SourceType::Toml(_) | SourceType::Markdown => DiagnosticsMap::default(),
+    }
+}
+
+fn check_python(
+    query: &DocumentQuery,
+    source_type: ruff_python_ast::PySourceType,
+    encoding: PositionEncoding,
+    show_syntax_errors: bool,
+    supports_related_information: bool,
+) -> DiagnosticsMap {
+    let settings = query.settings();
+    let document_path = query.virtual_file_path();
+    let source_kind = query.make_python_source_kind(source_type);
 
     let file_path = query.file_path();
     let package = if let Some(file_path) = &file_path {
@@ -163,15 +188,83 @@ pub(crate) fn check(
             SuppressionKind::Noqa
         },
     );
-    let context = LspDiagnosticContext {
-        source_kind: &source_kind,
-        index: locator.to_index(),
+
+    diagnostics_to_lsp(
+        query,
+        diagnostics,
+        suppression_edits,
+        LspDocument {
+            source: source_kind.source_code(),
+            index: locator.to_index(),
+            notebook_index: source_kind.as_ipy_notebook().map(Notebook::index),
+        },
         encoding,
-        document_path: document_path.as_ref(),
-        document_uri: &document_uri,
-        notebook,
+        show_syntax_errors,
         supports_related_information,
-        settings: &settings.linter,
+    )
+}
+
+fn check_toml(
+    query: &DocumentQuery,
+    source_type: TomlSourceType,
+    encoding: PositionEncoding,
+    show_syntax_errors: bool,
+    supports_related_information: bool,
+) -> DiagnosticsMap {
+    let Ok(document) = query.as_single_document() else {
+        return DiagnosticsMap::default();
+    };
+    let settings = query.settings();
+    let diagnostics = if settings
+        .linter
+        .rules
+        .iter_enabled()
+        .any(|rule| rule.lint_source().is_toml())
+    {
+        lint_toml(
+            &query.virtual_file_path(),
+            document.contents(),
+            &settings.linter,
+            source_type,
+        )
+    } else {
+        Vec::new()
+    };
+
+    diagnostics_to_lsp(
+        query,
+        diagnostics,
+        std::iter::repeat_with(|| None),
+        LspDocument {
+            source: document.contents(),
+            index: document.index(),
+            notebook_index: None,
+        },
+        encoding,
+        show_syntax_errors,
+        supports_related_information,
+    )
+}
+
+fn diagnostics_to_lsp(
+    query: &DocumentQuery,
+    diagnostics: Vec<Diagnostic>,
+    suppression_edits: impl IntoIterator<Item = Option<Edit>>,
+    document: LspDocument,
+    encoding: PositionEncoding,
+    show_syntax_errors: bool,
+    supports_related_information: bool,
+) -> DiagnosticsMap {
+    let document_uri = query.make_key().into_uri();
+    let document_path = query.virtual_file_path();
+    let context = LspDiagnosticContext {
+        document,
+        encoding,
+        document_path: &document_path,
+        document_uri: &document_uri,
+        notebook: query.as_notebook(),
+        supports_related_information,
+        settings: &query.settings().linter,
     };
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -249,9 +342,14 @@ pub(crate) fn fixes_for_diagnostics(
         .collect()
 }
 
-struct LspDiagnosticContext<'a> {
-    source_kind: &'a SourceKind,
+struct LspDocument<'a> {
+    source: &'a str,
     index: &'a LineIndex,
+    notebook_index: Option<&'a NotebookIndex>,
+}
+
+struct LspDiagnosticContext<'a> {
+    document: LspDocument<'a>,
     encoding: PositionEncoding,
     document_path: &'a Path,
     document_uri: &'a lsp_types::Uri,
@@ -299,22 +397,12 @@ fn to_lsp_diagnostic(
                 .into_iter()
                 .flat_map(Fix::edits)
                 .map(|edit| lsp_types::TextEdit {
-                    range: diagnostic_edit_range(
-                        edit.range(),
-                        context.source_kind,
-                        context.index,
-                        context.encoding,
-                    ),
+                    range: diagnostic_edit_range(edit.range(), context),
                     new_text: edit.content().unwrap_or_default().to_string(),
                 })
                 .collect();
             let noqa_edit = noqa_edit.map(|noqa_edit| lsp_types::TextEdit {
-                range: diagnostic_edit_range(
-                    noqa_edit.range(),
-                    context.source_kind,
-                    context.index,
-                    context.encoding,
-                ),
+                range: diagnostic_edit_range(noqa_edit.range(), context),
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
@@ -330,18 +418,18 @@ fn to_lsp_diagnostic(
     let range: lsp_types::Range;
     let cell: usize;
 
-    if let Some(notebook_index) = context.source_kind.as_ipy_notebook().map(Notebook::index) {
+    if let Some(notebook_index) = context.document.notebook_index {
         NotebookRange { cell, range } = diagnostic_range.to_notebook_range(
-            context.source_kind.source_code(),
-            context.index,
+            context.document.source,
+            context.document.index,
             notebook_index,
             context.encoding,
         );
     } else {
         cell = usize::default();
         range = diagnostic_range.to_range(
-            context.source_kind.source_code(),
-            context.index,
+            context.document.source,
+            context.document.index,
             context.encoding,
         );
     }
@@ -450,7 +538,7 @@ fn span_to_location(span: &Span, context: &LspDiagnosticContext) -> Option<lsp_t
     let range = span.range()?;
 
     if let Some(notebook) = context.notebook {
-        let notebook_index = context.source_kind.as_ipy_notebook().map(Notebook::index)?;
+        let notebook_index = context.document.notebook_index?;
         let NotebookRange { cell, range } = range.to_notebook_range(
             source_file.source_text(),
             source_file.index(),
@@ -473,18 +561,22 @@ fn span_to_location(span: &Span, context: &LspDiagnosticContext) -> Option<lsp_t
     }
 }
 
-fn diagnostic_edit_range(
-    range: TextRange,
-    source_kind: &SourceKind,
-    index: &LineIndex,
-    encoding: PositionEncoding,
-) -> lsp_types::Range {
-    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+fn diagnostic_edit_range(range: TextRange, context: &LspDiagnosticContext) -> lsp_types::Range {
+    if let Some(notebook_index) = context.document.notebook_index {
         range
-            .to_notebook_range(source_kind.source_code(), index, notebook_index, encoding)
+            .to_notebook_range(
+                context.document.source,
+                context.document.index,
+                notebook_index,
+                context.encoding,
+            )
             .range
     } else {
-        range.to_range(source_kind.source_code(), index, encoding)
+        range.to_range(
+            context.document.source,
+            context.document.index,
+            context.encoding,
+        )
     }
 }
 
@@ -515,6 +607,7 @@ fn tags(diagnostic: &Diagnostic) -> Option<Vec<lsp_types::DiagnosticTag>> {
 #[cfg(test)]
 mod tests {
     use ruff_db::diagnostic::{DiagnosticId, Severity, SubDiagnosticSeverity};
+    use ruff_linter::source_kind::SourceKind;
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -566,8 +659,11 @@ mod tests {
         let uri = lsp_types::Uri::parse("file:///test.py").expect("URI to be valid");
         let settings = LinterSettings::default();
         let context = LspDiagnosticContext {
-            source_kind: &source_kind,
-            index: &index,
+            document: LspDocument {
+                source: source_kind.source_code(),
+                index: &index,
+                notebook_index: None,
+            },
             encoding: PositionEncoding::UTF8,
             document_path: Path::new("test.py"),
             document_uri: &uri,

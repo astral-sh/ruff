@@ -1,6 +1,6 @@
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, CodeActionRequest, CodeActionResponse};
-use ruff_python_ast::SourceType;
+use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashSet;
 use types::CodeActionKind;
 
@@ -41,9 +41,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let query = snapshot.query();
 
-        // Don't provide code actions for non-Python documents (e.g., markdown files).
-        let SourceType::Python(_) = query.source_type_for_lint() else {
-            return Ok(Some(response));
+        let is_python = match query.source_type_for_lint() {
+            SourceType::Python(_) => true,
+            SourceType::Toml(TomlSourceType::Pyproject | TomlSourceType::Ruff) => false,
+            SourceType::Toml(_) | SourceType::Markdown => return Ok(Some(response)),
         };
 
         let document_path = query.virtual_file_path();
@@ -70,7 +71,8 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
                 .extend(quick_fix(&snapshot, &fixes).with_failure_code(ErrorCode::InternalError)?);
         }
 
-        if snapshot.client_settings().noqa_comments()
+        if is_python
+            && snapshot.client_settings().noqa_comments()
             && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
         {
             response.extend(noqa_comments(&snapshot, &fixes));
@@ -93,7 +95,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             }
         }
 
-        if snapshot.client_settings().organize_imports() {
+        if is_python && snapshot.client_settings().organize_imports() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
                 if snapshot.is_notebook_cell() {
                     // This is ignore here because the client requests this code action for each
