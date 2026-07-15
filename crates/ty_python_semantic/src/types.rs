@@ -332,12 +332,6 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
                 .bottom_materialization
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
-            TypeMapping::Materialize(
-                MaterializationKind::DeferredTop | MaterializationKind::DeferredBottom,
-            ) => self
-                .default
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
             _ => self
                 .default
                 .get_or_init(TypeTransformer::default)
@@ -408,13 +402,6 @@ pub(crate) struct VisitSpecialization;
 pub enum MaterializationKind {
     Top,
     Bottom,
-    /// A top materialization whose application is deferred. This is used for non-strict/unsound
-    /// `isinstance` checks with generic classes. For example, `isinstance(x, Sequence)` intersects
-    /// the type of `x` with `DeferredTop[Sequence[Unknown]]`, which is not eagerly evaluated to
-    /// `Sequence[object]`, so that it can be erased after the intersection has been computed.
-    DeferredTop,
-    /// The counterpart of [`MaterializationKind::DeferredTop`].
-    DeferredBottom,
 }
 
 impl MaterializationKind {
@@ -424,23 +411,6 @@ impl MaterializationKind {
         match self {
             Self::Top => Self::Bottom,
             Self::Bottom => Self::Top,
-            Self::DeferredTop => Self::DeferredBottom,
-            Self::DeferredBottom => Self::DeferredTop,
-        }
-    }
-
-    const fn is_deferred(self) -> bool {
-        matches!(self, Self::DeferredTop | Self::DeferredBottom)
-    }
-
-    const fn is_top(self) -> bool {
-        matches!(self, Self::Top | Self::DeferredTop)
-    }
-
-    const fn without_deferred_marker(self) -> Self {
-        match self {
-            Self::Top | Self::DeferredTop => Self::Top,
-            Self::Bottom | Self::DeferredBottom => Self::Bottom,
         }
     }
 }
@@ -1117,10 +1087,18 @@ impl<'db> Type<'db> {
         };
 
         match divergent.materialization_kind() {
-            Some(kind) if kind.is_top() => Some(Type::object()),
-            Some(_) => Some(Type::Never),
+            Some(MaterializationKind::Top) => Some(Type::object()),
+            Some(MaterializationKind::Bottom) => Some(Type::Never),
             None => None,
         }
+    }
+
+    fn narrowing_bound_fallback(self) -> Option<Type<'db>> {
+        let materialization_kind = self.as_nominal_instance()?.narrowing_bound_kind()?;
+        Some(match materialization_kind {
+            MaterializationKind::Top => Type::object(),
+            MaterializationKind::Bottom => Type::Never,
+        })
     }
 
     /// Negating a divergent marker preserves the marker and flips its materialization, if any.
@@ -1149,14 +1127,15 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        matches!(
-            self,
+        match self {
             Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
-        )
+            | Type::Divergent(DivergentType {
+                materialization: Some(MaterializationKind::Bottom),
+                ..
+            }) => true,
+            Type::NominalInstance(instance) => instance.is_narrowing_never(),
+            _ => false,
+        }
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -1489,25 +1468,20 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, MaterializationKind::Top)
     }
 
-    /// Returns a specially marked top materialization whose application is deferred.
-    /// The tag survives set-theoretic simplification and can be removed by
-    /// [`Type::erase_deferred_materialization`] immediately afterwards.
     #[must_use]
-    pub(crate) fn deferred_top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(
+    pub(crate) fn top_materialization_for_narrowing(&self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
             db,
-            MaterializationKind::DeferredTop,
-            &ApplyTypeMappingVisitor::default(),
+            &TypeMapping::MaterializeForNarrowing(MaterializationKind::Top),
+            TypeContext::default(),
         )
     }
 
-    /// Erases only the materialization tag introduced by
-    /// [`Type::deferred_top_materialization`].
     #[must_use]
-    pub(crate) fn erase_deferred_materialization(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn erase_narrowing_bounds(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::EraseDeferredMaterialization,
+            &TypeMapping::EraseNarrowingBounds,
             TypeContext::default(),
         )
     }
@@ -1907,6 +1881,13 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(materialization_kind) = self
+            .as_nominal_instance()
+            .and_then(NominalInstanceType::narrowing_bound_kind)
+        {
+            return Type::narrowing_bound(materialization_kind.flip());
+        }
+
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
         //
         // We verify that this always produces the same result as
@@ -6519,7 +6500,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => match type_mapping {
-                TypeMapping::EraseDeferredMaterialization => self,
+                TypeMapping::EraseNarrowingBounds => self,
                 _ => visitor.visit(db, self, type_mapping, || match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -6756,7 +6737,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::EraseDeferredMaterialization |
+                TypeMapping::MaterializeForNarrowing(_) |
+                TypeMapping::EraseNarrowingBounds |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
@@ -6782,10 +6764,11 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
-                    MaterializationKind::DeferredTop => Type::object(),
-                    MaterializationKind::DeferredBottom => Type::Never,
                 },
-                TypeMapping::EraseDeferredMaterialization => self,
+                TypeMapping::MaterializeForNarrowing(materialization_kind) => {
+                    Type::narrowing_bound(*materialization_kind)
+                }
+                TypeMapping::EraseNarrowingBounds => self,
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
@@ -7842,8 +7825,10 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
-    /// Remove a deferred materialization tag, restoring its gradual specialization.
-    EraseDeferredMaterialization,
+    /// Materialize a narrowing constraint, using tagged `object`/`Never` bounds for gradual types.
+    MaterializeForNarrowing(MaterializationKind),
+    /// Map tagged narrowing bounds back to `Unknown` after simplifying the intersection.
+    EraseNarrowingBounds,
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -7895,7 +7880,8 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
-            | TypeMapping::EraseDeferredMaterialization
+            | TypeMapping::MaterializeForNarrowing(_)
+            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -7929,6 +7915,9 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
             }
+            TypeMapping::MaterializeForNarrowing(materialization_kind) => {
+                TypeMapping::MaterializeForNarrowing(materialization_kind.flip())
+            }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
@@ -7942,7 +7931,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::EraseDeferredMaterialization
+            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
@@ -8817,7 +8806,7 @@ impl<'db> TypeIsType<'db> {
     /// Construct an unbound `TypeIs` return type from the user-written type expression.
     ///
     /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
-    /// used during narrowing applies the top materialization on demand.
+    /// used for narrowing applies the top materialization on demand.
     ///
     /// ```python
     /// from typing import TypeIs

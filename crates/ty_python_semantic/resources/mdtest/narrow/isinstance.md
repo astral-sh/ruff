@@ -759,12 +759,11 @@ python-version = "3.12"
 strict-generic-narrowing = false
 ```
 
-In `relaxed` mode, narrowing to a generic class using `isinstance()` also intersects with the top
-materialization of the generic class, but after the intersection has been created and simplified,
-the top materialization is removed, leaving `Unknown`-specializations. For example, in the case
-below, we build the intersection `object & Top*[Covariant[Unknown]]`, where the star is a marker
-indicating that the materialization will be removed. This intersection simplifies to
-`Top*[Covariant[Unknown]]`, so after removing `Top*[..]`, we are left with `Covariant[Unknown]`:
+In `relaxed` mode, narrowing to a generic class using `isinstance()` intersects with its top
+materialization, using specially tagged `object*`/`Never*` bounds for gradual type arguments. These
+bounds behave like `object`/`Never` while the intersection is simplified and are then mapped to
+`Unknown`. For example, in the case below, we build the intersection `object & Covariant[object*]`.
+This simplifies to `Covariant[object*]`, which is then mapped to `Covariant[Unknown]`:
 
 ```py
 from typing import Self
@@ -818,6 +817,21 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Unknown]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Invariant[Unknown]]
+```
+
+The mapping only affects the tagged bounds introduced by narrowing, not existing static type
+arguments:
+
+```py
+from typing import Never
+
+def _(x: Covariant[object], y: Contravariant[Never], z: Invariant[object]):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[object]
+    if isinstance(y, Contravariant):
+        reveal_type(y)  # revealed: Contravariant[Never]
+    if isinstance(z, Invariant):
+        reveal_type(z)  # revealed: Invariant[object]
 ```
 
 ## Use cases: `isinstance` narrowing and generics
@@ -936,10 +950,10 @@ def _(xs: list[str] | set[str]) -> str:
 
 ### Relaxed mode
 
-With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified against a
-specially marked top materialization before removing the marker to restore its
-`Unknown`-specialization. The negative branch still excludes the ordinary top materialization
-because a negative `isinstance` result excludes every specialization of the class:
+With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified using tagged
+`object*`/`Never*` bounds, which are mapped to `Unknown` afterwards. The negative branch still
+excludes the ordinary top materialization because a negative `isinstance` result excludes every
+specialization of the class:
 
 ```toml
 [analysis]

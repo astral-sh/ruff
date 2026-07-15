@@ -1030,22 +1030,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(crate) fn apply_deferred_materialization(
-        self,
-        db: &'db dyn Db,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        match self {
-            Self::NonGeneric(_) => self,
-            Self::Generic(alias) => {
-                let specialization = alias
-                    .specialization(db)
-                    .apply_deferred_materialization(db, visitor);
-                Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
-            }
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1887,7 +1871,6 @@ impl<'db> ClassType<'db> {
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
                             CallableFunctionProvenance::None,
-                            false,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2128,7 +2111,6 @@ impl<'db> ClassType<'db> {
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
-                false,
             );
 
             if returns_non_subclass {
@@ -2200,7 +2182,6 @@ impl<'db> ClassType<'db> {
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
-                    false,
                 ))
             } else {
                 None

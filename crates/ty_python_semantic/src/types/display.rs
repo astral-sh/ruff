@@ -958,6 +958,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
+            Type::NominalInstance(instance)
+                if instance.narrowing_bound_kind() == Some(MaterializationKind::Top) =>
+            {
+                f.with_type(self.ty).write_str("object*")
+            }
+            Type::NominalInstance(instance)
+                if instance.narrowing_bound_kind() == Some(MaterializationKind::Bottom) =>
+            {
+                f.with_type(self.ty).write_str("Never*")
+            }
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
 
@@ -1736,11 +1746,6 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
-                // The following two are not user-facing, but we distinguish them here from Top/Bottom for debugging purposes.
-                Some(MaterializationKind::DeferredTop) => Some(("Top*", SpecialFormType::Top)),
-                Some(MaterializationKind::DeferredBottom) => {
-                    Some(("Bottom*", SpecialFormType::Bottom))
-                }
             };
             let suffix = match self.specialization.materialization_kind(self.db) {
                 None => "",
@@ -2036,7 +2041,6 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            deferred_top_materialization: self.deferred_top_materialization(db),
             db,
             settings,
         }
@@ -2046,17 +2050,12 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    deferred_top_materialization: bool,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if self.deferred_top_materialization {
-            f.write_str("Top*[")?;
-        }
-
         match self.signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
@@ -2094,10 +2093,6 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     f.write_char(']')?;
                 }
             }
-        }
-
-        if self.deferred_top_materialization {
-            f.write_char(']')?;
         }
 
         Ok(())
@@ -2346,9 +2341,10 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
         let multiline = if self.settings.multiline {
             match self.parameters.kind() {
                 ParametersKind::Standard => self.parameters.len() > 1,
-                ParametersKind::Gradual | ParametersKind::Top | ParametersKind::ParamSpec(_) => {
-                    false
-                }
+                ParametersKind::Gradual
+                | ParametersKind::Top
+                | ParametersKind::Narrowing(_)
+                | ParametersKind::ParamSpec(_) => false,
                 ParametersKind::Concatenate(_) => {
                     // The tail already represents 2 parameters. Additionally, there should be more
                     // than 1 prefix parameters to use multiline, so the limit becomes 3.
@@ -2371,7 +2367,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             ParametersKind::Standard | ParametersKind::Concatenate(_) => {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
-            ParametersKind::Top => {
+            ParametersKind::Top | ParametersKind::Narrowing(MaterializationKind::Top) => {
                 // TODO: Remove `...`, always display all the parameters
                 // Top parameters are displayed the same as gradual parameters, we just wrap the
                 // entire signature in `Top[]`
@@ -2385,6 +2381,9 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             }
             ParametersKind::Gradual => {
                 // ... but otherwise display all the parameters as normal.
+                display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
+            }
+            ParametersKind::Narrowing(MaterializationKind::Bottom) => {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {

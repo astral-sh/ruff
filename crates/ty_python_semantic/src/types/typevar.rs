@@ -1175,12 +1175,15 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::EraseDeferredMaterialization
+            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
+                Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+            }
+            TypeMapping::MaterializeForNarrowing(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }
         }

@@ -1030,6 +1030,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(source) = source.narrowing_bound_fallback() {
+            return self.check_type_pair(db, source, target);
+        }
+
+        if let Some(target) = target.narrowing_bound_fallback() {
+            return self.check_type_pair(db, source, target);
+        }
+
         if let Some(source) = source.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
         }
@@ -2549,6 +2557,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(left) = left.narrowing_bound_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
+        if let Some(right) = right.narrowing_bound_fallback() {
+            return self.check_type_pair(db, left, right);
+        }
+
         if let Some(left) = left.materialized_divergent_fallback() {
             return self.check_type_pair(db, left, right);
         }
