@@ -868,7 +868,7 @@ class Direct(Base): ...
 
 def dynamic_arm(value: Any | Direct) -> None:
     if isinstance(value, Base):
-        # Dynamic arms never count as the direct witness, but remain possible once another arm
+        # Dynamic arms never count as a definite match, but remain possible once another arm
         # establishes the intended runtime branch.
         reveal_type(value)  # revealed: (Any & Base) | Direct
 
@@ -880,7 +880,7 @@ def typed_dict_arm(value: Payload | dict[str, int]) -> None:
         # A `TypedDict` is not a static subtype of `dict`, but all of its runtime values are dicts.
         reveal_type(value)  # revealed: Payload | dict[str, int]
 
-def typed_dict_witness(value: Payload | Area) -> None:
+def typed_dict_direct_match(value: Payload | Area) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
     else:
