@@ -342,29 +342,6 @@ fn divergent_type() {
 }
 
 #[test]
-fn apply_type_mapping_visitor_separates_promotion_modes() {
-    let db = setup_db();
-    let visitor = ApplyTypeMappingVisitor::default();
-    let ty = Type::unknown();
-
-    let promoted = visitor.visit(
-        &db,
-        ty,
-        &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
-        Type::object,
-    );
-    let unpromoted = visitor.visit(
-        &db,
-        ty,
-        &TypeMapping::Promote(PromotionMode::Off, PromotionKind::Regular),
-        || Type::Never,
-    );
-
-    assert_eq!(promoted, Type::object());
-    assert_eq!(unpromoted, Type::Never);
-}
-
-#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;

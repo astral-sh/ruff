@@ -293,21 +293,6 @@ fn definition_expression_annotation<'db>(
 struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
 
-#[repr(usize)]
-enum ApplyTypeMappingCache {
-    Default,
-    TopMaterialization,
-    BottomMaterialization,
-    TopSpecializationMaterialization,
-    BottomSpecializationMaterialization,
-    Promotion,
-    SkipPromotion,
-}
-
-impl ApplyTypeMappingCache {
-    const COUNT: usize = Self::SkipPromotion as usize + 1;
-}
-
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
@@ -316,9 +301,15 @@ type MaterializationEquivalenceVisitor<'db> =
 /// Some recursive transformations visit the same type under more than one mapping mode within a
 /// single call chain. Keep separate cycle caches for those modes so one transformation cannot
 /// reuse the result of another.
+#[derive(Default)]
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    type_transformers:
-        [OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>; ApplyTypeMappingCache::COUNT],
+    default: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    top_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    bottom_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    top_specialization_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    bottom_specialization_materialization: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    promotion: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
+    skip_promotion: OnceCell<TypeTransformer<'db, ApplyTypeMappingTag>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -335,26 +326,22 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let cache = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => {
-                ApplyTypeMappingCache::TopMaterialization
-            }
-            TypeMapping::Materialize(MaterializationKind::Bottom) => {
-                ApplyTypeMappingCache::BottomMaterialization
-            }
+        let type_transformer = match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
+            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization_kind: MaterializationKind::Top,
                 ..
-            } => ApplyTypeMappingCache::TopSpecializationMaterialization,
+            } => &self.top_specialization_materialization,
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization_kind: MaterializationKind::Bottom,
                 ..
-            } => ApplyTypeMappingCache::BottomSpecializationMaterialization,
-            TypeMapping::Promote(PromotionMode::On, _) => ApplyTypeMappingCache::Promotion,
-            TypeMapping::Promote(PromotionMode::Off, _) => ApplyTypeMappingCache::SkipPromotion,
-            _ => ApplyTypeMappingCache::Default,
+            } => &self.bottom_specialization_materialization,
+            TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
+            TypeMapping::Promote(PromotionMode::Off, _) => &self.skip_promotion,
+            _ => &self.default,
         };
-        self.type_transformers[cache as usize]
+        type_transformer
             .get_or_init(TypeTransformer::default)
             .visit_type(db, ty, func)
     }
@@ -377,17 +364,8 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         debug_assert!(was_empty.is_ok());
 
         Self {
-            type_transformers: std::array::from_fn(|_| OnceCell::new()),
             materialization_equivalence,
-        }
-    }
-}
-
-impl Default for ApplyTypeMappingVisitor<'_> {
-    fn default() -> Self {
-        Self {
-            type_transformers: std::array::from_fn(|_| OnceCell::new()),
-            materialization_equivalence: OnceCell::new(),
+            ..Self::default()
         }
     }
 }

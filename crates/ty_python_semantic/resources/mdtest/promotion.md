@@ -378,7 +378,13 @@ def _(c: Consumer[Intersection[A, Not[AlwaysFalsy]]], p: Producer[Intersection[A
     reveal_type(p)  # revealed: Producer[A & ~AlwaysFalsy]
     reveal_type([c])  # revealed: list[Consumer[A & ~AlwaysFalsy]]
     reveal_type([p])  # revealed: list[Producer[A]]
+```
 
+A callable can use the same type in both a contravariant parameter and a covariant return. When the
+callable is promoted as a list element, these positions must be transformed independently: the
+parameter keeps the narrowed type, while the return type is promoted.
+
+```py
 type NarrowA = Intersection[A, Not[AlwaysFalsy]]
 
 def transform(value: NarrowA) -> NarrowA:
