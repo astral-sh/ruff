@@ -1008,6 +1008,23 @@ class MyDict(collections.defaultdict[str, float]):
                 self.add(text, item)
 ```
 
+A generic class-info can be instantiated with `dict`, so the branch must remain reachable even
+though the type variable's bound does not statically include `TypedDict`. The intersection retains
+the correlation with the unknown class-info type:
+
+```py
+from typing import TypeVar
+
+TDict = TypeVar("TDict", bound=dict[object, object])
+
+def narrow_with_generic_classinfo(value: A | int, cls: type[TDict]) -> None:
+    if isinstance(value, cls):
+        reveal_type(value)  # revealed: A & TDict@narrow_with_generic_classinfo
+
+def call_with_dict(value: A) -> None:
+    narrow_with_generic_classinfo(value, dict)
+```
+
 The negative branch removes a `TypedDict` member, making attributes from the remaining class
 available:
 

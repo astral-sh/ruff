@@ -4993,7 +4993,7 @@ subclass:
 
 ```py
 from collections.abc import MutableMapping
-from typing import Mapping, TypedDict
+from typing import Literal, Mapping, TypedDict
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -5006,10 +5006,26 @@ class DictSubclass(dict[str, object]): ...
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
 static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
-static_assert(is_disjoint_from(TD, Mapping[int, object]))
+# TODO: Required string keys could prove this disjoint, but the gradual dictionary projection is
+# intentionally conservative about invariant key parameters.
+static_assert(not is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
 static_assert(not is_disjoint_from(TD, dict[str, int]))
+static_assert(not is_disjoint_from(TD, dict[Literal["x"], object]))
+static_assert(not is_disjoint_from(dict[Literal["x"], object], TD))
+static_assert(not is_disjoint_from(TD, dict[str | int, object]))
+static_assert(not is_disjoint_from(TD, dict[object, object]))
 static_assert(is_disjoint_from(TD, DictSubclass))
+```
+
+A `TypedDict` with no required fields can be empty, so incompatible dictionary key types do not make
+the two types disjoint:
+
+```py
+class EmptyTypedDict(TypedDict):
+    pass
+
+static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
 ```
 
 We do not yet use required field types to prove that a `TypedDict` and a dictionary have

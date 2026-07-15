@@ -3298,15 +3298,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-                // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all
-                // `TypedDict` types will always be disjoint from `T`. This doesn't cover all
-                // cases -- in fact `dict` *itself* is almost always disjoint from `TypedDict` --
-                // but it's a good approximation, and some false negatives are acceptable.
-                let dict_str_any = KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+                // Project to a gradual dictionary when proving disjointness. Using `str` for the
+                // key would be too precise here: invariant generic arguments would incorrectly
+                // prove disjointness from dictionaries whose key domain admits the TypedDict's
+                // literal keys, such as `dict[Literal["name"], object]`.
+                let dict =
+                    KnownClass::Dict.to_specialized_instance(db, &[Type::any(), Type::any()]);
 
                 self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict_str_any, other)
+                    .check_type_pair(db, dict, other)
                     .negate(db, self.constraints)
             }
         }
