@@ -1055,6 +1055,11 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
+        // `typing.Self` is bound by the mapping below, so its synthetic upper bound is not a
+        // declared receiver TypeVar domain.
+        let generic_context = self
+            .generic_context
+            .map(|generic_context| generic_context.remove_self(db, binding_context));
         let receiver_constraint = explicit_receiver.map(|parameter| {
             let receiver = receiver_type.unwrap_or_else(|| {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
@@ -1072,7 +1077,25 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
-            receiver.when_constraint_set_assignable_to_owned(db, annotation)
+            let receiver_constraint = receiver
+                .when_constraint_set_assignable_to_owned(db, annotation)
+                .into_owned();
+            // Bounds can refer to other variables in the same generic context, so include every
+            // remaining domain once the receiver annotation refers to one of them.
+            let receiver_has_typevar = generic_context.is_some_and(|context| {
+                context.variables(db).any(|typevar| {
+                    annotation.references_typevar(db, typevar.typevar(db).identity(db))
+                })
+            });
+            let typevars = generic_context
+                .filter(|_| receiver_has_typevar)
+                .into_iter()
+                .flat_map(|context| context.variables(db));
+            ConstraintSetBuilder::new().into_owned(|builder| {
+                builder.load(db, &receiver_constraint).and(db, builder, || {
+                    ConstraintSet::valid_typevar_specializations(db, builder, typevars)
+                })
+            })
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
@@ -1093,9 +1116,7 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
-                .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
+            generic_context,
             definition: self.definition,
             receiver_constraints,
             parameters,
