@@ -815,6 +815,13 @@ impl<'db> ProtocolMemberWrite<'db> {
         }
     }
 
+    fn resolve(self, db: &'db dyn Db) -> Option<Self> {
+        match self {
+            Self::Type(member) => Some(Self::Type(member.resolve(db)?)),
+            descriptor @ Self::Descriptor { .. } => Some(descriptor),
+        }
+    }
+
     fn bind_requirement(
         self,
         db: &'db dyn Db,
@@ -919,6 +926,25 @@ impl<'db> ProtocolMemberWrite<'db> {
         }
     }
 
+    fn apply_write_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Type(member) => {
+                Self::Type(member.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Self::Descriptor { descriptor, domain } => Self::Descriptor {
+                descriptor: descriptor.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                domain: domain.map(|domain| {
+                    domain.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+            },
+        }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
@@ -1517,6 +1543,30 @@ impl<'db> ProtocolMemberKind<'db> {
                 member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 kind,
             ),
+            Self::Property { read, write }
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Materialize(_)
+                        | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                ) =>
+            {
+                let resolved_read = read.and_then(|read| read.resolve(db));
+                let resolved_write = write.and_then(|write| write.resolve(db));
+                let mapped_read = resolved_read
+                    .map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let mapped_write = resolved_write.map(|write| {
+                    write.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)
+                });
+
+                if mapped_read == resolved_read && mapped_write == resolved_write {
+                    Self::Property { read, write }
+                } else {
+                    Self::Property {
+                        read: mapped_read,
+                        write: mapped_write,
+                    }
+                }
+            }
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
