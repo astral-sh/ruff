@@ -23,6 +23,51 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str
 ```
 
+## Type aliases in `type[...]`
+
+```py
+from typing import Type, TypeAliasType, assert_never
+
+class A: ...
+class B: ...
+
+type IntAlias = int
+type ChainedIntAlias = IntAlias
+type UnionAlias = A | B
+type NestedUnionAlias = IntAlias | str
+type GenericAlias[T] = T
+ManualIntAlias = TypeAliasType("ManualIntAlias", int)
+
+def _(
+    simple: type[IntAlias],
+    chained: type[ChainedIntAlias],
+    union: type[UnionAlias],
+    nested_union: type[NestedUnionAlias],
+    direct_union: type[IntAlias | str],
+    generic: type[GenericAlias[int]],
+    manual: type[ManualIntAlias],
+    typing_type: Type[IntAlias],
+):
+    reveal_type(simple)  # revealed: type[int]
+    reveal_type(chained)  # revealed: type[int]
+    reveal_type(union)  # revealed: type[A | B]
+    reveal_type(nested_union)  # revealed: type[int | str]
+    reveal_type(direct_union)  # revealed: type[int | str]
+    reveal_type(generic)  # revealed: type[int]
+    reveal_type(manual)  # revealed: type[int]
+    reveal_type(typing_type)  # revealed: type[int]
+
+# error: [invalid-assignment]
+bad: type[IntAlias] = str
+
+def exhaust_union(value: type[UnionAlias]) -> str:
+    if issubclass(value, A):
+        return "A"
+    if issubclass(value, B):
+        return "B"
+    assert_never(value)
+```
+
 ## `__value__` attribute
 
 ```py
