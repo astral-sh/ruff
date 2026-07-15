@@ -28,7 +28,7 @@ use crate::{
     UnsupportedSyntaxErrorKind,
 };
 
-use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind, ScratchBufferExt};
+use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);

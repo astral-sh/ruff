@@ -3,34 +3,57 @@ use std::vec::Drain;
 use drop_bomb::DebugDropBomb;
 use thin_vec::ThinVec;
 
-/// Operations for reusable scratch storage that preserve entries belonging to outer parser frames.
-pub(super) trait ScratchBufferExt<T> {
-    fn snapshot(&self) -> ScratchSnapshot;
-
-    fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C;
-
-    fn take_thin_vec(&mut self, snapshot: ScratchSnapshot) -> ThinVec<T>;
-
-    fn drain_snapshot(&mut self, snapshot: ScratchSnapshot) -> Drain<'_, T>;
+/// Reusable scratch storage that preserves entries belonging to outer parser frames.
+#[derive(Debug)]
+pub(super) struct ScratchBuffer<T> {
+    buffer: Vec<T>,
 }
 
-impl<T> ScratchBufferExt<T> for Vec<T> {
+impl<T> ScratchBuffer<T> {
+    pub(super) fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    pub(super) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(capacity),
+        }
+    }
+
     #[inline]
-    fn snapshot(&self) -> ScratchSnapshot {
+    pub(super) fn push(&mut self, value: T) {
+        self.buffer.push(value);
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
+    #[inline]
+    pub(super) fn is_empty_since(&self, snapshot: &ScratchSnapshot) -> bool {
+        debug_assert!(
+            self.buffer.len() >= snapshot.len,
+            "Scratch buffer snapshots must be restored in reverse order of creation."
+        );
+        self.buffer.len() == snapshot.len
+    }
+
+    #[inline]
+    pub(super) fn snapshot(&self) -> ScratchSnapshot {
         ScratchSnapshot {
-            len: self.len(),
+            len: self.buffer.len(),
             bomb: DebugDropBomb::new("Scratch buffer snapshots must be restored."),
         }
     }
 
     #[inline]
-    fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C {
+    pub(super) fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C {
         self.drain_snapshot(snapshot).collect()
     }
 
     #[inline]
-    fn take_thin_vec(&mut self, mut snapshot: ScratchSnapshot) -> ThinVec<T> {
-        if snapshot.is_empty(self) {
+    pub(super) fn take_thin_vec(&mut self, mut snapshot: ScratchSnapshot) -> ThinVec<T> {
+        if self.is_empty_since(&snapshot) {
             snapshot.bomb.defuse();
             return ThinVec::new();
         }
@@ -44,11 +67,11 @@ impl<T> ScratchBufferExt<T> for Vec<T> {
     #[inline]
     fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
         debug_assert!(
-            self.len() >= snapshot.len,
+            self.buffer.len() >= snapshot.len,
             "Scratch buffer snapshots must be restored in reverse order of creation."
         );
         snapshot.bomb.defuse();
-        self.drain(snapshot.len..)
+        self.buffer.drain(snapshot.len..)
     }
 }
 
@@ -57,25 +80,15 @@ pub(super) struct ScratchSnapshot {
     bomb: DebugDropBomb,
 }
 
-impl ScratchSnapshot {
-    pub(super) fn is_empty<T>(&self, buffer: &[T]) -> bool {
-        debug_assert!(
-            buffer.len() >= self.len,
-            "Scratch buffer snapshots must be restored in reverse order of creation."
-        );
-        buffer.len() == self.len
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::ScratchBufferExt;
+    use super::ScratchBuffer;
 
     #[test]
     #[cfg(debug_assertions)]
     #[should_panic(expected = "Scratch buffer snapshots must be restored.")]
     fn snapshot_must_be_restored() {
-        let buffer = Vec::<u8>::new();
+        let buffer = ScratchBuffer::<u8>::new();
         let _snapshot = buffer.snapshot();
     }
 
@@ -85,21 +98,23 @@ mod tests {
         expected = "Scratch buffer snapshots must be restored in reverse order of creation."
     )]
     fn snapshot_must_be_restored_in_reverse_order() {
-        let mut buffer = vec![1];
+        let mut buffer = ScratchBuffer::new();
+        buffer.push(1);
         let snapshot = buffer.snapshot();
-        buffer.clear();
+        buffer.buffer.clear();
 
         let _: Vec<_> = buffer.take(snapshot);
     }
 
     #[test]
     fn snapshot_is_empty_relative_to_its_buffer() {
-        let mut buffer = vec![1];
+        let mut buffer = ScratchBuffer::new();
+        buffer.push(1);
         let snapshot = buffer.snapshot();
-        assert!(snapshot.is_empty(&buffer));
+        assert!(buffer.is_empty_since(&snapshot));
 
         buffer.push(2);
-        assert!(!snapshot.is_empty(&buffer));
+        assert!(!buffer.is_empty_since(&snapshot));
 
         let _: Vec<_> = buffer.take(snapshot);
     }

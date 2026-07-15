@@ -19,8 +19,8 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
+use super::Parenthesized;
 use super::expression::ExpressionContext;
-use super::{Parenthesized, ScratchBufferExt};
 
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -3454,7 +3454,7 @@ impl<'src> Parser<'src> {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parameters_snapshot.is_empty(&parser.parameter_scratch)
+                    if parser.parameter_scratch.is_empty_since(&parameters_snapshot)
                         && parameters.vararg.is_none()
                         && parameters.kwarg.is_none()
                     {

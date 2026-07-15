@@ -17,7 +17,7 @@ use unicode_normalization::UnicodeNormalization;
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
-use crate::parser::scratch_buffer::ScratchBufferExt;
+use crate::parser::scratch_buffer::ScratchBuffer;
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -73,22 +73,22 @@ pub(crate) struct Parser<'src> {
     max_nesting_depth: u32,
 
     /// Reusable, nesting-safe scratch storage for expression lists.
-    expr_scratch: Vec<Expr>,
+    expr_scratch: ScratchBuffer<Expr>,
 
     /// Reusable, nesting-safe scratch storage for call keywords.
-    keyword_scratch: Vec<Keyword>,
+    keyword_scratch: ScratchBuffer<Keyword>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
-    parameter_scratch: Vec<ParameterWithDefault>,
+    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
 
     /// Reusable, nesting-safe scratch storage for statement lists.
-    stmt_scratch: Vec<Stmt>,
+    stmt_scratch: ScratchBuffer<Stmt>,
 
     /// Reusable scratch storage for import aliases.
-    alias_scratch: Vec<Alias>,
+    alias_scratch: ScratchBuffer<Alias>,
 
     /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
-    elif_else_scratch: Vec<ElifElseClause>,
+    elif_else_scratch: ScratchBuffer<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -119,12 +119,12 @@ impl<'src> Parser<'src> {
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
-            expr_scratch: Vec::with_capacity(16),
-            keyword_scratch: Vec::new(),
-            parameter_scratch: Vec::new(),
-            stmt_scratch: Vec::with_capacity(32),
-            alias_scratch: Vec::new(),
-            elif_else_scratch: Vec::new(),
+            expr_scratch: ScratchBuffer::with_capacity(16),
+            keyword_scratch: ScratchBuffer::new(),
+            parameter_scratch: ScratchBuffer::new(),
+            stmt_scratch: ScratchBuffer::with_capacity(32),
+            alias_scratch: ScratchBuffer::new(),
+            elif_else_scratch: ScratchBuffer::new(),
         }
     }
 
