@@ -1,4 +1,3 @@
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -114,7 +113,7 @@ impl<'db> Type<'db> {
                 let call_symbol = self
                     .member_lookup_with_policy(
                         db,
-                        Name::new_static("__call__"),
+                        "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
                     .place;

@@ -4968,7 +4968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
             .place
         {
             Place::Defined(DefinedPlace {
@@ -9717,7 +9717,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
             Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
-                .class_member(self.db(), id.clone())
+                .class_member(self.db(), id)
                 .place
                 .is_undefined(),
             Some(MethodDecorator::None) => !Type::instance(self.db(), class)
@@ -11825,7 +11825,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
             if value_ty
-                .class_member(db, attr.id.clone())
+                .class_member(db, &attr.id)
                 .place
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))

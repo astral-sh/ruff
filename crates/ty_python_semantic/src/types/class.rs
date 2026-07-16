@@ -2056,7 +2056,7 @@ impl<'db> ClassType<'db> {
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
-                "__call__".into(),
+                "__call__",
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
@@ -2124,7 +2124,7 @@ impl<'db> ClassType<'db> {
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
-                "__init__".into(),
+                "__init__",
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
@@ -2210,7 +2210,7 @@ impl<'db> ClassType<'db> {
                 let new_function_symbol = self_ty
                     .member_lookup_with_policy(
                         db,
-                        "__new__".into(),
+                        "__new__",
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
                     .place;

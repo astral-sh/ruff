@@ -23,7 +23,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
+        InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction, MemberLookupKey,
         MemberLookupPolicy, Parameter, PropertyInstanceType, ProtocolInstanceType, SelfBinding,
         Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
         TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
@@ -1527,7 +1527,7 @@ fn descriptor_decorated_protocol_member<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = descriptor_ty
-        .class_member_with_policy(db, "__get__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .class_member_with_policy(db, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     else {
         return None;
@@ -1600,7 +1600,7 @@ fn single_descriptor_setter_domain<'db>(
     }) = descriptor_ty
         .member_lookup_with_policy(
             db,
-            "__set__".into(),
+            "__set__",
             MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
         .place
@@ -1762,15 +1762,19 @@ fn protocol_member_read_type<'db>(
         && !matches!(ty, Type::ModuleLiteral(_))
         && (!is_class_object_type(ty) || member.uses_special_method_lookup())
     {
-        ty.invoke_descriptor_protocol(
+        Type::invoke_descriptor_protocol(
             db,
+            MemberLookupKey::new(
+                db,
+                ty,
+                member.name,
+                // The undefined fallback excludes instance members. Keep the class
+                // member lookup from reintroducing dynamic instance fallbacks.
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            ),
             ty,
-            member.name,
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
-            // The undefined fallback excludes instance members. Keep the class
-            // member lookup from reintroducing dynamic instance fallbacks.
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
         .place
     } else {
@@ -2014,7 +2018,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = object_ty
             .member_lookup_with_policy(
                 db,
-                "__setattr__".into(),
+                "__setattr__",
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
@@ -2602,7 +2606,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             ty: Type::PropertyInstance(actual_property),
             definedness: Definedness::AlwaysDefined,
             ..
-        }) = ty.class_member(db, member.name().into()).place
+        }) = ty.class_member(db, member.name()).place
         else {
             return self.never();
         };
