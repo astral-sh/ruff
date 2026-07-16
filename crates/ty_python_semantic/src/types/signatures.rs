@@ -2069,9 +2069,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // returning.
         //
         // Target signature typevars require the opposite quantifier: the relation must hold for
-        // every target specialization. Preserve their constraints here instead of existentially
-        // quantifying them away.
+        // every target specialization, so universally quantify those away before returning.
         when.reduce_inferable(db, self.constraints, source_inferable)
+            .for_all(db, self.constraints, target_inferable)
     }
 
     fn with_signature_recursion_guard(
