@@ -3763,12 +3763,19 @@ class ReceiverOnly(Protocol):
     def method(self) -> None: ...
 
 class InvalidBoundedReceiver:
-    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
     def method[T: int](self: T) -> None: ...
 
 class InvalidConstrainedReceiver:
-    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
     def method[T: (int, str)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
+class RecursiveReceiverBound:
+    def method[T: ReceiverOnly](self: T) -> None: ...
 
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
@@ -3821,10 +3828,19 @@ static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol
 static_assert(not is_assignable_to(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 static_assert(not is_subtype_of(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 
-static_assert(is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
-static_assert(is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
-static_assert(is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
-static_assert(is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
+# A bound receiver must choose a specialization within its declared domain.
+static_assert(not is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidBoundedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidBoundedReceiver, ReceiverOnly))
+static_assert(not is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidConstrainedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidConstrainedReceiver, ReceiverOnly))
+
+# Verifying the receiver's bound recurses into the protocol relation currently being checked.
+static_assert(is_assignable_to(RecursiveReceiverBound, ReceiverOnly))
+static_assert(is_subtype_of(RecursiveReceiverBound, ReceiverOnly))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
