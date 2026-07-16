@@ -24,7 +24,7 @@ A protocol is defined by inheriting from the `Protocol` class, which is annotate
 `_SpecialForm` in typeshed's stubs.
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 from ty_extensions._internal import reveal_mro
 
 class MyProtocol(Protocol): ...
@@ -2611,7 +2611,7 @@ type instead of reducing it to a bare `Unknown`, which would allow an incompatib
 
 ```py
 from functools import cached_property
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, reveal_protocol_interface
 
@@ -3860,8 +3860,6 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 A receiver TypeVar's bound limits the specializations for which a protocol method must be
 compatible. It is not an additional constraint that must hold for every possible specialization:
 
-TODO: Bind receiver TypeVars before comparing signatures so that these cases pass.
-
 ```py
 from typing import Protocol, TypeVar
 from typing_extensions import Self, assert_type
@@ -3880,8 +3878,18 @@ class ConcreteHasParent:
     def get_parent(self) -> Self:
         return self
 
-parent = generic_get_parent(ConcreteHasParent())  # error: [invalid-argument-type]
-assert_type(parent, ConcreteHasParent)  # error: [type-assertion-failure]
+class InvalidHasParent:
+    def get_parent(self) -> object:
+        return self
+
+class GradualHasParent:
+    def get_parent(self) -> Any:
+        return self
+
+parent = generic_get_parent(ConcreteHasParent())
+assert_type(parent, ConcreteHasParent)
+invalid_parent: HasParent = InvalidHasParent()  # error: [invalid-assignment]
+gradual_parent: HasParent = GradualHasParent()
 
 C = TypeVar("C", bound="Copyable")
 
@@ -3900,8 +3908,58 @@ class Other:
         return self
 
 copyable: Copyable
-copyable = One()  # error: [invalid-assignment]
-copyable = Other()  # error: [invalid-assignment]
+copyable = One()
+copyable = Other()
+```
+
+Receiver TypeVars are distinct from unrelated method TypeVars. Binding the receiver limits the
+former, but the latter must still work for every specialization:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+
+type ReceiverAlias[T] = T
+
+class AliasedReceiver(Protocol):
+    def copy[T](self: ReceiverAlias[T]) -> T: ...
+
+class AliasedCopy:
+    def copy(self) -> Self:
+        return self
+
+aliased_copy: AliasedReceiver = AliasedCopy()
+
+class ReceiverAndMethodLocal(Protocol):
+    def apply[ReceiverT, T](self: ReceiverT, value: T) -> T: ...
+
+class GenericApply:
+    def apply[T](self, value: T) -> T:
+        return value
+
+class IntApply:
+    def apply(self, value: int) -> int:
+        return value
+
+generic_apply: ReceiverAndMethodLocal = GenericApply()
+int_apply: ReceiverAndMethodLocal = IntApply()  # error: [invalid-assignment]
+
+class GenericClassReceiver(Protocol):
+    @classmethod
+    def make[T](cls: type[T]) -> T: ...
+
+class ClassFactory:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class InvalidClassFactory:
+    @classmethod
+    def make(cls) -> object:
+        return object()
+
+class_factory: GenericClassReceiver = ClassFactory()
+invalid_class_factory: GenericClassReceiver = InvalidClassFactory()  # error: [invalid-assignment]
 ```
 
 ## Module objects with static-method protocol members

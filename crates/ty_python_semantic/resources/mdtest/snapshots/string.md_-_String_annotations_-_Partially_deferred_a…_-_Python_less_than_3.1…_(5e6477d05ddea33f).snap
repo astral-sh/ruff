@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
  6 |     x: int
  7 | 
  8 | class Meta(type):
- 9 |     def __or__(cls, other: str) -> Any:  # error: [invalid-method-override]
+ 9 |     def __or__(cls, other: str) -> Any:
 10 |         return "wow, so fancy, bet type checkers can't handle this"
 11 | 
 12 | class UsesMeta(metaclass=Meta): ...
@@ -81,22 +81,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 ```
 
 # Diagnostics
-
-```
-error[invalid-method-override]: Invalid override of method `__or__`
-   --> src/mdtest_snippet.py:9:9
-    |
-  9 |     def __or__(cls, other: str) -> Any:  # error: [invalid-method-override]
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `type.__or__`
-    |
-   ::: stdlib/builtins.pyi:307:9
-    |
-307 |     def __or__(self: _typeshed.Self, value: Any, /) -> types.UnionType | _typeshed.Self:
-    |         ------------------------------------------------------------------------------- `type.__or__` defined here
-    |
-info: This violates the Liskov Substitution Principle
-
-```
 
 ```
 error[unsupported-operator]: Unsupported `|` operation

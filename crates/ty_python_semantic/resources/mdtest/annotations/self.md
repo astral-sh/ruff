@@ -951,11 +951,9 @@ class MyMetaclass(type):
 Using the `self` parameter as a runtime value should not be flagged, even in a metaclass. Only the
 literal `Self` type form should be disallowed.
 
-TODO: Bind receiver TypeVars before checking this override against `type.__or__`.
-
 ```py
 class AnnotableMeta(type):
-    def __or__(self, other):  # error: [invalid-method-override]
+    def __or__(self, other):
         return self  # No `invalid-type-form` error: runtime use of `self`, not the `Self` type form
 ```
 

@@ -66,8 +66,6 @@ common runtime error:
 python-version = "3.13"
 ```
 
-TODO: Bind receiver TypeVars before checking this override against `type.__or__`.
-
 ```py
 from typing import Any, TypeVar, Callable, Protocol, TypedDict, TYPE_CHECKING
 
@@ -77,7 +75,7 @@ class P(Protocol):
     x: int
 
 class Meta(type):
-    def __or__(cls, other: str) -> Any:  # error: [invalid-method-override]
+    def __or__(cls, other: str) -> Any:
         return "wow, so fancy, bet type checkers can't handle this"
 
 class UsesMeta(metaclass=Meta): ...

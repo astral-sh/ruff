@@ -329,6 +329,8 @@ impl<'db> CallableSignature<'db> {
                             tcx,
                             visitor,
                         ),
+                        receiver_generic_context: self_signature
+                            .map_receiver_generic_context(db, type_mapping),
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
@@ -364,6 +366,11 @@ impl<'db> CallableSignature<'db> {
                                     mapped.as_ref(),
                                 )
                             },
+                            receiver_generic_context: GenericContext::merge_optional(
+                                db,
+                                signature.receiver_generic_context,
+                                self_signature.map_receiver_generic_context(db, type_mapping),
+                            ),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -555,6 +562,12 @@ pub struct Signature<'db> {
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
     receiver_constraints: Option<OwnedConstraintSet<'db>>,
 
+    /// The callable-local type variables that occur in an explicitly annotated receiver.
+    ///
+    /// These variables are quantified over the receiver constraint's domain, rather than over
+    /// every specialization of the callable's generic context.
+    receiver_generic_context: Option<GenericContext<'db>>,
+
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -693,6 +706,7 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             receiver_constraints: None,
+            receiver_generic_context: None,
             parameters,
             return_ty,
         }
@@ -707,6 +721,7 @@ impl<'db> Signature<'db> {
             generic_context,
             definition: None,
             receiver_constraints: None,
+            receiver_generic_context: None,
             parameters,
             return_ty,
         }
@@ -718,6 +733,7 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             receiver_constraints: None,
+            receiver_generic_context: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
         }
@@ -771,6 +787,7 @@ impl<'db> Signature<'db> {
             generic_context,
             definition: Some(definition),
             receiver_constraints: None,
+            receiver_generic_context: None,
             parameters,
             return_ty,
         }
@@ -844,6 +861,7 @@ impl<'db> Signature<'db> {
             generic_context: self.generic_context,
             definition: self.definition,
             receiver_constraints: self.receiver_constraints.clone(),
+            receiver_generic_context: self.receiver_generic_context,
             parameters,
             return_ty,
         }
@@ -874,6 +892,7 @@ impl<'db> Signature<'db> {
             generic_context: self.generic_context,
             definition: self.definition,
             receiver_constraints: self.receiver_constraints.clone(),
+            receiver_generic_context: self.receiver_generic_context,
             parameters,
             return_ty,
         })
@@ -892,6 +911,7 @@ impl<'db> Signature<'db> {
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
             receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+            receiver_generic_context: self.map_receiver_generic_context(db, type_mapping),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -1092,6 +1112,13 @@ impl<'db> Signature<'db> {
             self.receiver_constraints.as_ref(),
             receiver_constraint.as_deref(),
         );
+        let receiver_generic_context = GenericContext::merge_optional(
+            db,
+            self.receiver_generic_context,
+            explicit_receiver.and_then(|parameter| {
+                self.generic_context_for_receiver_annotation(db, parameter.annotated_type())
+            }),
+        );
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, removed_receiver)
         {
@@ -1111,6 +1138,7 @@ impl<'db> Signature<'db> {
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             receiver_constraints,
+            receiver_generic_context,
             parameters,
             return_ty,
         }
@@ -1286,6 +1314,7 @@ impl<'db> Signature<'db> {
             generic_context: self.generic_context,
             definition: self.definition,
             receiver_constraints,
+            receiver_generic_context: self.receiver_generic_context,
             parameters,
             return_ty,
         }
@@ -1318,6 +1347,55 @@ impl<'db> Signature<'db> {
         );
         (!constraints.query(|_builder, constraints| constraints.is_always_satisfied(db)))
             .then_some(constraints)
+    }
+
+    fn map_receiver_generic_context(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+    ) -> Option<GenericContext<'db>> {
+        let generic_context =
+            type_mapping.update_signature_generic_context(db, self.receiver_generic_context?);
+        (generic_context.variables(db).len() > 0).then_some(generic_context)
+    }
+
+    /// Extracts the callable-local variables whose quantifier domain is set by the receiver.
+    ///
+    /// ```python
+    /// def apply[ReceiverT, T](self: ReceiverT, value: T) -> T: ...
+    /// ```
+    ///
+    /// This returns a context containing `ReceiverT`, but not `T`. `typing.Self` is excluded
+    /// because descriptor binding substitutes it directly.
+    fn generic_context_for_receiver_annotation(
+        &self,
+        db: &'db dyn Db,
+        annotation: Type<'db>,
+    ) -> Option<GenericContext<'db>> {
+        let generic_context = self.generic_context?;
+        let typevars = generic_context.variables(db).filter(|typevar| {
+            !typevar.typevar(db).is_self(db)
+                && super::visitor::any_over_type(db, annotation, true, |ty| {
+                    matches!(
+                        ty,
+                        Type::TypeVar(annotation_typevar)
+                            if annotation_typevar.is_same_typevar_as(db, *typevar)
+                    )
+                })
+        });
+        let receiver_generic_context = GenericContext::from_typevar_instances(db, typevars);
+        (receiver_generic_context.variables(db).len() > 0).then_some(receiver_generic_context)
+    }
+
+    fn receiver_inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+        InferableTypeVars::from_typevars(
+            db,
+            self.receiver_generic_context
+                .into_iter()
+                .flat_map(|generic_context| generic_context.variables(db))
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        )
     }
 
     fn map_constraints(
@@ -2011,9 +2089,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, freshen that signature's typevars before considering
-        // them inferable for this relation. The relation only needs to find one specialization of
-        // each generic callable that causes the check to succeed, but those callable-local
-        // specializations must not collide with any same-source typevars in the other signature.
+        // them inferable for this relation. The source and target variables are quantified below,
+        // but their callable-local occurrences must not collide with same-source typevars in the
+        // other signature.
         let freshened_source;
         let source = if source.generic_context != target.generic_context
             && let Some(generic_context) = source.generic_context
@@ -2039,8 +2117,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
+        let source_inferable = source
+            .inferable_typevars(db)
+            .merge(db, source.receiver_inferable_typevars(db));
+        let target_receiver_inferable = target.receiver_inferable_typevars(db);
+        let target_inferable = target
+            .inferable_typevars(db)
+            .merge(db, target_receiver_inferable);
+        let target_non_receiver_inferable = InferableTypeVars::from_typevars(
+            db,
+            target_inferable
+                .iter(db)
+                .filter(|typevar| !typevar.is_inferable(db, target_receiver_inferable))
+                .collect(),
+        );
         let signature_inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, signature_inferable);
 
@@ -2056,11 +2146,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             source
                 .receiver_constraints_when_satisfied(&checker, db)
                 .and(db, self.constraints, || {
-                    target
-                        .receiver_constraints_when_satisfied(&checker, db)
-                        .and(db, self.constraints, || {
-                            checker.check_signature_pair_inner(db, source, target)
-                        })
+                    if matches!(target_receiver_inferable, InferableTypeVars::None) {
+                        target
+                            .receiver_constraints_when_satisfied(&checker, db)
+                            .and(db, self.constraints, || {
+                                checker.check_signature_pair_inner(db, source, target)
+                            })
+                    } else {
+                        target
+                            .receiver_constraints_when_satisfied(&checker, db)
+                            .implies(db, self.constraints, || {
+                                checker.check_signature_pair_inner(db, source, target)
+                            })
+                    }
                 })
         });
 
@@ -2069,9 +2167,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // returning.
         //
         // Target signature typevars require the opposite quantifier: the relation must hold for
-        // every target specialization, so universally quantify those away before returning.
+        // every target specialization. Receiver typevars are quantified over the domain imposed
+        // by binding the receiver; the remaining target variables are unconditional.
         when.reduce_inferable(db, self.constraints, source_inferable)
-            .for_all(db, self.constraints, target_inferable)
+            .for_all(db, self.constraints, target_receiver_inferable)
+            .for_all(db, self.constraints, target_non_receiver_inferable)
     }
 
     fn with_signature_recursion_guard(
