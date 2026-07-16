@@ -78,7 +78,9 @@ pub fn suppress_all(
 
     for (start_offset, (lints, suppressed_diagnostics)) in by_start {
         let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
-        if let Some(existing) = find_existing_suppression(suppressions, &source, start_offset) {
+        if let Some(add_to_start) =
+            add_to_existing_suppression(suppressions, &source, &codes, start_offset)
+        {
             by_line.entry(start_offset).or_default().extend(
                 codes
                     .iter()
@@ -86,7 +88,7 @@ pub fn suppress_all(
                     .map(|code| (code, SuppressionPosition::StartLine)),
             );
             fixes.push(SuppressFix {
-                fix: add_to_existing_suppression(existing, &codes),
+                fix: add_to_start,
                 suppressed_diagnostics,
             });
         }
@@ -166,10 +168,10 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     let source = source_text(db, file);
     let codes = &[id.name()];
 
-    if let Some(existing) =
-        find_existing_suppression(suppressions, &source, suppression_range.start())
+    if let Some(add_fix) =
+        add_to_existing_suppression(suppressions, &source, codes, suppression_range.start())
     {
-        return add_to_existing_suppression(existing, codes);
+        return add_fix;
     }
 
     append_to_existing_or_add_end_of_line_suppression(
@@ -239,8 +241,8 @@ fn append_to_existing_or_add_end_of_line_suppression(
     codes: &[LintName],
     line_end: TextSize,
 ) -> Fix {
-    if let Some(existing) = find_existing_suppression(suppressions, source, line_end) {
-        return add_to_existing_suppression(existing, codes);
+    if let Some(add_fix) = add_to_existing_suppression(suppressions, source, codes, line_end) {
+        return add_fix;
     }
 
     let up_to_line_end = &source[..line_end.to_usize()];
@@ -264,11 +266,12 @@ fn append_to_existing_or_add_end_of_line_suppression(
     })
 }
 
-fn find_existing_suppression(
+fn add_to_existing_suppression(
     suppressions: &Suppressions,
     source: &str,
+    codes: &[LintName],
     offset: TextSize,
-) -> Option<ExistingSuppression> {
+) -> Option<Fix> {
     let existing = suppressions
         .inline_suppressions_on_line(source.line_range(offset))
         .find(|suppression| {
@@ -291,36 +294,12 @@ fn find_existing_suppression(
     };
     let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
 
-    Some(ExistingSuppression {
-        insertion_offset: existing.comment_range.end() - relative_offset_from_end,
-        kind: existing.kind,
-        separator,
-    })
-}
-
-/// Appends `codes` to an existing suppression comment.
-fn add_to_existing_suppression(existing: ExistingSuppression, codes: &[LintName]) -> Fix {
-    let separator = existing.separator;
     let insertion = format!("{separator}{codes}", codes = Codes(existing.kind, codes));
 
-    Fix::safe_edit(Edit::insertion(insertion, existing.insertion_offset))
-}
-
-/// The location and formatting required to append lint codes to an existing suppression comment.
-///
-/// `kind` determines how codes are rendered, while `separator` preserves the syntax around the
-/// existing final code. For example:
-///
-/// ```python
-/// # ty: ignore[division-by-zero]
-/// ```
-///
-/// has an insertion offset before `]` and uses `", "` as the separator.
-#[derive(Copy, Clone)]
-struct ExistingSuppression {
-    insertion_offset: TextSize,
-    kind: SuppressionKind,
-    separator: &'static str,
+    Some(Fix::safe_edit(Edit::insertion(
+        insertion,
+        existing.comment_range.end() - relative_offset_from_end,
+    )))
 }
 
 struct Codes<'a>(SuppressionKind, &'a [LintName]);

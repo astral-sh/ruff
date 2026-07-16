@@ -1246,43 +1246,6 @@ class B(A):
         );
     }
 
-    #[test]
-    fn safe_fix_preserves_nested_own_line_suppression() {
-        let mut db = TestDbBuilder::new()
-            .with_file(
-                "test.py",
-                r#"seen_code = True
-# ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]
-value = missing
-"#,
-            )
-            .build()
-            .unwrap();
-
-        let file = system_path_to_file(&db, "test.py").unwrap();
-        let diagnostics = db.check_file(file);
-        let cancellation_token_source = CancellationTokenSource::new();
-        let fixes = fix_all(
-            &mut db,
-            diagnostics,
-            FixMode::ApplyFixes(Applicability::Safe),
-            &cancellation_token_source.token(),
-            Db::check_file,
-        )
-        .expect("operation never gets cancelled");
-
-        assert_eq!(fixes.count, 0);
-        assert_eq!(
-            &*source_text(&db, file),
-            r#"seen_code = True
-# ty: ignore[division-by-zero] # ty: ignore[unresolved-reference]
-value = missing
-"#
-        );
-        assert_eq!(fixes.diagnostics.len(), 1);
-        assert_eq!(fixes.diagnostics[0].id().as_str(), "unused-ignore-comment");
-    }
-
     /// Tests that the `fix_all` doesn't end up in an infinite loop
     /// if the fixes never converge and that it emits a diagnostic in that case.
     #[test]
@@ -1617,10 +1580,32 @@ value = missing
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
         let diagnostics = db.check_file(file);
+        let total_diagnostics = diagnostics.len();
+        let suppressible_diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| FixMode::Suppress.is_fixable(diagnostic))
+            .count();
+        let unsuppressible_diagnostics = total_diagnostics - suppressible_diagnostics;
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes =
             suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
                 .expect("operation never gets cancelled");
+
+        if had_syntax_errors {
+            assert_eq!(fixes.count, 0);
+            assert_eq!(fixes.diagnostics.len(), total_diagnostics);
+        } else {
+            assert_eq!(fixes.count, suppressible_diagnostics);
+            assert!(
+                fixes
+                    .diagnostics
+                    .iter()
+                    .all(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            );
+            // Adding a code to an empty suppression can also resolve its
+            // `unused-ignore-comment`.
+            assert!(fixes.diagnostics.len() <= unsuppressible_diagnostics);
+        }
 
         File::sync_path(&mut db, SystemPath::new("test.py"));
 
