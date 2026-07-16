@@ -5215,7 +5215,7 @@ fn ruff_toml_is_linted() -> Result<()> {
     1 | lint.select = ["F401"]
       |                 ^^^^
       |
-    help: Replace rule code with name
+    help: Replace rule code with `unused-import`
       |
       - lint.select = ["F401"]
     1 + lint.select = ["unused-import"]

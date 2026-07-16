@@ -38,6 +38,7 @@ use crate::{
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct RuleCodesInSelectors {
     selector: &'static str,
+    name: &'static str,
     in_lint_table: bool,
 }
 
@@ -47,6 +48,7 @@ impl AlwaysFixableViolation for RuleCodesInSelectors {
         let Self {
             selector,
             in_lint_table,
+            name: _,
         } = self;
         if *in_lint_table {
             format!("Rule code used instead of name in `lint.{selector}`")
@@ -56,7 +58,7 @@ impl AlwaysFixableViolation for RuleCodesInSelectors {
     }
 
     fn fix_title(&self) -> String {
-        "Replace rule code with name".to_string()
+        format!("Replace rule code with `{name}`", name = self.name)
     }
 }
 
@@ -148,6 +150,7 @@ fn check_selector_array(
                 RuleCodesInSelectors {
                     selector,
                     in_lint_table,
+                    name: name.as_str(),
                 },
                 range,
             )
