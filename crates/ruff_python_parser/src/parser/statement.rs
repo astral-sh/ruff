@@ -832,9 +832,8 @@ impl<'src> Parser<'src> {
             return first;
         }
 
-        let mut dotted_name = std::mem::take(&mut self.name_buffer);
-        dotted_name.clear();
-        dotted_name.push_str(&first.id);
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.push_str(&first.id);
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -843,13 +842,13 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            dotted_name.push('.');
-            dotted_name.push_str(&self.parse_identifier().id);
+            self.name_buffer.push('.');
+            let identifier = self.parse_identifier();
+            self.name_buffer.push_str(&identifier.id);
         }
 
-        let id = self.name_interner.intern(&dotted_name);
-        dotted_name.clear();
-        self.name_buffer = dotted_name;
+        let id = self.name_interner.intern(&self.name_buffer[snapshot..]);
+        self.name_buffer.truncate(snapshot);
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c

@@ -465,14 +465,12 @@ impl<'src> Parser<'src> {
     }
 
     fn intern_normalized_name(&mut self, text: &str) -> Name {
-        let mut normalized = std::mem::take(&mut self.name_buffer);
-        normalized.clear();
-        normalized.extend(text.nfkc());
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.extend(text.nfkc());
 
-        let name = self.name_interner.intern(&normalized);
+        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
 
-        normalized.clear();
-        self.name_buffer = normalized;
+        self.name_buffer.truncate(snapshot);
         name
     }
 
