@@ -39,7 +39,7 @@ use ty_python_semantic::{
 ///
 /// For a reference to a class (a base class, annotation, or `Animal()`), this behaves like clicking
 /// the class declaration: the referenced class plus its known transitive subclasses. The reference
-/// is resolved through its definitions rather than its syntax, so a qualified reference such as
+/// is resolved through its definitions, so a qualified reference such as
 /// `module.Animal` or `Outer.Inner` behaves the same as a bare name.
 ///
 /// ```py
@@ -54,10 +54,6 @@ pub fn goto_implementation(
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
-
-    // Compute the search universe once: subclass discovery makes a single pass over these files,
-    // checking each candidate class's MRO against the implementation roots. Sort by path so
-    // results come back in a deterministic order.
     let mut candidate_files: Vec<File> = db.project().files(db).iter().copied().collect();
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
@@ -78,15 +74,12 @@ pub fn goto_implementation(
                 .map(|definitions| definitions.iter().as_slice())
                 .unwrap_or(&[]);
 
-            // A target that resolves to class objects gets class-family lookup regardless of
-            // syntax: a bare name, a qualified reference like `module.Animal`, or a constructor call.
             implementation_definitions_for_class_references(
                 db,
                 resolved_definitions,
                 &candidate_files,
             )
             .or_else(|| match expression {
-                // If the target does not resolve to class objects, fall back to member handling.
                 ruff_python_ast::ExprRef::Attribute(attribute) => Some(
                     implementation_definitions_for_attribute(&model, attribute, &candidate_files),
                 ),

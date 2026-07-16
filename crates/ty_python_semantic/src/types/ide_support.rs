@@ -639,14 +639,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 ///
 /// The first entries are the definitions that would be selected for the root classes themselves,
 /// using MRO lookup. That matters for concrete subclasses that inherit a member without overriding
-/// it. After that, we add same-named definitions on known transitive subclasses, which are the
-/// concrete overrides a user expects from "go to implementation". The member may be a method or an
-/// attribute declared in the class body (`sound: str = ...`) or assigned to `self` in a method
-/// body.
-///
-/// Subclasses are found with a single pass over the classes defined in `candidate_files`, keeping
-/// each class whose MRO contains one of the roots. Checking candidates upward through their MROs
-/// scans each file once, rather than once for every class discovered beneath a root.
+/// it. After that, we add same-named definitions on known transitive subclasses.
 fn implementation_definitions_for_member_families<'db>(
     db: &'db dyn Db,
     candidate_files: &[File],
@@ -656,6 +649,7 @@ fn implementation_definitions_for_member_families<'db>(
     let mut definitions = Vec::new();
     let mut family_roots = FxHashSet::default();
 
+    // First, find definitions that would be selected for the root classes using MRO lookup.
     for root in roots {
         let root_definitions = mro_member_definitions(db, root, member_name);
 
@@ -670,6 +664,7 @@ fn implementation_definitions_for_member_families<'db>(
                 definitions.push(definition);
             }
         }
+
         family_roots.insert(root);
     }
 
@@ -677,18 +672,25 @@ fn implementation_definitions_for_member_families<'db>(
         return definitions;
     }
 
+    // Then, add same-named definitions on known transitive subclasses.
     for file in candidate_files {
-        // A subclass can only contribute an override if it spells the member name somewhere in
+        // Cheap pre-filter - a subclass can only contribute an override if it spells the member name somewhere in
         // its file, whether as a method name, a class-body target, or a `self.member` assignment.
         if !contains_identifier(&source_text(db, *file), member_name) {
             continue;
         }
+
         for candidate in reachable_class_literals_in_file(db, *file) {
-            if family_roots.contains(&candidate)
-                || !class_mro_intersects(db, candidate, &family_roots)
-            {
+            // We already have the root implementations from the first phase.
+            if family_roots.contains(&candidate) {
                 continue;
             }
+
+            // We only want to look at definitions on a class that has one of `family_roots` in its MRO.
+            if !class_mro_intersects(db, candidate, &family_roots) {
+                continue;
+            }
+
             for definition in own_member_definitions(db, candidate, member_name).unwrap_or_default()
             {
                 if !definitions.contains(&definition) {
@@ -697,6 +699,7 @@ fn implementation_definitions_for_member_families<'db>(
             }
         }
     }
+
     definitions
 }
 
@@ -2629,16 +2632,19 @@ fn reachable_class_literals_in_file(db: &dyn Db, file: File) -> Vec<ClassLiteral
             continue;
         };
 
+        // Map AST class node to its definition in the semantic index.
         let definition = index.expect_single_definition(class_node);
         if !matches!(definition.kind(db), DefinitionKind::Class(_)) {
             continue;
         }
 
+        // Drop classes in dead code — e.g. a class under if sys.version_info < (3, 9): on a newer Python.
         let file_scope_id = scope_id.file_scope_id(db);
         if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
             continue;
         }
 
+        // Convert the definition's type into a ClassLiteral, dropping anything that doesn't produce a usable class object.
         if let Some(class) = extract_class_literal(db, binding_type(db, definition)) {
             classes.push(class);
         }
