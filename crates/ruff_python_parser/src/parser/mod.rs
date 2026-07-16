@@ -6,7 +6,8 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    ModModule, ParameterWithDefault, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -16,6 +17,7 @@ use unicode_normalization::UnicodeNormalization;
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::parser::scratch_buffer::ScratchBuffer;
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -30,6 +32,7 @@ mod options;
 mod pattern;
 mod progress;
 mod recovery;
+mod scratch_buffer;
 mod statement;
 #[cfg(test)]
 mod tests;
@@ -68,6 +71,24 @@ pub(crate) struct Parser<'src> {
 
     /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
     max_nesting_depth: u32,
+
+    /// Reusable, nesting-safe scratch storage for expression lists.
+    expr_scratch: ScratchBuffer<Expr>,
+
+    /// Reusable, nesting-safe scratch storage for call keywords.
+    keyword_scratch: ScratchBuffer<Keyword>,
+
+    /// Reusable, nesting-safe scratch storage for function and lambda parameters.
+    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+
+    /// Reusable, nesting-safe scratch storage for statement lists.
+    stmt_scratch: ScratchBuffer<Stmt>,
+
+    /// Reusable scratch storage for import aliases.
+    alias_scratch: ScratchBuffer<Alias>,
+
+    /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
+    elif_else_scratch: ScratchBuffer<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -98,6 +119,12 @@ impl<'src> Parser<'src> {
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
+            expr_scratch: ScratchBuffer::with_capacity(16),
+            keyword_scratch: ScratchBuffer::new(),
+            parameter_scratch: ScratchBuffer::new(),
+            stmt_scratch: ScratchBuffer::with_capacity(32),
+            alias_scratch: ScratchBuffer::new(),
+            elif_else_scratch: ScratchBuffer::new(),
         }
     }
 
@@ -207,7 +234,6 @@ impl<'src> Parser<'src> {
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
-
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
         let (tokens, lex_errors) = self.tokens.finish();
