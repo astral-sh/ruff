@@ -639,6 +639,7 @@ from ty_extensions._internal import is_subtype_of
 type Left[T] = tuple[Left[list[T]]]
 type Right[T] = tuple[Right[list[T]]]
 
+# TODO: Left[int] should be equivalent to (subtype of) Right[int]
 static_assert(not is_subtype_of(Left[int], Right[int]))
 ```
 
