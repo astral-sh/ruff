@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// - [PEP 479](https://peps.python.org/pep-0479/)
 /// - [Python documentation](https://docs.python.org/3/library/exceptions.html#StopIteration)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.3")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct StopIterationReturn;
 
 impl Violation for StopIterationReturn {
