@@ -2020,6 +2020,93 @@ class MyClass:
         ");
     }
 
+    #[test]
+    fn implementation_class_unreachable_subclass_excluded() {
+        // `ChildFuture` is defined in an unreachable block (the default Python version is well
+        // below 3.999), so it must not be returned as an implementation.
+        let test = cursor_test(
+            r#"
+            import sys
+
+            class Ba<CURSOR>se:
+                pass
+
+            if sys.version_info >= (3, 5):
+                class ChildOld(Base):
+                    pass
+
+            if sys.version_info >= (3, 999):
+                class ChildFuture(Base):
+                    pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:7
+          |
+        4 | class Base:
+          |       ^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:4:7
+          |
+        4 | class Base:
+          |       ----
+          |
+         ::: main.py:8:11
+          |
+        8 |     class ChildOld(Base):
+          |           --------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_unreachable_override_excluded() {
+        // `FutureDog.speak` is defined in an unreachable block, so member lookup must not return
+        // it as an override.
+        let test = cursor_test(
+            r#"
+            import sys
+
+            class Animal:
+                def speak(self): ...
+
+            if sys.version_info >= (3, 5):
+                class Dog(Animal):
+                    def speak(self): ...
+
+            if sys.version_info >= (3, 999):
+                class FutureDog(Animal):
+                    def speak(self): ...
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:16:12
+           |
+        16 |     animal.speak()
+           |            ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:5:9
+          |
+        5 |     def speak(self): ...
+          |         -----
+        6 |
+        7 | if sys.version_info >= (3, 5):
+        8 |     class Dog(Animal):
+        9 |         def speak(self): ...
+          |             -----
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_implementation(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
