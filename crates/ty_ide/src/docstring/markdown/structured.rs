@@ -7,7 +7,8 @@ use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
 use crate::docstring::document::syntax::{
-    is_wrapped_in_markdown_code_span, starts_with_markdown_list_item,
+    InlineMarkupScanner, InlineMarkupToken, is_wrapped_in_markdown_code_span,
+    starts_with_markdown_list_item,
 };
 
 mod google;
@@ -379,7 +380,44 @@ fn render_type_code_span_into(output: &mut String, ty: &str) {
         return;
     }
 
+    let normalized = normalize_embedded_type_markup(&normalized);
     render_code_span_into(output, normalized.as_ref());
+}
+
+/// Removes embedded backticks, reStructuredText role prefixes, and punctuation escapes before
+/// wrapping a type in a code span.
+///
+/// For example, ``"str or :class:`pkg.Type` or `pkg.Other`"`` becomes
+/// `"str or pkg.Type or pkg.Other"`, and `"-\\|>"` becomes `"-|>"`.
+fn normalize_embedded_type_markup(ty: &str) -> Cow<'_, str> {
+    if !ty.contains('`') && !ty.contains('\\') {
+        return Cow::Borrowed(ty);
+    }
+
+    let mut normalized = String::with_capacity(ty.len());
+    for token in InlineMarkupScanner::new(ty) {
+        match token {
+            InlineMarkupToken::Text(text) => push_unescaped(&mut normalized, text),
+            InlineMarkupToken::Code(span) | InlineMarkupToken::RestPrefixRole { span, .. } => {
+                push_unescaped(&mut normalized, span.content());
+            }
+        }
+    }
+
+    Cow::Owned(normalized)
+}
+
+fn push_unescaped(output: &mut String, text: &str) {
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\\'
+            && let Some(escaped) = characters.next_if(char::is_ascii_punctuation)
+        {
+            output.push(escaped);
+        } else {
+            output.push(character);
+        }
+    }
 }
 
 /// Normalizes type text so it fits in a single Markdown code span.
@@ -602,6 +640,43 @@ mod tests {
 
         **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**<HB>
         Escaped name.
+        ");
+    }
+
+    #[test]
+    fn section_items_normalize_source_markup_in_types() {
+        let _snap = bind_markdown_snapshot_filters();
+        let section = section_block(vec![
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("rng"),
+                Some("{None, int, `numpy.random.Generator`, `numpy.random.RandomState`}, optional"),
+                "Random number generator.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("arrowstyle"),
+                Some(r"str (default='-\|>')"),
+                "Arrow style.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some("str or :class:`pkg.Model`"),
+                "Model type.",
+            ),
+        ]);
+
+        assert_snapshot!(render_markdown(&section), @"
+        ## Parameters
+        **rng**: `{None, int, numpy.random.Generator, numpy.random.RandomState}, optional`<HB>
+        Random number generator.
+
+        **arrowstyle**: `str (default='-|>')`<HB>
+        Arrow style.
+
+        **model**: `str or pkg.Model`<HB>
+        Model type.
         ");
     }
 
