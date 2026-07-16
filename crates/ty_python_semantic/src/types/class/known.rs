@@ -1133,7 +1133,7 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.to_specialized_class_type(db, specialization)
-            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .and_then(|class_type| Type::from(class_type).to_instance_approximation(db))
             .unwrap_or_else(Type::unknown)
     }
 

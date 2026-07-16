@@ -2764,7 +2764,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 actual @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)),
             ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
-                if let Some(actual_instance) = actual.to_instance(self.db) {
+                if let Some(actual_instance) = actual.to_instance_approximation(self.db) {
                     return self.infer_map_impl(
                         formal_typeform.type_argument(self.db),
                         actual_instance,
@@ -3124,7 +3124,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(actual_instance) = ty.to_instance(self.db) =>
+                    && let Some(actual_instance) = ty.to_instance_approximation(self.db) =>
             {
                 return self.infer_map_impl(
                     Type::TypeVar(type_var),

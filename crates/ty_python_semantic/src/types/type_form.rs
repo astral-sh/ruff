@@ -81,7 +81,7 @@ impl<'db> Type<'db> {
                     instance.type_form_argument(db)
                 }
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    ty.to_instance(db)
+                    ty.to_instance_approximation(db)
                 }
                 _ => None,
             }

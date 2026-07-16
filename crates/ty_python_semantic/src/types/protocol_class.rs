@@ -2119,7 +2119,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // that returns an instance cannot satisfy a protocol that promises the class object.
         let protocol_self_binding_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
         let implementation_self_binding_ty = ty
-            .to_instance(db)
+            .to_instance_approximation(db)
             .or_else(|| ty.literal_fallback_instance(db))
             .unwrap_or(ty);
         let implementation_receiver_binding_ty = if member.is_class_method() {

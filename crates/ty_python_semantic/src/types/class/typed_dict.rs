@@ -676,7 +676,7 @@ fn synthesize_typed_dict_view_method<'db>(
                     .specialize(db, &[typed_dict.key_type(db), typed_dict.value_type(db)])
             })
         })
-        .and_then(|class| Type::from(class).to_instance(db))
+        .and_then(|class| Type::from(class).to_instance_approximation(db))
         .unwrap_or_else(Type::unknown);
 
     synthesize_typed_dict_no_argument_method(db, typed_dict, return_ty)
