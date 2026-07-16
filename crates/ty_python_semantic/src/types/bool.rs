@@ -338,9 +338,9 @@ impl<'db> Type<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
-pub(crate) struct TryBool;
 pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<'db, TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
+pub(crate) struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoolError<'db> {

@@ -244,11 +244,10 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
 
         let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen.iter().any(|active| {
-            active.ty == ty
-                || (!matches!(identity, TypeIdentity::RecursiveTypeAlias(_))
-                    && active.identity == identity)
-        }) {
+        if seen
+            .iter()
+            .any(|active| active.ty == ty || active.identity == identity)
+        {
             return TypeTransformerVisit::Ready(ty);
         }
         drop(seen);

@@ -3,9 +3,9 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::TypeInferenceBuilder;
 use crate::Db;
-use crate::types::CycleDetector;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
@@ -22,15 +22,8 @@ enum BinaryExpressionOperandTypes<'db> {
     TypedDictResult(Type<'db>),
 }
 
-struct BinaryExpressionVisit;
-
-type BinaryExpressionVisitor<'db> = CycleDetector<
-    'db,
-    BinaryExpressionVisit,
-    (Type<'db>, ast::Operator, Type<'db>),
-    Option<Type<'db>>,
-    1,
->;
+type BinaryExpressionVisitor<'db> =
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(

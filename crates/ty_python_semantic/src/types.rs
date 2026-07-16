@@ -291,9 +291,10 @@ fn definition_expression_annotation<'db>(
 }
 
 struct ApplyTypeMappingTag;
-struct MaterializationEquivalence;
+struct ApplyMaterializationEquivalence;
+
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, MaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -371,14 +372,16 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
-pub(crate) struct FindLegacyTypeVars;
 pub(crate) type FindLegacyTypeVarsVisitor<'db> =
     CycleDetector<'db, FindLegacyTypeVars, Type<'db>, (), 3>;
 
+#[derive(Debug)]
+pub(crate) struct FindLegacyTypeVars;
+
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) struct VisitSpecialization;
 pub(crate) type SpecializationVisitor<'db> =
     CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
+pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
 ///
@@ -6511,9 +6514,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::TypeVar(bound_typevar) => {
-                bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
-            }
+            Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
@@ -6714,10 +6715,10 @@ impl<'db> Type<'db> {
                         Type::TypeAlias(alias.apply_specialization(
                             db,
                             |generic_context| {
-                                let specialization = alias
+                                alias
                                     .specialization(db)
-                                    .unwrap_or_else(|| generic_context.default_specialization(db, None));
-                                specialization.apply_specialization(db, current_specialization)
+                                    .unwrap_or_else(|| generic_context.default_specialization(db, None))
+                                    .apply_specialization(db, current_specialization)
                             },
                         ))
                     }

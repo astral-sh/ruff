@@ -9,7 +9,7 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{CycleDetectorVisit, PairVisitor};
+use crate::types::cyclic::{CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -714,12 +714,31 @@ impl<'db> Type<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
-pub(crate) struct HasRelationTo;
+pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
+    'db,
+    TypeRelation,
+    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
+    ConstraintSet<'db, 'c>,
+    1,
+>;
 
-type RelationCycleKey<'db> = (Type<'db>, (TypeRelation, TypeVarEvaluation), Type<'db>);
+impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
+    type Id = (
+        TypeIdentity<'db>,
+        TypeIdentity<'db>,
+        TypeRelation,
+        TypeVarEvaluation,
+    );
 
-pub(crate) type HasRelationToVisitor<'db, 'c> =
-    CycleDetector<'db, HasRelationTo, RelationCycleKey<'db>, ConstraintSet<'db, 'c>, 1>;
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        (
+            self.0.to_type_identity(db),
+            self.1.to_type_identity(db),
+            self.2,
+            self.3,
+        )
+    }
+}
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -727,10 +746,11 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `is_disjoint_from` methods.
-pub(crate) struct IsDisjoint;
-
+/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
 pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
+
+#[derive(Debug)]
+pub(crate) struct IsDisjoint;
 
 impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -934,12 +954,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        match self.relation_visitor.begin_visit(
-            db,
-            (source, (self.relation, self.typevar_evaluation), target),
-        ) {
+        match self
+            .relation_visitor
+            .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
+        {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(item) => self.recursive_type_pair_fallback(&item),
+            CycleDetectorVisit::Cycle(item) => self.recursive_type_pair_fallback(item.0, item.1),
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
                 self.relation_visitor.finish_visit(item, result)
@@ -947,8 +967,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    fn recursive_type_pair_fallback(&self, item: &RelationCycleKey<'db>) -> ConstraintSet<'db, 'c> {
-        if matches!((item.0, item.2), (Type::TypeAlias(_), Type::TypeAlias(_))) {
+    fn recursive_type_pair_fallback(
+        &self,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
             // TODO: Recursive aliases can encode context-free languages, whose inclusion and
             // equivalence are undecidable. No complete fallback exists, but more decidable cases
             // can be recognized here before conservatively rejecting the pair.

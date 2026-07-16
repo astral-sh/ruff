@@ -1804,10 +1804,9 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
-pub(crate) struct TypeVarDefault;
-
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<'db, TypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+    CycleDetector<'db, VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+pub(crate) struct VisitTypeVarDefault;
 
 impl<'db> super::cyclic::HasIdentity<'db> for TypeVarInstance<'db> {
     type Id = Self;
