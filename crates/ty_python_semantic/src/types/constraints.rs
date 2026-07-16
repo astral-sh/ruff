@@ -7761,7 +7761,11 @@ mod tests {
             )
         };
 
-        let Solutions::Constrained(solutions) = set.solutions(&db, &builder, inferable) else {
+        let Solutions::Constrained(solutions) =
+            set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
+                PathBounds::default_solve(&db, &builder, path_bound)
+            })
+        else {
             panic!("expected constrained solutions");
         };
         assert_eq!(solutions.len(), 1);
@@ -7801,7 +7805,9 @@ mod tests {
         };
 
         assert_eq!(
-            set.solutions(&db, &builder, inferable),
+            set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
+                PathBounds::default_solve(&db, &builder, path_bound)
+            }),
             Solutions::Unsatisfiable
         );
 
