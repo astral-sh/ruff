@@ -283,7 +283,7 @@ pub struct PlaceTableBuilder {
 impl PlaceTableBuilder {
     /// Iterates over the members in this table.
     pub(crate) fn members(&self) -> std::slice::Iter<'_, Member> {
-        self.member.members()
+        self.member.iter()
     }
 
     /// Looks up a place ID by its expression.

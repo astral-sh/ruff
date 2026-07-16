@@ -1,26 +1,21 @@
 use get_size2::GetSize;
-use ruff_db::files::File;
-use ruff_db::parsed::{parsed_module, parsed_string_annotation};
-use ruff_db::source::{SourceText, source_text};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{
-    self as ast, AnyNodeRef,
+    self as ast,
     helpers::is_dunder,
     name::{Name, UnqualifiedName},
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::ExpressionNodeKey;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState, dotted_starts_with};
 use ty_python_core::scope::ScopeKind;
-use ty_python_core::semantic_index;
+use ty_python_core::{ProgramFile, semantic_index};
 
 use super::visible_reachable_definitions_for_name;
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::semantic_model::SemanticModel;
-use crate::types::TypeContext;
-use crate::types::infer::{infer_deferred_types, infer_definition_types, infer_scope_types};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedImport {
@@ -34,20 +29,21 @@ pub struct UnusedImport {
 /// unless the file explicitly reexports them with `as` aliases or `__all__`. This can report an
 /// implicit package export as unused; make the export explicit to suppress the hint.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
-    let parsed = parsed_module(db, file).load(db);
+pub fn unused_imports(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedImport]> {
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
-    let mut string_annotation_definitions = None;
+    let mut string_annotation_uses = None;
     let mut explicit_exports = None;
-    let mut member_attribute_uses = None;
+    let mut member_places = None;
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
         let scope = index.scope(file_scope_id);
-        let is_module_scope = scope.kind().is_module();
+        let scope_kind = scope.kind();
+        let is_module_scope = scope_kind.is_module();
 
-        if matches!(scope.kind(), ScopeKind::TypeParams | ScopeKind::TypeAlias) {
+        if matches!(scope_kind, ScopeKind::TypeParams | ScopeKind::TypeAlias) {
             continue;
         }
 
@@ -63,7 +59,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
                 continue;
             }
 
-            if is_module_scope && kind.is_reexported() {
+            if is_module_scope && definition.is_reexported(db) {
                 continue;
             }
 
@@ -90,8 +86,8 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
             // which records a member place without marking the class-scope symbol used.
             // TODO: Match by the accessed object's type instead of by name alone.
             let imported_path = multipart_import_name.unwrap_or(display_name.as_str());
-            if scope.kind().is_class()
-                && member_attribute_uses
+            if scope_kind.is_class()
+                && member_places
                     .get_or_insert_with(|| {
                         index
                             .scope_ids()
@@ -110,8 +106,8 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
 
             // Multipart imports additionally require a dotted path in some string
             // annotation to go through the imported submodule.
-            let string_annotation_uses = string_annotation_definitions
-                .get_or_insert_with(|| string_annotation_used_definitions(db, file));
+            let string_annotation_uses = string_annotation_uses
+                .get_or_insert_with(|| collect_string_annotation_uses(db, file));
             let used_in_string_annotation =
                 string_annotation_uses.definitions.contains(&definition)
                     && multipart_import_name.is_none_or(|imported_name| {
@@ -156,78 +152,56 @@ struct StringAnnotationUses<'db> {
 
 /// Resolves the strings that inference classified as type expressions.
 ///
-/// Inference retains the node keys of every string it parsed as an annotation, so
-/// classification is inherited from the checker. Only name resolution and dotted
-/// paths are re-derived here.
-fn string_annotation_used_definitions(db: &dyn Db, file: File) -> StringAnnotationUses<'_> {
-    let index = semantic_index(db, file);
-
-    let mut annotation_keys: FxHashSet<ExpressionNodeKey> = FxHashSet::default();
-    for scope_id in index.scope_ids() {
-        annotation_keys
-            .extend(infer_scope_types(db, scope_id, TypeContext::default()).string_annotations());
-
-        let file_scope_id = scope_id.file_scope_id(db);
-        let use_def = index.use_def_map(file_scope_id);
-        for (_, state, _) in use_def.all_definitions_with_usage() {
-            let DefinitionState::Defined(definition) = state else {
-                continue;
-            };
-            let inference = infer_definition_types(db, definition);
-            annotation_keys.extend(inference.string_annotations());
-            for deferred in inference.deferred_definitions() {
-                annotation_keys.extend(infer_deferred_types(db, *deferred).string_annotations());
-            }
-        }
-    }
+/// [`SemanticModel::enter_string_annotation`] inherits the classification from the
+/// checker. Only name resolution and dotted paths are re-derived here.
+fn collect_string_annotation_uses<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> StringAnnotationUses<'db> {
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let model = SemanticModel::new(db, file);
 
     let mut uses = StringAnnotationUses {
         definitions: FxHashSet::default(),
         dotted_names: FxHashSet::default(),
     };
 
-    if annotation_keys.is_empty() {
-        return uses;
-    }
-
-    let parsed = parsed_module(db, file).load(db);
-    let source = source_text(db, file);
-    let model = SemanticModel::new(db, file);
-
-    let mut collector = StringLiteralCollector {
-        annotation_keys: &annotation_keys,
-        strings: Vec::new(),
+    let mut collector = StringAnnotationCollector {
+        model: &model,
+        uses: &mut uses,
     };
     for stmt in parsed.suite() {
         collector.visit_stmt(stmt);
     }
 
-    for string in collector.strings {
-        let mut visitor = StringAnnotationResolver {
-            model: &model,
-            source: &source,
-            annotation_keys: &annotation_keys,
-            scope_node: string.into(),
-            uses: &mut uses,
-        };
-        visitor.visit_string(string);
-    }
-
     uses
 }
 
-/// Collects the file-level string literals that inference classified as annotations.
-struct StringLiteralCollector<'a, 'ast> {
-    annotation_keys: &'a FxHashSet<ExpressionNodeKey>,
-    strings: Vec<&'ast ast::ExprStringLiteral>,
+fn resolve_string_annotation<'db>(
+    model: &SemanticModel<'db>,
+    string: &ast::ExprStringLiteral,
+    uses: &mut StringAnnotationUses<'db>,
+) {
+    let Some((parsed, model)) = model.enter_string_annotation(string) else {
+        return;
+    };
+    StringAnnotationResolver {
+        model: &model,
+        uses,
+    }
+    .visit_expr(parsed.expr());
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for StringLiteralCollector<'_, 'ast> {
+/// Finds the file's annotation strings, resolution runs in their sub-ASTs.
+struct StringAnnotationCollector<'a, 'db> {
+    model: &'a SemanticModel<'db>,
+    uses: &'a mut StringAnnotationUses<'db>,
+}
+
+impl<'ast> SourceOrderVisitor<'ast> for StringAnnotationCollector<'_, '_> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         if let ast::Expr::StringLiteral(string) = expr {
-            if self.annotation_keys.contains(&expr.into()) {
-                self.strings.push(string);
-            }
+            resolve_string_annotation(self.model, string, self.uses);
         } else {
             source_order::walk_expr(self, expr);
         }
@@ -236,43 +210,24 @@ impl<'ast> SourceOrderVisitor<'ast> for StringLiteralCollector<'_, 'ast> {
 
 struct StringAnnotationResolver<'a, 'db> {
     model: &'a SemanticModel<'db>,
-    source: &'a SourceText,
-    annotation_keys: &'a FxHashSet<ExpressionNodeKey>,
-    /// The file-level string literal, used to resolve names in its enclosing scope.
-    scope_node: AnyNodeRef<'a>,
     uses: &'a mut StringAnnotationUses<'db>,
-}
-
-impl StringAnnotationResolver<'_, '_> {
-    fn visit_string(&mut self, string: &ast::ExprStringLiteral) {
-        let Some(string_literal) = string.as_single_part_string() else {
-            return;
-        };
-        let Ok(parsed) = parsed_string_annotation(self.source.as_str(), string_literal) else {
-            return;
-        };
-        self.visit_expr(parsed.expr());
-    }
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for StringAnnotationResolver<'_, '_> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         match expr {
             ast::Expr::Name(name) => {
+                // The sub-model resolves sub-AST nodes through the outer string's scope.
                 self.uses
                     .definitions
                     .extend(visible_reachable_definitions_for_name(
                         self.model,
                         name.id.as_str(),
-                        self.scope_node,
+                        expr.into(),
                     ));
             }
-            // Sub-ASTs keep file-relative node keys, so inference's classification
-            // applies at any nesting depth.
             ast::Expr::StringLiteral(string) => {
-                if self.annotation_keys.contains(&expr.into()) {
-                    self.visit_string(string);
-                }
+                resolve_string_annotation(self.model, string, self.uses);
             }
             ast::Expr::Attribute(_) => {
                 // Retain the dotted path for multipart matching, the walk must continue
@@ -323,6 +278,7 @@ mod tests {
     use crate::db::tests::TestDbBuilder;
     use ruff_db::files::system_path_to_file;
     use ruff_python_trivia::textwrap::dedent;
+    use ty_python_core::ProgramFile;
 
     struct UnusedImportTest<'a> {
         path: &'a str,
@@ -344,6 +300,8 @@ mod tests {
             let source = dedent(source);
             let db = TestDbBuilder::new().with_file(self.path, &source).build()?;
             let file = system_path_to_file(&db, self.path)?;
+            let program = db.program_environment().program(&db);
+            let file = ProgramFile::new(&db, file, program);
             let mut entries = unused_imports(&db, file)
                 .iter()
                 .map(|import| {
@@ -1141,7 +1099,7 @@ mod tests {
 
     #[test]
     fn class_scope_import_attribute_suppression_is_name_based() -> anyhow::Result<()> {
-        // Accepted false negative: any attribute access with a matching name
+        // false negative: any attribute access with a matching name
         // suppresses the hint, even on an unrelated object.
         let names = UnusedImportTest::new().names(
             r#"
@@ -1403,6 +1361,36 @@ mod tests {
             from typing import List
 
             x: """List['Path']""" = []
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_import_used_in_stringified_annotation_before_import() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            x: "Path"
+            from pathlib import Path
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn string_annotation_usage_is_reachability_based() -> anyhow::Result<()> {
+        // false negative: string annotations mark every reachable definition used,
+        // even shadowed imports.
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+
+            Path = str
+            x: "Path"
             "#,
         )?;
 
