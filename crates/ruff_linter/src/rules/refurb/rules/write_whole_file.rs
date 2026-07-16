@@ -41,7 +41,7 @@ use crate::{FixAvailability, Locator, Violation};
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.6")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct WriteWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
