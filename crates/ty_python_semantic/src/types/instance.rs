@@ -26,6 +26,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -534,8 +535,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
                 && !result.is_never_satisfied(db)
                 && source_nominal_view.is_some_and(|source| {
-                    source.class(db).class_literal(db)
-                        == nominal_instance.class(db).class_literal(db)
+                    let source_class = source.class(db);
+                    let target_class_literal = nominal_instance.class(db).class_literal(db);
+                    if source_class.class_literal(db) != target_class_literal {
+                        return false;
+                    }
+
+                    if !Type::ProtocolInstance(protocol).has_typevar(db) {
+                        return true;
+                    }
+
+                    let ClassType::Generic(source_alias) = source_class else {
+                        return true;
+                    };
+
+                    let ClassType::Generic(target_alias) = nominal_instance.class(db) else {
+                        return true;
+                    };
+
+                    if target_alias
+                        .specialization(db)
+                        .types(db)
+                        .iter()
+                        .any(|argument| {
+                            any_over_type(db, *argument, false, |nested| {
+                                let Type::TypeVar(typevar) = nested else {
+                                    return false;
+                                };
+                                typevar.typevar(db).bound_or_constraints(db).is_none()
+                                    && !protocol.interface(db).references_typevar(db, typevar)
+                            })
+                        })
+                    {
+                        return false;
+                    }
+
+                    !source_alias
+                        .specialization(db)
+                        .types(db)
+                        .iter()
+                        .any(|argument| {
+                            any_over_type(db, *argument, false, |nested| {
+                                nested
+                                    .as_nominal_instance()
+                                    .or_else(|| {
+                                        nested
+                                            .as_protocol_instance()
+                                            .and_then(ProtocolInstanceType::to_nominal_instance)
+                                    })
+                                    .is_some_and(|nested| {
+                                        nested.class(db).class_literal(db) == target_class_literal
+                                    })
+                            })
+                        })
                 })
             {
                 return result;

@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -336,6 +337,23 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db)
             .iter()
             .map(|(name, data)| ProtocolMember { name, data })
+    }
+
+    /// Returns whether any member of this specialized interface references `typevar`.
+    pub(super) fn references_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        self.members(db).any(|member| {
+            member.data.kind.member_types().any(|member| {
+                member.resolve(db).is_some_and(|member| {
+                    any_over_type(db, member.ty(), false, |nested| {
+                        nested == Type::TypeVar(typevar)
+                    })
+                })
+            })
+        })
     }
 
     fn member_count(self, db: &'db dyn Db) -> usize {
@@ -1284,11 +1302,18 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Returns whether this member can be compared before recursive or overloaded methods.
     ///
-    /// A single-signature method with a non-protocol return is inexpensive and can reject an
-    /// incompatible specialization before a recursive method expands the same interface again.
+    /// A non-recursive property or attribute, or a single-signature method with a non-recursive
+    /// return, is inexpensive and can reject an incompatible specialization before a recursive
+    /// member expands the same interface again.
     fn is_simple_structural_member(&self, db: &'db dyn Db) -> bool {
         let ProtocolMemberKind::Method(member, _) = self.data.kind else {
-            return true;
+            return self.data.kind.member_types().all(|member| {
+                member.resolve(db).is_some_and(|member| {
+                    !any_over_type(db, member.ty(), false, |nested| {
+                        matches!(nested, Type::ProtocolInstance(_))
+                    })
+                })
+            });
         };
         let Type::Callable(callable) = member.ty() else {
             return false;
@@ -1298,7 +1323,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             return false;
         };
 
-        signatures.next().is_none() && !matches!(signature.return_ty, Type::ProtocolInstance(_))
+        signatures.next().is_none()
+            && !any_over_type(db, signature.return_ty, false, |nested| {
+                matches!(nested, Type::ProtocolInstance(_))
+            })
     }
 
     fn is_instance_method(&self) -> bool {
