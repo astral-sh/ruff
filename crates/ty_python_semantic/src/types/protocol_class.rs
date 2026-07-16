@@ -1600,7 +1600,7 @@ fn single_descriptor_setter_domain<'db>(
     }) = descriptor_ty
         .member_lookup_with_policy(
             db,
-            "__set__".into(),
+            "__set__",
             MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
         .place
