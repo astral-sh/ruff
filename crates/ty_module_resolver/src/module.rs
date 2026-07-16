@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
@@ -25,7 +26,7 @@ impl get_size2::GetSize for Module<'_> {}
 impl<'db> Module<'db> {
     pub(crate) fn file_module(
         db: &'db dyn Db,
-        name: ModuleName,
+        name: Cow<'_, ModuleName>,
         kind: ModuleKind,
         search_path: SearchPath,
         file: File,
@@ -35,7 +36,7 @@ impl<'db> Module<'db> {
         Self::File(FileModule::new(db, name, kind, search_path, file, known))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: ModuleName) -> Self {
+    pub(crate) fn namespace_package(db: &'db dyn Db, name: Cow<'_, ModuleName>) -> Self {
         Self::Namespace(NamespacePackage::new(db, name))
     }
 
@@ -204,7 +205,7 @@ fn all_submodule_names_for_package<'db>(
                     };
                     Some(Module::file_module(
                         db,
-                        name,
+                        Cow::Owned(name),
                         kind,
                         module.search_path(db).clone(),
                         file,
@@ -241,7 +242,7 @@ fn all_submodule_names_for_package<'db>(
                 };
                 Some(Module::file_module(
                     db,
-                    name,
+                    Cow::Owned(name),
                     kind,
                     module.search_path(db).clone(),
                     file,
