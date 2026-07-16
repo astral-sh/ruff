@@ -73,6 +73,47 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
+    let has_expected_type = |open_file: bool| -> anyhow::Result<bool> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            from typing_extensions import Literal
+
+            value: Literal["apple", "banana"] = "app"
+            "#,
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
+        if open_file {
+            db.open_file(file);
+        }
+
+        let module = parsed_module(&db, file).load(&db);
+        let assignment = module.syntax().body[1]
+            .as_ann_assign_stmt()
+            .expect("annotated assignment");
+        let string_expr = assignment
+            .value
+            .as_deref()
+            .expect("annotated assignment to have a value")
+            .as_string_literal_expr()
+            .expect("string literal value");
+        let scope = global_scope(&db, file);
+
+        Ok(infer_complete_scope_types(&db, scope)
+            .try_expected_type(ruff_python_ast::ExprRef::from(string_expr))
+            .is_some())
+    };
+
+    assert!(!has_expected_type(false)?);
+    assert!(has_expected_type(true)?);
+
+    Ok(())
+}
+
+#[test]
 fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert!(
         std::mem::size_of::<DefinitionTypes>()

@@ -51,7 +51,7 @@ pub mod watch;
 #[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
-    /// The files that are open in the project, [`None`] if there are no open files.
+    /// The files that are open in the project.
     #[returns(ref)]
     #[default]
     open_fileset: FxHashSet<File>,
@@ -204,7 +204,6 @@ impl Project {
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
         let included_paths = self.included_paths_list(db).to_vec();
-        let open_files = self.open_fileset(db).clone();
         let check_mode = self.check_mode(db);
         let verbose = self.verbose_flag(db);
         let force_exclude = self.force_exclude_flag(db);
@@ -218,9 +217,6 @@ impl Project {
         self.set_included_paths_list(db)
             .with_durability(durability)
             .to(included_paths);
-        self.set_open_fileset(db)
-            .with_durability(durability)
-            .to(open_files);
         self.set_check_mode(db)
             .with_durability(durability)
             .to(check_mode);
@@ -490,7 +486,7 @@ impl Project {
         }
     }
 
-    /// Returns the open files in the project or `None` if there are no open files.
+    /// Returns the open files in the project.
     pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
@@ -501,6 +497,14 @@ impl Project {
         tracing::debug!("Set open project files (count: {})", open_files.len());
 
         self.set_open_fileset(db).to(open_files);
+    }
+
+    /// Permanently marks the project as never having open files, so reads of the
+    /// open-file state record no salsa dependency. Any later write panics.
+    pub fn freeze_open_files(self, db: &mut dyn Db) {
+        self.set_open_fileset(db)
+            .with_durability(Durability::NEVER_CHANGE)
+            .to(FxHashSet::default());
     }
 
     /// This takes the open files from the project and returns them.

@@ -179,6 +179,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         ruff_db::disable_lru(&mut db);
     }
 
+    // The CLI never opens files, so this is safe even where the freeze below isn't
+    db.freeze_open_files();
+
     // A one-shot check never mutates these heavily read inputs, so freezing them avoids recording
     // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
     // source-text overrides, and memory reports measure the database without this optimization, so

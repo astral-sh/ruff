@@ -281,6 +281,10 @@ impl ty_python_semantic::Db for CorpusDb {
         false
     }
 
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
     }
