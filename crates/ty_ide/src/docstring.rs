@@ -841,16 +841,17 @@ Summary.
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...<HB>
-        <HB>
-        Returns:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details<HB>
+        My cool func...
+
+        ## Returns
+        Some details
+
         `````python
-            x_y = thing_do();
-            ``` # this should't close the fence!
-            a_b = other_thing();
+        x_y = thing_do();
+        ``` # this should't close the fence!
+        a_b = other_thing();
         `````<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        And so on.
         ");
     }
 
@@ -876,16 +877,17 @@ Summary.
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @"
-        My cool func...<HB>
-        <HB>
-        Returns:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;Some details<HB>
+        My cool func...
+
+        ## Returns
+        Some details
+
         ~~~~~~python
-            x_y = thing_do();
-            ~~~ # this should't close the fence!
-            a_b = other_thing();
+        x_y = thing_do();
+        ~~~ # this should't close the fence!
+        a_b = other_thing();
         ~~~~~~<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;And so on.
+        And so on.
         ");
     }
 
@@ -1284,16 +1286,21 @@ Summary.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation<HB>
-        <HB>
-        Returns:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;str: The return value description
+        This is a function description.
+
+        ## Arguments
+        **param1**: `str`<HB>
+        The first parameter description
+
+        **param2**: `int`<HB>
+        The second parameter description<HB>
+        This is a continuation of param2 description.
+
+        **param3**<HB>
+        A parameter without type annotation
+
+        ## Returns
+        str: The return value description
         ");
     }
 
@@ -1495,12 +1502,15 @@ Summary.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter<HB>
-        <HB>
+        This is a function description.
+
+        ## Arguments
+        **param1**: `str`<HB>
+        Google-style parameter
+
+        **param2**: `int`<HB>
+        Another Google-style parameter
+
         Parameters<HB>
         ----------<HB>
         param3 : bool<HB>
@@ -1649,11 +1659,14 @@ Summary.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Google-style duplicate parameter
+        This is a function description.
+
+        ## Arguments
+        **param1**: `str`<HB>
+        Google-style parameter
+
+        **param2**: `int`<HB>
+        Google-style duplicate parameter
 
         ## Parameters
         **param2**: `int`<HB>
@@ -1854,11 +1867,14 @@ Summary.
 
         let markdown = docstring_windows.render_markdown();
         assert_snapshot!(markdown.as_str(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
+        This is a function description.
+
+        ## Arguments
+        **param1**: `str`<HB>
+        The first parameter
+
+        **param2**: `int`<HB>
+        The second parameter
         ");
         assert_eq!(docstring_mac.render_markdown(), markdown);
         assert_eq!(docstring_unix.render_markdown(), markdown);
