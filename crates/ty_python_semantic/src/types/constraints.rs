@@ -402,9 +402,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
+        let constraint = Constraint::new_node_with_bounds(db, builder, typevar, lower, upper);
+        let valid_specializations = typevar.valid_specializations(db, builder);
         Self::from_node(
             builder,
-            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
+            constraint.and_with_offset(builder, valid_specializations),
         )
     }
 
@@ -601,37 +603,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
-    /// Intersects this set with the declared domain of every constrained type variable.
-    ///
-    /// Receiver constraints need this explicitly so that a nested type variable cannot be inferred
-    /// outside of its declared domain:
-    ///
-    /// ```python
-    /// class C:
-    ///     def method[T: int](self: list[T]) -> None: ...
-    /// ```
-    ///
-    /// This is separate from [`Self::reduce_inferable`], because applying domains during every
-    /// signature abstraction would recursively reapply self-referential protocol bounds.
-    pub(crate) fn and_valid_typevar_specializations(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        let mut constrained = self.node;
-        let mut typevars = FxOrderSet::default();
-        self.node
-            .for_each_unique_constraint(builder, &mut |constraint, _| {
-                typevars.insert(builder.constraint_data(constraint).typevar);
-            });
-        for typevar in typevars {
-            constrained =
-                constrained.and_with_offset(builder, typevar.valid_specializations(db, builder));
-        }
-        Self::from_node(builder, constrained)
-    }
-
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -704,7 +675,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     .map(|upper| upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
                 let mapped = if let Type::TypeVar(typevar) = subject {
-                    Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
+                    Constraint::new_node_with_kind(
+                        db,
+                        builder,
+                        typevar,
+                        lower,
+                        upper,
+                        constraint.kind,
+                    )
                 } else {
                     let lower_holds = lower.map_or(ALWAYS_TRUE, |lower| {
                         builder
@@ -1401,6 +1379,28 @@ pub struct ConstraintId;
 pub(crate) struct Constraint<'db> {
     pub(crate) typevar: BoundTypeVarInstance<'db>,
     pub(crate) bounds: ConstraintBounds<'db>,
+    kind: ConstraintKind,
+}
+
+/// Whether a constraint provides inference evidence or only restricts the valid domain.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum ConstraintKind {
+    Inference,
+    TypeVarDomain,
+}
+
+impl ConstraintKind {
+    /// Combines the roles of two antecedents for a constraint derived from both.
+    ///
+    /// A fact derived only from domain guards remains a guard. Once an inference constraint
+    /// participates, the derived fact can carry that evidence to another type variable.
+    fn derived_with(self, other: Self) -> Self {
+        if matches!(self, Self::TypeVarDomain) && matches!(other, Self::TypeVarDomain) {
+            Self::TypeVarDomain
+        } else {
+            Self::Inference
+        }
+    }
 }
 
 /// The explicit lower and upper bounds inferred for a typevar on one constraint path.
@@ -1577,6 +1577,7 @@ impl<'db> UpperBound<'db> {
 }
 
 impl ConstraintId {
+    #[cfg(test)]
     fn new<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
@@ -1587,6 +1588,7 @@ impl ConstraintId {
         Self::new_with_bounds(db, builder, typevar, Some(lower), Some(upper))
     }
 
+    #[cfg(test)]
     fn new_with_bounds<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
@@ -1594,11 +1596,31 @@ impl ConstraintId {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> ConstraintId {
+        Self::new_with_kind(
+            db,
+            builder,
+            typevar,
+            lower,
+            upper,
+            ConstraintKind::Inference,
+        )
+    }
+
+    /// Interns a range constraint with its role in solution inference.
+    fn new_with_kind<'db>(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+        kind: ConstraintKind,
+    ) -> ConstraintId {
         builder.intern_constraint(
             db,
             Constraint {
                 typevar,
                 bounds: ConstraintBounds::new(lower, upper),
+                kind,
             },
         )
     }
@@ -1712,6 +1734,24 @@ impl<'db> Constraint<'db> {
         Self::new_node_with_bounds(db, builder, typevar, Some(lower), Some(upper))
     }
 
+    /// Returns an exact range that restricts a type variable's declared domain.
+    fn new_domain_node(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> NodeId {
+        Self::new_node_with_kind(
+            db,
+            builder,
+            typevar,
+            Some(lower),
+            Some(upper),
+            ConstraintKind::TypeVarDomain,
+        )
+    }
+
     /// Returns a new range constraint, preserving whether each bound was present explicitly.
     ///
     /// Panics if present `lower` and `upper` bounds are not fully static.
@@ -1719,8 +1759,45 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+    ) -> NodeId {
+        Self::new_node_with_kind(
+            db,
+            builder,
+            typevar,
+            lower,
+            upper,
+            ConstraintKind::Inference,
+        )
+    }
+
+    /// Returns a declared-domain range while preserving which bounds are explicit.
+    fn new_domain_node_with_bounds(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+    ) -> NodeId {
+        Self::new_node_with_kind(
+            db,
+            builder,
+            typevar,
+            lower,
+            upper,
+            ConstraintKind::TypeVarDomain,
+        )
+    }
+
+    /// Returns a range constraint with its role in solution inference.
+    fn new_node_with_kind(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         mut lower: Option<Type<'db>>,
         mut upper: Option<Type<'db>>,
+        kind: ConstraintKind,
     ) -> NodeId {
         if lower.is_none() && upper.is_none() {
             return ALWAYS_TRUE;
@@ -1739,12 +1816,13 @@ impl<'db> Constraint<'db> {
             for lower_element in lower_union.elements(db) {
                 result = result.and_with_offset(
                     builder,
-                    Constraint::new_node_with_bounds(
+                    Constraint::new_node_with_kind(
                         db,
                         builder,
                         typevar,
                         Some(*lower_element),
                         upper,
+                        kind,
                     ),
                 );
             }
@@ -1760,24 +1838,26 @@ impl<'db> Constraint<'db> {
             for upper_element in upper_intersection.iter_positive(db) {
                 result = result.and_with_offset(
                     builder,
-                    Constraint::new_node_with_bounds(
+                    Constraint::new_node_with_kind(
                         db,
                         builder,
                         typevar,
                         lower,
                         Some(upper_element),
+                        kind,
                     ),
                 );
             }
             for upper_element in upper_intersection.iter_negative(db) {
                 result = result.and_with_offset(
                     builder,
-                    Constraint::new_node_with_bounds(
+                    Constraint::new_node_with_kind(
                         db,
                         builder,
                         typevar,
                         lower,
                         Some(upper_element.negate(db)),
+                        kind,
                     ),
                 );
             }
@@ -1810,7 +1890,14 @@ impl<'db> Constraint<'db> {
             {
                 return Node::new_constraint(
                     builder,
-                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
+                    ConstraintId::new_with_kind(
+                        db,
+                        builder,
+                        typevar,
+                        Some(Type::Never),
+                        Some(Type::object()),
+                        kind,
+                    ),
                     1,
                 )
                 .negate(builder);
@@ -1866,12 +1953,13 @@ impl<'db> Constraint<'db> {
                 };
                 Node::new_constraint(
                     builder,
-                    ConstraintId::new(
+                    ConstraintId::new_with_kind(
                         db,
                         builder,
                         typevar,
-                        Type::TypeVar(bound),
-                        Type::TypeVar(bound),
+                        Some(Type::TypeVar(bound)),
+                        Some(Type::TypeVar(bound)),
+                        kind,
                     ),
                     1,
                 )
@@ -1884,23 +1972,25 @@ impl<'db> Constraint<'db> {
             {
                 let lower = Node::new_constraint(
                     builder,
-                    ConstraintId::new_with_bounds(
+                    ConstraintId::new_with_kind(
                         db,
                         builder,
                         lower,
                         None,
                         Some(Type::TypeVar(typevar)),
+                        kind,
                     ),
                     1,
                 );
                 let upper = Node::new_constraint(
                     builder,
-                    ConstraintId::new_with_bounds(
+                    ConstraintId::new_with_kind(
                         db,
                         builder,
                         upper,
                         Some(Type::TypeVar(typevar)),
                         None,
+                        kind,
                     ),
                     1,
                 );
@@ -1911,19 +2001,20 @@ impl<'db> Constraint<'db> {
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
                 let lower = Node::new_constraint(
                     builder,
-                    ConstraintId::new_with_bounds(
+                    ConstraintId::new_with_kind(
                         db,
                         builder,
                         lower,
                         None,
                         Some(Type::TypeVar(typevar)),
+                        kind,
                     ),
                     1,
                 );
                 let upper = if upper.is_none() {
                     ALWAYS_TRUE
                 } else {
-                    Constraint::new_node_with_bounds(db, builder, typevar, None, upper)
+                    Constraint::new_node_with_kind(db, builder, typevar, None, upper, kind)
                 };
                 lower.and(builder, upper)
             }
@@ -1933,16 +2024,17 @@ impl<'db> Constraint<'db> {
                 let lower = if lower.is_none() {
                     ALWAYS_TRUE
                 } else {
-                    Constraint::new_node_with_bounds(db, builder, typevar, lower, None)
+                    Constraint::new_node_with_kind(db, builder, typevar, lower, None, kind)
                 };
                 let upper = Node::new_constraint(
                     builder,
-                    ConstraintId::new_with_bounds(
+                    ConstraintId::new_with_kind(
                         db,
                         builder,
                         upper,
                         Some(Type::TypeVar(typevar)),
                         None,
+                        kind,
                     ),
                     1,
                 );
@@ -1951,7 +2043,7 @@ impl<'db> Constraint<'db> {
 
             _ => Node::new_constraint(
                 builder,
-                ConstraintId::new_with_bounds(db, builder, typevar, lower, upper),
+                ConstraintId::new_with_kind(db, builder, typevar, lower, upper, kind),
                 1,
             ),
         }
@@ -2063,6 +2155,12 @@ impl ConstraintId {
             return IntersectionResult::Disjoint;
         }
 
+        // Keep declared-domain guards separate from inference evidence. We still perform the
+        // satisfiability check above so incompatible evidence makes the pair impossible.
+        if self_constraint.kind != other_constraint.kind {
+            return IntersectionResult::CannotSimplify;
+        }
+
         // We do not create lower bounds that are unions, or upper bounds that are factored
         // intersections, since those can be broken apart into BDDs over simpler constraints. If the
         // merged upper contains a union clause, keep any useful disjointness result from above but
@@ -2080,6 +2178,7 @@ impl ConstraintId {
         IntersectionResult::Simplified(Constraint {
             typevar: self_constraint.typevar,
             bounds: ConstraintBounds::new(lower, upper),
+            kind: self_constraint.kind,
         })
     }
 
@@ -3654,6 +3753,10 @@ impl<'db> ConstraintBoundsBuilder<'db> {
 }
 
 /// The explicit lower and upper bounds inferred for one typevar on one BDD path.
+///
+/// Declared-domain guards determine whether the path is valid, but are not included here as
+/// inference evidence. [`PathBounds::default_solve`] validates the inferred result against the
+/// type variable's declared bound or constraints.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
@@ -3792,6 +3895,9 @@ impl<'db> PathBounds<'db> {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = builder.constraint_data(constraint);
+                if constraint.kind == ConstraintKind::TypeVarDomain {
+                    continue;
+                }
                 let typevar = constraint.typevar;
                 if let Some(lower) = constraint.bounds.lower {
                     let bounds = mappings.entry(typevar).or_default();
@@ -3866,11 +3972,13 @@ impl<'db> PathBounds<'db> {
                     }
 
                     current = interior.if_true;
-                    constraints.push((
-                        constraint.typevar,
-                        constraint.bounds,
-                        interior.source_order,
-                    ));
+                    if constraint.kind == ConstraintKind::Inference {
+                        constraints.push((
+                            constraint.typevar,
+                            constraint.bounds,
+                            interior.source_order,
+                        ));
+                    }
                 }
             }
         }
@@ -4790,12 +4898,15 @@ impl InteriorNode {
                     _ => continue,
                 };
 
-                let new_constraint = ConstraintId::new_with_bounds(
+                let new_constraint = ConstraintId::new_with_kind(
                     db,
                     builder,
                     constrained_typevar,
                     new_lower,
                     new_upper,
+                    left_constraint_data
+                        .kind
+                        .derived_with(right_constraint_data.kind),
                 );
                 if seen_constraints.contains(&new_constraint) {
                     continue;
@@ -5814,6 +5925,9 @@ impl SequentMap {
         let bound_typevar = bound_constraint_data.typevar;
         let constrained_constraint_data = builder.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
+        let derived_kind = bound_constraint_data
+            .kind
+            .derived_with(constrained_constraint_data.kind);
 
         // Transitive pivots require subtyping; classes with dynamic bases can be assignable to
         // unrelated types without being subtypes.
@@ -5907,12 +6021,13 @@ impl SequentMap {
         if let Some(Type::TypeVar(lower_bound_typevar)) = new_lower
             && !lower_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
         {
-            post_constraints.push(ConstraintId::new_with_bounds(
+            post_constraints.push(ConstraintId::new_with_kind(
                 db,
                 builder,
                 lower_bound_typevar,
                 None,
                 Some(Type::TypeVar(constrained_typevar)),
+                derived_kind,
             ));
             constrained_lower = None;
         }
@@ -5920,12 +6035,13 @@ impl SequentMap {
         if let Some(Type::TypeVar(upper_bound_typevar)) = new_upper
             && !upper_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
         {
-            post_constraints.push(ConstraintId::new_with_bounds(
+            post_constraints.push(ConstraintId::new_with_kind(
                 db,
                 builder,
                 upper_bound_typevar,
                 Some(Type::TypeVar(constrained_typevar)),
                 None,
+                derived_kind,
             ));
             constrained_upper = None;
         }
@@ -5933,12 +6049,13 @@ impl SequentMap {
         if !(constrained_lower.is_none_or(|ty| ty.is_never())
             && constrained_upper.is_none_or(|ty| ty.is_object()))
         {
-            post_constraints.push(ConstraintId::new_with_bounds(
+            post_constraints.push(ConstraintId::new_with_kind(
                 db,
                 builder,
                 constrained_typevar,
                 constrained_lower,
                 constrained_upper,
+                derived_kind,
             ));
         }
 
@@ -5994,6 +6111,7 @@ impl SequentMap {
                 let constrained_identity = constrained_typevar.identity(db);
                 let constrained_lower = constrained_data.bounds.materialized_lower();
                 let constrained_upper = constrained_data.bounds.materialized_upper();
+                let derived_kind = bound_data.kind.derived_with(constrained_data.kind);
 
                 // If the replacement contains the bound typevar itself (e.g., the bound
                 // constraint is `_V ≤ G[_V]`), or the constrained typevar (e.g., the bound
@@ -6064,12 +6182,13 @@ impl SequentMap {
                     let new_upper =
                         constrained_upper.substitute_one_typevar(db, bound_typevar, replacement);
                     if new_upper != constrained_upper {
-                        let post = ConstraintId::new_with_bounds(
+                        let post = ConstraintId::new_with_kind(
                             db,
                             builder,
                             constrained_typevar,
                             constrained_data.bounds.lower,
                             Some(new_upper),
+                            derived_kind,
                         );
                         self.add_pair_implication(
                             db,
@@ -6125,12 +6244,13 @@ impl SequentMap {
                     let new_lower =
                         constrained_lower.substitute_one_typevar(db, bound_typevar, replacement);
                     if new_lower != constrained_lower {
-                        let post = ConstraintId::new_with_bounds(
+                        let post = ConstraintId::new_with_kind(
                             db,
                             builder,
                             constrained_typevar,
                             Some(new_lower),
                             constrained_data.bounds.upper,
+                            derived_kind,
                         );
                         self.add_pair_implication(
                             db,
@@ -6176,6 +6296,7 @@ impl SequentMap {
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_lower = constrained_data.bounds.materialized_lower();
                 let constrained_upper = constrained_data.bounds.materialized_upper();
+                let derived_kind = bound_data.kind.derived_with(constrained_data.kind);
 
                 let mut try_one_bound = |bound: Type<'db>, is_upper_bound: bool| {
                     let Some(nested_typevar) = bound.as_typevar() else {
@@ -6218,12 +6339,13 @@ impl SequentMap {
                             replacement,
                         );
                         if new_upper != constrained_upper {
-                            let post = ConstraintId::new_with_bounds(
+                            let post = ConstraintId::new_with_kind(
                                 db,
                                 builder,
                                 constrained_typevar,
                                 constrained_data.bounds.lower,
                                 Some(new_upper),
+                                derived_kind,
                             );
                             self.add_pair_implication(
                                 db,
@@ -6256,12 +6378,13 @@ impl SequentMap {
                             replacement,
                         );
                         if new_lower != constrained_lower {
-                            let post = ConstraintId::new_with_bounds(
+                            let post = ConstraintId::new_with_kind(
                                 db,
                                 builder,
                                 constrained_typevar,
                                 Some(new_lower),
                                 constrained_data.bounds.upper,
+                                derived_kind,
                             );
                             self.add_pair_implication(
                                 db,
@@ -6305,6 +6428,9 @@ impl SequentMap {
                 let right_constraint_data = builder.constraint_data(right_constraint);
                 let right_lower = right_constraint_data.bounds.lower;
                 let right_upper = right_constraint_data.bounds.upper;
+                let derived_kind = left_constraint_data
+                    .kind
+                    .derived_with(right_constraint_data.kind);
                 let new_constraints =
                     |bound_typevar: BoundTypeVarInstance<'db>,
                      mut right_lower: Option<Type<'db>>,
@@ -6335,12 +6461,13 @@ impl SequentMap {
                         if let Some(Type::TypeVar(lower_bound_typevar)) = right_lower
                             && !lower_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
                         {
-                            post_constraints.push(ConstraintId::new_with_bounds(
+                            post_constraints.push(ConstraintId::new_with_kind(
                                 db,
                                 builder,
                                 lower_bound_typevar,
                                 None,
                                 Some(Type::TypeVar(bound_typevar)),
+                                derived_kind,
                             ));
                             constrained_lower = None;
                         }
@@ -6348,12 +6475,13 @@ impl SequentMap {
                         if let Some(Type::TypeVar(upper_bound_typevar)) = right_upper
                             && !upper_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
                         {
-                            post_constraints.push(ConstraintId::new_with_bounds(
+                            post_constraints.push(ConstraintId::new_with_kind(
                                 db,
                                 builder,
                                 upper_bound_typevar,
                                 Some(Type::TypeVar(bound_typevar)),
                                 None,
+                                derived_kind,
                             ));
                             constrained_upper = None;
                         }
@@ -6361,12 +6489,13 @@ impl SequentMap {
                         if !(constrained_lower.unwrap_or(Type::Never).is_never()
                             && constrained_upper.unwrap_or(Type::object()).is_object())
                         {
-                            post_constraints.push(ConstraintId::new_with_bounds(
+                            post_constraints.push(ConstraintId::new_with_kind(
                                 db,
                                 builder,
                                 bound_typevar,
                                 constrained_lower,
                                 constrained_upper,
+                                derived_kind,
                             ));
                         }
 
@@ -7224,6 +7353,12 @@ impl<'db> BoundTypeVarInstance<'db> {
             // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
             return ALWAYS_TRUE;
         }
+        if self.typevar(db).is_self(db) {
+            // `typing.Self` is specialized by receiver binding. Its synthetic upper bound is not
+            // a declared TypeVar domain and can be recursively parameterized by the class's own
+            // type variables.
+            return ALWAYS_TRUE;
+        }
 
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
@@ -7238,8 +7373,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         match self.typevar(db).bound_or_constraints(db) {
             None => ALWAYS_TRUE,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                // Intersecting an F-bounded protocol domain at construction time re-enters the
+                // same structural protocol relation while its constraint set is being checked.
+                // Omit that domain for now; all other constrained typevars still carry their
+                // declared domains in every constraint set.
+                if matches!(bound, Type::ProtocolInstance(_))
+                    && any_over_type(db, bound, true, |ty| {
+                        ty.as_typevar()
+                            .is_some_and(|candidate| candidate.typevar(db) == self.typevar(db))
+                    })
+                {
+                    return ALWAYS_TRUE;
+                }
                 let bound = bound.top_materialization(db);
-                Constraint::new_node_with_bounds(db, builder, self, None, Some(bound))
+                Constraint::new_domain_node_with_bounds(db, builder, self, None, Some(bound))
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = ALWAYS_FALSE;
@@ -7248,7 +7395,13 @@ impl<'db> BoundTypeVarInstance<'db> {
                     let constraint_upper = constraint.top_materialization(db);
                     specializations = specializations.or_with_offset(
                         builder,
-                        Constraint::new_node(db, builder, self, constraint_lower, constraint_upper),
+                        Constraint::new_domain_node(
+                            db,
+                            builder,
+                            self,
+                            constraint_lower,
+                            constraint_upper,
+                        ),
                     );
                 }
                 specializations
@@ -7318,6 +7471,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::generics::ApplySpecialization;
+    use crate::types::typevar::TypeVarConstraints;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
@@ -7452,6 +7606,49 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn typevar_domain_restricts_without_providing_inference_evidence() {
+        let db = setup_db();
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
+        let typevar = create_typevar(&db, "T").map_bound_or_constraints(&db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(
+                    &db,
+                    Vec::from([str_or_bytes, str, bytes]).into_boxed_slice(),
+                ),
+            ))
+        });
+        let builder = ConstraintSetBuilder::new();
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(typevar.identity(&db)).collect());
+
+        let valid = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, typevar, str)
+            .solutions(&db, &builder, inferable);
+        let Solutions::Constrained(solutions) = valid else {
+            panic!("expected constrained solutions");
+        };
+        assert!(
+            solutions
+                .iter()
+                .flatten()
+                .all(|binding| { binding.bound_typevar == typevar && binding.solution == str })
+        );
+
+        let invalid = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &builder,
+            typevar,
+            known_instance(&db, KnownClass::Int),
+        );
+        assert!(invalid.is_never_satisfied(&db));
+        assert_eq!(
+            invalid.solutions(&db, &builder, inferable),
+            Solutions::Unsatisfiable
+        );
     }
 
     #[test]
