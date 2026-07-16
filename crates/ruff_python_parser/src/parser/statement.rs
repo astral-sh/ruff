@@ -1,5 +1,13 @@
 use std::fmt::{Display, Write};
 
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
+};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
 use crate::error::StarTupleKind;
 use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
@@ -9,13 +17,6 @@ use crate::parser::{
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
-use ruff_python_ast::name::Name;
-use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
-    Operator, PythonVersion, Stmt, Suite, WithItem,
-};
-use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::Parenthesized;
 use super::expression::ExpressionContext;
