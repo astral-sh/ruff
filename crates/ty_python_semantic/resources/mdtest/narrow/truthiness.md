@@ -71,7 +71,7 @@ if (foo1 := Foo()).val:
     reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
-## Narrowing tagged unions by attribute truthiness
+## Narrowing tagged unions of nominal classes by attribute truthiness
 
 ```py
 from typing import Literal
