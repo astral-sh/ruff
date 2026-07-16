@@ -21,7 +21,8 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -526,6 +527,38 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_always_satisfied(db)
             {
                 return result;
+            }
+
+            if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                && let Some(source_instance) = ty
+                    .as_protocol_instance()
+                    .and_then(ProtocolInstanceType::to_nominal_instance)
+                && let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
+                    (source_instance.class(db), nominal_instance.class(db))
+                && source_alias.origin(db) == target_alias.origin(db)
+                && let Some(identity_protocol) = target_alias
+                    .origin(db)
+                    .identity_specialization(db)
+                    .into_protocol_class(db)
+            {
+                // A protocol's structural relation is determined by its interface. Relating
+                // the arguments using the identity interface's variance avoids expanding
+                // recursive members (and their freshly bound method typevars) at every step.
+                let interface = identity_protocol.interface(db);
+                let structurally_satisfied = self.check_specialization_pair_with_variance(
+                    db,
+                    source_alias.specialization(db),
+                    target_alias.specialization(db),
+                    |typevar| {
+                        let variance = interface.variance_of(db, typevar.identity(db));
+                        if typevar.is_paramspec(db) {
+                            variance.flip()
+                        } else {
+                            variance
+                        }
+                    },
+                );
+                return result.or(db, self.constraints, || structurally_satisfied);
             }
 
             // For union simplification, failing the nominal relation between two

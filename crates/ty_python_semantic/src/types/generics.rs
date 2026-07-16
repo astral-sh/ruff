@@ -1542,6 +1542,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: Specialization<'db>,
         target: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_specialization_pair_with_variance(db, source, target, |typevar| {
+            specialization_variance(db, typevar)
+        })
+    }
+
+    /// Relates two specializations using the variance supplied for each type parameter.
+    ///
+    /// Protocol structural relations use their interface variance instead of the declared
+    /// variance, since parameters that do not occur in the interface cannot constrain that
+    /// relation.
+    pub(super) fn check_specialization_pair_with_variance(
+        &self,
+        db: &'db dyn Db,
+        source: Specialization<'db>,
+        target: Specialization<'db>,
+        mut variance: impl FnMut(BoundTypeVarInstance<'db>) -> TypeVarVariance,
+    ) -> ConstraintSet<'db, 'c> {
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1572,7 +1589,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 //   - contravariant: verify that target_type <: source_type
                 //   - invariant: verify that source_type <: target_type AND target_type <: source_type
                 //   - bivariant: skip, can't make subtyping/assignability false
-                match specialization_variance(db, bound_typevar) {
+                match variance(bound_typevar) {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
                         *source_type,
