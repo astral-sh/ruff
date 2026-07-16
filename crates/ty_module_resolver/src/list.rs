@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
 use ruff_db::files::directory_listing;
@@ -178,7 +179,7 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
-                            module_name,
+                            Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
                             file,
@@ -222,7 +223,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package(self.db, Cow::Owned(module_name)),
                     );
                 }
                 return;
@@ -250,7 +251,7 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
-                module_name,
+                Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
                 file,

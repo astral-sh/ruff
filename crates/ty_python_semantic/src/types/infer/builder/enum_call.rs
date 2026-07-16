@@ -421,19 +421,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_ty = self.expression_type(name_arg);
         let name = name_ty
             .as_string_literal()
-            .map(|name_literal| Name::new(name_literal.value(db)));
+            .map(|name_literal| name_literal.value(db));
 
         if (name.is_some() || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)))
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
+            && Some(assigned_name.as_str()) != name
         {
             report_mismatched_type_name(
                 &self.context,
                 name_arg,
                 base_name,
                 &assigned_name,
-                name.as_deref(),
+                name,
                 name_ty,
             );
         }
@@ -471,7 +471,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         name_arg: &ast::Expr,
         base_class: KnownClass,
-    ) -> Option<Name> {
+    ) -> Option<&'db str> {
         let db = self.db();
         let base_name = base_class.name(db);
         let name_type = self.expression_type(name_arg);
@@ -491,7 +491,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         };
 
-        Some(Name::new(name_literal.value(db)))
+        Some(name_literal.value(db))
     }
 
     fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> EnumStart {
