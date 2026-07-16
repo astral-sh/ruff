@@ -1,6 +1,7 @@
 ---
 name: wobbling-ty-constraint-order
 description: Use when a user asks to wobble ty constraint ordering, check constraint-set or TDD ordering determinism, test reversed constraint/typevar IDs, or investigate nondeterministic ty inference and mdtest results.
+compatibility: Requires Cargo, mktemp, and a POSIX-compatible shell; uses cargo-nextest when available and otherwise falls back to cargo test.
 ---
 
 # Wobbling ty constraint order
@@ -15,11 +16,26 @@ This deliberately changes internal TDD shape. Run **mdtests only**: graph-struct
 
 ## Run
 
-From the Ruff root, first establish the normal baseline, then run the reversed and XOR-masked orders sequentially:
+From the Ruff root, first establish the normal baseline, then run the reversed and XOR-masked orders sequentially. Set `TY_CONSTRAINT_ORDER_LOG_DIR` to retain logs in a particular writable directory; otherwise `mktemp` chooses an appropriate temporary directory (respecting the environment's temporary-directory configuration).
 
 ```bash
-set -uo pipefail
-mkdir -p "$HOME/.pi/tmp"
+set -u
+
+if test -n "${TY_CONSTRAINT_ORDER_LOG_DIR:-}"; then
+    log_dir="$TY_CONSTRAINT_ORDER_LOG_DIR"
+    mkdir -p "$log_dir"
+else
+    log_dir="$(mktemp -d -t ty-constraint-order.XXXXXXXX)"
+fi
+printf '%s\n' "logs: $log_dir"
+
+if cargo nextest --version >/dev/null 2>&1; then
+    runner=nextest
+else
+    runner=test
+fi
+printf '%s\n' "runner: cargo $runner"
+
 export CARGO_PROFILE_DEV_OPT_LEVEL=1
 export CARGO_PROFILE_DEV_DEBUG=line-tables-only
 export INSTA_UPDATE=no
@@ -33,13 +49,18 @@ for order in normal reverse 1 2 3 4 7 8 15; do
         export TY_CONSTRAINT_SET_ORDER="$order"
     fi
 
-    log="$HOME/.pi/tmp/ty-constraint-order-${order}.log"
-    cargo nextest run -p ty_python_semantic --test mdtest \
-        --no-fail-fast --status-level fail --failure-output immediate-final \
-        >"$log" 2>&1
+    log="$log_dir/ty-constraint-order-${order}.log"
+    if test "$runner" = nextest; then
+        cargo nextest run -p ty_python_semantic --test mdtest \
+            --no-fail-fast --status-level fail --failure-output immediate-final \
+            >"$log" 2>&1
+    else
+        cargo test -p ty_python_semantic --test mdtest >"$log" 2>&1
+    fi
     status=$?
-    printf '%-7s exit=%s  ' "$order" "$status"
-    rg 'Summary \[' "$log" | tail -1
+
+    printf '%-7s exit=%s\n' "$order" "$status"
+    grep -E 'Summary \[|test result:' "$log" | tail -1 || true
     printf '%s\n' "  log: $log"
 done
 ```
