@@ -936,3 +936,537 @@ def _(top: Top[FunctionHolder[Any]], bottom: Bottom[FunctionHolder[Any]]) -> Non
     # revealed: (def shared(self, value: Never) -> object, /) -> def shared(self, value: object) -> Never
     reveal_type(bottom.nested)
 ```
+
+## Protocols
+
+Materializing a protocol maps each member according to how it is used. Reads are covariant and
+writes are contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### Instance attributes
+
+For a mutable `Any` attribute, `Top` reads `object` and writes `Never`; `Bottom` does the reverse:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class MutableAny(Protocol):
+    value: Any
+
+def mutable_attributes(top: Top[MutableAny], bottom: Bottom[MutableAny]) -> None:
+    reveal_type(top)  # revealed: Top[MutableAny]
+    reveal_type(top.value)  # revealed: object
+    top.value = 1  # error: [invalid-assignment]
+    reveal_type(bottom)  # revealed: Bottom[MutableAny]
+    reveal_type(bottom.value)  # revealed: Never
+    bottom.value = object()
+```
+
+The class object of a materialized protocol preserves its instance type when called directly or
+passed through a generic callable:
+
+```py
+from typing import Callable
+
+def invoke[T](factory: Callable[[], T]) -> T:
+    return factory()
+
+def constructors(top: Top[MutableAny]) -> None:
+    reveal_type(type(top))  # revealed: type[Top[MutableAny]]
+    reveal_type(type(top)())  # revealed: Top[MutableAny]
+    reveal_type(invoke(type(top)))  # revealed: Top[MutableAny]
+```
+
+### Writable properties
+
+A property setter is already a write, so its parameter is mapped only once:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class WritableAny(Protocol):
+    @property
+    def value(self) -> Any: ...
+    @value.setter
+    def value(self, value: Any) -> None: ...
+
+def writable_properties(top: Top[WritableAny], bottom: Bottom[WritableAny]) -> None:
+    reveal_type(top.value)  # revealed: object
+    top.value = 1  # error: [invalid-assignment]
+    reveal_type(bottom.value)  # revealed: Never
+    bottom.value = object()
+```
+
+### Protocol relations
+
+`MutableAny` and `Top[MutableAny]` refer to the same protocol class, but they do not have the same
+read and write requirements. Subtyping and union simplification must use those requirements:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class MutableAny(Protocol):
+    value: Any
+
+static_assert(not is_subtype_of(Top[MutableAny], Bottom[MutableAny]))
+static_assert(not is_subtype_of(Top[MutableAny], MutableAny))
+
+def union_order(
+    plain_first: MutableAny | Top[MutableAny],
+    top_first: Top[MutableAny] | MutableAny,
+) -> None:
+    reveal_type(plain_first)  # revealed: Top[MutableAny]
+    reveal_type(top_first)  # revealed: Top[MutableAny]
+    reveal_type(plain_first.value)  # revealed: object
+    reveal_type(top_first.value)  # revealed: object
+```
+
+Inheriting from a protocol must not bypass its materialized write requirement. A nominal subclass
+and a structurally identical class therefore have the same result here:
+
+```py
+class MutableAnySubclass(MutableAny):
+    value: int
+
+class StructuralMutableAny:
+    value: int
+
+static_assert(not is_subtype_of(MutableAnySubclass, Bottom[MutableAny]))
+static_assert(not is_subtype_of(StructuralMutableAny, Bottom[MutableAny]))
+```
+
+An inherited `Any` member is materialized along with members declared directly on the protocol, so
+it cannot satisfy a more specific inherited protocol:
+
+```py
+class GenericBase[T](Protocol):
+    item: T
+
+class InheritedAny(GenericBase[Any], Protocol):
+    marker: Any
+
+def requires_int_base(value: GenericBase[int]) -> None: ...
+def _(top: Top[InheritedAny]) -> None:
+    requires_int_base(top)  # error: [invalid-argument-type]
+```
+
+Materializing an unrelated member does not erase explicit protocol inheritance, even when an
+override is structurally incompatible with the base protocol:
+
+```py
+class NominalBase(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class NominalChild(NominalBase, Protocol):
+    marker: Any
+
+    @property
+    def value(self) -> str: ...
+
+static_assert(is_subtype_of(Top[NominalChild], NominalBase))
+```
+
+### Class variables
+
+Class variables have separate read and write types. `Top` reads `object` and writes `Never`, while
+`Bottom` reads `Never` and writes `object`:
+
+```py
+from typing import Any, ClassVar, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class ClassVarAny(Protocol):
+    value: ClassVar[Any]
+
+def class_writes(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
+    type(top).value = 1  # error: [invalid-assignment]
+    type(bottom).value = object()
+
+def class_reads(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
+    reveal_type(type(top).value)  # revealed: object
+    reveal_type(type(bottom).value)  # revealed: Never
+```
+
+Structural protocol checks use the mapped read and write types as well. `ClassVarInt` satisfies the
+top-materialized protocol, but not the bottom-materialized one:
+
+```py
+class ClassVarInt:
+    value: ClassVar[int] = 1
+
+static_assert(is_subtype_of(ClassVarInt, Top[ClassVarAny]))
+static_assert(not is_subtype_of(ClassVarInt, Bottom[ClassVarAny]))
+top_class: type[Top[ClassVarAny]] = ClassVarInt
+```
+
+Union simplification preserves the materialized class variable regardless of operand order:
+
+```py
+def class_union_order(
+    plain: ClassVarAny,
+    top: Top[ClassVarAny],
+    flag: bool,
+) -> None:
+    plain_first = type(plain) if flag else type(top)
+    top_first = type(top) if flag else type(plain)
+    reveal_type(plain_first.value)  # revealed: object
+    reveal_type(top_first.value)  # revealed: object
+```
+
+### Methods through the class object
+
+Ordinary, static, and class methods use their materialized signatures when accessed through the
+class object. Ordinary methods remain unbound:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class DecoratedAny(Protocol):
+    def transform(self, value: Any) -> Any: ...
+    @staticmethod
+    def parse(value: Any) -> Any: ...
+    @classmethod
+    def create(cls, value: Any) -> Any: ...
+
+def decorated_class_access(
+    top: Top[DecoratedAny],
+    bottom: Bottom[DecoratedAny],
+) -> None:
+    reveal_type(type(top).transform)  # revealed: (self, /, value: Never) -> object
+    reveal_type(type(top).parse)  # revealed: (value: Never) -> object
+    reveal_type(type(top).create)  # revealed: (value: Never) -> object
+    reveal_type(type(bottom).transform)  # revealed: (self, /, value: object) -> Never
+    reveal_type(type(bottom).parse)  # revealed: (value: object) -> Never
+    reveal_type(type(bottom).create)  # revealed: (value: object) -> Never
+```
+
+### Members outside the protocol interface
+
+`__init__` is not a protocol requirement, but accessing it on a materialized value still uses the
+declaration on the protocol class:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top
+
+class ProtocolWithInit(Protocol):
+    value: Any
+
+    def __init__(self, value: int) -> None: ...
+
+def constructor(top: Top[ProtocolWithInit]) -> None:
+    reveal_type(top.__init__)  # revealed: bound method Top[ProtocolWithInit].__init__(value: int) -> None
+```
+
+### Read-only property deletion
+
+Materializing a read-only property must not make it deletable:
+
+```py
+from typing import Any, Protocol
+from typing_extensions import TypeIs
+from ty_extensions import Top
+
+class ReadOnlyProperty(Protocol):
+    @property
+    def property(self) -> Any: ...
+
+def is_read_only_property(value: object) -> TypeIs[ReadOnlyProperty]:
+    return True
+
+def property_deletion(
+    top: Top[ReadOnlyProperty],
+    value: object,
+) -> None:
+    del top.property  # error: [invalid-assignment]
+    if is_read_only_property(value):
+        del value.property  # error: [invalid-assignment]
+```
+
+### Descriptor-decorated properties
+
+A descriptor can expose separate read and write types. `Top` maps an `Any` read to `object` and an
+`Any` write to `Never`; `Bottom` maps them in the opposite direction:
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object] | None = None) -> Any: ...
+    def __set__(self, instance: object, value: Any) -> None: ...
+
+def descriptor(function: Callable[..., Any]) -> Descriptor:
+    raise NotImplementedError
+
+class DescriptorProperty(Protocol):
+    @descriptor
+    def value(self) -> Any: ...
+
+class TopDescriptorProperty:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: Never) -> None: ...
+
+class NarrowBottomDescriptorProperty:
+    @property
+    def value(self) -> Never:
+        raise RuntimeError
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+static_assert(is_subtype_of(TopDescriptorProperty, Top[DescriptorProperty]))
+static_assert(not is_subtype_of(NarrowBottomDescriptorProperty, Bottom[DescriptorProperty]))
+```
+
+### Property accessor types
+
+Materializing a property with fully static exposed types is a no-op. The accessor's implicit
+receiver and the setter's return type do not contribute to the property requirement:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class FullyStaticProperty(Protocol):
+    @property
+    def value(self) -> int: ...
+    @value.setter
+    def value(self, value: int) -> Any: ...
+
+def fully_static_property(
+    top: Top[FullyStaticProperty],
+    bottom: Bottom[FullyStaticProperty],
+) -> None:
+    reveal_type(top)  # revealed: FullyStaticProperty
+    reveal_type(bottom)  # revealed: FullyStaticProperty
+```
+
+### Assigning to properties
+
+A property setter may transform the assigned value. Assigning a literal therefore must not narrow
+subsequent reads to that literal:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top
+
+class TransformingProperty(Protocol):
+    marker: Any
+
+    @property
+    def value(self) -> int: ...
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+def property_assignment_narrowing(top: Top[TransformingProperty]) -> None:
+    top.value = 1
+    reveal_type(top.value)  # revealed: int
+```
+
+### Generic inference through inherited protocols
+
+Generic inference uses the materialized type of an inherited member, not the original `Any`:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top
+
+class InferenceBase[T](Protocol):
+    @property
+    def item(self) -> T: ...
+
+class InheritedInferenceAny(InferenceBase[Any], Protocol):
+    marker: Any
+
+def infer_item[T](value: InferenceBase[T]) -> T:
+    raise NotImplementedError
+
+def materialized_inference(inherited: Top[InheritedInferenceAny]) -> None:
+    reveal_type(infer_item(inherited))  # revealed: object
+```
+
+### Generator delegation
+
+`yield from` uses the same materialized yield and return types as direct generator methods. Applying
+another materialization must not change a result that no longer contains `Any`:
+
+```py
+from collections.abc import Generator
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class MaterializedGenerator(Generator[Any, Any, Any], Protocol):
+    marker: Any
+
+def generator_delegation(
+    generator: Top[MaterializedGenerator],
+    nested: Bottom[Top[MaterializedGenerator]],
+):
+    reveal_type(generator.__next__())  # revealed: object
+    result = yield from generator
+    reveal_type(result)  # revealed: object
+    nested_result = yield from nested
+    reveal_type(nested_result)  # revealed: object
+```
+
+The send type is contravariant. A top-materialized generator cannot accept values sent by a
+`Generator[object, object, object]`, while a bottom-materialized generator can:
+
+```py
+def top_generator_send(
+    generator: Top[MaterializedGenerator],
+) -> Generator[object, object, object]:
+    result = yield from generator  # error: [invalid-yield]
+    return result
+
+def bottom_generator_send(
+    generator: Bottom[MaterializedGenerator],
+) -> Generator[object, object, object]:
+    result = yield from generator
+    return result
+```
+
+### `Self` binding
+
+`Self` may appear in `Top[GenericProtocol[Self]]` even when the protocol member itself is `Any`. It
+must still bind to the class through which the attribute is accessed:
+
+```py
+from typing import Any, Protocol, Self
+from ty_extensions import Top
+
+class GenericProtocol[T](Protocol):
+    value: Any
+
+class SelfContainer:
+    member: Top[GenericProtocol[Self]]
+
+class SelfContainerChild(SelfContainer):
+    pass
+
+reveal_type(SelfContainerChild().member)  # revealed: Top[GenericProtocol[SelfContainerChild]]
+```
+
+### Legacy type variables
+
+A legacy type variable in the protocol's type arguments still makes the enclosing function generic:
+
+```py
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+
+class LegacyProtocol(Protocol[T]):
+    value: Any
+
+def accepts_legacy(value: Top[LegacyProtocol[T]]) -> None: ...
+
+reveal_type(accepts_legacy)  # revealed: def accepts_legacy[T](value: Top[LegacyProtocol[T]]) -> None
+```
+
+### Generic aliases
+
+Expanding a generic alias preserves the materialized write type:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class GenericMutable[T](Protocol):
+    value: T
+
+type MutableAlias[T] = GenericMutable[T]
+
+def alias_writes(
+    top: Top[MutableAlias[Any]],
+    bottom: Bottom[MutableAlias[Any]],
+) -> None:
+    top.value = 1  # error: [invalid-assignment]
+    bottom.value = object()
+```
+
+### Nested generic protocols
+
+A protocol nested inside another generic type preserves its separate read and write requirements
+after materialization:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class Leaf[T](Protocol):
+    value: T
+
+class Outer[T](Protocol):
+    leaf: Leaf[T]
+
+class ReadHolder[T]:
+    @property
+    def outer(self) -> Outer[T]:
+        raise NotImplementedError
+
+def nested_specialization(
+    holder: Top[ReadHolder[Any]],
+    top_leaf: Top[Leaf[Any]],
+    bottom_leaf: Bottom[Leaf[Any]],
+) -> None:
+    reveal_type(holder.outer)  # revealed: Top[Outer[Any]]
+    holder.outer.leaf = bottom_leaf
+    holder.outer.leaf = top_leaf  # error: [invalid-assignment]
+```
+
+### Recursive protocols
+
+Materialization terminates when a protocol refers to itself through an alias, including when it is
+applied more than once:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type RecursiveAlias = RecursiveProtocol
+
+class RecursiveProtocol(Protocol):
+    marker: Any
+
+    @property
+    def child(self) -> RecursiveAlias: ...
+
+static_assert(is_equivalent_to(Top[RecursiveProtocol], Top[Top[RecursiveProtocol]]))
+```
+
+### Display
+
+Materialized protocols display `Top` and `Bottom` around the protocol class:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class ReadAny(Protocol):
+    @property
+    def value(self) -> Any: ...
+
+def _(top: Top[ReadAny], bottom: Bottom[ReadAny]) -> None:
+    reveal_type(top)  # revealed: Top[ReadAny]
+    reveal_type(bottom)  # revealed: Bottom[ReadAny]
+```

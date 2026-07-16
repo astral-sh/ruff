@@ -150,7 +150,7 @@ def get_any() -> Any:
 async def test():
     x = get_any()
     if inspect.isawaitable(x):
-        reveal_type(x)  # revealed: Any & Awaitable[object]
+        reveal_type(x)  # revealed: Any & Top[Awaitable[object]]
         y = await x
         reveal_type(y)  # revealed: Any
 ```
@@ -239,10 +239,10 @@ def is_async_callable(x: object) -> TypeIs[Top[Callable[..., Awaitable[object]]]
 
 async def f(fn: Callable[[int], int | Awaitable[int]]) -> None:
     if is_async_callable(fn):
-        reveal_type(fn)  # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Awaitable[object]]
+        reveal_type(fn)  # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Top[Awaitable[object]]]
         result = fn(1)
-        # This includes `int & Awaitable[object]`: an `int` subtype could define `__await__`.
-        reveal_type(result)  # revealed: (int & Awaitable[object]) | Awaitable[int]
+        # This includes `int & Top[Awaitable[object]]`: an `int` subtype could define `__await__`.
+        reveal_type(result)  # revealed: (int & Top[Awaitable[object]]) | Awaitable[int]
         reveal_type(await result)  # revealed: object
 ```
 

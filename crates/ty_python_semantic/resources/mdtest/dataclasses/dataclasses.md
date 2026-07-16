@@ -1826,6 +1826,23 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)
 ```
 
+## `dataclasses.is_dataclass`
+
+`is_dataclass` recognizes both dataclass instances and dataclass classes. A concrete dataclass
+instance always satisfies the `DataclassInstance` protocol, so the negative branch is unreachable:
+
+```py
+from dataclasses import dataclass, is_dataclass
+
+@dataclass
+class Event:
+    x: int
+
+def check(event: Event) -> None:
+    if not is_dataclass(event):
+        reveal_type(event)  # revealed: Never
+```
+
 ## `dataclasses.KW_ONLY`
 
 If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized

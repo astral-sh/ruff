@@ -219,7 +219,7 @@ pub fn definitions_for_attribute<'db>(
     // location for go-to-definition, even though the origin is not a nominal upper bound.
     let subclass_origin = |subclass_of: SubclassOfInner<'db>| {
         let class = match subclass_of {
-            SubclassOfInner::Protocol(protocol) => protocol.class_origin().map(|origin| *origin),
+            SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| *origin),
             subclass_of => subclass_of.into_class(db),
         }?;
         class

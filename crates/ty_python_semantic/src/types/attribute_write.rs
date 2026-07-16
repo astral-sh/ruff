@@ -629,6 +629,10 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
         ) {
         object_ty.member(db, attribute)
+    } else if let Type::ProtocolInstance(protocol) = object_ty
+        && let Some(origin) = protocol.materialized_origin_property(db, attribute)
+    {
+        Type::instance(db, *origin).class_member(db, attribute.into())
     } else {
         object_ty.class_member(db, attribute.into())
     };

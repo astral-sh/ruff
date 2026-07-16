@@ -444,7 +444,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            let Some(class) = protocol.as_class_based() else {
+            let Some(class) = protocol.class_origin(db) else {
                 walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
                 return;
             };

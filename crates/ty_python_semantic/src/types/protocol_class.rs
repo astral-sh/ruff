@@ -248,10 +248,45 @@ pub(super) fn walk_protocol_instance_interface<
                     }
                 }
             }
-            ProtocolMemberKind::Attribute(attribute) => {
-                if let Some(ty) = attribute.bind_self(db, receiver_ty) {
-                    visitor.visit_type(db, ty);
+            ProtocolMemberKind::Attribute { .. } => {
+                for member_type in member.data.kind.member_types() {
+                    if let Some(ty) = member_type.bind_self(db, receiver_ty) {
+                        visitor.visit_type(db, ty);
+                    }
                 }
+            }
+        }
+    }
+}
+
+/// Visits the member types that participate in structural protocol relations.
+///
+/// For methods, the instance-access callable omits the implicit receiver while retaining every
+/// user-visible parameter and the return type. Visiting that form avoids treating the receiver's
+/// protocol type as a recursive member reference.
+pub(super) fn walk_protocol_interface_requirements<
+    'db,
+    V: super::visitor::TypeVisitor<'db> + ?Sized,
+>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    visitor: &V,
+) {
+    for member in interface.members(db) {
+        let capabilities = member.capabilities(db);
+        let accesses = if member.is_method() {
+            [Some(capabilities.instance), None]
+        } else {
+            [Some(capabilities.instance), Some(capabilities.class)]
+        };
+        for member_type in accesses
+            .into_iter()
+            .flatten()
+            .flat_map(|access| [access.read, access.write])
+            .flatten()
+        {
+            if let Some(member_type) = member_type.resolve(db) {
+                visitor.visit_type(db, member_type.ty());
             }
         }
     }
@@ -347,6 +382,32 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Returns whether two interfaces differ for any member named by `required`.
+    ///
+    /// Members outside `required` are deliberately ignored so an unrelated materialized member
+    /// does not disable a valid nominal relation.
+    pub(super) fn differs_for_members_required_by(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        required: Self,
+    ) -> bool {
+        required
+            .inner(db)
+            .keys()
+            .any(|name| self.inner(db).get(name) != other.inner(db).get(name))
+    }
+
+    pub(super) fn member_has_todo_type(self, db: &'db dyn Db, name: &str) -> bool {
+        self.member_by_name(db, name)
+            .is_some_and(|member| member.has_todo_type())
+    }
+
+    pub(super) fn member_is_property(self, db: &'db dyn Db, name: &str) -> bool {
+        self.member_by_name(db, name)
+            .is_some_and(|member| member.is_property())
     }
 
     /// Returns the declared instance-write requirement for a protocol member.
@@ -675,6 +736,17 @@ impl<'db> ProtocolMemberType<'db> {
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         self.with_ty(ty)
     }
+
+    /// Maps an attribute write contravariantly.
+    fn apply_write_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        self.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -797,9 +869,10 @@ impl<'db> ProtocolMemberData<'db> {
         definition: Option<Definition<'db>>,
     ) -> Self {
         Self {
-            kind: ProtocolMemberKind::Attribute(ProtocolMemberType::with_definition(
-                ty, definition,
-            )),
+            kind: ProtocolMemberKind::Attribute {
+                read: ProtocolMemberType::with_definition(ty, definition),
+                write: None,
+            },
             qualifiers,
             definition,
         }
@@ -827,27 +900,32 @@ impl<'db> ProtocolMemberData<'db> {
                 instance: ProtocolMemberAccess::new(read, write),
                 class: ProtocolMemberAccess::NONE,
             },
-            ProtocolMemberKind::Attribute(member_ty) => {
-                let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
-                let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
-                // A `Todo` records a protocol member form that is not modeled yet; do not infer a
-                // write requirement from that temporary representation.
-                let is_todo = member_ty.ty().is_todo();
-                ProtocolMemberCapabilities {
-                    instance: ProtocolMemberAccess::new(
-                        Some(member_ty),
-                        (!is_class_var && !is_final && !is_todo).then_some(member_ty),
-                    ),
-                    class: if is_class_var {
-                        ProtocolMemberAccess::new(
-                            Some(member_ty),
-                            (!is_final && !is_todo).then_some(member_ty),
-                        )
-                    } else {
-                        ProtocolMemberAccess::NONE
-                    },
-                }
+            ProtocolMemberKind::Attribute { read, write } => {
+                self.attribute_capabilities(read, write.map_or(read, |write| read.with_ty(write)))
             }
+        }
+    }
+
+    fn attribute_capabilities(
+        &self,
+        read: ProtocolMemberType<'db>,
+        write: ProtocolMemberType<'db>,
+    ) -> ProtocolMemberCapabilities<'db> {
+        let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
+        let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
+        // A `Todo` records a protocol member form that is not modeled yet; do not infer a
+        // write requirement from that temporary representation.
+        let is_todo = read.ty().is_todo();
+        ProtocolMemberCapabilities {
+            instance: ProtocolMemberAccess::new(
+                Some(read),
+                (!is_class_var && !is_final && !is_todo).then_some(write),
+            ),
+            class: if is_class_var {
+                ProtocolMemberAccess::new(Some(read), (!is_final && !is_todo).then_some(write))
+            } else {
+                ProtocolMemberAccess::NONE
+            },
         }
     }
 
@@ -879,10 +957,24 @@ impl<'db> ProtocolMemberData<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let kind = match self.kind {
+            ProtocolMemberKind::Attribute {
+                read: attribute,
+                write,
+            } if !self.qualifiers.contains(TypeQualifiers::FINAL) && !attribute.ty().is_todo() => {
+                let read = attribute.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                let write = write
+                    .map_or(attribute, |write| attribute.with_ty(write))
+                    .apply_write_type_mapping_impl(db, type_mapping, tcx, visitor);
+                ProtocolMemberKind::Attribute {
+                    read,
+                    write: (read != write).then_some(write.ty()),
+                }
+            }
+            kind => kind.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        };
         Self {
-            kind: self
-                .kind
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            kind,
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -925,7 +1017,9 @@ impl<'db> ProtocolMemberData<'db> {
                         }
                         d.finish()
                     }
-                    ProtocolMemberKind::Attribute(attribute) => {
+                    ProtocolMemberKind::Attribute {
+                        read: attribute, ..
+                    } => {
                         f.write_str("AttributeMember(")?;
                         write!(f, "`{}`", attribute.ty().display(self.db))?;
                         if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
@@ -952,7 +1046,14 @@ enum ProtocolMemberKind<'db> {
         read: Option<ProtocolMemberType<'db>>,
         write: Option<ProtocolMemberType<'db>>,
     },
-    Attribute(ProtocolMemberType<'db>),
+    Attribute {
+        read: ProtocolMemberType<'db>,
+        /// A contravariantly mapped write type when it differs from `read`.
+        ///
+        /// The member-local binding context is shared with `read`, so storing only the type keeps
+        /// the common member representation compact.
+        write: Option<Type<'db>>,
+    },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -965,9 +1066,9 @@ enum ProtocolMethodKind {
 impl<'db> ProtocolMemberKind<'db> {
     fn member_types(self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
         match self {
-            Self::Method(member, _) => [Some(member), None],
+            Self::Method(method, _) => [Some(method), None],
             Self::Property { read, write } => [read, write],
-            Self::Attribute(attribute) => [Some(attribute), None],
+            Self::Attribute { read, write } => [Some(read), write.map(|write| read.with_ty(write))],
         }
         .into_iter()
         .flatten()
@@ -1010,9 +1111,25 @@ impl<'db> ProtocolMemberKind<'db> {
                 read: cycle_normalized_optional_type(db, current_read, previous_read, cycle),
                 write: cycle_normalized_optional_type(db, current_write, previous_write, cycle),
             },
-            (Self::Attribute(current), Self::Attribute(previous)) => {
-                Self::Attribute(current.cycle_normalized(db, previous, cycle))
-            }
+            (
+                Self::Attribute {
+                    read: current_read,
+                    write: current_write,
+                },
+                Self::Attribute {
+                    read: previous_read,
+                    write: previous_write,
+                },
+            ) => Self::Attribute {
+                read: current_read.cycle_normalized(db, previous_read, cycle),
+                write: cycle_normalized_optional_type(
+                    db,
+                    current_write.map(|write| current_read.with_ty(write)),
+                    previous_write.map(|write| previous_read.with_ty(write)),
+                    cycle,
+                )
+                .map(ProtocolMemberType::ty),
+            },
             (current, _) => current,
         }
     }
@@ -1038,9 +1155,13 @@ impl<'db> ProtocolMemberKind<'db> {
                     None => None,
                 },
             },
-            Self::Attribute(attribute) => {
-                Self::Attribute(attribute.recursive_type_normalized_impl(db, div, nested)?)
-            }
+            Self::Attribute { read, write } => Self::Attribute {
+                read: read.recursive_type_normalized_impl(db, div, nested)?,
+                write: match write {
+                    Some(write) => Some(write.recursive_type_normalized_impl(db, div, nested)?),
+                    None => None,
+                },
+            },
         })
     }
 
@@ -1056,14 +1177,43 @@ impl<'db> ProtocolMemberKind<'db> {
                 member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 kind,
             ),
+            Self::Property { read, write }
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Materialize(_)
+                        | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                ) =>
+            {
+                let resolved_read = read.and_then(|read| read.resolve(db));
+                let resolved_write = write.and_then(|write| write.resolve(db));
+                let mapped_read = resolved_read
+                    .map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let mapped_write = resolved_write.map(|write| {
+                    write.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)
+                });
+
+                if mapped_read == resolved_read && mapped_write == resolved_write {
+                    Self::Property { read, write }
+                } else {
+                    Self::Property {
+                        read: mapped_read,
+                        write: mapped_write,
+                    }
+                }
+            }
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
                     .map(|write| write.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             },
-            Self::Attribute(attribute) => {
-                Self::Attribute(attribute.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Self::Attribute { read, write } => Self::Attribute {
+                read: read.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                write: write.map(|write| {
+                    read.with_ty(write)
+                        .apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        .ty()
+                }),
+            },
         }
     }
 }

@@ -463,8 +463,8 @@ especially when using various functions from typeshed that are annotated as retu
 `TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
 purposes, it would usually lead to more intuitive results if `object` was used as the specialization
 for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`.
+For a covariant generic class, this simplifies to `TypeIs[SomeCovariantGeneric[object]]`.
 
 ```py
 class Unrelated: ...
@@ -488,6 +488,26 @@ def _(x: Unrelated | Covariant[int]):
     # We would emit a false-positive diagnostic here if we didn't implicitly transform
     # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
     needs_instance_of_unrelated(x)
+```
+
+## `TypeIs` narrowing with protocol class variables
+
+`TypeIs` materializes the type it uses for narrowing. If a protocol class variable is `Any`, a read
+through the class object after narrowing therefore has type `object`:
+
+```py
+from typing import Any, ClassVar, Protocol
+from typing_extensions import TypeIs
+
+class HasClassVar(Protocol):
+    x: ClassVar[Any]
+
+def is_has_class_var(x: object) -> TypeIs[HasClassVar]:
+    return True
+
+def _(x: object):
+    if is_has_class_var(x):
+        reveal_type(type(x).x)  # revealed: object
 ```
 
 ## `TypeGuard` special cases
