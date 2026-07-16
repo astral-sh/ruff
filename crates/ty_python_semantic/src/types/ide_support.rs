@@ -2548,7 +2548,7 @@ pub fn type_hierarchy_subtypes(
     let Some(target_class) = extract_class_literal(db, ty) else {
         return vec![];
     };
-    direct_subtypes(db, target_class)
+    direct_subtypes(db, target_class, modules)
         .into_iter()
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
         .collect()
@@ -2566,6 +2566,7 @@ pub fn type_hierarchy_subtypes(
 fn direct_subtypes<'db>(
     db: &'db dyn Db,
     target_class: ClassLiteral<'db>,
+    modules: &[Module<'db>],
 ) -> Vec<ClassLiteral<'db>> {
     let target_name = target_class.name(db);
     let target_is_object = target_class.is_known(db, KnownClass::Object);

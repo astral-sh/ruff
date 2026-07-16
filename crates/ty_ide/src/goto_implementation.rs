@@ -54,7 +54,14 @@ pub fn goto_implementation(
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
-    let mut candidate_files: Vec<File> = db.project().files(db).iter().copied().collect();
+    let mut candidate_files: Vec<File> = db
+        .project()
+        .files(db)
+        .iter()
+        .copied()
+        .filter(|candidate| *candidate != file)
+        .collect();
+    candidate_files.push(file);
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
     let class_reference_implementations = || {
@@ -114,6 +121,8 @@ mod tests {
     use crate::goto_implementation;
     use crate::tests::{CursorTest, cursor_test};
     use insta::assert_snapshot;
+    use ruff_db::system::SystemPathBuf;
+    use ty_project::Db as _;
 
     #[test]
     fn implementation_method_family_from_attribute() {
@@ -749,6 +758,46 @@ class MyClass:
         6 |     pass
         7 |
         8 | class Cat(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_family_in_request_file_excluded_from_project() {
+        let mut test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Anim<CURSOR>al:
+                    pass
+
+                class Dog(Animal):
+                    pass
+                "#,
+            )
+            .source("included.py", "")
+            .build();
+
+        test.db
+            .project()
+            .set_included_paths(&mut test.db, vec![SystemPathBuf::from("/included.py")]);
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
           |       ---
           |
         ");
