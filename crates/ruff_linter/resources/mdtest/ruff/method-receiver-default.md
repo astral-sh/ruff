@@ -9,7 +9,7 @@ lint.select = ["RUF077"]
 
 ```py
 class InstanceReceiverDefault:
-    def method(self=None): ...  # error: [method-receiver-default]
+    def method(self=None): ...  # snapshot: method-receiver-default
 
 
 class ClassReceiverDefault:
@@ -24,6 +24,16 @@ class NewMethodClassReceiver:
 class NestedInIfReceiverDefault:
     if True:
         def method(self=None): ...  # error: [method-receiver-default]
+```
+
+```snapshot
+error[RUF077]: Instance receiver parameter should not have a default value
+ --> src/mdtest_snippet.py:2:21
+  |
+2 |     def method(self=None): ...  # snapshot: method-receiver-default
+  |                     ^^^^
+  |
+help: Remove default value from receiver parameter
 ```
 
 ## No errors
