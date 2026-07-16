@@ -22,17 +22,17 @@ from ty_extensions._internal import ConstraintSet
 
 def bindings_tuv[T, U, V]() -> None:
     constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
-    # revealed: tuple[tuple[TypeForm[int], TypeForm[str], TypeForm[bytes]]]
+    # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_vtu[V, T, U]() -> None:
     constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
-    # revealed: tuple[tuple[TypeForm[int], TypeForm[str], TypeForm[bytes]]]
+    # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_reverse_source[T, U, V]() -> None:
     constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
-    # revealed: tuple[tuple[TypeForm[bytes], TypeForm[str], TypeForm[int]]]
+    # revealed: tuple[Solution[V=bytes, U=str, T=int]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
@@ -50,19 +50,20 @@ def nested_transitive[T, U, V]() -> None:
         ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
     ) | ConstraintSet.range(bytes, V, object)
 
-    # TODO: sometimes: revealed tuple[TypeForm[list[int]], TypeForm[Never]]
-    # TODO: sometimes: revealed tuple[TypeForm[list[int]], TypeForm[list[int]]]
-    # revealed: tuple[TypeForm[list[int]]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]]]
+    # revealed: tuple[Solution[T=list[int]]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
-    # TODO: sometimes: revealed tuple[TypeForm[int], TypeForm[Never]]
-    # revealed: tuple[TypeForm[int]]
+    # TODO: sometimes: revealed tuple[Solution[U=int], Solution[U=Never]]
+    # revealed: tuple[Solution[U=int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
-    # TODO: sometimes: revealed tuple[TypeForm[bytes], TypeForm[bytes]]
-    # revealed: tuple[TypeForm[bytes]]
+    # TODO: sometimes: revealed tuple[Solution[V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
-    # TODO: sometimes: revealed tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[Never], TypeForm[bytes]], tuple[TypeForm[bytes]]]
-    # TODO: sometimes: revealed tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[list[int]], TypeForm[bytes]], tuple[TypeForm[bytes]]]
-    # revealed: tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[bytes]]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
@@ -80,14 +81,14 @@ def negated_alternative[T, U]() -> None:
         bytes, U, object
     )
 
-    # TODO: sometimes: revealed tuple[TypeForm[Never]]
+    # TODO: sometimes: revealed tuple[Solution[T=Never]]
     # revealed: tuple[()]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
-    # TODO: sometimes: revealed tuple[TypeForm[bytes], TypeForm[bytes]]
-    # revealed: tuple[TypeForm[bytes]]
+    # TODO: sometimes: revealed tuple[Solution[U=bytes], Solution[U=bytes]]
+    # revealed: tuple[Solution[U=bytes]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
-    # TODO: sometimes: revealed tuple[tuple[()], tuple[TypeForm[Never], TypeForm[bytes]], tuple[TypeForm[bytes]]]
-    # revealed: tuple[tuple[()], tuple[TypeForm[bytes]]]
+    # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never, U=bytes], Solution[U=bytes]]
+    # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
@@ -108,11 +109,11 @@ def derived_solution[U, T]() -> None:
     )
 
     # TODO: The derived relationship should not leave an inferable `U` in the solution for `T`.
-    # TODO: sometimes: revealed tuple[TypeForm[int | U@derived_solution]]
-    # revealed: tuple[TypeForm[U@derived_solution | int]]
+    # TODO: sometimes: revealed tuple[Solution[T=int | U@derived_solution]]
+    # revealed: tuple[Solution[T=U@derived_solution | int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
-    # TODO: revealed: tuple[TypeForm[T@derived_solution & int]]
-    # revealed: tuple[TypeForm[Never]]
+    # TODO: revealed: tuple[Solution[U=T@derived_solution & int]]
+    # revealed: tuple[Solution[U=Never]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 ```
 
@@ -155,12 +156,12 @@ def chain_stu[S, T, U]() -> None:
 
     constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[TypeForm[int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[TypeForm[T@chain_stu | int | U@chain_stu]]
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
+    # revealed: tuple[Solution[S=T@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[TypeForm[S@chain_stu | int | U@chain_stu]]
+    # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[TypeForm[T@chain_stu | S@chain_stu | int]]
+    # revealed: tuple[Solution[U=T@chain_stu | S@chain_stu | int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 
 def chain_uts[U, T, S]() -> None:
@@ -171,12 +172,12 @@ def chain_uts[U, T, S]() -> None:
 
     constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[TypeForm[int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[TypeForm[T@chain_uts | int | U@chain_uts]]
+    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
+    # revealed: tuple[Solution[S=T@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[TypeForm[S@chain_uts | int | U@chain_uts]]
+    # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[TypeForm[T@chain_uts | S@chain_uts | int]]
+    # revealed: tuple[Solution[U=T@chain_uts | S@chain_uts | int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
@@ -197,22 +198,22 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.range(bytes, V, object)
 
     # `U` is deliberately non-inferable here.
-    # TODO: sometimes: revealed tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[Never], TypeForm[bytes]], tuple[TypeForm[bytes]]]
-    # TODO: sometimes: revealed tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[list[int]], TypeForm[bytes]], tuple[TypeForm[bytes]]]
-    # revealed: tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[bytes]]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, V]))
-    # TODO: sometimes: revealed tuple[TypeForm[list[int]], TypeForm[Never]]
-    # TODO: sometimes: revealed tuple[TypeForm[list[int]], TypeForm[list[int]]]
-    # revealed: tuple[TypeForm[list[int]]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]]]
+    # revealed: tuple[Solution[T=list[int]]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, V]))
-    # TODO: sometimes: revealed tuple[TypeForm[bytes], TypeForm[bytes]]
-    # revealed: tuple[TypeForm[bytes]]
+    # TODO: sometimes: revealed tuple[Solution[V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, V]))
 
     quantified = constraints.for_all(tuple[T, U])
     expected = ConstraintSet.range(bytes, V, object)
     static_assert(quantified == expected)
-    # revealed: tuple[TypeForm[bytes]]
+    # revealed: tuple[Solution[V=bytes]]
     reveal_type(quantified.solutions_for(V, inferable=tuple[V]))
 
 def noninferable_negated[T, U]() -> None:
@@ -223,7 +224,7 @@ def noninferable_negated[T, U]() -> None:
     quantified = constraints.for_all(tuple[T])
     expected = ConstraintSet.range(bytes, U, object)
     static_assert(quantified == expected)
-    # revealed: tuple[TypeForm[bytes]]
+    # revealed: tuple[Solution[U=bytes]]
     reveal_type(quantified.solutions_for(U, inferable=tuple[U]))
 ```
 
@@ -425,41 +426,41 @@ def high_fanout[
     result = constraints.solutions_for(R11, inferable=inferable)
 
     # TODO: inferred solutions should not retain the intermediate inferable typevars.
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # revealed: tuple[TypeForm[L0@high_fanout | L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
+    # revealed: tuple[Solution[P=L0@high_fanout | L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     reveal_type(pivot)
-    # TODO: sometimes: revealed tuple[TypeForm[P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # revealed: tuple[TypeForm[L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
+    # revealed: tuple[Solution[R11=L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     reveal_type(result)
 
     def takes_empty(value: tuple[()]) -> None: ...
 
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 7 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 7 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
     # snapshot: invalid-argument-type
     takes_empty(pivot)
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[P@high_fanout]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L2@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 5, 6, 7, ... omitted 4 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=P@high_fanout]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L2@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 5, 6, 7, ... omitted 4 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
+    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
     # snapshot: invalid-argument-type
     takes_empty(result)
 
@@ -473,7 +474,7 @@ error[invalid-argument-type]: Argument to function `takes_empty` is incorrect
    --> src/mdtest_snippet.py:119:17
     |
 119 |     takes_empty(pivot)
-    |                 ^^^^^ Expected `tuple[()]`, found `tuple[TypeForm[L0@high_fanout | L1@high_fanout | L2@high_fanout | ... omitted 10 union elements]]`
+    |                 ^^^^^ Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | L1@high_fanout | L2@high_fanout | ... omitted 10 union elements]]`
     |
 info: a tuple of length 1 is not assignable to a tuple of length 0
 info: Function defined here
@@ -488,7 +489,7 @@ error[invalid-argument-type]: Argument to function `takes_empty` is incorrect
    --> src/mdtest_snippet.py:128:17
     |
 128 |     takes_empty(result)
-    |                 ^^^^^^ Expected `tuple[()]`, found `tuple[TypeForm[L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`
+    |                 ^^^^^^ Expected `tuple[()]`, found `tuple[Solution[R11=L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`
     |
 info: a tuple of length 1 is not assignable to a tuple of length 0
 info: Function defined here

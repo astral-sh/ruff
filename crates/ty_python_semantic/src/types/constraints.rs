@@ -5094,8 +5094,8 @@ pub(crate) enum Solutions<'db> {
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct TypeVarSolution<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,
 }

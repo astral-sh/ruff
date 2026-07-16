@@ -1537,6 +1537,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::ConstraintSetSolution(_) => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`ty_extensions._internal.ConstraintSetSolution` is not allowed in {}s",
+                            self.type_expression_context(),
+                        ));
+                    }
+                    Type::unknown()
+                }
                 KnownInstanceType::GenericContext(_) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());

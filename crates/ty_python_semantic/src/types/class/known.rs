@@ -147,6 +147,7 @@ pub enum KnownClass {
     FunctoolsPartial,
     // ty_extensions
     ConstraintSet,
+    ConstraintSetSolution,
     GenericContext,
     Specialization,
     TyExtensionsAsyncIterable,
@@ -280,6 +281,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::ProtocolMeta
@@ -390,6 +392,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
@@ -500,6 +503,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
@@ -612,6 +616,7 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::BuiltinFunctionType
@@ -730,6 +735,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -850,6 +856,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::PydanticBaseModel
@@ -968,6 +975,7 @@ impl KnownClass {
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::ConstraintSetSolution => "ConstraintSetSolution",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
@@ -1360,6 +1368,7 @@ impl KnownClass {
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike => KnownModule::TyExtensions,
             Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable
@@ -1471,6 +1480,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -1587,6 +1597,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -1702,6 +1713,7 @@ impl KnownClass {
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "ConstraintSetSolution" => &[Self::ConstraintSetSolution],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
             "TypedDictFallback" => &[Self::TypedDictFallback],
@@ -1799,6 +1811,7 @@ impl KnownClass {
             | Self::Sentinel
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable

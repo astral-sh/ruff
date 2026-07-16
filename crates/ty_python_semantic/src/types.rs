@@ -6109,6 +6109,14 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::ConstraintSet],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::ConstraintSetSolution(__call__) => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec_inline![
+                            InvalidTypeExpression::ConstraintSetSolution
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
                 KnownInstanceType::GenericContext(__call__) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::GenericContext],
                     fallback_type: Type::unknown(),
@@ -6397,6 +6405,7 @@ impl<'db> Type<'db> {
                         | KnownInstanceType::Deprecated(_)
                         | KnownInstanceType::Field(_)
                         | KnownInstanceType::ConstraintSet(_)
+                        | KnownInstanceType::ConstraintSetSolution(_)
                         | KnownInstanceType::GenericContext(_)
                         | KnownInstanceType::Specialization(_)
                         | KnownInstanceType::Literal(_)
@@ -7009,6 +7018,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::ConstraintSetSolution(_)
                 | KnownInstanceType::GenericContext(_)
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::Literal(_)
@@ -8231,6 +8241,8 @@ enum InvalidTypeExpression<'db> {
     Field,
     /// Same for `ty_extensions._internal.ConstraintSet`
     ConstraintSet,
+    /// Same for `ty_extensions._internal.ConstraintSetSolution`
+    ConstraintSetSolution,
     /// Same for `ty_extensions._internal.GenericContext`
     GenericContext,
     /// Same for `ty_extensions._internal.Specialization`
@@ -8298,6 +8310,10 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::ConstraintSet => write!(
                         f,
                         "`ty_extensions._internal.ConstraintSet` is not allowed in {location}s",
+                    ),
+                    InvalidTypeExpression::ConstraintSetSolution => write!(
+                        f,
+                        "`ty_extensions._internal.ConstraintSetSolution` is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::GenericContext => {
                         write!(

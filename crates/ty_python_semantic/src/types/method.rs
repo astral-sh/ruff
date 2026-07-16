@@ -487,7 +487,14 @@ impl<'db> KnownBoundMethodType<'db> {
                             ),
                         ),
                     ]),
-                    Type::homogeneous_tuple(db, object_type_form()),
+                    UnionType::from_two_elements(
+                        db,
+                        Type::homogeneous_tuple(
+                            db,
+                            KnownClass::ConstraintSetSolution.to_instance(db),
+                        ),
+                        Type::none(db),
+                    ),
                 )))
             }
 
@@ -498,7 +505,14 @@ impl<'db> KnownBoundMethodType<'db> {
                             db,
                             Type::homogeneous_tuple(db, Type::object()),
                         ))]),
-                    Type::homogeneous_tuple(db, Type::homogeneous_tuple(db, object_type_form())),
+                    UnionType::from_two_elements(
+                        db,
+                        Type::homogeneous_tuple(
+                            db,
+                            KnownClass::ConstraintSetSolution.to_instance(db),
+                        ),
+                        Type::none(db),
+                    ),
                 )))
             }
 

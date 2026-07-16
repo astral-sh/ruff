@@ -51,7 +51,7 @@ use crate::types::generics::{
     TypeVarInference,
 };
 use crate::types::infer::original_class_type;
-use crate::types::known_instance::FieldInstance;
+use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
@@ -65,9 +65,8 @@ use crate::types::{
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeFormType, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    list_members,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -2758,13 +2757,19 @@ impl<'db> Bindings<'db> {
                                     path.into_iter()
                                         .find(|binding| binding.bound_typevar == typevar)
                                         .map(|binding| {
-                                            TypeFormType::from_type_expression(db, binding.solution)
+                                            Type::KnownInstance(
+                                                KnownInstanceType::ConstraintSetSolution(
+                                                    InternedConstraintSetSolution::new(
+                                                        db,
+                                                        vec![binding].into_boxed_slice(),
+                                                    ),
+                                                ),
+                                            )
                                         })
                                 }),
                             ),
-                            Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                                Type::empty_tuple(db)
-                            }
+                            Solutions::Unsatisfiable => Type::none(db),
+                            Solutions::Unconstrained => Type::empty_tuple(db),
                         };
                         overload.set_return_type(result);
                     }
@@ -2789,17 +2794,16 @@ impl<'db> Bindings<'db> {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
                                 db,
                                 paths.into_iter().map(|path| {
-                                    Type::heterogeneous_tuple(
-                                        db,
-                                        path.into_iter().map(|binding| {
-                                            TypeFormType::from_type_expression(db, binding.solution)
-                                        }),
-                                    )
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(
+                                            db,
+                                            path.into_boxed_slice(),
+                                        ),
+                                    ))
                                 }),
                             ),
-                            Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                                Type::empty_tuple(db)
-                            }
+                            Solutions::Unsatisfiable => Type::none(db),
+                            Solutions::Unconstrained => Type::empty_tuple(db),
                         };
                         overload.set_return_type(result);
                     }
