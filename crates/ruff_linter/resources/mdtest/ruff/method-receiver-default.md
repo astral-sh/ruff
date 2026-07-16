@@ -77,6 +77,4 @@ class StackedDecoratorsClassMethod:
 class StackedDecoratorsNewMethod:
     @decorator
     def __new__(cls=None): ...
-
-
 ```
