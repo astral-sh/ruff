@@ -72,7 +72,7 @@ class CustomDecoratorReceiverNoDefault:
 class StackedDecoratorsClassMethod:
     @decorator
     @classmethod
-    def build(cls): ...
+    def build(cls=None): ...
 
 class StackedDecoratorsNewMethod:
     @decorator
