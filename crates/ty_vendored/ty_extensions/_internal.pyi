@@ -141,8 +141,8 @@ class ConstraintSet:
         """
         Returns the explicit solutions inferred for `typevar` across all paths.
 
-        `inferable` specifies all typevars that should be solved for. Paths that
-        do not infer a solution for `typevar` do not contribute an element.
+        `inferable` specifies all typevars that should be solved for. Every
+        solution path is preserved, with its bindings filtered to `typevar`.
         Returns `None` if the constraint set is unsatisfiable.
         """
 

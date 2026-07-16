@@ -2753,19 +2753,14 @@ impl<'db> Bindings<'db> {
                         let result = match set.solutions(db, &constraints, inferable) {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
                                 db,
-                                paths.into_iter().filter_map(|path| {
-                                    path.into_iter()
-                                        .find(|binding| binding.bound_typevar == typevar)
-                                        .map(|binding| {
-                                            Type::KnownInstance(
-                                                KnownInstanceType::ConstraintSetSolution(
-                                                    InternedConstraintSetSolution::new(
-                                                        db,
-                                                        vec![binding].into_boxed_slice(),
-                                                    ),
-                                                ),
-                                            )
-                                        })
+                                paths.into_iter().map(|path| {
+                                    let path: Box<[_]> = path
+                                        .into_iter()
+                                        .filter(|binding| binding.bound_typevar == typevar)
+                                        .collect();
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(db, path),
+                                    ))
                                 }),
                             ),
                             Solutions::Unsatisfiable => Type::none(db),
