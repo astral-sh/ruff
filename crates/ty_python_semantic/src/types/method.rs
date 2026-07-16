@@ -65,6 +65,31 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
+    /// Normalize this method's implicit receiver for a parameter, if needed.
+    ///
+    /// A protocol class object does not generally inhabit `type[P]`, but it is a valid receiver
+    /// for a class method whose receiver is generic over `type[T]`.
+    pub(crate) fn normalized_receiver_argument_type(
+        self,
+        db: &'db dyn Db,
+        parameter: &Parameter<'db>,
+        argument_type: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if !self.function(db).is_classmethod(db) {
+            return None;
+        }
+
+        let Type::SubclassOf(subclass_of) = parameter.annotated_type() else {
+            return None;
+        };
+        subclass_of.into_type_var()?;
+
+        match argument_type.to_instance(db) {
+            Some(Type::ProtocolInstance(protocol)) => Some(protocol.to_meta_type(db)),
+            _ => None,
+        }
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| CallableType::bottom(db),

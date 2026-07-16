@@ -5325,11 +5325,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
 
                 let declared_type = parameters[parameter_index].annotated_type();
-                let argument_type = argument_types.get_for_declared_type(declared_type);
-                let specialization_result = builder.infer(
-                    declared_type,
-                    matched_parameter.argument_type.unwrap_or(argument_type),
-                );
+                let argument_type = matched_parameter
+                    .argument_type
+                    .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
+                let specialization_result = builder.infer(declared_type, argument_type);
 
                 if let Err(error) = specialization_result {
                     specialization_errors.push(BindingError::SpecializationError {
@@ -5363,6 +5362,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if self.is_gradual_variadic_parameter(parameter_index) {
             return;
         }
+
+        argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
 
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
@@ -5799,10 +5800,11 @@ pub struct MatchedParameter<'db> {
     /// The index of the matched parameter.
     pub index: usize,
 
-    /// The type contributed by an unpacked positional or keyword argument.
+    /// A parameter-specific argument type.
     ///
-    /// This is `None` for non-splatted arguments because their type is not known when argument
-    /// matching runs.
+    /// This is used for values contributed by unpacking and for implicit receivers whose type is
+    /// normalized for the matched parameter. It is `None` for ordinary arguments because their
+    /// type is not known when argument matching runs.
     argument_type: Option<Type<'db>>,
 
     /// Why this parameter match exists.
@@ -6420,11 +6422,28 @@ impl<'db> Binding<'db> {
 
     fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         let parameters = self.signature.parameters();
+        let normalized_bound_receiver_type = if let Type::BoundMethod(method) = self.signature_type
+            && let Some(parameter) = parameters.get_positional(0)
+            && let Some((Argument::Synthetic, argument_types)) = arguments.iter().next()
+            && let Some(argument_type) = argument_types.get_default()
+        {
+            method.normalized_receiver_argument_type(db, parameter, argument_type)
+        } else {
+            None
+        };
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
         for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
             match argument {
-                Argument::Positional | Argument::Synthetic => {
+                Argument::Synthetic => {
+                    let _ = matcher.match_positional(
+                        argument_index,
+                        argument,
+                        normalized_bound_receiver_type,
+                        false,
+                    );
+                }
+                Argument::Positional => {
                     let _ = matcher.match_positional(argument_index, argument, None, false);
                 }
                 Argument::Keyword(name) => {

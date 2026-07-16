@@ -1026,6 +1026,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
+    /// Check an exact class object against a `type[...]` target, including the concrete-class
+    /// requirement for protocol meta-types.
+    fn check_class_object_against_subclass_of(
+        &self,
+        db: &'db dyn Db,
+        source_ty: Type<'db>,
+        source_class: ClassType<'db>,
+        target: SubclassOfType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match target.subclass_of() {
+            SubclassOfInner::Protocol(_) if !source_class.is_concrete(db) => self.never(),
+            SubclassOfInner::Protocol(target_protocol) => {
+                self.check_meta_type_satisfies_protocol(db, source_ty, target_protocol)
+            }
+            target => target
+                .into_class(db)
+                .map(|target_class| self.check_class_pair(db, source_class, target_class))
+                .unwrap_or_else(|| {
+                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                }),
+        }
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -2109,31 +2132,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (Type::ClassLiteral(source_cls), Type::SubclassOf(target_subclass_ty)) => {
-                match target_subclass_ty.subclass_of() {
-                    SubclassOfInner::Protocol(target_protocol) => self
-                        .check_meta_type_satisfies_protocol(
-                            db,
-                            Type::ClassLiteral(source_cls),
-                            target_protocol,
-                        ),
-                    target => target
-                        .into_class(db)
-                        .map(|target_cls| {
-                            self.check_class_pair(
-                                db,
-                                source_cls.default_specialization(db),
-                                target_cls,
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            ConstraintSet::from_bool(
-                                self.constraints,
-                                self.is_eager_assignability(),
-                            )
-                        }),
-                }
-            }
+            (source @ Type::ClassLiteral(source_cls), Type::SubclassOf(target)) => self
+                .check_class_object_against_subclass_of(
+                    db,
+                    source,
+                    source_cls.default_specialization(db),
+                    target,
+                ),
 
             // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
             // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
@@ -2154,27 +2159,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     ClassType::Generic(target_alias),
                 ),
 
-            (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty)) => {
-                match target_subclass_ty.subclass_of() {
-                    SubclassOfInner::Protocol(target_protocol) => self
-                        .check_meta_type_satisfies_protocol(
-                            db,
-                            Type::GenericAlias(source_alias),
-                            target_protocol,
-                        ),
-                    target => target
-                        .into_class(db)
-                        .map(|target_cls| {
-                            self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
-                        })
-                        .unwrap_or_else(|| {
-                            ConstraintSet::from_bool(
-                                self.constraints,
-                                self.is_eager_assignability(),
-                            )
-                        }),
-                }
-            }
+            (source @ Type::GenericAlias(source_alias), Type::SubclassOf(target)) => self
+                .check_class_object_against_subclass_of(
+                    db,
+                    source,
+                    ClassType::Generic(source_alias),
+                    target,
+                ),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(source), Type::SubclassOf(target)) => {

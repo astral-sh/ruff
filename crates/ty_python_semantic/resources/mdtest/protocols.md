@@ -5864,8 +5864,8 @@ def _(cls: type[PropertyProtocol]) -> None:
     cls.value  # error: [unresolved-attribute]
 ```
 
-Protocol and abstract class objects are accepted as inhabitants of `type[Foo]`. This is
-intentionally more permissive than the typing spec, which requires a concrete class.
+Protocol classes and abstract classes do not inhabit `type[Foo]` because they cannot be instantiated
+to produce a `Foo`.
 
 ```py
 from abc import ABC, ABCMeta, abstractmethod
@@ -5876,8 +5876,17 @@ class AbstractFoo(ABC):
     @abstractmethod
     def method(self) -> bytes: ...
 
-static_assert(is_assignable_to(TypeOf[Foo], type[Foo]))
-static_assert(is_assignable_to(TypeOf[AbstractFoo], type[Foo]))
+static_assert(not is_assignable_to(TypeOf[Foo], type[Foo]))
+static_assert(not is_assignable_to(TypeOf[AbstractFoo], type[Foo]))
+```
+
+By contrast, a value typed as `type[AbstractFoo]` may contain a concrete subclass. It can be
+forwarded to `type[Foo]` because every such subclass implements `Foo`.
+
+```py
+def accepts_foo(cls: type[Foo]) -> None: ...
+def forward_abstract_foo(cls: type[AbstractFoo]) -> None:
+    accepts_foo(cls)
 ```
 
 A structural implementation can use any subclass of `type` as its metaclass, so `type[Foo]` is not
@@ -6132,10 +6141,10 @@ def _(cls: type[P] | type[int]) -> None:
     preserved: type[P] | type[int] = class_identity(cls)
 ```
 
-The protocol class object is also accepted by the identity function as an inhabitant of `type[P]`.
+The protocol class object itself remains distinct from structural `type[P]`.
 
 ```py
-reveal_type(class_identity(P))  # revealed: type[P]
+class_identity(P)  # error: [invalid-argument-type]
 ```
 
 Generic protocol arguments are also preserved through the identity function.
@@ -6169,6 +6178,73 @@ class RuntimeProtocol(Protocol):
 def _(value: RuntimeProtocol) -> None:
     if isinstance(value, int):
         reveal_type(type(value))  # revealed: type[RuntimeProtocol] & type[int]
+```
+
+## Protocol class objects as generic self receivers
+
+A protocol class does not inhabit `type[P]`, but it can still receive a class method declared on the
+protocol itself. This exception applies only to the method's receiver.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self, TypeVar, cast
+
+class SelfFactory(Protocol):
+    @classmethod
+    def make(cls) -> Self:
+        return cast(Self, object())
+
+reveal_type(SelfFactory.make())  # revealed: SelfFactory
+not_concrete: type[SelfFactory] = SelfFactory  # error: [invalid-assignment]
+```
+
+The specialization of a generic protocol class is retained when binding `Self`.
+
+```py
+class GenericSelfFactory[T](Protocol):
+    @classmethod
+    def make(cls, value: T) -> Self:
+        return cast(Self, object())
+
+reveal_type(GenericSelfFactory[int].make(1))  # revealed: GenericSelfFactory[int]
+```
+
+Bound type variables are the pre-PEP 673 spelling of generic self. Both legacy syntax and PEP 695
+method type parameters are supported.
+
+```py
+T_legacy = TypeVar("T_legacy", bound="LegacySelfFactory")
+
+class LegacySelfFactory(Protocol):
+    @classmethod
+    def make(cls: type[T_legacy]) -> T_legacy:
+        return cast(T_legacy, object())
+
+reveal_type(LegacySelfFactory.make())  # revealed: LegacySelfFactory
+
+class Pep695SelfFactory(Protocol):
+    @classmethod
+    def make[T: Pep695SelfFactory](cls: type[T]) -> T:
+        return cast(T, object())
+
+reveal_type(Pep695SelfFactory.make())  # revealed: Pep695SelfFactory
+```
+
+The receiver exception does not bypass an unrelated type-variable bound.
+
+```py
+T_unrelated = TypeVar("T_unrelated", bound=int)
+
+class UnrelatedBoundFactory(Protocol):
+    @classmethod
+    def make(cls: type[T_unrelated]) -> T_unrelated:
+        return cast(T_unrelated, object())
+
+UnrelatedBoundFactory.make()  # error: [invalid-argument-type]
 ```
 
 ## Regression test for `ClassVar` members in stubs
