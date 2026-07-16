@@ -934,6 +934,64 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+## Subscripting non-generic classes
+
+Subscripting a non-generic class in a type expression is an error. The invalid type expression
+recovers to `Unknown`.
+
+```py
+class NonGeneric: ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type"
+def direct(value: NonGeneric[int]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+The same diagnostic applies when the specialization is nested inside `type[...]`.
+
+```py
+class NonGeneric: ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type"
+def nested(value: type[NonGeneric[int]]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+Inheriting from a non-generic class, or from a specialization of a generic class, does not make the
+subclass generic.
+
+```py
+class NonGeneric: ...
+class PlainChild(NonGeneric): ...
+class Generic[T]: ...
+class SpecializedChild(Generic[int]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type"
+def plain_child(value: PlainChild[str]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot subscript non-generic type"
+def specialized_child(value: SpecializedChild[bytes]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+Classes parameterized by any kind of type variable remain subscriptable.
+
+```py
+class TypeVarGeneric[T]: ...
+class ParamSpecGeneric[**P]: ...
+class TypeVarTupleGeneric[*Ts]: ...
+
+def valid(
+    type_var: TypeVarGeneric[int],
+    param_spec: ParamSpecGeneric[[int, str]],
+    type_var_tuple: TypeVarTupleGeneric[int, str],
+) -> None:
+    reveal_type(type_var)  # revealed: TypeVarGeneric[int]
+    reveal_type(param_spec)  # revealed: ParamSpecGeneric[(int, str, /)]
+    reveal_type(type_var_tuple)  # revealed: TypeVarTupleGeneric[int, str]
+```
+
 ## Tuple as a PEP-695 generic class
 
 Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in
