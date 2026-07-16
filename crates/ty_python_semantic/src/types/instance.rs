@@ -22,11 +22,9 @@ use crate::types::protocol_class::{
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
-    TypeVarEvaluation,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -510,15 +508,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut result = self.never();
 
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
-            let source_protocol_as_nominal = ty
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance);
-            let source_nominal_view = ty.as_nominal_instance().or(source_protocol_as_nominal);
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = source_protocol_as_nominal
+            let type_to_test = ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
 
@@ -547,77 +543,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
             {
                 return nominally_satisfied;
-            }
-
-            // During lazy inference, a viable nominal relation between specializations of the
-            // same protocol is sufficient; structurally comparing the inherited interface would
-            // only revisit its members. However, the nominal relation must not make a type
-            // variable recursively contain the protocol itself. For example, relating
-            // `P[P[Any]]` to `P[T]` could solve `T` as another `P[...]`, growing the specialization
-            // on every recursive relation.
-            if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                && !result.is_never_satisfied(db)
-                && source_nominal_view.is_some_and(|source| {
-                    let source_class = source.class(db);
-                    let target_class_literal = nominal_instance.class(db).class_literal(db);
-                    if source_class.class_literal(db) != target_class_literal {
-                        return false;
-                    }
-
-                    // A fully resolved target cannot produce the recursive inference described
-                    // above.
-                    if !Type::ProtocolInstance(protocol).has_typevar(db) {
-                        return true;
-                    }
-
-                    let ClassType::Generic(source_alias) = source_class else {
-                        return true;
-                    };
-                    let ClassType::Generic(target_alias) = nominal_instance.class(db) else {
-                        return true;
-                    };
-
-                    // Do not let the shortcut infer an unconstrained typevar. A sibling union arm
-                    // can otherwise feed a different protocol specialization into the typevar,
-                    // forming an indirect cycle before the source contains this declaration.
-                    if target_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .any(|argument| {
-                            any_over_type(db, *argument, false, |nested| {
-                                let Type::TypeVar(typevar) = nested else {
-                                    return false;
-                                };
-                                typevar.typevar(db).bound_or_constraints(db).is_none()
-                            })
-                        })
-                    {
-                        return false;
-                    }
-
-                    // A constrained target can still recurse directly through this declaration.
-                    !source_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .any(|argument| {
-                            any_over_type(db, *argument, false, |nested| {
-                                nested
-                                    .as_nominal_instance()
-                                    .or_else(|| {
-                                        nested
-                                            .as_protocol_instance()
-                                            .and_then(ProtocolInstanceType::to_nominal_instance)
-                                    })
-                                    .is_some_and(|nested| {
-                                        nested.class(db).class_literal(db) == target_class_literal
-                                    })
-                            })
-                        })
-                })
-            {
-                return result;
             }
         }
 
