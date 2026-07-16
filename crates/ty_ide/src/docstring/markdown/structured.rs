@@ -375,7 +375,9 @@ fn description_block_start(description: &str) -> Option<usize> {
 fn render_type_code_span_into(output: &mut String, ty: &str) {
     let normalized = normalize_type_for_code_span(ty);
 
-    if is_wrapped_in_markdown_code_span(&normalized) {
+    // Preserve existing code spans, except abbreviated Sphinx references such as
+    // "`~pkg.Model`", whose display label is "Model".
+    if !normalized.starts_with("`~") && is_wrapped_in_markdown_code_span(&normalized) {
         output.push_str(&normalized);
         return;
     }
@@ -384,11 +386,12 @@ fn render_type_code_span_into(output: &mut String, ty: &str) {
     render_code_span_into(output, normalized.as_ref());
 }
 
-/// Removes embedded backticks, reStructuredText role prefixes, and punctuation escapes before
-/// wrapping a type in a code span.
+/// Removes markup before wrapping a type in a code span. For example:
 ///
-/// For example, ``"str or :class:`pkg.Type` or `pkg.Other`"`` becomes
-/// `"str or pkg.Type or pkg.Other"`, and `"-\\|>"` becomes `"-|>"`.
+/// ```text
+/// str or :class:`~pkg.Widget` or `pkg.Other` -> str or Widget or pkg.Other
+/// -\|> -> -|>
+/// ```
 fn normalize_embedded_type_markup(ty: &str) -> Cow<'_, str> {
     if !ty.contains('`') && !ty.contains('\\') {
         return Cow::Borrowed(ty);
@@ -398,13 +401,79 @@ fn normalize_embedded_type_markup(ty: &str) -> Cow<'_, str> {
     for token in InlineMarkupScanner::new(ty) {
         match token {
             InlineMarkupToken::Text(text) => push_unescaped(&mut normalized, text),
-            InlineMarkupToken::Code(span) | InlineMarkupToken::RestPrefixRole { span, .. } => {
-                push_unescaped(&mut normalized, span.content());
+            InlineMarkupToken::Code(span) => {
+                let markup = span.content();
+                // "`~pkg.Widget`" -> "Widget"; "``literal`tick``" -> "literal`tick".
+                let display_text = if span.is_single() {
+                    interpreted_text_label(markup, false)
+                } else {
+                    markup
+                };
+                push_unescaped(&mut normalized, display_text);
+            }
+            InlineMarkupToken::RestPrefixRole { name, span } => {
+                // ":class:`Model <pkg.Model>`" -> "Model"; ":obj:`.lines.line`" -> "lines.line".
+                let markup = span.content();
+                let explicit_title = markup
+                    .strip_suffix('>')
+                    .and_then(|markup| markup.split_once('<'))
+                    .map(|(title, _)| title.trim_end());
+                let display_text = explicit_title
+                    .unwrap_or_else(|| interpreted_text_label(markup, is_python_domain_role(name)));
+                push_unescaped(&mut normalized, display_text);
             }
         }
     }
 
     Cow::Owned(normalized)
+}
+
+/// Returns whether `name` is a Sphinx Python-domain cross-reference role.
+fn is_python_domain_role(name: &str) -> bool {
+    let mut components = name.rsplit(':');
+    let Some(role) = components.next() else {
+        return false;
+    };
+
+    matches!(components.next(), None | Some("py"))
+        && matches!(
+            role,
+            "attr"
+                | "class"
+                | "const"
+                | "data"
+                | "deco"
+                | "exc"
+                | "func"
+                | "meth"
+                | "mod"
+                | "obj"
+                | "type"
+        )
+}
+
+/// Returns the display label for reStructuredText interpreted text.
+///
+/// For example, `"~pkg.Widget"` becomes `"Widget"`; a Python role target like `".lines.line"`
+/// becomes `"lines.line"`.
+fn interpreted_text_label(text: &str, is_python_role_target: bool) -> &str {
+    let (abbreviated, target) = text
+        .strip_prefix('~')
+        .map_or((false, text), |target| (true, target));
+    let target = if is_python_role_target {
+        target.strip_prefix('.').unwrap_or(target)
+    } else {
+        target
+    };
+    if target.is_empty() {
+        return text;
+    }
+
+    if abbreviated {
+        target.rsplit_once('.').map_or(target, |(_, label)| label)
+    } else {
+        target
+    }
 }
 
 fn push_unescaped(output: &mut String, text: &str) {
@@ -677,6 +746,72 @@ mod tests {
 
         **model**: `str or pkg.Model`<HB>
         Model type.
+        ");
+    }
+
+    #[test]
+    fn section_items_remove_rest_roles_from_types() {
+        let _snap = bind_markdown_snapshot_filters();
+        let section = section_block(vec![
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("colormap"),
+                Some(
+                    "str or :class:`~matplotlib.colors.Colormap` or :mod:`matplotlib.colors` or `~.pandas.Index`",
+                ),
+                "Color mapping.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some("`~astropy.modeling.core.Model`"),
+                "Model.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("extension"),
+                Some("`.py`"),
+                "File extension.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("config"),
+                Some("str or `.env` or `.Figure` or `.lines.Line2D`"),
+                "Configuration source.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("line"),
+                Some(":py:obj:`.lines.line`"),
+                "Line helper.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some(":class:`Model <pkg.Model>`"),
+                "Named model.",
+            ),
+        ]);
+
+        assert_snapshot!(render_markdown(&section), @"
+        ## Parameters
+        **colormap**: `str or Colormap or matplotlib.colors or Index`<HB>
+        Color mapping.
+
+        **model**: `Model`<HB>
+        Model.
+
+        **extension**: `.py`<HB>
+        File extension.
+
+        **config**: `str or .env or .Figure or .lines.Line2D`<HB>
+        Configuration source.
+
+        **line**: `lines.line`<HB>
+        Line helper.
+
+        **model**: `Model`<HB>
+        Named model.
         ");
     }
 
