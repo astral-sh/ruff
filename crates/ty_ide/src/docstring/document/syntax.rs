@@ -1,3 +1,4 @@
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::{Cursor, leading_indentation, tab_offset_u32};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{TextRange, TextSize};
@@ -28,6 +29,13 @@ pub(super) struct ParsedLine<'a> {
     pub(super) range: TextRange,
     /// The indentation in the source document.
     pub(super) indent: TextSize,
+}
+
+/// Returns whether every component of `name` is a Python identifier.
+///
+/// For example, this returns `true` for `"package.Type"` and `false` for `"package.1"`.
+pub(super) fn is_dotted_identifier(name: &str) -> bool {
+    !name.is_empty() && name.split('.').all(is_identifier)
 }
 
 /// Returns whether `line` starts with a `CommonMark` list-item marker.
