@@ -1087,6 +1087,31 @@ impl<'db> IntersectionType<'db> {
         self.negative(db).iter().copied()
     }
 
+    /// Project an intersection containing class-object types into the corresponding instance types.
+    ///
+    /// A projected positive element supplies a sound instance-space over-approximation for the
+    /// whole intersection. Other positive elements can constrain class objects in a domain with no
+    /// instance-space projection, so omitting them is also a sound over-approximation. Negative
+    /// elements cannot be projected: a class object excluded by an exact-class negative can still
+    /// have subclasses whose instances inhabit the excluded class's instance type. Without a
+    /// projected positive element, we cannot tell whether the intersection contains class objects
+    /// at all.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut has_projected_positive = false;
+        for positive in self.iter_positive(db) {
+            if let Some(instance) = positive.to_instance(db) {
+                has_projected_positive = true;
+                builder = builder.add_positive(instance);
+            }
+        }
+        if !has_projected_positive {
+            return None;
+        }
+
+        Some(builder.build())
+    }
+
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
     }

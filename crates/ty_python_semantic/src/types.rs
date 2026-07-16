@@ -5980,7 +5980,7 @@ impl<'db> Type<'db> {
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            Type::Intersection(intersection) => intersection.to_instance(db),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
                 if KnownClass::Type

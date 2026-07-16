@@ -65,6 +65,39 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
+## Intersected exception types
+
+An intersected exception class projects its positive class-object constraints into the caught
+instance type. Unmappable positive constraints and exact-class negatives do not exclude valid
+subclass instances.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class FirstError(Exception): ...
+class SecondError(Exception): ...
+
+def catch_intersection(exc: Intersection[type[FirstError], type[SecondError]]) -> None:
+    try:
+        help()
+    except exc as caught:
+        reveal_type(caught)  # revealed: FirstError & SecondError
+
+def catch_proper_subclass(exc: Any) -> None:
+    if exc != ValueError and issubclass(exc, ValueError):
+        reveal_type(exc)  # revealed: Any & type[ValueError] & ~<class 'ValueError'>
+        try:
+            help()
+        except exc as caught:
+            reveal_type(caught)  # revealed: Any & ValueError
+
+try:
+    help()
+except ZeroDivisionError and ValueError as caught:
+    reveal_type(caught)  # revealed: ZeroDivisionError | ValueError
+```
+
 We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
 MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
 
