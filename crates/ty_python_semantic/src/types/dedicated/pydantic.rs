@@ -144,8 +144,15 @@ impl<'db> FieldMetadata<'db> {
             return;
         }
 
-        let Expr::Name(name) = annotation else {
-            return;
+        let name = match annotation {
+            Expr::Name(name) => name,
+            Expr::Subscript(subscript) => {
+                let Expr::Name(name) = subscript.value.as_ref() else {
+                    return;
+                };
+                name
+            }
+            _ => return,
         };
 
         // The following part is unfortunate. Pydantic defines `StrictInt` and the other aliases
