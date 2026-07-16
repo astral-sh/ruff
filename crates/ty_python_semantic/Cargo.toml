@@ -30,7 +30,7 @@ ty_python_core = { workspace = true }
 bitflags = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
+get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
@@ -45,6 +45,7 @@ static_assertions = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+thin-vec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
