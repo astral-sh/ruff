@@ -11814,13 +11814,26 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
-            // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if value_ty
-                .class_member(db, attr.id.clone())
-                .place
-                .ignore_possibly_undefined()
-                .is_some_and(|ty| ty.may_be_data_descriptor(db))
-            {
+            if (
+                // A custom `__setattr__` may transform or discard the assigned value.
+                !value_ty
+                    .class_member_with_policy(
+                        db,
+                        "__setattr__".into(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                            | MemberLookupPolicy::REQUIRE_CONCRETE,
+                    )
+                    .place
+                    .is_undefined()
+            ) || (
+                // A data descriptor may store a value different from the RHS.
+                value_ty
+                    .class_member(db, attr.id.clone())
+                    .place
+                    .ignore_possibly_undefined()
+                    .is_some_and(|ty| ty.may_be_data_descriptor(db))
+            ) {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }

@@ -181,6 +181,45 @@ c.desc = -1
 reveal_type(c.desc)  # revealed: int
 ```
 
+### Do not narrow attributes assigned through a custom `__setattr__`
+
+A custom `__setattr__` can transform or discard the value being assigned. Subsequent reads must use
+the attribute's read type instead of the type of the assigned value.
+
+```py
+from typing import Any
+
+class Props:
+    def __getattr__(self, name: str) -> Any: ...
+    def __setattr__(self, name: str, value: Any) -> None: ...
+
+def f(props: Props) -> None:
+    props.status = "Closed"
+    reveal_type(props.status)  # revealed: Any
+    props.status.name
+
+class SetAttrBase:
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class WithDeclaredAttribute(SetAttrBase):
+    status: int | str
+
+def g(obj: WithDeclaredAttribute) -> None:
+    obj.status = 1
+    reveal_type(obj.status)  # revealed: int | str
+    if hasattr(obj, "other"):
+        obj.status = 1
+        reveal_type(obj.status)  # revealed: int | str
+
+class WithoutSetAttr:
+    status: int | str
+
+def h(obj: WithoutSetAttr) -> None:
+    if hasattr(obj, "other"):
+        obj.status = 1
+        reveal_type(obj.status)  # revealed: Literal[1]
+```
+
 ## Subscript
 
 ### Specialization for builtin types
