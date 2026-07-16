@@ -207,24 +207,47 @@ fn freshen_generic_contexts_in_type<'db>(
         })
 }
 
+/// Maximum number of constrained-`TypeVar` specializations checked when validating an overloaded
+/// callback against a `TypeVarTuple` parameter.
+///
+/// Above this limit, the overload-specific workaround declines to accept the callback and leaves
+/// the normal argument-type diagnostic in place. This mirrors the expansion limit used by
+/// `type_expansion` and prevents compact overload sets from causing exponential call-checking work.
+const MAX_TYPEVARTUPLE_OVERLOAD_SPECIALIZATIONS: usize = 64;
+
 fn all_cartesian_product_satisfies<T: Copy>(
     factors: &[&[T]],
     selected: &mut Vec<T>,
     predicate: &mut impl FnMut(&[T]) -> bool,
 ) -> bool {
-    let Some((factor, remaining)) = factors.split_first() else {
-        return predicate(selected);
-    };
+    fn visit<T: Copy>(
+        factors: &[&[T]],
+        selected: &mut Vec<T>,
+        predicate: &mut impl FnMut(&[T]) -> bool,
+    ) -> bool {
+        let Some((factor, remaining)) = factors.split_first() else {
+            return predicate(selected);
+        };
 
-    for &element in *factor {
-        selected.push(element);
-        let satisfies = all_cartesian_product_satisfies(remaining, selected, predicate);
-        selected.pop();
-        if !satisfies {
-            return false;
+        for &element in *factor {
+            selected.push(element);
+            let satisfies = visit(remaining, selected, predicate);
+            selected.pop();
+            if !satisfies {
+                return false;
+            }
         }
+        true
     }
-    true
+
+    let product_size = factors
+        .iter()
+        .try_fold(1usize, |acc, factor| acc.checked_mul(factor.len()))
+        .unwrap_or(usize::MAX);
+    if product_size > MAX_TYPEVARTUPLE_OVERLOAD_SPECIALIZATIONS {
+        return false;
+    }
+    visit(factors, selected, predicate)
 }
 
 fn inferable_typevars_from_tuple<'db>(
@@ -8935,7 +8958,7 @@ mod tests {
     #[test]
     fn cartesian_product_short_circuits() {
         let factor = [0, 1];
-        let factors = [factor.as_slice(); 16];
+        let factors = [factor.as_slice(); 6];
         let mut selected = Vec::new();
         let mut visited = 0;
 
@@ -8946,5 +8969,21 @@ mod tests {
 
         assert!(!satisfies);
         assert_eq!(visited, 2);
+    }
+
+    #[test]
+    fn cartesian_product_respects_budget() {
+        let factor = [0, 1];
+        let factors = [factor.as_slice(); 16];
+        let mut selected = Vec::new();
+        let mut visited = 0;
+
+        let satisfies = all_cartesian_product_satisfies(&factors, &mut selected, &mut |_| {
+            visited += 1;
+            true
+        });
+
+        assert_eq!(visited, 0);
+        assert!(!satisfies);
     }
 }
