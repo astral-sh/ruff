@@ -101,8 +101,53 @@ If we were to treat `Callable`s as bound-method descriptors, then the signatures
 This would be equally unsound, because now we would allow a call to `C3().callable_n(1)` which would
 also fail at runtime.
 
-There is no perfect solution here, but we can use some heuristics to improve the situation for
-certain use cases (at the cost of purity and simplicity).
+There is no perfect solution here, but for compatibility with other type checkers we treat inferred
+class-body callables and `ClassVar`-annotated callables with a positional receiver as bound-method
+descriptors. Wholly gradual signatures have no known receiver to bind during ordinary attribute
+access, and explicit non-`ClassVar` callable annotations remain regular. Concrete callable dunders
+are treated as methods when invoked implicitly; callable-bounded TypeVars and ParamSpecs remain
+regular. Gradual callable dunders retain function-like behavior for class-level inspection.
+
+## Callable descriptor lookup modes
+
+For inferred and `ClassVar` callables, promotion to a bound-method descriptor only affects instance
+reads. Class reads and writes retain the declared callable signature. This also applies when the
+callable is hidden behind a PEP 695 type alias or has a gradual `Concatenate` tail:
+
+```py
+from collections.abc import Callable
+from typing import Any, ClassVar, Concatenate, cast
+
+def method(value: object, argument: str) -> int:
+    return len(argument)
+
+def gradual_method(value: object, *args: Any, **kwargs: Any) -> int:
+    return 1
+
+type Method = Callable[[object, str], int]
+type GradualMethod = Callable[Concatenate[object, ...], int]
+
+class C:
+    inferred = cast(Method, method)
+    inferred_gradual = cast(GradualMethod, gradual_method)
+    classvar: ClassVar[Method] = method
+    classvar_gradual: ClassVar[GradualMethod] = gradual_method
+    explicit: Method = method
+
+reveal_type(C.inferred)  # revealed: (object, str, /) -> int
+reveal_type(C().inferred)  # revealed: (str, /) -> int
+reveal_type(C.classvar)  # revealed: (object, str, /) -> int
+reveal_type(C().classvar)  # revealed: (str, /) -> int
+reveal_type(C().explicit)  # revealed: (object, str, /) -> int
+
+C.inferred = method
+C.classvar = method
+
+reveal_type(C().inferred("value"))  # revealed: int
+reveal_type(C().classvar("value"))  # revealed: int
+reveal_type(C().inferred_gradual())  # revealed: int
+reveal_type(C().classvar_gradual())  # revealed: int
+```
 
 ## Use case: Decorating a method with a `Callable`-typed decorator
 
@@ -203,10 +248,10 @@ def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
     pass
 ```
 
-In general, a function call might however return a `Callable` that is unrelated to the argument
-passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
-This allows correct programs like the following to pass type checking (that are currently rejected
-by pyright and mypy with a heuristic that apparently applies in a wider range of situations):
+This is necessarily unsound: a function call can return a `Callable` unrelated to the argument. The
+following program is valid at runtime, but we reject it because the inferred class-body callable is
+treated as a descriptor. This heuristic does not check whether the first parameter can accept the
+instance:
 
 ```py
 class SquareCalculator:
@@ -222,7 +267,8 @@ def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
 class Calculator:
     square_then_round = square_then(round)
 
-reveal_type(Calculator().square_then_round(3.14))  # revealed: int
+# error: [too-many-positional-arguments]
+Calculator().square_then_round(3.14)
 ```
 
 ## Use case: Wrappers with explicit receivers
@@ -251,35 +297,17 @@ class Path:
     write_bytes = _wrap_method(RawPath.write_bytes)
 
 def check(path: Path) -> None:
-    # TODO: shouldn't be errors, should reveal `int`
-    # error: [missing-argument]
-    # error: [invalid-argument-type]
     reveal_type(path.write_bytes(b""))  # revealed: int
 ```
 
 ## Use case: Treating dunder methods as bound-method descriptors
 
-pytorch defines a `__pow__` dunder attribute on [`TensorBase`] in a similar way to the following
-example. We generally treat dunder attributes as bound-method descriptors since they all take a
-`self` argument. This allows us to type-check the following code correctly:
+In the following example, the `__lt__` dunder attribute is not declared. The attribute type is
+inferred as `Callable[…]`, so we treat it as a bound-method descriptor:
 
 ```py
-from typing import Callable
+from collections.abc import Callable
 
-def pow_impl(tensor: Tensor, exponent: int) -> Tensor:
-    raise NotImplementedError
-
-class Tensor:
-    __pow__: Callable[[Tensor, int], Tensor] = pow_impl
-
-Tensor() ** 2
-```
-
-The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
-is not declared. The attribute type is inferred as `Callable[…]`, but we still treat it as a
-bound-method descriptor:
-
-```py
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
     raise NotImplementedError
 
@@ -289,8 +317,8 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
-accept a receiver:
+An explicitly annotated non-`ClassVar` callable dunder without a positional first parameter remains
+a regular callable:
 
 ```py
 class Thunk:
@@ -302,8 +330,7 @@ class Thunk:
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
 ```
 
-For other concrete signatures, the heuristic does not check whether the first parameter can accept
-the instance:
+In particular, ordinary attribute access retains the full signature of a concrete callable dunder:
 
 ```py
 def descriptor_candidate(value: str) -> int:
@@ -312,11 +339,11 @@ def descriptor_candidate(value: str) -> int:
 class DescriptorCandidate:
     __value__: Callable[[str], int] = descriptor_candidate
 
-reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+reveal_type(DescriptorCandidate().__value__)  # revealed: (str, /) -> int
 ```
 
-A gradual callable signature might accept the receiver, so we preserve the function-descriptor
-heuristic. This also preserves function attributes on class access:
+A gradual callable annotation on a dunder also describes a method, so function attributes are
+available on the class member:
 
 ```py
 from typing import Any
@@ -389,11 +416,12 @@ C().f2(1)
 python-version = "3.14"
 ```
 
-The callable type of a type object is not function-like.
+The callable type of a type object is not function-like. Once that type is extracted into a regular
+callable signature, the `ClassVar` descriptor heuristic applies on instance reads.
 
 ```py
 from typing import ClassVar
-from ty_extensions._internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -404,13 +432,21 @@ class WithInit:
         pass
 
 class C:
-    with_new: ClassVar[RegularCallableTypeOf[WithNew]]
-    with_init: ClassVar[RegularCallableTypeOf[WithInit]]
+    with_new: ClassVar[TypeOf[WithNew]]
+    with_init: ClassVar[TypeOf[WithInit]]
+    extracted_new: ClassVar[RegularCallableTypeOf[WithNew]]
+    extracted_init: ClassVar[RegularCallableTypeOf[WithInit]]
 
 C.with_new(1)
 C().with_new(1)
 C.with_init(1)
 C().with_init(1)
+C.extracted_new(1)
+# error: [too-many-positional-arguments]
+C().extracted_new(1)
+C.extracted_init(1)
+# error: [too-many-positional-arguments]
+C().extracted_init(1)
 ```
 
 ## Decorators returning PEP 695 type aliases
@@ -473,5 +509,3 @@ reveal_type(Child().method)  # revealed: (int, /) -> str
 Parent().method(1)
 Child().method(1)
 ```
-
-[`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

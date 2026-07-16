@@ -4679,7 +4679,7 @@ C.<CURSOR>
             builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
-        __annotate__ :: (() -> dict[str, Any]) | None
+        __annotate__ :: ((Format, /) -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -4878,7 +4878,7 @@ Quux.<CURSOR>
         some_method :: def some_method(self) -> int
         some_property :: property
         some_static_method :: def some_static_method(self) -> int
-        __annotate__ :: (() -> dict[str, Any]) | None
+        __annotate__ :: ((Format, /) -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]

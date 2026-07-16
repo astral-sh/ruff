@@ -3952,6 +3952,15 @@ class ClassVarAttributeBad(Protocol):
 
 static_assert(not is_subtype_of(ClassVarAttributeBad, Method))
 static_assert(not is_assignable_to(ClassVarAttributeBad, Method))
+
+class ClassVarCallable(Protocol):
+    f: ClassVar[Callable[[int], int]]
+
+class ImplementsClassVarCallable:
+    f: ClassVar[Callable[[int], int]]
+
+static_assert(is_subtype_of(ImplementsClassVarCallable, ClassVarCallable))
+static_assert(is_assignable_to(ImplementsClassVarCallable, ClassVarCallable))
 ```
 
 ## Narrowing of protocols

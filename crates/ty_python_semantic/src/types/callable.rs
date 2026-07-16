@@ -9,7 +9,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeTransformer,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -30,6 +31,42 @@ impl<'db> Type<'db> {
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
     pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
+    }
+
+    /// Promote regular callables with a positional receiver to function-like callables.
+    pub(crate) fn into_function_like_callable(self, db: &'db dyn Db) -> Type<'db> {
+        struct IntoFunctionLikeCallable;
+
+        fn transform<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
+        ) -> Type<'db> {
+            match ty {
+                Type::Callable(callable)
+                    if callable.is_regular(db)
+                        && callable.signatures(db).has_bindable_receiver() =>
+                {
+                    Type::Callable(callable.into_function_like(db))
+                }
+                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+                    let value_type = alias.value_type(db);
+                    let transformed = transform(db, value_type, visitor);
+                    if transformed == value_type {
+                        ty
+                    } else {
+                        transformed
+                    }
+                }),
+                Type::Union(union) => union.map(db, |element| transform(db, *element, visitor)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, |element| transform(db, *element, visitor))
+                }
+                _ => ty,
+            }
+        }
+
+        transform(db, self, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`
@@ -321,12 +358,6 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
-    /// Represents a `Callable[P, R]`-typed dunder attribute.
-    ///
-    /// This is distinct from [`Self::Regular`] so that the dunder descriptor heuristic does not
-    /// turn the callable into a function-like object after `P` is specialized.
-    DunderParamSpec,
-
     /// A callable type that represents a staticmethod. These callables do not bind `self`
     /// when accessed as attributes on instances - they return the underlying function as-is.
     StaticMethodLike,
@@ -491,10 +522,6 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
-    }
-
     pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::Regular)
     }
@@ -561,10 +588,6 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
-        if self.is_dunder_paramspec(db) {
-            return self.into_regular(db);
-        }
-
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
@@ -578,15 +601,6 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db),
             CallableTypeKind::FunctionLike,
-            self.provenance(db),
-        )
-    }
-
-    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db),
-            CallableTypeKind::DunderParamSpec,
             self.provenance(db),
         )
     }

@@ -111,7 +111,7 @@ pub(crate) use literal::{
 };
 pub use special_form::SpecialFormType;
 pub(crate) use special_form::TypedDictModule;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
@@ -450,6 +450,7 @@ bitflags! {
         /// All other attributes use the `WithInstanceFallback` policy.
         ///
         /// If this flag is set - look up the attribute on the meta-type only.
+        /// This also selects method-like binding for concrete callable dunder declarations.
         const NO_INSTANCE_FALLBACK = 1 << 0;
 
         /// When looking up an attribute on a class, we sometimes need to avoid
@@ -2829,13 +2830,66 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Type::TypeVar(_) = self
-            && let Some(class) = self.nominal_class(db)
-        {
-            self.to_meta_type(db)
-                .class_namespace_member(db, class, name.as_str(), policy)
-        } else {
-            self.class_member_with_policy(db, name, policy)
+        match self {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |element| {
+                element.instance_lookup_class_member_with_policy(db, name.clone(), policy)
+            }),
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness_and_qualifiers(db, |element| {
+                    element.instance_lookup_class_member_with_policy(db, name.clone(), policy)
+                })
+            }
+            // Synthesized protocol members are already instance reads, so their method callables
+            // have already been bound.
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(_),
+                ..
+            }) => self.instance_member(db, &name),
+            _ => {
+                let is_dunder_lookup =
+                    policy.no_instance_fallback() && name.starts_with("__") && name.ends_with("__");
+                let member = if let Type::TypeVar(_) = self
+                    && let Some(class) = self.nominal_class(db)
+                {
+                    self.to_meta_type(db)
+                        .class_namespace_member(db, class, name.as_str(), policy)
+                } else {
+                    self.class_member_with_policy(db, name, policy)
+                };
+
+                let is_callable_dunder = is_dunder_lookup
+                    && matches!(member.place, Place::Defined(place) if place
+                    .provenance
+                    .definition()
+                    .is_some_and(|definition| {
+                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                            && inferred_declaration(db, definition)
+                                .declared()
+                                .is_some_and(|declared| {
+                                    let ty = declared.inner_type();
+                                    ty.into_function_like_callable(db) != ty
+                                })
+                    }));
+
+                // Inferred class-body callables, `ClassVar` callables, and concrete callable
+                // dunders behave as descriptors when read through an instance. Dunder lookup uses
+                // the unspecialized declaration so callable-bounded TypeVars and ParamSpecs keep
+                // their full signatures after specialization.
+                if member.is_class_var()
+                    || is_callable_dunder
+                    || matches!(
+                        member.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Inferred,
+                            ..
+                        })
+                    )
+                {
+                    member.map_type(|ty| ty.into_function_like_callable(db))
+                } else {
+                    member
+                }
+            }
         }
     }
 
