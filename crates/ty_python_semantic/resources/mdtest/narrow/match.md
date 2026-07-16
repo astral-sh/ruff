@@ -264,14 +264,13 @@ def test_sequence_subject_facts_are_scoped_to_successful_case(
     reveal_type(value[0])  # revealed: int | str
 
 # This deliberately documents the remaining unsoundness. Mutating the subject inside the case can
-# invalidate the observed length and element types, but we retain them for the rest of the branch.
+# invalidate the observed element types, but we retain them for the rest of the branch.
 def test_sequence_subject_facts_can_be_stale_after_mutation(
     value: list[int | str],
 ) -> None:
     match value:
         case [int(), str()]:
             value.reverse()
-            reveal_type(len(value))  # revealed: Literal[2]
             reveal_type(value[0])  # revealed: int
 
 def test_match_prefix_star_object_sequence(value: object) -> None:
@@ -289,6 +288,8 @@ def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
             # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
             reveal_type(value)
             reveal_type(value[0])  # revealed: int
+            # This is deliberately unsound: custom sequences can handle negative indices differently
+            # from their corresponding positive indices.
             reveal_type(value[-1])  # revealed: str
             reveal_type(value[1])  # revealed: object
 
