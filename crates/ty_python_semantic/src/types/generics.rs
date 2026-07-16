@@ -2045,20 +2045,12 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
-    /// Whether `pending` contains a relation from an actual intersection whose solution paths can
-    /// refine a call return type.
-    has_actual_intersection_constraint: bool,
-    /// Whether every constraint-set inference path in `pending` preserves the meaning needed for
+    /// Whether `pending` contains an actual-intersection relation for which the caller should try
     /// path-wise return refinement.
     ///
-    /// Some hybrid inference paths still flatten their own solutions into `types` before adding
-    /// their constraint set to `pending`. Until those paths retain provenance too, combining them
-    /// with actual-intersection paths would conflate alternative overloads with simultaneous
-    /// specializations of one call.
-    ///
-    /// TODO: Replace this call-wide gate with per-path provenance once all constraint-set inference
-    /// paths preserve their solutions.
-    supports_path_return_inference: bool,
+    /// This is only a scope/performance gate. Callers must independently validate every path
+    /// before using its return type; disjunctions in `pending` need not originate here.
+    has_actual_intersection_constraint: bool,
 }
 
 /// The result of type variable inference before choosing how to handle unsolved type variables.
@@ -2164,7 +2156,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
             has_actual_intersection_constraint: false,
-            supports_path_return_inference: true,
         }
     }
 
@@ -2259,7 +2250,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Option<Box<[TypeVarInference<'db>]>> {
         if !self.has_actual_intersection_constraint
-            || !self.supports_path_return_inference
             || generic_context
                 .variables_inner(self.db)
                 .values()
@@ -2687,7 +2677,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ConstraintSetInferenceError<'db>> {
-        self.supports_path_return_inference = false;
         let mut first_error = None;
         let solutions = match set.solutions_with(
             self.db,

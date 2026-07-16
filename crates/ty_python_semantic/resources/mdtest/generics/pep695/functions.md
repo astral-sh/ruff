@@ -250,13 +250,19 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 
-# Constrained typevars use the same path-based inference. A lower bound that rules out every
-# declared constraint should produce the usual constraint violation.
+# Constrained typevars can be inferred from matching intersection elements; non-matching elements
+# do not contribute. If no element matches a declared constraint, report the constraint violation.
 
 def first_constrained[Constrained: (Sub1, Sub2)](
     x: Sequence[Constrained],
 ) -> Constrained:
     return x[0]
+
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    reveal_type(first_constrained(x))  # revealed: Sub1 & Sub2
+
+def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
+    reveal_type(first_constrained(x))  # revealed: Sub1
 
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first_constrained` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
@@ -352,6 +358,26 @@ def _(
     y: Intersection[Source[B], Source[D]],
 ) -> None:
     reveal_type(correlated(x, y))  # revealed: (A & B) | (D & B)
+```
+
+Callable constraints can add their own alternatives to the call-wide constraint set. Each complete
+static specialization still validates the whole call and contributes its instantiated return:
+
+```py
+from collections.abc import Callable
+from typing import overload
+from ty_extensions import Intersection
+
+def with_callback[T](x: Source[T], callback: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@overload
+def accepts(value: A) -> None: ...
+@overload
+def accepts(value: B) -> None: ...
+def accepts(value: A | B) -> None: ...
+def _(x: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(with_callback(x, accepts))  # revealed: A & B
 ```
 
 PEP 695 can infer a bivariant class parameter when it is unused. Such a parameter should remain

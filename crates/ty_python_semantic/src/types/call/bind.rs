@@ -5225,6 +5225,36 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
     }
 
+    /// Returns `true` if `specialization` independently validates every argument relation that
+    /// contributes to specialization inference.
+    fn specialization_validates_arguments(&self, specialization: Specialization<'db>) -> bool {
+        let parameters = self.signature.parameters();
+        self.enumerate_argument_types()
+            .all(|(argument_index, _, _, argument_types)| {
+                self.argument_matches[argument_index]
+                    .iter()
+                    .all(|matched_parameter| {
+                        let parameter_index = matched_parameter.index;
+                        let parameter = &parameters[parameter_index];
+                        if self.is_gradual_variadic_parameter(parameter_index)
+                            || parameter.has_starred_annotation()
+                        {
+                            return true;
+                        }
+
+                        let declared_type = parameter.annotated_type();
+                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        let argument_type =
+                            matched_parameter.argument_type.unwrap_or(argument_type);
+                        let argument_type =
+                            argument_type.apply_specialization(self.db, specialization);
+                        let expected_type =
+                            declared_type.apply_specialization(self.db, specialization);
+                        argument_type.is_subtype_of(self.db, expected_type)
+                    })
+            })
+    }
+
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
@@ -5496,12 +5526,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let specialization = merged_inference.specialization(self.db);
         let merged_return_ty = original_return_ty.apply_specialization(self.db, specialization);
         let path_return_ty = path_inferences.as_deref().and_then(|paths| {
+            // Every retained path independently validates the entire call. For a static argument
+            // type `S`, parameter type `P`, and solution `T`, `S <= P[T]` establishes the
+            // instantiated return `R[T]`. The same call therefore satisfies every retained
+            // `R[T]`, so their intersection is sound regardless of why `pending` is disjunctive.
             let returns: Vec<_> = paths
                 .iter()
                 .copied()
                 .filter(|inference| {
                     inference.is_complete_for(self.db, original_return_ty)
                         && inference.is_fully_static(self.db)
+                        && self
+                            .specialization_validates_arguments(inference.specialization(self.db))
                 })
                 .map(|inference| {
                     original_return_ty
