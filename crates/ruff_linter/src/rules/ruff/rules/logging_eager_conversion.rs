@@ -62,7 +62,7 @@ use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_c
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.13.2")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct LoggingEagerConversion {
     pub(crate) format_conversion: FormatConversion,
     pub(crate) function_name: Option<&'static str>,
