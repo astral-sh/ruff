@@ -7609,12 +7609,28 @@ mod tests {
         });
     }
 
-    fn solutions_for_constraint_orderings<'db>(
+    #[derive(Clone, Copy)]
+    struct PermutedConstraint<'db>(
+        BoundTypeVarInstance<'db>,
+        Option<Type<'db>>,
+        Option<Type<'db>>,
+    );
+
+    impl<'db> PermutedConstraint<'db> {
+        fn node(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> NodeId {
+            let PermutedConstraint(typevar, lower, upper) = self;
+            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
+        }
+    }
+
+    #[track_caller]
+    fn check_solutions_for_constraint_orderings<'db>(
         db: &'db dyn Db,
         typevars: &[BoundTypeVarInstance<'db>],
-        atoms: &[Constraint<'db>],
+        atoms: &[PermutedConstraint<'db>],
         build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
-    ) -> FxIndexSet<String> {
+        expected: impl IntoIterator<Item = &'static str>,
+    ) {
         let inferable = InferableTypeVars::from_typevars(
             db,
             typevars
@@ -7630,7 +7646,14 @@ mod tests {
                 builder.intern_typevar(db, *typevar);
             }
             for index in constraint_order {
-                builder.intern_constraint(db, atoms[index]);
+                let PermutedConstraint(typevar, lower, upper) = atoms[index];
+                builder.intern_constraint(
+                    db,
+                    Constraint {
+                        typevar,
+                        bounds: ConstraintBounds::new(lower, upper),
+                    },
+                );
             }
 
             let set = ConstraintSet::from_node(&builder, build_bdd(&builder));
@@ -7682,7 +7705,8 @@ mod tests {
             ));
         }
 
-        signatures
+        let expected: FxIndexSet<_> = expected.into_iter().map(String::from).collect();
+        assert_eq!(signatures, expected);
     }
 
     #[test]
@@ -7696,57 +7720,32 @@ mod tests {
         let list_u = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(u)]);
         let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
         let atoms = [
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(None, Some(list_u)),
-            },
-            Constraint {
-                typevar: u,
-                bounds: ConstraintBounds::new(None, Some(int)),
-            },
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(Some(list_int), None),
-            },
-            Constraint {
-                typevar: v,
-                bounds: ConstraintBounds::new(Some(bytes), None),
-            },
+            PermutedConstraint(t, None, Some(list_u)),
+            PermutedConstraint(u, None, Some(int)),
+            PermutedConstraint(t, Some(list_int), None),
+            PermutedConstraint(v, Some(bytes), None),
         ];
 
-        let actual = solutions_for_constraint_orderings(&db, &[t, u, v], &atoms, |builder| {
-            let [t_list_u, u_int, list_int_t, bytes_v] = atoms.map(|atom| {
-                Constraint::new_node_with_bounds(
-                    &db,
-                    builder,
-                    atom.typevar,
-                    atom.bounds.lower,
-                    atom.bounds.upper,
-                )
-            });
-            t_list_u
-                .and_with_offset(builder, u_int)
-                .and_with_offset(builder, list_int_t)
-                .or_with_offset(builder, bytes_v)
-        });
-        // TODO: All permutations should produce the first result. TDD traversal currently leaks
-        // irrelevant positive constraints onto the `V = bytes` alternative.
-        assert_eq!(
-            actual,
-            FxIndexSet::from_iter([
-                String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]"
-                ),
-                String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]"
-                ),
-                String::from(
-                    "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]"
-                ),
-                String::from(
-                    "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]"
-                ),
-            ])
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u, v],
+            &atoms,
+            |builder| {
+                let [t_list_u, u_int, list_int_t, bytes_v] =
+                    atoms.map(|atom| atom.node(&db, builder));
+                t_list_u
+                    .and_with_offset(builder, u_int)
+                    .and_with_offset(builder, list_int_t)
+                    .or_with_offset(builder, bytes_v)
+            },
+            // TODO: All permutations should produce the first result. TDD traversal currently
+            // leaks irrelevant positive constraints onto the `V = bytes` alternative.
+            [
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]",
+            ],
         );
     }
 
@@ -7759,48 +7758,29 @@ mod tests {
         let str = KnownClass::Str.to_instance(&db);
         let bytes = KnownClass::Bytes.to_instance(&db);
         let atoms = [
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(None, Some(int)),
-            },
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(None, Some(str)),
-            },
-            Constraint {
-                typevar: u,
-                bounds: ConstraintBounds::new(Some(bytes), None),
-            },
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(u, Some(bytes), None),
         ];
 
-        let actual = solutions_for_constraint_orderings(&db, &[t, u], &atoms, |builder| {
-            let [t_int, t_str, bytes_u] = atoms.map(|atom| {
-                Constraint::new_node_with_bounds(
-                    &db,
-                    builder,
-                    atom.typevar,
-                    atom.bounds.lower,
-                    atom.bounds.upper,
-                )
-            });
-            t_int
-                .or_with_offset(builder, t_str)
-                .negate(builder)
-                .or_with_offset(builder, bytes_u)
-        });
-        // TODO: All permutations should produce the first result. A satisfied alternative should
-        // not infer `T` from unrelated positive decisions made earlier in a BDD path.
-        assert_eq!(
-            actual,
-            FxIndexSet::from_iter([
-                String::from("never=false always=false merged=[U=bytes] paths=[; U=bytes]"),
-                String::from(
-                    "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]"
-                ),
-                String::from(
-                    "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]"
-                ),
-            ])
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, bytes_u] = atoms.map(|atom| atom.node(&db, builder));
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .negate(builder)
+                    .or_with_offset(builder, bytes_u)
+            },
+            // TODO: All permutations should produce the first result. A satisfied alternative
+            // should not infer `T` from unrelated positive decisions made earlier in a BDD path.
+            [
+                "never=false always=false merged=[U=bytes] paths=[; U=bytes]",
+                "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]",
+                "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]",
+            ],
         );
     }
 
@@ -7812,57 +7792,30 @@ mod tests {
         let int = KnownClass::Int.to_instance(&db);
         let str = KnownClass::Str.to_instance(&db);
         let atoms = [
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(None, Some(int)),
-            },
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(None, Some(str)),
-            },
-            Constraint {
-                typevar: t,
-                bounds: ConstraintBounds::new(Some(int), None),
-            },
-            Constraint {
-                typevar: u,
-                bounds: ConstraintBounds::new(None, Some(int)),
-            },
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(u, None, Some(int)),
         ];
 
-        let actual: FxIndexSet<_> =
-            solutions_for_constraint_orderings(&db, &[t, u], &atoms, |builder| {
-                let [t_int, t_str, int_t, u_int] = atoms.map(|atom| {
-                    Constraint::new_node_with_bounds(
-                        &db,
-                        builder,
-                        atom.typevar,
-                        atom.bounds.lower,
-                        atom.bounds.upper,
-                    )
-                });
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, int_t, u_int] = atoms.map(|atom| atom.node(&db, builder));
                 t_int
                     .or_with_offset(builder, t_str)
                     .and_with_offset(builder, int_t)
                     .and_with_offset(builder, u_int)
-            })
-            .into_iter()
-            .map(|signature| {
-                signature
-                    .split_once(" paths=")
-                    .expect("solution signature should contain paths")
-                    .0
-                    .to_string()
-            })
-            .collect();
-        // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not source
-        // order. That changes which equivalent upper-bound intersection is constructed first.
-        assert_eq!(
-            actual,
-            FxIndexSet::from_iter([
-                String::from("never=false always=false merged=[T=int | U, U=T & int]"),
-                String::from("never=false always=false merged=[T=int | U, U=int & T]"),
-            ])
+            },
+            // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not
+            // source order. That changes which equivalent upper-bound intersection is constructed
+            // first.
+            [
+                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
+                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
+            ],
         );
     }
 
