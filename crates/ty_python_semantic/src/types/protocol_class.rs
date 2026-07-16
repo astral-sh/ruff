@@ -357,9 +357,8 @@ impl<'db> ProtocolInterface<'db> {
             db,
             self.inner(db)
                 .iter()
-                .filter_map(|(name, data)| {
-                    predicate(&ProtocolMember { name, data }).then(|| (name.clone(), data.clone()))
-                })
+                .filter(|&(name, data)| predicate(&ProtocolMember { name, data }))
+                .map(|(name, data)| (name.clone(), data.clone()))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -1354,7 +1353,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .skip(usize::from(
                             signature.has_implicit_positional_receiver_annotation(),
                         ))
-                        .map(|parameter| parameter.annotated_type()),
+                        .map(Parameter::annotated_type),
                 )
                 .chain(std::iter::once(signature.return_ty))
                 .any(|ty| {
