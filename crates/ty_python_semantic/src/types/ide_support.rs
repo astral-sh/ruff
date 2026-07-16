@@ -19,6 +19,7 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::Module;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
@@ -1975,15 +1976,15 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
     supertypes
 }
 
-/// Get the direct subtypes of the class given.
+/// Get the direct subtypes of the class given in `modules`.
 ///
 /// When the type given doesn't correspond to a class literal, then this always
 /// returns an empty sequence.
-///
-/// Note that this scans all modules in `db` to find classes that directly
-/// inherit from the given class. This could be quite expensive in large
-/// projects.
-pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
+pub fn type_hierarchy_subtypes(
+    db: &dyn Db,
+    ty: Type<'_>,
+    modules: &[Module<'_>],
+) -> Vec<TypeHierarchyClass> {
     let Some(target_class) = extract_class_literal(db, ty) else {
         return vec![];
     };
@@ -1991,8 +1992,7 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
     let target_is_object = target_class.is_known(db, KnownClass::Object);
     let mut subtypes = vec![];
 
-    // Scan all modules in the workspace
-    for module in ty_module_resolver::all_modules(db) {
+    for &module in modules {
         let Some(file) = module.file(db) else {
             continue;
         };
