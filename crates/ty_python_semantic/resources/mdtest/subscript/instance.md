@@ -199,6 +199,15 @@ a = Identity()
 a[0] = 0
 ```
 
+## Subscript assignment on a negative-only intersection
+
+```py
+from ty_extensions import Not
+
+def assign(value: Not[None]) -> None:
+    value[:] = 1
+```
+
 ## `__setitem__` with invalid index argument
 
 ```py

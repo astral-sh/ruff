@@ -1685,6 +1685,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !valid {
                     check_positive_elements(true);
                 }
+                #[expect(
+                    clippy::drop_non_drop,
+                    reason = "release the inference-guard borrows before finalizing them"
+                )]
+                drop(check_positive_elements);
+
+                // A negative-only intersection has no candidate arm from which to select a type
+                // context, but these expressions still need one committed inference.
+                if intersection.positive(db).is_empty() {
+                    infer_slice_ty.infer_loud(self, TypeContext::default());
+                    infer_rhs_value.infer_loud(self, TypeContext::default());
+                }
 
                 valid
             }
