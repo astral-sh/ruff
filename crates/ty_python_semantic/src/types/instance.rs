@@ -21,7 +21,8 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -508,13 +509,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut result = self.never();
 
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
+            let source_protocol_as_nominal = ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance);
+            let source_nominal_view = ty.as_nominal_instance().or(source_protocol_as_nominal);
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = ty
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance)
+            let type_to_test = source_protocol_as_nominal
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
 
@@ -524,6 +527,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if result
                 .union(db, self.constraints, nominally_satisfied)
                 .is_always_satisfied(db)
+            {
+                return result;
+            }
+
+            if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                && !result.is_never_satisfied(db)
+                && source_nominal_view.is_some_and(|source| {
+                    source.class(db).class_literal(db)
+                        == nominal_instance.class(db).class_literal(db)
+                })
             {
                 return result;
             }

@@ -1282,6 +1282,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
 
+    /// Returns whether this member can be compared before recursive or overloaded methods.
+    ///
+    /// A single-signature method with a non-protocol return is inexpensive and can reject an
+    /// incompatible specialization before a recursive method expands the same interface again.
+    fn is_simple_structural_member(&self, db: &'db dyn Db) -> bool {
+        let ProtocolMemberKind::Method(member, _) = self.data.kind else {
+            return true;
+        };
+        let Type::Callable(callable) = member.ty() else {
+            return false;
+        };
+        let mut signatures = callable.signatures(db).iter();
+        let Some(signature) = signatures.next() else {
+            return false;
+        };
+
+        signatures.next().is_none() && !matches!(signature.return_ty, Type::ProtocolInstance(_))
+    }
+
     fn is_instance_method(&self) -> bool {
         matches!(
             self.data.kind,
@@ -2540,6 +2559,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         target
             .members(db)
+            .filter(|member| member.is_simple_structural_member(db))
+            .chain(
+                target
+                    .members(db)
+                    .filter(|member| !member.is_simple_structural_member(db)),
+            )
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
