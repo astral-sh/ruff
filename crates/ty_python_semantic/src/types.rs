@@ -4000,6 +4000,14 @@ impl<'db> Type<'db> {
                     .into()
                 }
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "solutions" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetSolutions(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                     if name == "with_detailed_display" =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -6407,6 +6415,7 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                        | KnownBoundMethodType::ConstraintSetSolutions(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
                 )
         ) {
@@ -6778,6 +6787,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
             )
             | Type::DataclassDecorator(_)
@@ -7036,6 +7046,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)

@@ -2769,6 +2769,41 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(result);
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
+                        tracked,
+                    )) => {
+                        let [Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, &inferable) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(db, tracked.constraints(db));
+                        let result = match set.solutions(db, &constraints, inferable) {
+                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                                db,
+                                paths.into_iter().map(|path| {
+                                    Type::heterogeneous_tuple(
+                                        db,
+                                        path.into_iter().map(|binding| {
+                                            TypeFormType::from_type_expression(db, binding.solution)
+                                        }),
+                                    )
+                                }),
+                            ),
+                            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                                Type::empty_tuple(db)
+                            }
+                        };
+                        overload.set_return_type(result);
+                    }
+
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
                     ) => {

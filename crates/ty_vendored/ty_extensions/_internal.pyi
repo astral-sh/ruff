@@ -142,6 +142,16 @@ class ConstraintSet:
         do not infer a solution for `typevar` do not contribute an element.
         """
 
+    def solutions(
+        self, *, inferable: TypeForm[tuple[object, ...]]
+    ) -> tuple[tuple[TypeForm[object], ...], ...]:
+        """
+        Returns all explicit solutions, preserving path and binding order.
+
+        `inferable` specifies all typevars that should be solved for. Each inner
+        tuple contains the solutions inferred on one satisfying path.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...

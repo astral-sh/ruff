@@ -2,12 +2,38 @@
 
 These regressions exercise solution extraction while changing the builder-local constraint and
 typevar ordering with `TY_CONSTRAINT_SET_ORDER`. `ConstraintSet.solutions_for` exposes each explicit
-per-path solution as a `TypeForm`, including duplicate and `Never` solutions that would otherwise
-disappear when paths are unioned.
+per-typevar solution as a `TypeForm`; `ConstraintSet.solutions` additionally preserves path and
+binding order. This keeps duplicate and `Never` solutions visible when they would otherwise
+disappear as paths are unioned.
 
 ```toml
 [environment]
 python-version = "3.13"
+```
+
+## Solution binding order follows constraint source order
+
+The order of bindings within a path must follow the first constraint that introduced each typevar,
+not hashes of their Salsa-backed identities. Reversing either the typevar declaration order or the
+constraint source order exercises both sides of this requirement.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def bindings_tuv[T, U, V]() -> None:
+    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    # revealed: tuple[tuple[TypeForm[int], TypeForm[str], TypeForm[bytes]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+
+def bindings_vtu[V, T, U]() -> None:
+    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    # revealed: tuple[tuple[TypeForm[int], TypeForm[str], TypeForm[bytes]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+
+def bindings_reverse_source[T, U, V]() -> None:
+    constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
+    # revealed: tuple[tuple[TypeForm[bytes], TypeForm[str], TypeForm[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
 ## Nested transitive constraints and an unrelated alternative
@@ -27,6 +53,8 @@ def nested_transitive[T, U, V]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))  # revealed: tuple[TypeForm[list[int]]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))  # revealed: tuple[TypeForm[int]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))  # revealed: tuple[TypeForm[bytes]]
+    # revealed: tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[bytes]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
 ## Negated alternatives do not infer positive evidence
@@ -45,6 +73,8 @@ def negated_alternative[T, U]() -> None:
 
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))  # revealed: tuple[()]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))  # revealed: tuple[TypeForm[bytes]]
+    # revealed: tuple[tuple[()], tuple[TypeForm[bytes]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
 ## Derived solution element order
@@ -67,6 +97,196 @@ def derived_solution[U, T]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))  # revealed: tuple[TypeForm[U@derived_solution | int]]
     # TODO: revealed: tuple[TypeForm[T@derived_solution & int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))  # revealed: tuple[TypeForm[Never]]
+```
+
+## Bare-typevar orientation and tied source order
+
+`S ≤ T` can be represented as a constraint on either typevar, and `S ≤ T ≤ U` can be either one
+range or two linked constraints. Reorientation combines nodes whose source orders can tie, so
+logical equivalence and solution-element order must remain stable in both declaration orders.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def orientation_st[S, T]() -> None:
+    lower = ConstraintSet.range(Never, S, T)
+    upper = ConstraintSet.range(S, T, object)
+    static_assert(lower == upper)
+
+    equality_st = ConstraintSet.range(T, S, T)
+    equality_ts = ConstraintSet.range(S, T, S)
+    static_assert(equality_st == equality_ts)
+
+def orientation_ts[T, S]() -> None:
+    lower = ConstraintSet.range(Never, S, T)
+    upper = ConstraintSet.range(S, T, object)
+    static_assert(lower == upper)
+
+    equality_st = ConstraintSet.range(T, S, T)
+    equality_ts = ConstraintSet.range(S, T, S)
+    static_assert(equality_st == equality_ts)
+
+def chain_stu[S, T, U]() -> None:
+    chain = ConstraintSet.range(S, T, U)
+    linked = ConstraintSet.range(Never, S, T) & ConstraintSet.range(Never, T, U)
+    static_assert(chain == linked)
+
+    constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # revealed: tuple[TypeForm[T@chain_stu | int | U@chain_stu]]
+    reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
+    # revealed: tuple[TypeForm[S@chain_stu | int | U@chain_stu]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
+    # revealed: tuple[TypeForm[T@chain_stu | S@chain_stu | int]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
+
+def chain_uts[U, T, S]() -> None:
+    chain = ConstraintSet.range(S, T, U)
+    linked = ConstraintSet.range(Never, S, T) & ConstraintSet.range(Never, T, U)
+    static_assert(chain == linked)
+
+    constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
+    # TODO: inferable typevars should not remain in these concrete solutions.
+    # revealed: tuple[TypeForm[T@chain_uts | int | U@chain_uts]]
+    reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
+    # revealed: tuple[TypeForm[S@chain_uts | int | U@chain_uts]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
+    # revealed: tuple[TypeForm[T@chain_uts | S@chain_uts | int]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
+```
+
+## Abstraction and non-inferable typevars
+
+Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not
+leak onto the surviving paths. Universal abstraction of an alternative must likewise leave only the
+unrelated branch.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_nested[T, U, V]() -> None:
+    constraints = (
+        ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
+    ) | ConstraintSet.range(bytes, V, object)
+
+    # `U` is deliberately non-inferable here.
+    # revealed: tuple[tuple[TypeForm[list[int]], TypeForm[int]], tuple[TypeForm[bytes]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, V]))
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, V]))  # revealed: tuple[TypeForm[list[int]]]
+    reveal_type(constraints.solutions_for(V, inferable=tuple[T, V]))  # revealed: tuple[TypeForm[bytes]]
+
+    quantified = constraints.for_all(tuple[T, U])
+    expected = ConstraintSet.range(bytes, V, object)
+    static_assert(quantified == expected)
+    reveal_type(quantified.solutions_for(V, inferable=tuple[V]))  # revealed: tuple[TypeForm[bytes]]
+
+def noninferable_negated[T, U]() -> None:
+    constraints = ~(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str)) | ConstraintSet.range(
+        bytes, U, object
+    )
+
+    quantified = constraints.for_all(tuple[T])
+    expected = ConstraintSet.range(bytes, U, object)
+    static_assert(quantified == expected)
+    reveal_type(quantified.solutions_for(U, inferable=tuple[U]))  # revealed: tuple[TypeForm[bytes]]
+```
+
+## Call-site upper bounds preserve intersection order
+
+Upper bounds inferred from contravariant callable parameters are intersected in call-site source
+order. This exercises the direct `UpperBound` insertion path separately from sequent-derived bounds.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+class P(Protocol):
+    def p(self) -> None: ...
+
+class Q(Protocol):
+    def q(self) -> None: ...
+
+T = TypeVar("T")
+
+def accepts_p(value: P) -> None: ...
+def accepts_q(value: Q) -> None: ...
+def infer_from_callbacks(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_from_callbacks(accepts_p, accepts_q))  # revealed: P & Q
+reveal_type(infer_from_callbacks(accepts_q, accepts_p))  # revealed: Q & P
+```
+
+## Generic-callable and protocol relation constraints
+
+Relations can introduce fresh typevars and nested invariant constraints before those typevars are
+quantified away. A `TypedDict` union additionally exercises common-constraint probing and the
+fallback protocol-inference path; neither should depend on TDD order.
+
+```py
+from typing import Callable, Literal, Protocol, TypeVar, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, TypeOf
+
+def listify[T](value: T) -> list[T]:
+    return [value]
+
+def invariant_callable[U, V]() -> None:
+    constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
+    # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
+    # error: [static-assert-error]
+    static_assert(constraints.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
+
+ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
+
+class GetValue(Protocol[ConstrainedValue]):
+    def __getitem__(self, key: Literal["value"], /) -> ConstrainedValue: ...
+
+class ValueA(TypedDict):
+    value: int
+
+class ValueB(TypedDict):
+    value: int
+
+def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
+    raise NotImplementedError
+
+def typed_dict_union(value: ValueA | ValueB) -> None:
+    reveal_type(get_value(value))  # revealed: int
+```
+
+## Recursive derived relations remain cycle-safe
+
+Derived constraints can recursively invoke relation checking. The coinductive owned-set cycle
+boundary must continue to terminate without accepting an incompatible non-recursive member when
+ordering changes.
+
+```py
+from __future__ import annotations
+from typing import Protocol, cast
+
+class Array(Protocol):
+    def __abs__(self) -> Array: ...
+    def __pos__(self) -> Array: ...
+    def marker(self) -> int: ...
+
+class Concrete[T]:
+    def __abs__[S](self: S) -> S:
+        return self
+
+    def __pos__[S](self: S) -> S:
+        return self
+
+    def marker(self) -> str:
+        return ""
+
+def convert[T](value: Concrete[T]) -> Array:
+    return cast(Array, value)
+
+invalid: Array = Concrete[int]()  # error: [invalid-assignment]
 ```
 
 ## High-fanout sequents and inferred-union truncation
