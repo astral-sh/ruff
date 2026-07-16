@@ -298,6 +298,7 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
+            suppress_typevar_domains: Cell::new(false),
         };
         let set = ConstraintSet::from_node(&builder, self.node);
         f(&builder, set)
@@ -403,6 +404,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         upper: Option<Type<'db>>,
     ) -> Self {
         let constraint = Constraint::new_node_with_bounds(db, builder, typevar, lower, upper);
+        if builder.typevar_domains_suppressed() {
+            return Self::from_node(builder, constraint);
+        }
         let valid_specializations = typevar.valid_specializations(db, builder);
         Self::from_node(
             builder,
@@ -831,6 +835,23 @@ impl Debug for ConstraintSet<'_, '_> {
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
+    /// Temporarily omit declared `TypeVar` domains while checking recursive protocols.
+    ///
+    /// Recursive protocol member comparisons can re-enter constraint implication through a
+    /// fresh builder, bypassing the existing relation recursion guards. This escape hatch can be
+    /// removed once those recursive relations share a cycle detector.
+    suppress_typevar_domains: Cell<bool>,
+}
+
+struct TypeVarDomainSuppressionGuard<'a> {
+    suppress_typevar_domains: &'a Cell<bool>,
+    previous: bool,
+}
+
+impl Drop for TypeVarDomainSuppressionGuard<'_> {
+    fn drop(&mut self) {
+        self.suppress_typevar_domains.set(self.previous);
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
@@ -942,6 +963,19 @@ impl ConstraintSetStorage<'_> {
 impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    pub(super) fn typevar_domains_suppressed(&self) -> bool {
+        self.suppress_typevar_domains.get()
+    }
+
+    pub(super) fn with_typevar_domains_suppressed<R>(&self, work: impl FnOnce() -> R) -> R {
+        let previous = self.suppress_typevar_domains.replace(true);
+        let _guard = TypeVarDomainSuppressionGuard {
+            suppress_typevar_domains: &self.suppress_typevar_domains,
+            previous,
+        };
+        work()
     }
 
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
@@ -2101,6 +2135,12 @@ impl ConstraintId {
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> bool {
+        // Constraint implication is only a simplification. Conservatively skip it while checking
+        // recursive protocols because assignability between the bounds can re-enter the same
+        // protocol relation through a fresh builder.
+        if builder.typevar_domains_suppressed() {
+            return false;
+        }
         let self_constraint = builder.constraint_data(self);
         let other_constraint = builder.constraint_data(other);
         if !self_constraint

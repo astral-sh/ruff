@@ -5143,6 +5143,31 @@ class Concrete:
 value: Comparable = Concrete()
 ```
 
+### Recursive protocols and bounded generic methods
+
+Comparing a recursive protocol against a generic method whose receiver has a declared bound must not
+recursively re-enter constraint implication:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Array(Protocol):
+    def __abs__(self) -> Array: ...
+
+class NDArray:
+    def __abs__[T: NDArray](self: T) -> T:
+        return self
+
+array: Array = NDArray()
+```
+
 ### Nested occurrences of self-reference
 
 Make sure that we handle self-reference correctly, even if the self-reference appears deeply nested

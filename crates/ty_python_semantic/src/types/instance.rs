@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
@@ -25,6 +26,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -493,6 +495,28 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// Returns whether a class-based protocol refers back to its own origin.
+fn is_recursive_protocol<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) -> bool {
+    let Some((origin, _)) = protocol
+        .as_class_based()
+        .and_then(|class| class.static_class_literal(db))
+    else {
+        return false;
+    };
+
+    // The walk visits the root first. A second visit to the same origin is an interface back-edge.
+    let seen_origin = Cell::new(false);
+    any_over_type(db, Type::ProtocolInstance(protocol), true, |nested| {
+        let Type::ProtocolInstance(nested) = nested else {
+            return false;
+        };
+        nested
+            .as_class_based()
+            .and_then(|class| class.static_class_literal(db))
+            .is_some_and(|(nested_origin, _)| nested_origin == origin && seen_origin.replace(true))
+    })
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -569,21 +593,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                ty,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
+        let check_structurally =
+            || match ty {
+                Type::ProtocolInstance(source_protocol) => self.check_protocol_interface_pair(
+                    db,
+                    ty,
+                    source_protocol.interface(db),
+                    protocol.interface(db),
+                ),
+                _ => protocol.inner.interface(db).members(db).when_all(
+                    db,
+                    self.constraints,
+                    |member| self.type_satisfies_protocol_member(db, ty, &member),
+                ),
+            };
+        // Declared TypeVar domains can make recursive member-signature comparisons re-enter the
+        // same protocol relation through constraint implication. Omit the domains for recursive
+        // structural comparisons until those relations can share a recursion guard.
+        let structurally_satisfied = if !self.constraints.typevar_domains_suppressed()
+            && (is_recursive_protocol(db, protocol)
+                || ty
+                    .as_protocol_instance()
+                    .is_some_and(|source| is_recursive_protocol(db, source)))
+        {
+            self.constraints
+                .with_typevar_domains_suppressed(check_structurally)
         } else {
-            protocol
-                .inner
-                .interface(db)
-                .members(db)
-                .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
-                })
+            check_structurally()
         };
         if let Some(context) = self.report_context()
             && structurally_satisfied.is_never_satisfied(db)
