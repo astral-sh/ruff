@@ -5260,6 +5260,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
+    fn has_unmatched_explicit_argument(&self) -> bool {
+        self.arguments
+            .iter()
+            .enumerate()
+            .any(|(argument_index, (argument, _))| {
+                matches!(argument, Argument::Positional | Argument::Keyword(_))
+                    && !self.argument_matches[argument_index].matched
+            })
+    }
+
     /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
     ///
     /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
@@ -5365,14 +5375,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         builder: &mut SpecializationBuilder<'db, 'c>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> StarredConstraintInference {
-        let has_unmatched_explicit_argument =
-            self.arguments
-                .iter()
-                .enumerate()
-                .any(|(argument_index, (argument, _))| {
-                    matches!(argument, Argument::Positional | Argument::Keyword(_))
-                        && !self.argument_matches[argument_index].matched
-                });
+        let has_unmatched_explicit_argument = self.has_unmatched_explicit_argument();
 
         let mut inference = StarredConstraintInference::default();
 
@@ -5402,7 +5405,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             inference.owned_parameters.insert(arguments.parameter_index);
-            let provided_tuple = self.starred_typevartuple_inference_actual(
+            let provided_tuple = self.align_starred_typevartuple_actual(
                 arguments.declared_tuple,
                 arguments.provided_tuple,
             );
@@ -5423,7 +5426,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         inference
     }
 
-    fn starred_typevartuple_inference_actual(
+    fn align_starred_typevartuple_actual(
         &self,
         declared_tuple: Type<'db>,
         provided_tuple: Type<'db>,
@@ -5797,6 +5800,55 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         (assignable_to_declared_type, starred_inference)
     }
 
+    fn check_starred_parameter_arguments(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+        for (parameter_index, parameter) in self.signature.parameters().iter().enumerate() {
+            let Some(arguments) =
+                self.collect_starred_parameter_arguments(parameter_index, parameter)
+            else {
+                continue;
+            };
+            if self
+                .starred_constraint_error_parameters
+                .contains(&parameter_index)
+                || arguments
+                    .contributing_argument_indices
+                    .iter()
+                    .any(|&argument_index| self.constraint_set_errors[argument_index])
+            {
+                continue;
+            }
+            if arguments.contributing_argument_indices.is_empty()
+                && self.has_unmatched_explicit_argument()
+            {
+                continue;
+            }
+
+            let mut expected_ty = arguments.declared_tuple;
+            let mut provided_ty = self.align_starred_typevartuple_actual(
+                arguments.declared_tuple,
+                arguments.provided_tuple,
+            );
+            if let Some(specialization) = self.specialization() {
+                expected_ty = expected_ty.apply_specialization(self.db, specialization);
+                provided_ty = provided_ty.apply_specialization(self.db, specialization);
+            }
+            if !provided_ty
+                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
+                .is_never_satisfied(self.db)
+            {
+                continue;
+            }
+
+            self.errors.push(BindingError::InvalidArgumentType {
+                parameter: ParameterContext::new(parameter, parameter_index, false),
+                argument_index: arguments.diagnostic_argument_index,
+                expected_ty,
+                provided_ty,
+                provenance: InvalidArgumentTypeProvenance::Argument,
+            });
+        }
+    }
+
     fn check_argument_type(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -5848,7 +5900,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // constraint set that we get from this assignability check, instead of inferring and
         // building them in an earlier separate step.
         //
-        // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        // Starred annotations are validated as a single tuple by
+        // `check_starred_parameter_arguments`.
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
@@ -6015,6 +6068,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 None
             }
         });
+
+        self.check_starred_parameter_arguments(constraints);
 
         let is_paramspec_component_parameter = |parameter_index: usize| {
             paramspec_component_start.is_some_and(|start| parameter_index >= start)

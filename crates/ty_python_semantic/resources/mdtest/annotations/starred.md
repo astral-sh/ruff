@@ -23,7 +23,10 @@ reveal_type(append_int())  # revealed: tuple[int]
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-first_arg_int("not an int", "42", "42")  # TODO: error: [invalid-argument-type]
-first_arg_int(56, "42", 56)  # TODO: error: [invalid-argument-type]
-first_arg_int()  # TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type]
+first_arg_int("not an int", "42", "42")
+# error: [invalid-argument-type]
+first_arg_int(56, "42", 56)
+# error: [invalid-argument-type]
+first_arg_int()
 ```
