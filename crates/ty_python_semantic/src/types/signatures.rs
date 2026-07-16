@@ -1072,6 +1072,9 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
+            // TODO: Also intersect nested receiver type variables, such as the `T` in
+            // `self: list[T]`, with their valid specializations when constructing or solving the
+            // receiver constraint set.
             let receiver_typevar = match annotation {
                 Type::TypeVar(typevar) => Some(typevar),
                 Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
