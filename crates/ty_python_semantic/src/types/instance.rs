@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
@@ -9,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -18,7 +19,8 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
+    walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
@@ -26,7 +28,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -513,7 +515,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let source_protocol_as_nominal = ty
                 .as_protocol_instance()
                 .and_then(ProtocolInstanceType::to_nominal_instance);
-            let source_nominal_view = ty.as_nominal_instance().or(source_protocol_as_nominal);
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
@@ -532,13 +533,57 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return result;
             }
 
-            if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                && !result.is_never_satisfied(db)
-                && source_nominal_view.is_some_and(|source| {
-                    can_skip_structural_protocol_relation(db, source, nominal_instance, protocol)
-                })
+            // `Generator` special case: compare the type parameters nominally. Prior to 3.13,
+            // its return type does not appear non-recursively in the protocol; from 3.13 onward,
+            // structurally inferring through `close() -> ReturnT | None` can spuriously infer
+            // `None`.
+            // TODO: Remove the Python 3.13+ extension of this special case once
+            // https://github.com/astral-sh/ty/issues/3596 is fixed.
+            if let Some(source_protocol) = ty.as_protocol_instance()
+                && let Protocol::FromClass(source_class) = source_protocol.inner
+                && let Protocol::FromClass(proto_class) = protocol.inner
+                && source_class.is_known(db, KnownClass::Generator)
+                && proto_class.is_known(db, KnownClass::Generator)
             {
                 return result;
+            }
+
+            if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                && !self.is_context_collection_enabled()
+                && let Type::ProtocolInstance(source_protocol) = ty
+                && let Some(source_instance) = source_protocol.to_nominal_instance()
+                && let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
+                    (source_instance.class(db), nominal_instance.class(db))
+                && source_alias.origin(db) == target_alias.origin(db)
+                && let Some(identity_protocol) = target_alias
+                    .origin(db)
+                    .identity_specialization(db)
+                    .into_protocol_class(db)
+            {
+                let source_interface = source_protocol.interface(db);
+                let target_interface = protocol.interface(db);
+                let source_non_recursive =
+                    non_recursive_protocol_interface(db, source_interface, identity_protocol, ty);
+                let target_non_recursive = non_recursive_protocol_interface(
+                    db,
+                    target_interface,
+                    identity_protocol,
+                    Type::ProtocolInstance(protocol),
+                );
+
+                if source_non_recursive != source_interface
+                    || target_non_recursive != target_interface
+                {
+                    // Finite members retain structural solutions (such as `T | int`), while
+                    // recursive members are the coinductive edge currently being proved.
+                    let structurally_satisfied = self.check_protocol_interface_pair(
+                        db,
+                        ty,
+                        source_non_recursive,
+                        target_non_recursive,
+                    );
+                    return result.or(db, self.constraints, || structurally_satisfied);
+                }
             }
 
             // For union simplification, failing the nominal relation between two
@@ -557,20 +602,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return nominally_satisfied;
             }
-        }
-
-        // `Generator` special case: compare the type parameters nominally. Prior to 3.13, its
-        // return type does not appear non-recursively in the protocol; from 3.13 onward,
-        // structurally inferring through `close() -> ReturnT | None` can spuriously infer `None`.
-        // TODO: Remove the Python 3.13+ extension of this special case once
-        // https://github.com/astral-sh/ty/issues/3596 is fixed.
-        if let Some(source_protocol) = ty.as_protocol_instance()
-            && let Protocol::FromClass(source_class) = source_protocol.inner
-            && let Protocol::FromClass(proto_class) = protocol.inner
-            && source_class.is_known(db, KnownClass::Generator)
-            && proto_class.is_known(db, KnownClass::Generator)
-        {
-            return result;
         }
 
         // Fast path: skip expensive per-member type comparisons when members are plainly
@@ -653,86 +684,57 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
-/// Returns whether a viable nominal relation can safely skip structural protocol comparison.
-///
-/// This avoids recursively expanding members when relating specializations of the same protocol:
-///
-/// ```python
-/// class P[T](Protocol):
-///     def child(self) -> P[list[T]]: ...
-/// ```
-fn can_skip_structural_protocol_relation<'db>(
+/// Returns the finite members of a protocol interface, omitting members that refer back to its
+/// class-backed origin.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn non_recursive_protocol_interface<'db>(
     db: &'db dyn Db,
-    source: NominalInstanceType<'db>,
-    target: NominalInstanceType<'db>,
-    protocol: ProtocolInstanceType<'db>,
-) -> bool {
-    let source_class = source.class(db);
-    let target_class_literal = target.class(db).class_literal(db);
-
-    // Only skip structural comparison for specializations of the same protocol. A subclass can
-    // override a member and structurally satisfy a different specialization, such as
-    // `class Child(P[int], Protocol): ...` being related to `P[bool]`.
-    if source_class.class_literal(db) != target_class_literal {
-        return false;
+    interface: ProtocolInterface<'db>,
+    protocol: ProtocolClass<'db>,
+    receiver_ty: Type<'db>,
+) -> ProtocolInterface<'db> {
+    struct ProtocolReferenceFinder<'db> {
+        origin: ClassLiteral<'db>,
+        found: Cell<bool>,
+        recursion_guard: TypeCollector<'db>,
     }
 
-    // A fully resolved target such as `P[int]` cannot recursively bind an inferable TypeVar.
-    if !Type::ProtocolInstance(protocol).has_typevar(db) {
-        return true;
+    impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+            self.visit_type(db, type_alias.value_type(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            if ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .is_some_and(|instance| instance.class_literal(db) == self.origin)
+            {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
     }
 
-    // Without source specialization arguments (for example, an unspecialized `P`), there is no
-    // nested source argument that can make an inferred target specialization grow.
-    let ClassType::Generic(source_alias) = source_class else {
-        return true;
-    };
-
-    // Likewise, a non-generic target has no specialization argument to infer into.
-    let ClassType::Generic(target_alias) = target.class(db) else {
-        return true;
-    };
-
-    // Do not let the nominal relation bind an unconstrained TypeVar that the protocol interface
-    // does not otherwise constrain. In `P[T] | Iterable[T]`, for example, the sibling arm can
-    // feed another specialization into `T` before the structural relation is checked.
-    if target_alias
-        .specialization(db)
-        .types(db)
-        .iter()
-        .any(|argument| {
-            any_over_type(db, *argument, false, |nested| {
-                let Type::TypeVar(typevar) = nested else {
-                    return false;
-                };
-                typevar.typevar(db).bound_or_constraints(db).is_none()
-                    && !protocol.interface(db).references_typevar(db, typevar)
-            })
-        })
-    {
-        return false;
-    }
-
-    // Reject direct self-embedding as well: relating `P[P[Any]]` to `P[T]` could infer another
-    // `P[...]` for `T` and grow the specialization on every recursive relation.
-    !source_alias
-        .specialization(db)
-        .types(db)
-        .iter()
-        .any(|argument| {
-            any_over_type(db, *argument, false, |nested| {
-                nested
-                    .as_nominal_instance()
-                    .or_else(|| {
-                        nested
-                            .as_protocol_instance()
-                            .and_then(ProtocolInstanceType::to_nominal_instance)
-                    })
-                    .is_some_and(|nested| {
-                        nested.class(db).class_literal(db) == target_class_literal
-                    })
-            })
-        })
+    interface.filter_members(db, |member| {
+        let visitor = ProtocolReferenceFinder {
+            origin: protocol.class_literal(db),
+            found: Cell::new(false),
+            recursion_guard: TypeCollector::default(),
+        };
+        walk_protocol_instance_member(db, member, receiver_ty, &visitor);
+        !visitor.found.get()
+    })
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
