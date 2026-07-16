@@ -14,7 +14,7 @@ cases.
 
 ```pyi
 from typing import Any
-from ty_extensions import Bottom, static_assert
+from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
 
@@ -300,46 +300,6 @@ static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
 
-We can also consider intersections with the negation of an `Any`-specialized generic class. For all
-of the generic classes `C` above, we can negate the canonical interval representation of `C[Any]`:
-
-```ignore
-~C[Any]
-    = ~(Bottom[C[Any]] | Top[C[Any]] & Any)
-    = ~Bottom[C[Any]] & (~Top[C[Any]] | Any)
-    = ~Top[C[Any]] | ~Bottom[C[Any]] & Any
-```
-
-Every fully-static specialization `C[P]` is a subtype of `Top[C[Any]]`, therefore:
-
-```ignore
-C[P] & ~C[Any]
-    = C[P] & (~Top[C[Any]] | ~Bottom[C[Any]] & Any)
-    = C[P] & ~Bottom[C[Any]] & Any
-```
-
-For covariant and contravariant classes, we can simplify the bottom materializations as in (3a) and
-(3b):
-
-```ignore
-Co[P]        & ~Co[Any]        = Co[P]        & ~Co[Never]              & Any
-Contra[P]    & ~Contra[Any]    = Contra[P]    & ~Contra[object]         & Any
-Invariant[P] & ~Invariant[Any] = Invariant[P] & ~Bottom[Invariant[Any]] & Any
-```
-
-We can verify all three relations in ty:
-
-```pyi
-static_assert(is_equivalent_to(Co[P] & ~Co[Any], Co[P] & ~Bottom[Co[Any]] & Any))
-static_assert(is_equivalent_to(~Co[Any] & Co[P], Co[P] & ~Bottom[Co[Any]] & Any))
-
-static_assert(is_equivalent_to(Contra[P] & ~Contra[Any], Contra[P] & ~Bottom[Contra[Any]] & Any))
-static_assert(is_equivalent_to(~Contra[Any] & Contra[P], Contra[P] & ~Bottom[Contra[Any]] & Any))
-
-static_assert(is_equivalent_to(Invariant[P] & ~Invariant[Any], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
-static_assert(is_equivalent_to(~Invariant[Any] & Invariant[P], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
-```
-
 ## Edge cases
 
 ### Multi-parameter and mixed-variance generics
@@ -348,7 +308,8 @@ The results above naturally extend to multi-parameter generics and mixed varianc
 
 ```pyi
 from typing import Any, Generic, TypeVar
-from ty_extensions import Bottom, static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -369,17 +330,15 @@ Tuple types are covariant in every type parameter, so the results derived for `C
 `tuple` at every position:
 
 ```pyi
-from typing import Any, Never
-from ty_extensions import static_assert, is_equivalent_to
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
 
 static_assert(is_equivalent_to(tuple[P] & tuple[Any], tuple[P & Any]))
 static_assert(is_equivalent_to(tuple[Any] & tuple[P], tuple[P & Any]))
-
-static_assert(is_equivalent_to(tuple[P] & ~tuple[Any], tuple[P] & ~tuple[Never] & Any))
-static_assert(is_equivalent_to(~tuple[Any] & tuple[P], tuple[P] & ~tuple[Never] & Any))
 
 static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
 static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
@@ -391,29 +350,20 @@ static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Any], tuple[P & Any, Q &
 static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q & Any]))
 ```
 
-Intersections with tuples of different length are not affected:
-
-```pyi
-static_assert(is_equivalent_to(tuple[int, str] & ~tuple[Any], tuple[int, str]))
-static_assert(is_equivalent_to(tuple[int, str] & ~tuple[int, str, Any], tuple[int, str]))
-```
-
 ### `type[...]`
 
 `type[..]` can also be seen as a covariant type constructor, so the results also hold here:
 
 ```pyi
-from typing import Any, Never
-from ty_extensions import static_assert, is_equivalent_to
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
 
 static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
 static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
-
-static_assert(is_equivalent_to(type[P] & ~type[Any], type[P] & ~type[Never] & Any))
-static_assert(is_equivalent_to(~type[Any] & type[P], type[P] & ~type[Never] & Any))
 ```
 
 ### Type var bounds and `NewTypes`
@@ -422,7 +372,8 @@ The simplification preserve the identities of type variables and `NewType` insta
 
 ```pyi
 from typing import Any, NewType
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...

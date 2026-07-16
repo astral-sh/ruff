@@ -37,9 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use super::generic_gradual_intersections::{
-    generic_gradual_intersection, negated_generalization_bottom,
-};
+use super::generic_gradual_intersections::generic_gradual_intersection;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
@@ -1337,11 +1335,6 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
-struct Replacement<'db> {
-    index: usize,
-    value: Type<'db>,
-}
-
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -1590,10 +1583,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if merged == *existing_positive {
                             return;
                         }
-                        replacement = Some(Replacement {
-                            index,
-                            value: merged,
-                        });
+                        replacement = Some((index, merged));
                         break;
                     }
                     // S & T = S if S <: T.
@@ -1611,7 +1601,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                 }
-                if let Some(Replacement { index, value }) = replacement {
+                if let Some((index, value)) = replacement {
                     self.positive.swap_remove_index(index);
                     self.add_positive(db, value);
                     return;
@@ -1621,17 +1611,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                let mut replacement_negatives = SmallVec::<[Type<'db>; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
-                    // S & ~G = S & ~Bottom[G] & Any if G is a dynamic generalization of the
-                    // fully-static specialization S.
-                    if let Some(bottom) =
-                        negated_generalization_bottom(db, *existing_negative, new_positive)
-                    {
-                        to_remove.push(index);
-                        replacement_negatives.push(bottom);
-                        continue;
-                    }
                     // S & ~T = Never    if S <: T
                     if new_positive.is_subtype_of(db, *existing_negative) {
                         *self = Self::default();
@@ -1645,17 +1625,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
-                }
-                // For example, if we add `Co[P]` to an intersection containing `~Co[Any]`,
-                // replace that negative with `~Bottom[Co[Any]]` and add `Any`, producing
-                // `Co[P] & ~Bottom[Co[Any]] & Any`. See `generics/set_theoretic.md` for details.
-                if !replacement_negatives.is_empty() {
-                    for bottom in replacement_negatives {
-                        self.add_negative(db, bottom);
-                    }
-                    self.add_positive(db, Type::any());
-                    self.add_positive(db, new_positive);
-                    return;
                 }
 
                 self.positive.insert(new_positive);
@@ -1738,17 +1707,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
-                // For example, if we add `~Co[Any]` to an intersection containing `Co[P]`,
-                // replace that negative with `~Bottom[Co[Any]]` and add `Any`, producing
-                // `Co[P] & ~Bottom[Co[Any]] & Any`. See `generics/set_theoretic.md` for details.
-                if let Some(bottom) = self.positive.iter().find_map(|existing_positive| {
-                    negated_generalization_bottom(db, new_negative, *existing_positive)
-                }) {
-                    self.add_negative(db, bottom);
-                    self.add_positive(db, Type::any());
-                    return;
-                }
-
                 let new_negative_enum = new_negative.as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
