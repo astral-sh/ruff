@@ -1,6 +1,7 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::types::tuple::TupleType;
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
@@ -40,6 +41,35 @@ fn typing_vs_typeshed_no_default() {
         typing_extensions_no_default.display(&db).to_string(),
         "NoDefault"
     );
+}
+
+#[test]
+fn tuple_class_type_respects_normalization_context() {
+    let db = setup_db();
+    let int_literal = Type::int_literal(1);
+    let int_instance = KnownClass::Int.to_instance(&db);
+    let tuple = TupleType::heterogeneous(&db, [int_literal, int_instance]).unwrap();
+
+    let general_class = tuple
+        .to_class_type(&db)
+        .into_generic_alias()
+        .expect("`tuple` should have a generic specialization");
+    assert_eq!(
+        general_class.specialization(&db).types(&db),
+        &[int_instance]
+    );
+
+    let relation_class = tuple
+        .to_class_type_for_relation(&db)
+        .into_generic_alias()
+        .expect("`tuple` should have a generic specialization");
+    let [Type::Union(element_union)] = relation_class.specialization(&db).types(&db) else {
+        panic!("structural normalization should preserve the element union");
+    };
+
+    assert_eq!(element_union.elements(&db).len(), 2);
+    assert!(element_union.elements(&db).contains(&int_literal));
+    assert!(element_union.elements(&db).contains(&int_instance));
 }
 
 fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {

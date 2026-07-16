@@ -326,6 +326,7 @@ the aliases occur inside a larger type.
 ```py
 from enum import Enum
 from typing import Literal
+from ty_extensions import Intersection, Not
 
 class Choice(Enum):
     A = "A"
@@ -335,6 +336,8 @@ type A = Literal[Choice.A]
 type B = Literal[Choice.B]
 type Either = A | B
 type Selector = A | B | tuple[A, B]
+type NotA = Intersection[Choice, Not[A]]
+type Partition = NotA | A
 
 def accept_either(value: Either) -> None: ...
 def accept_optional_either(value: Either | None) -> None: ...
@@ -350,6 +353,7 @@ def _(choice: Choice, config: Config) -> None:
     accept_optional_either(config.either)
     values: list[Selector] = []
     accept_selector(config.selector)
+    partition: Partition = choice
 
 class ExtendedChoice(Enum):
     A = "A"
@@ -628,6 +632,152 @@ type C = Callable[[], C | None]
 
 def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
+```
+
+### Recursive union expansion
+
+```py
+from ty_extensions import Intersection
+
+type GrowingUnion[T] = int | GrowingUnion[list[T]]
+
+def growing_union(x: GrowingUnion[int]):
+    reveal_type(x)  # revealed: int
+
+growing_union_int: GrowingUnion[int] = 1
+# error: [invalid-assignment] "Object of type `None` is not assignable to `GrowingUnion[int]`"
+growing_union_none: GrowingUnion[int] = None
+
+type IntOr[T] = int | IntOr[int]
+
+def nested_union(x: IntOr[IntOr[int]] | str):
+    reveal_type(x)  # revealed: int | str
+
+type Branch[T] = T | Branch[str] | Branch[int]
+
+def branch(x: Branch[Branch[int]] | bytes):
+    reveal_type(x)  # revealed: int | str | bytes
+
+def branch_intersection(x: Intersection[Branch[Branch[int]], object]):
+    reveal_type(x)  # revealed: int | str
+
+type StableRecursiveList[T] = T | list[StableRecursiveList[T]]
+
+def stable_recursive_list(x: StableRecursiveList[int]):
+    reveal_type(x)  # revealed: int | list[StableRecursiveList[int]]
+```
+
+### Recursive union unfolding boundary
+
+Recursive unions are unfolded through ten recursive applications. At the limit, an already redundant
+remainder is omitted, while a remainder that may add more members is covered by `Unknown`. A member
+exposed by the tenth application is therefore included exactly, while one that requires an eleventh
+application is covered by the fallback.
+
+```py
+from enum import Enum
+from typing import Literal, final
+
+@final
+class C1: ...
+
+@final
+class C2: ...
+
+@final
+class C3: ...
+
+@final
+class C4: ...
+
+@final
+class C5: ...
+
+@final
+class C6: ...
+
+@final
+class C7: ...
+
+@final
+class C8: ...
+
+@final
+class C9: ...
+
+@final
+class C10: ...
+
+@final
+class C11: ...
+
+class Member(Enum):
+    A = 1
+    B = 2
+
+type Shift10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10] = T1 | Shift10[T2, T3, T4, T5, T6, T7, T8, T9, T10, None]
+
+type Shift11[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11] = T1 | Shift11[T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, None]
+
+type Rotate2[T1, T2] = T1 | Rotate2[T2, T1]
+type Rotate2Reversed[T1, T2] = Rotate2Reversed[T2, T1] | T1
+type Delayed4[T1, T2, T3, T4] = T1 | Delayed4[T2, T3, T4, T1]
+
+def within_limit(x: Shift10[C1, C2, C3, C4, C5, C6, C7, C8, C9, C10]):
+    # revealed: C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | None
+    reveal_type(x)
+
+def beyond_limit(x: Shift11[C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11]):
+    # revealed: C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | Unknown
+    reveal_type(x)
+
+def finite_cycle(x: Rotate2[Literal[1], Literal[2]]):
+    reveal_type(x)  # revealed: Literal[1, 2]
+
+def finite_cycle_reversed(x: Rotate2Reversed[Literal[1], Literal[2]]):
+    reveal_type(x)  # revealed: Literal[1, 2]
+
+def finite_string_cycle_reversed(x: Rotate2Reversed[Literal["a"], Literal["b"]]):
+    reveal_type(x)  # revealed: Literal["a", "b"]
+
+def finite_bytes_cycle_reversed(x: Rotate2Reversed[Literal[b"a"], Literal[b"b"]]):
+    reveal_type(x)  # revealed: Literal[b"a", b"b"]
+
+def finite_enum_cycle_reversed(x: Rotate2Reversed[Literal[Member.A], Literal[Member.B]]):
+    reveal_type(x)  # revealed: Member
+
+def temporarily_unchanged(x: Delayed4[Literal[1], Literal[1], Literal[1], Literal[2]]):
+    reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+### Undecidable recursive alias relations
+
+Recursive type aliases with nested specialization can encode context-free grammars (CFG). It is
+known that determining the equivalence or inclusion of two CFGs is undecidable; therefore, no
+general subtyping algorithm exists for such type aliases. When this pattern is detected, we
+immediately provide a conservative judgment and terminate.
+
+```py
+from typing import Literal, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+@final
+class End:
+    pass
+
+type AAnd[Rest] = tuple[Literal["a"], Rest]
+type BAnd[Rest] = tuple[Literal["b"], Rest]
+
+# S -> ε | aSb
+# {a^n b^n | n >= 0}
+type S[Rest] = Rest | AAnd[S[BAnd[Rest]]]
+# T -> ε | aTb | aaTbb
+# {a^n b^n | n >= 0}
+type T[Rest] = Rest | AAnd[T[BAnd[Rest]]] | AAnd[AAnd[T[BAnd[BAnd[Rest]]]]]
+
+# S and T produce exactly the same language, but the type checker cannot tell that.
+static_assert(not is_subtype_of(S[End], T[End]))
 ```
 
 ### Growing recursive alias relations without unions
