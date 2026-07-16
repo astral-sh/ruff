@@ -283,9 +283,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    /// Root names bound by unaliased multipart imports (`import a.b` binds `a`).
-    /// Checking against the names seen so far is sound, as eager resolution can
-    /// only credit imports that precede the use.
+    /// Root names of unaliased multipart imports seen so far (`import a.b` adds `a`).
     multipart_import_roots: FxHashSet<Name>,
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
@@ -685,8 +683,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        // A dotted use recorded before this import couldn't have deferred its path,
-        // so match the import against the capturing scope's member places instead.
+        // The import was not known when the nested scope was visited, so no multipart
+        // use was deferred. Recover it from the capturing scope's member places.
         if !capturing_scopes.is_empty()
             && let Some(imported_name) =
                 self.unaliased_multipart_import_name_of(current_scope, definition_id)
@@ -750,7 +748,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     name: symbol.name().clone(),
                     laziness: popped_scope_laziness,
-                    // Entries left behind had roots that became local, the use was unbound.
+                    // Entries for roots that became local stay in the map and are
+                    // dropped, those uses were unbound.
                     multipart_uses: deferred_multipart_uses
                         .remove(symbol.name())
                         .unwrap_or_default(),
@@ -4273,16 +4272,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 }
 
-/// Multipart import (`import a.b`) usage tracking.
+/// Tracks uses of unaliased multipart imports such as `import a.b`.
 ///
-/// A dotted use (`a.b.x`) is credited to the matching multipart imports of its
-/// root name:
-/// - root bound in the current scope: matched eagerly against its live bindings,
-/// - root declared `global`: matched against the module scope,
-/// - otherwise: deferred ([`ScopeInfo::deferred_multipart_uses`]) and resolved with
-///   the pending captures at scope pop. An import recorded after the use couldn't
-///   have deferred a path and is credited without submodule matching
-///   (see `record_pending_capture_binding`).
+/// Python binds only the root name (`a`), so use-def tracking alone cannot
+/// distinguish a use of `a.b` from any other use of `a`. Dotted uses are matched
+/// eagerly against live bindings where possible, otherwise deferred
+/// ([`ScopeInfo::deferred_multipart_uses`]) and resolved through pending captures.
+/// An import recorded after the use is matched against the capturing scope's
+/// member places (see `record_pending_capture_binding`).
 impl SemanticIndexBuilder<'_, '_> {
     fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
         if self.multipart_import_roots.is_empty() {
@@ -4349,7 +4346,7 @@ impl SemanticIndexBuilder<'_, '_> {
             }
         }
 
-        // When every live definition is a multipart import, also credit reachable
+        // When every live definition is a multipart import, also match reachable
         // sibling imports of the same root (`import a.b, a.c` used as `a.b.x`).
         if all_live_definitions_are_multipart_imports {
             matching_definitions = self.use_def_maps[scope_id]

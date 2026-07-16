@@ -555,10 +555,6 @@ pub(super) struct MemberTableBuilder {
 }
 
 impl MemberTableBuilder {
-    pub(super) fn members(&self) -> std::slice::Iter<'_, Member> {
-        self.table.iter()
-    }
-
     pub(super) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,
