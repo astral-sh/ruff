@@ -10,8 +10,7 @@ both of these cases.
 target-version = "py312"
 
 [lint]
-preview = true
-select = ["non-pep695-type-alias"]
+select = ["UP040"]
 ```
 
 ### `TypeAlias`

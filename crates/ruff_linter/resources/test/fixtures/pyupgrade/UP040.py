@@ -129,6 +129,6 @@ T: TypeAlias = ( # comment0
     # comment7
 ) # comment8
 
-# Test case for TypeVar with default - should be converted when preview mode is enabled
+# TypeVar with default
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]

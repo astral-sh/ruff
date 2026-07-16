@@ -208,6 +208,25 @@ help: Use the `type` keyword
    |
 note: This is an unsafe fix and may change runtime behavior
 
+UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+  --> UP040.py:48:1
+   |
+46 | # `default` was added in Python 3.13
+47 | T = typing.TypeVar("T", default=Any)
+48 | x: typing.TypeAlias = list[T]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 |
+50 | # OK
+   |
+help: Use the `type` keyword
+   |
+47 | T = typing.TypeVar("T", default=Any)
+   - x: typing.TypeAlias = list[T]
+48 + type x[T = Any] = list[T]
+49 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
 UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:57:1
    |
@@ -428,7 +447,7 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 130 | | ) # comment8
     | |_^
 131 |
-132 |   # Test case for TypeVar with default - should be converted when preview mode is enabled
+132 |   # TypeVar with default
     |
 help: Use the `type` keyword
     |
@@ -436,5 +455,21 @@ help: Use the `type` keyword
     - T: TypeAlias = ( # comment0
 122 + type T = ( # comment0
 123 |     # comment1
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:134:1
+    |
+132 | # TypeVar with default
+133 | T_default = TypeVar("T_default", default=int)
+134 | DefaultList: TypeAlias = list[T_default]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use the `type` keyword
+    |
+133 | T_default = TypeVar("T_default", default=int)
+    - DefaultList: TypeAlias = list[T_default]
+134 + type DefaultList[T_default = int] = list[T_default]
     |
 note: This is an unsafe fix and may change runtime behavior

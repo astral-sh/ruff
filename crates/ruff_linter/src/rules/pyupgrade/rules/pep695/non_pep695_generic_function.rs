@@ -22,9 +22,9 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 ///
 /// ## Known problems
 ///
-/// The rule currently skips generic functions nested inside of other functions or classes and those
-/// with type parameters containing the `default` argument introduced in [PEP 696] and implemented
-/// in Python 3.13.
+/// The rule currently skips generic functions nested inside of other functions or classes. When
+/// targeting Python versions before 3.13, it also skips functions with type parameters containing
+/// the `default` argument introduced in [PEP 696].
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
 /// cause type checking to [fail].

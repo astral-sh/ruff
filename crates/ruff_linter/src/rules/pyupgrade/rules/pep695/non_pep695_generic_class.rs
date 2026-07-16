@@ -28,9 +28,9 @@ use super::{
 ///
 /// ## Known problems
 ///
-/// The rule currently skips generic classes nested inside of other functions or classes. It also
-/// skips type parameters with the `default` argument introduced in [PEP 696] and implemented in
-/// Python 3.13.
+/// The rule currently skips generic classes nested inside of other functions or classes. When
+/// targeting Python versions before 3.13, it also skips type parameters with the `default`
+/// argument introduced in [PEP 696].
 ///
 /// This rule can only offer a fix if all of the generic types in the class definition are defined
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested

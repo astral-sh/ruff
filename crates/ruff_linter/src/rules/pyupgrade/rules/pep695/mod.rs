@@ -15,7 +15,6 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_type_var_default_enabled;
 
 pub(crate) use non_pep695_generic_class::*;
 pub(crate) use non_pep695_generic_function::*;
@@ -369,18 +368,15 @@ fn in_nested_context(checker: &Checker) -> bool {
 
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
 /// Also returns `None` if any `TypeVar` has a default value and the target Python version
-/// is below 3.13 or preview mode is not enabled. Note that `typing_extensions` backports
-/// the default argument, but the rule should be skipped in that case.
+/// is below 3.13. Note that `typing_extensions` backports the default argument, but the rule
+/// should be skipped in that case.
 fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<TypeVar<'a>>> {
     if vars.is_empty() {
         return None;
     }
 
-    // If any type variables have defaults, skip the rule unless
-    // running with preview mode enabled and targeting Python 3.13+.
-    if vars.iter().any(|tv| tv.default.is_some())
-        && (checker.target_version() < PythonVersion::PY313
-            || !is_type_var_default_enabled(checker.settings()))
+    // If any type variables have defaults, skip the rule unless targeting Python 3.13+.
+    if vars.iter().any(|tv| tv.default.is_some()) && checker.target_version() < PythonVersion::PY313
     {
         return None;
     }

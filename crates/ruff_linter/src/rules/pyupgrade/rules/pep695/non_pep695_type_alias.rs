@@ -8,7 +8,6 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_type_var_default_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -259,8 +258,7 @@ fn create_diagnostic(
 ) {
     // If any type variables have defaults, skip the rule unless
     // running with preview mode enabled and targeting Python 3.13+.
-    if (checker.target_version() < PythonVersion::PY313
-        || !is_type_var_default_enabled(checker.settings()))
+    if checker.target_version() < PythonVersion::PY313
         && type_vars.iter().any(|type_var| type_var.default.is_some())
     {
         return;
