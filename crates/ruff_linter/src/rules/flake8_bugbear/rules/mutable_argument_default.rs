@@ -13,7 +13,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_b006_check_guaranteed_mutable_expr_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -111,11 +110,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             .iter()
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
-        let is_mut_expr = if is_b006_check_guaranteed_mutable_expr_enabled(checker.settings()) {
-            is_guaranteed_mutable_expr(default, checker.semantic())
-        } else {
-            is_mutable_expr(default, checker.semantic())
-        };
+        let is_mut_expr = is_guaranteed_mutable_expr(default, checker.semantic());
         if is_mut_expr
             && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
