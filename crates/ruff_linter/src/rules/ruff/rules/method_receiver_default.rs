@@ -12,8 +12,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Receiver parameters (`self`, `cls`, or any name used as the receiver) should not have default
-/// values. In practice, these parameters are always bound by the method binding protocol and
-/// cannot be omitted when calling the method. A default value on a receiver parameter is almost
+/// values. In practice, these parameters are usually bound by the method binding protocol, so a
+/// default value on a receiver parameter is almost
 /// certainly a mistake and can lead to confusing behavior or runtime errors.
 ///
 /// ## Example
