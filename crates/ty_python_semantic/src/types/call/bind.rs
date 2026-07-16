@@ -4617,7 +4617,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
         variable_argument_length: bool,
-    ) -> Result<usize, ()> {
+    ) -> Result<(), ()> {
         if matches!(argument, Argument::Synthetic) {
             self.num_synthetic_args += 1;
         }
@@ -4642,7 +4642,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             !parameter.is_variadic(),
             variable_argument_length,
         );
-        Ok(parameter_index)
+        Ok(())
     }
 
     fn match_keyword(
@@ -4833,24 +4833,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
         let has_fixed_union_tail = is_variable && variable_element.is_none();
-        let variadic_parameter_index = self.parameters.variadic().map(|(index, _)| index);
-        let mut fixed_arguments_consumed = 0usize;
-        let mut matched_variadic_parameter = false;
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
         for _ in 0..length.minimum() {
-            let matched_parameter_index = self.match_positional(
+            self.match_positional(
                 argument_index,
                 argument,
                 argument_types.next().or(variable_element),
                 is_variable,
             )?;
-            if Some(matched_parameter_index) == variadic_parameter_index {
-                matched_variadic_parameter = true;
-            } else if !matched_variadic_parameter {
-                fixed_arguments_consumed += 1;
-            }
         }
 
         // For a union of fixed-length tuples, positions beyond the guaranteed minimum are only
@@ -4870,17 +4862,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 if parameter.default_type().is_none() {
                     return Err(());
                 }
-                let matched_parameter_index = self.match_positional(
-                    argument_index,
-                    argument,
-                    Some(argument_type),
-                    is_variable,
-                )?;
-                if Some(matched_parameter_index) == variadic_parameter_index {
-                    matched_variadic_parameter = true;
-                } else if !matched_variadic_parameter {
-                    fixed_arguments_consumed += 1;
-                }
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         // If the tuple is truly variable-length, we assume that it will soak up all remaining
         // positional parameters, stopping only when we reach a parameter that has an explicit
@@ -4902,13 +4884,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 if arg_type.is_none() {
                     break;
                 }
-                let matched_parameter_index =
-                    self.match_positional(argument_index, argument, arg_type, is_variable)?;
-                if Some(matched_parameter_index) == variadic_parameter_index {
-                    matched_variadic_parameter = true;
-                } else if !matched_variadic_parameter {
-                    fixed_arguments_consumed += 1;
-                }
+                self.match_positional(argument_index, argument, arg_type, is_variable)?;
             }
         }
 
@@ -4921,17 +4897,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // instead of silently dropping those extra positions.
         if has_fixed_union_tail {
             for argument_type in argument_types.by_ref() {
-                let matched_parameter_index = self.match_positional(
-                    argument_index,
-                    argument,
-                    Some(argument_type),
-                    is_variable,
-                )?;
-                if Some(matched_parameter_index) == variadic_parameter_index {
-                    matched_variadic_parameter = true;
-                } else if !matched_variadic_parameter {
-                    fixed_arguments_consumed += 1;
-                }
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         }
 
@@ -4941,29 +4907,23 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // raise a false positive as "too many arguments".
         if self.parameters.variadic().is_some() {
             if let Some(argument_type) = argument_types.next().or(variable_element) {
-                let matched_parameter_index = self.match_positional(
-                    argument_index,
-                    argument,
-                    Some(argument_type),
-                    is_variable,
-                )?;
-                matched_variadic_parameter |=
-                    Some(matched_parameter_index) == variadic_parameter_index;
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
                 for argument_type in argument_types {
-                    let matched_parameter_index = self.match_positional(
+                    self.match_positional(
                         argument_index,
                         argument,
                         Some(argument_type),
                         is_variable,
                     )?;
-                    matched_variadic_parameter |=
-                        Some(matched_parameter_index) == variadic_parameter_index;
                 }
             }
         }
 
-        if matched_variadic_parameter
-            && let Some(parameter_index) = variadic_parameter_index
+        if let Some((parameter_index, _)) = self.parameters.variadic()
+            && let Some(fixed_arguments_consumed) = self.argument_matches[argument_index]
+                .parameters
+                .iter()
+                .position(|matched| matched.index == parameter_index)
             && let VariadicArgumentType::Other { tuple, .. } = &variadic_type
         {
             let residual_tuple = if fixed_arguments_consumed == 0 {
@@ -5188,7 +5148,6 @@ struct ArgumentTypeChecker<'a, 'db> {
 }
 
 struct StarredParameterArguments<'db> {
-    parameter_index: usize,
     declared_tuple: Type<'db>,
     provided_tuple: Type<'db>,
     contributing_argument_indices: SmallVec<[usize; 2]>,
@@ -5375,9 +5334,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             {
                 provided_tuple = provided_tuple.concat(self.db, &variadic_parameter.tuple);
                 contributing_argument_indices.push(argument_index);
-                if diagnostic_argument_index.is_none() {
-                    diagnostic_argument_index = adjusted_argument_index;
-                }
+                diagnostic_argument_index = diagnostic_argument_index.or(adjusted_argument_index);
                 continue;
             }
 
@@ -5397,15 +5354,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             if contributed {
                 contributing_argument_indices.push(argument_index);
-                if diagnostic_argument_index.is_none() {
-                    diagnostic_argument_index = adjusted_argument_index;
-                }
+                diagnostic_argument_index = diagnostic_argument_index.or(adjusted_argument_index);
             }
         }
 
         let provided_tuple_spec = provided_tuple.build();
         Some(StarredParameterArguments {
-            parameter_index,
             declared_tuple,
             provided_tuple: Type::tuple(TupleType::new(self.db, &provided_tuple_spec)),
             contributing_argument_indices,
@@ -5447,7 +5401,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 continue;
             }
 
-            inference.owned_parameters.insert(arguments.parameter_index);
+            inference.owned_parameters.insert(parameter_index);
             let provided_tuple = self.align_starred_typevartuple_actual(
                 arguments.declared_tuple,
                 arguments.provided_tuple,
@@ -5457,9 +5411,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     error,
                     argument_index: arguments.diagnostic_argument_index,
                 });
-                inference
-                    .failed_parameters
-                    .insert(arguments.parameter_index);
+                inference.failed_parameters.insert(parameter_index);
                 inference
                     .failed_arguments
                     .extend(arguments.contributing_argument_indices);
@@ -5858,6 +5810,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_starred_parameter_arguments(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+        let has_unmatched_explicit_argument = self.has_unmatched_explicit_argument();
+
         for (parameter_index, parameter) in self.signature.parameters().iter().enumerate() {
             let Some(arguments) =
                 self.collect_starred_parameter_arguments(parameter_index, parameter)
@@ -5874,8 +5828,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             {
                 continue;
             }
-            if arguments.contributing_argument_indices.is_empty()
-                && self.has_unmatched_explicit_argument()
+            if arguments.contributing_argument_indices.is_empty() && has_unmatched_explicit_argument
             {
                 continue;
             }
