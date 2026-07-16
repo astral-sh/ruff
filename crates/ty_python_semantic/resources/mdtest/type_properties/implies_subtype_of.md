@@ -572,7 +572,7 @@ def quantifies_callable_typevars_together[V]():
 
     actual = ConstraintSet.always().implies_subtype_of(RegularCallableTypeOf[source], RegularCallableTypeOf[target])
     expected = ConstraintSet.range(int, V, object)
-    # TODO: Restore the constraint on `V` when target callable typevars can be quantified correctly.
+    # TODO: Preserve the constraint on `V` when the target callable typevar is quantified universally.
     static_assert(actual == expected)  # error: [static-assert-error]
 ```
 
