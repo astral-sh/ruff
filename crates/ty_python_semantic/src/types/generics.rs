@@ -1004,7 +1004,7 @@ impl<'db> GenericContext<'db> {
         element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
+        Specialization::new(db, self, [element_type].as_slice(), None, Some(tuple))
     }
 
     fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>

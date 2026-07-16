@@ -873,7 +873,7 @@ impl<'db> DataclassParams<'db> {
             .ignore_possibly_undefined()
             .unwrap_or_else(Type::unknown);
 
-        Self::new(db, flags, vec![dataclasses_field].into_boxed_slice())
+        Self::new(db, flags, [dataclasses_field].as_slice())
     }
 
     fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {

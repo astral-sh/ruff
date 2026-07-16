@@ -521,14 +521,13 @@ impl<'db> TypeVarInstance<'db> {
                 let typevar_node = typevar.node(&module);
                 let bound =
                     definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
-                let constraints = if let Some(tuple) = bound.tuple_instance_spec(db)
+                if let Some(tuple) = bound.tuple_instance_spec(db)
                     && let Tuple::Fixed(tuple) = tuple.into_owned()
                 {
-                    tuple.owned_elements()
+                    TypeVarConstraints::new(db, tuple.owned_elements())
                 } else {
-                    vec![Type::unknown()].into_boxed_slice()
-                };
-                TypeVarConstraints::new(db, constraints)
+                    TypeVarConstraints::new(db, [Type::unknown()].as_slice())
+                }
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {

@@ -248,7 +248,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             && let Some(canonical_name) = enum_class.resolve_member(db, &Name::new(name))
         {
             let enum_lit =
-                crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name.clone());
+                crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name);
             return Member::definitely_declared(Type::enum_literal(enum_lit));
         }
         Member::unbound()

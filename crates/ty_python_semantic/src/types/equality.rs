@@ -790,9 +790,7 @@ fn enum_literal_constraint<'db>(
     }
 
     let enum_class_literal = right.enum_class_literal(db);
-    let name = enum_class_literal
-        .resolve_member(db, right.name(db))?
-        .clone();
+    let name = enum_class_literal.resolve_member(db, right.name(db))?;
     let equal_to_right = Type::from(LiteralValueType::new(
         EnumLiteralType::new(db, enum_class_literal, name),
         right_literal.is_promotable(),
