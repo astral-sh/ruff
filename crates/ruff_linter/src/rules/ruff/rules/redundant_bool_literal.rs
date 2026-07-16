@@ -37,13 +37,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// The fix for this rule is marked as unsafe, as it may change the semantics of the code.
-/// Specifically:
-///
-/// - Type checkers may not treat `bool` as equivalent when overloading boolean arguments
-///   with `Literal[True]` and `Literal[False]` (see, e.g., [#14764] and [#5421]).
-/// - `bool` is not strictly equivalent to `Literal[True, False]`, as `bool` is
-///   a subclass of `int`, and this rule may not apply if the type annotations are used
-///   in a numeric context.
+/// Specifically, some type checkers may not treat `bool` as equivalent when overloading
+/// boolean arguments with `Literal[True]` and `Literal[False]` (see, e.g., [#14764] and
+/// [#5421]).
 ///
 /// Further, the `Literal` slice may contain trailing-line comments which the fix would remove.
 ///
@@ -55,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [#14764]: https://github.com/python/mypy/issues/14764
 /// [#5421]: https://github.com/microsoft/pyright/issues/5421
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.0")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct RedundantBoolLiteral {
     seen_others: bool,
 }
