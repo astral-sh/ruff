@@ -2043,6 +2043,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_inferable = target.inferable_typevars(db);
         let signature_inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, signature_inferable);
+        let target_has_generic_receiver = target.generic_context.is_some_and(|generic_context| {
+            target.receiver_constraint_types().any(|ty| {
+                matches!(
+                    ty,
+                    Type::TypeVar(typevar)
+                        if !typevar.typevar(db).is_self(db)
+                            && generic_context.contains(db, typevar.identity(db))
+                )
+            })
+        });
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
@@ -2053,22 +2063,40 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
-            source
-                .receiver_constraints_when_satisfied(&checker, db)
-                .and(db, self.constraints, || {
-                    target
-                        .receiver_constraints_when_satisfied(&checker, db)
-                        .and(db, self.constraints, || {
-                            checker.check_signature_pair_inner(db, source, target)
-                        })
-                })
+            // A receiver constraint over a callable-local TypeVar defines the domain over which
+            // that target TypeVar is universally quantified. `Self` is different: binding it fixes
+            // the receiver instead of defining a freely quantified domain.
+            if target_has_generic_receiver {
+                target
+                    .receiver_constraints_when_satisfied(&checker, db)
+                    .implies(db, self.constraints, || {
+                        source
+                            .receiver_constraints_when_satisfied(&checker, db)
+                            .and(db, self.constraints, || {
+                                checker.check_signature_pair_inner(db, source, target)
+                            })
+                    })
+            } else {
+                source
+                    .receiver_constraints_when_satisfied(&checker, db)
+                    .and(db, self.constraints, || {
+                        target
+                            .receiver_constraints_when_satisfied(&checker, db)
+                            .and(db, self.constraints, || {
+                                checker.check_signature_pair_inner(db, source, target)
+                            })
+                    })
+            }
         });
 
-        // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(db, self.constraints, signature_inferable)
+        // The caller does not need to consider the source signature's typevars. A relation only
+        // needs one source specialization to succeed, so existentially quantify those away before
+        // returning.
+        //
+        // Target signature typevars require the opposite quantifier: the relation must hold for
+        // every target specialization. Preserve their constraints here instead of existentially
+        // quantifying them away.
+        when.reduce_inferable(db, self.constraints, source_inferable)
     }
 
     fn with_signature_recursion_guard(

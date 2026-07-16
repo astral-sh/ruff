@@ -954,7 +954,7 @@ literal `Self` type form should be disallowed.
 ```py
 class AnnotableMeta(type):
     def __or__(self, other):
-        return self  # No error: runtime use of `self`, not the `Self` type form
+        return self  # No `invalid-type-form` error: runtime use of `self`, not the `Self` type form
 ```
 
 ## Indirect metaclass inheritance

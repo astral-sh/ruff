@@ -335,7 +335,7 @@ respect the metaclass dunder if a class is `|`'d with a non-class, however:
 
 ```py
 class Meta(type):
-    def __or__(self, other) -> str:
+    def __or__(self, other) -> str:  # error: [invalid-method-override]
         return "Meta"
 
 class Foo(metaclass=Meta): ...
