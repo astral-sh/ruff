@@ -3857,6 +3857,53 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+A receiver TypeVar's bound limits the specializations for which a protocol method must be
+compatible. It is not an additional constraint that must hold for every possible specialization:
+
+TODO: Bind receiver TypeVars before comparing signatures so that these cases pass.
+
+```py
+from typing import Protocol, TypeVar
+from typing_extensions import Self, assert_type
+
+T = TypeVar("T")
+
+class HasParent(Protocol):
+    def get_parent(self: T) -> T: ...
+
+GenericHasParent = TypeVar("GenericHasParent", bound=HasParent)
+
+def generic_get_parent(value: GenericHasParent) -> GenericHasParent:
+    return value.get_parent()
+
+class ConcreteHasParent:
+    def get_parent(self) -> Self:
+        return self
+
+parent = generic_get_parent(ConcreteHasParent())  # error: [invalid-argument-type]
+assert_type(parent, ConcreteHasParent)  # error: [type-assertion-failure]
+
+C = TypeVar("C", bound="Copyable")
+
+class Copyable(Protocol):
+    def copy(self: C) -> C:
+        return self
+
+class One:
+    def copy(self) -> "One":
+        return One()
+
+OtherT = TypeVar("OtherT", bound="Other")
+
+class Other:
+    def copy(self: OtherT) -> OtherT:
+        return self
+
+copyable: Copyable
+copyable = One()  # error: [invalid-assignment]
+copyable = Other()  # error: [invalid-assignment]
+```
+
 ## Module objects with static-method protocol members
 
 Module objects implement protocols through their public interface. A module-level function can

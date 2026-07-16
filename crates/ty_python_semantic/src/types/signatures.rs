@@ -2064,11 +2064,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         });
 
-        // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(db, self.constraints, signature_inferable)
+        // The caller does not need to consider the source signature's typevars. A relation only
+        // needs one source specialization to succeed, so existentially quantify those away before
+        // returning.
+        //
+        // Target signature typevars require the opposite quantifier: the relation must hold for
+        // every target specialization. Preserve their constraints here instead of existentially
+        // quantifying them away.
+        when.reduce_inferable(db, self.constraints, source_inferable)
     }
 
     fn with_signature_recursion_guard(

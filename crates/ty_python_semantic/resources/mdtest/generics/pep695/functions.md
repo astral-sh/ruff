@@ -1138,7 +1138,8 @@ def _(x: list[str]):
     # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_regular_callable(GenericClass)))
 
-    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
+    # TODO: Restore the generic binder when target callable typevars can be quantified correctly.
+    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
     reveal_type(accepts_callable(GenericClass))
     # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
