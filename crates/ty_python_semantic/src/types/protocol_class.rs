@@ -233,6 +233,7 @@ pub(super) fn walk_protocol_instance_interface<
     }
 }
 
+/// Walks the types of a protocol member after binding any implicit receiver to `receiver_ty`.
 pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
@@ -1284,7 +1285,7 @@ pub(super) struct ProtocolMember<'a, 'db> {
     data: &'a ProtocolMemberData<'db>,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
 enum StructuralMemberPriority {
     Simple,
     FiniteOverload,
@@ -1319,13 +1320,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// Simple finite members are cheapest, followed by finite overloads. Recursive and
     /// alias-containing members are compared last because they can expand the same interface again.
     fn structural_member_priority(&self, db: &'db dyn Db) -> StructuralMemberPriority {
+        let is_recursive_type = |ty| {
+            any_over_type(db, ty, false, |nested| {
+                matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
+            })
+        };
+
         let ProtocolMemberKind::Method(member, _) = self.data.kind else {
             let is_finite = self.data.kind.member_types().all(|member| {
-                member.resolve(db).is_some_and(|member| {
-                    !any_over_type(db, member.ty(), false, |nested| {
-                        matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
-                    })
-                })
+                member
+                    .resolve(db)
+                    .is_some_and(|member| !is_recursive_type(member.ty()))
             });
             return if is_finite {
                 StructuralMemberPriority::Simple
@@ -1356,11 +1361,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .map(Parameter::annotated_type),
                 )
                 .chain(std::iter::once(signature.return_ty))
-                .any(|ty| {
-                    any_over_type(db, ty, false, |nested| {
-                        matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
-                    })
-                })
+                .any(is_recursive_type)
         });
         if is_recursive {
             return StructuralMemberPriority::Recursive;
@@ -2631,15 +2632,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         target
             .members(db)
-            .filter(|member| {
-                member.structural_member_priority(db) == StructuralMemberPriority::Simple
-            })
-            .chain(target.members(db).filter(|member| {
-                member.structural_member_priority(db) == StructuralMemberPriority::FiniteOverload
-            }))
-            .chain(target.members(db).filter(|member| {
-                member.structural_member_priority(db) == StructuralMemberPriority::Recursive
-            }))
+            .sorted_by_cached_key(|member| member.structural_member_priority(db))
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 

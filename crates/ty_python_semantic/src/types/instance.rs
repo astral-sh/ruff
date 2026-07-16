@@ -551,7 +551,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
                 && !self.is_context_collection_enabled()
                 && let Type::ProtocolInstance(source_protocol) = ty
-                && let Some(source_instance) = source_protocol.to_nominal_instance()
+                && let Some(source_instance) = source_protocol_as_nominal
                 && let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
                     (source_instance.class(db), nominal_instance.class(db))
                 && source_alias.origin(db) == target_alias.origin(db)
@@ -685,7 +685,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// Returns the finite members of a protocol interface, omitting members that refer back to its
-/// class-backed origin.
+/// class-backed origin. Type aliases are expanded, but lazy protocol attributes are not visited.
+///
+/// For example, `value` is retained while `child` is omitted:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def value(self) -> T | int: ...
+///     def child(self) -> P[list[T]]: ...
+/// ```
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn non_recursive_protocol_interface<'db>(
     db: &'db dyn Db,
