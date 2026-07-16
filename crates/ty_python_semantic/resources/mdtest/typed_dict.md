@@ -5037,6 +5037,55 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+Boolean tags can be narrowed by truthiness, including through a generic `TypedDict` and a type
+alias:
+
+```py
+import json
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+class Success(TypedDict, Generic[T]):
+    success: Literal[True]
+    result: T
+
+class Failure(TypedDict):
+    success: Literal[False]
+    errors: list[str]
+
+Response: TypeAlias = Success[int] | Failure
+
+def _(response: Response):
+    if response["success"]:
+        reveal_type(response)  # revealed: Success[int]
+        reveal_type(response["result"])  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure
+        reveal_type(response["errors"])  # revealed: list[str]
+
+response: Response = json.loads("{}")
+
+if not response["success"]:
+    reveal_type(response)  # revealed: Failure
+    reveal_type(response["errors"])  # revealed: list[str]
+else:
+    reveal_type(response)  # revealed: Success[int]
+    reveal_type(response["result"])  # revealed: int
+
+class TruthyIntTag(TypedDict):
+    success: Literal[1]
+
+class FalsyIntTag(TypedDict):
+    success: Literal[0]
+
+def _(response: Response | TruthyIntTag | FalsyIntTag):
+    if response["success"]:
+        reveal_type(response)  # revealed: Success[int] | TruthyIntTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag
+```
+
 Enum literals are also supported as tags:
 
 ```py
