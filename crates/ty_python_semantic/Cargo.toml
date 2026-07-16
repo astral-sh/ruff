@@ -28,6 +28,7 @@ ty_site_packages = { workspace = true }
 ty_python_core = { workspace = true }
 
 bitflags = { workspace = true }
+char_str = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }

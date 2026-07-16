@@ -344,7 +344,7 @@ impl<'db> TypeVarInstance<'db> {
         };
         let identity = TypeVarIdentity::new(
             db,
-            Name::new(format!("{}'instance", self.name(db))),
+            Name::concat(&[self.name(db).as_str(), "'instance"]),
             None, // definition
             self.kind(db),
         );
@@ -1366,8 +1366,8 @@ impl get_size2::GetSize for TypeVarIdentity<'_> {}
 
 impl<'db> TypeVarIdentity<'db> {
     fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        let name = format!("{}'{}", self.name(db), suffix);
-        Self::new(db, Name::from(name), self.definition(db), self.kind(db))
+        let name = Name::concat(&[self.name(db).as_str(), "'", suffix]);
+        Self::new(db, name, self.definition(db), self.kind(db))
     }
 }
 

@@ -235,6 +235,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "char_str"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f826e1dd81cad0bcd59e3ba09153b87b1d0630423af6083204d08c310eb0cccf"
+dependencies = [
+ "castaway",
+ "get-size2",
+ "itoa",
+ "ryu",
+ "serde_core",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1512,6 +1525,7 @@ dependencies = [
 name = "ruff_cache"
 version = "0.0.4"
 dependencies = [
+ "char_str",
  "filetime",
  "glob",
  "globset",
@@ -1692,6 +1706,7 @@ dependencies = [
  "aho-corasick",
  "arrayvec",
  "bitflags 2.13.0",
+ "char_str",
  "compact_str",
  "get-size2",
  "is-macro",
@@ -1786,7 +1801,6 @@ version = "0.0.4"
 dependencies = [
  "bitflags 2.13.0",
  "bstr",
- "compact_str",
  "get-size2",
  "memchr",
  "ruff_python_ast",
@@ -2330,6 +2344,7 @@ version = "0.0.4"
 dependencies = [
  "bitflags 2.13.0",
  "bitvec",
+ "char_str",
  "get-size2",
  "hashbrown 0.17.1",
  "itertools 0.15.0",
@@ -2356,6 +2371,7 @@ name = "ty_python_semantic"
 version = "0.0.4"
 dependencies = [
  "bitflags 2.13.0",
+ "char_str",
  "compact_str",
  "drop_bomb",
  "get-size2",

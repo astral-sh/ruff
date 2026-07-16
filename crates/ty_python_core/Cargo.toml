@@ -24,6 +24,7 @@ ty_combine = { workspace = true }
 
 bitflags = { workspace = true }
 bitvec = { workspace = true }
+char_str = { workspace = true, features = ["get-size"] }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }

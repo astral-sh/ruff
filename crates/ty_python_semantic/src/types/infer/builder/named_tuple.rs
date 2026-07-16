@@ -16,6 +16,7 @@ use crate::{
         infer::TypeInferenceBuilder,
     },
 };
+use char_str::format_char;
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
@@ -495,7 +496,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     || !is_identifier(name_str)
                     || seen_names.contains(name_str);
                 if needs_rename {
-                    *field_name = Name::new(format!("_{i}"));
+                    *field_name = Name::from(format_char!("_{i}"));
                 }
                 seen_names.insert(field_name.as_str());
             }

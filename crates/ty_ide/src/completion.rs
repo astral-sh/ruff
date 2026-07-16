@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
-use compact_str::CompactString;
+use compact_str::{CompactString, CompactStringExt};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
@@ -427,7 +427,7 @@ impl<'db> CompletionBuilder<'db> {
     fn argument(name: impl Into<Name>) -> CompletionBuilder<'db> {
         let name = name.into();
         let insert = compact_str::format_compact!("{name}=");
-        Completion::builder(name)
+        Completion::builder(CompactString::new(name))
             .kind(CompletionKind::Variable)
             .insert(insert)
             .context_specific(true)
@@ -756,7 +756,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(CompactString::new(class_def.name.as_str()));
+                        bases.insert(CompactString::new(&class_def.name.id));
                     }
                     bases
                 });
@@ -1621,7 +1621,7 @@ fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactS
         .bases()
         .iter()
         .filter_map(UnqualifiedName::from_expr)
-        .map(|name| compact_str::format_compact!("{name}"))
+        .map(|name| name.segments().join_compact("."))
         .collect()
 }
 
