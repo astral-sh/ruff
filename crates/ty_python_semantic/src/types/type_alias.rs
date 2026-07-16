@@ -219,7 +219,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
-    if !visitor.should_visit_type_alias_value() {
+    if !visitor.should_visit_lazy_type_attributes() {
         return;
     }
     match type_alias {

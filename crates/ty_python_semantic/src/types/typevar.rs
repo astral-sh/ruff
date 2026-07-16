@@ -19,7 +19,7 @@ use crate::{
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, RecursionGuard, TypeVisitor},
+        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -802,7 +802,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 ) -> Option<TypeVarNonce> {
     struct MatchingFreshnessCollector<'db> {
         base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
-        recursion_guard: RecursionGuard<'db>,
+        recursion_guard: TypeCollector<'db>,
         max_freshness: Cell<Option<TypeVarNonce>>,
     }
 
@@ -818,7 +818,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
                 .collect();
             Self {
                 base_identities,
-                recursion_guard: RecursionGuard::default(),
+                recursion_guard: TypeCollector::default(),
                 max_freshness: Cell::default(),
             }
         }
@@ -846,7 +846,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            self.recursion_guard.walk(db, ty, self);
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 

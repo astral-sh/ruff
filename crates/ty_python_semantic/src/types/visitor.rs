@@ -1,6 +1,5 @@
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
-use std::mem::ManuallyDrop;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
@@ -16,7 +15,7 @@ use crate::{
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
-        cyclic::{ActiveRecursionDetector, TypeIdentity},
+        cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
@@ -41,11 +40,6 @@ use crate::{
 pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
-
-    /// Should the visitor recurse into the value of a type alias?
-    fn should_visit_type_alias_value(&self) -> bool {
-        self.should_visit_lazy_type_attributes()
-    }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
@@ -293,152 +287,30 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+pub(crate) fn walk_type_with_recursion_guard<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &TypeCollector<'db>,
+) {
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => {}
+        TypeKind::NonAtomic(non_atomic_type) => {
+            if recursion_guard.type_was_already_seen(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            walk_non_atomic_type(db, non_atomic_type, visitor);
+        }
+    }
+}
+
 #[derive(Default, Debug)]
-struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
+pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
-    #[inline]
-    fn collect_type(&self, ty: Type<'db>) -> bool {
-        self.0.borrow_mut().insert(ty)
-    }
-}
-
-enum RecursionGuardVisit<'guard, 'db> {
-    AlreadyCollected,
-    Cycle,
-    Pending(ActiveIdentityGuard<'guard, 'db>),
-}
-
-type ActiveIdentityStorage<'db> = RefCell<Option<Box<SmallVec<[TypeIdentity<'db>; 4]>>>>;
-
-// The last active guard releases the allocation, so this field has no resources left to drop.
-#[derive(Default, Debug)]
-struct ActiveIdentities<'db>(ManuallyDrop<ActiveIdentityStorage<'db>>);
-
-impl<'db> ActiveIdentities<'db> {
-    #[inline]
-    fn contains(&self, identity: TypeIdentity<'db>) -> bool {
-        self.0
-            .borrow()
-            .as_deref()
-            .is_some_and(|active| active.contains(&identity))
-    }
-
-    #[inline]
-    fn push(&self, identity: TypeIdentity<'db>) {
-        self.0
-            .borrow_mut()
-            .get_or_insert_with(|| Box::new(SmallVec::new()))
-            .push(identity);
-    }
-
-    #[inline]
-    fn pop(&self) -> Option<TypeIdentity<'db>> {
-        let mut active = self.0.borrow_mut();
-        let identity = active.as_deref_mut().and_then(SmallVec::pop);
-        if active.as_deref().is_some_and(SmallVec::is_empty) {
-            *active = None;
-        }
-        identity
-    }
-}
-
-struct ActiveIdentityGuard<'guard, 'db> {
-    active_identities: &'guard ActiveIdentities<'db>,
-    identity: TypeIdentity<'db>,
-}
-
-impl Drop for ActiveIdentityGuard<'_, '_> {
-    fn drop(&mut self) {
-        let active_identity = self.active_identities.pop();
-        debug_assert_eq!(active_identity, Some(self.identity));
-    }
-}
-
-/// Guards recursive type walks.
-///
-/// [`TypeCollector`] only de-duplicates exact `Type` values. Recursive aliases, `NewType`s, and
-/// functions must also be detected by identity, because they can re-enter with a different type
-/// structure. Other type kinds stay on the exact-type path to keep common type walks cheap.
-#[derive(Default, Debug)]
-pub(crate) struct RecursionGuard<'db> {
-    collected_types: TypeCollector<'db>,
-    active_identities: ActiveIdentities<'db>,
-}
-
-impl<'db> RecursionGuard<'db> {
-    /// Walks a type while ignoring recursive cycles.
-    ///
-    /// Use [`Self::walk_with_fallback`] if the cycle needs further processing.
-    #[inline]
-    pub(crate) fn walk(&self, db: &'db dyn Db, ty: Type<'db>, visitor: &impl TypeVisitor<'db>) {
-        let _cycle = self.walk_with_fallback(db, ty, visitor);
-    }
-
-    /// Walks a type, returning the type when recursion is detected after collecting the exact
-    /// type.
-    #[must_use]
-    #[inline]
-    pub(crate) fn walk_with_fallback(
-        &self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        visitor: &impl TypeVisitor<'db>,
-    ) -> Option<Type<'db>> {
-        match TypeKind::from(ty) {
-            TypeKind::Atomic => None,
-            TypeKind::NonAtomic(non_atomic_type) => {
-                if matches!(non_atomic_type, NonAtomicType::TypeAlias(_))
-                    && !visitor.should_visit_type_alias_value()
-                {
-                    if self.collected_types.collect_type(ty) {
-                        walk_non_atomic_type(db, non_atomic_type, visitor);
-                    }
-                    return None;
-                }
-
-                let Some(identity) = ty.recursive_identity(db) else {
-                    if self.collected_types.collect_type(ty) {
-                        walk_non_atomic_type(db, non_atomic_type, visitor);
-                    }
-                    return None;
-                };
-
-                match self.begin_visit(ty, identity) {
-                    RecursionGuardVisit::AlreadyCollected => None,
-                    RecursionGuardVisit::Cycle => Some(ty),
-                    RecursionGuardVisit::Pending(_active_identity) => {
-                        walk_non_atomic_type(db, non_atomic_type, visitor);
-                        None
-                    }
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn begin_visit<'guard>(
-        &'guard self,
-        ty: Type<'db>,
-        identity: TypeIdentity<'db>,
-    ) -> RecursionGuardVisit<'guard, 'db> {
-        // Collect the exact type before checking for identity recursion. A recursive type keeps
-        // the same identity across different expansions, but callers still need each distinct
-        // expanded type to be collected.
-        let was_collected = self.collected_types.collect_type(ty);
-
-        if self.active_identities.contains(identity) {
-            return RecursionGuardVisit::Cycle;
-        }
-        if !was_collected {
-            return RecursionGuardVisit::AlreadyCollected;
-        }
-
-        self.active_identities.push(identity);
-        RecursionGuardVisit::Pending(ActiveIdentityGuard {
-            active_identities: &self.active_identities,
-            identity,
-        })
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
     }
 }
 
@@ -535,7 +407,7 @@ impl DynamicContent {
 /// because each recursive edge creates a new specialization.
 pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
     struct DynamicContentVisitor<'db> {
-        recursion_guard: RecursionGuard<'db>,
+        recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         content: Cell<DynamicContent>,
     }
@@ -563,13 +435,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
                 return;
             }
 
-            if self
-                .recursion_guard
-                .walk_with_fallback(db, ty, self)
-                .is_some()
-            {
-                self.record(DynamicContent::Indeterminate);
-            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
 
         fn visit_protocol_instance_type(
@@ -607,7 +473,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
     }
 
     let visitor = DynamicContentVisitor {
-        recursion_guard: RecursionGuard::default(),
+        recursion_guard: TypeCollector::default(),
         active_class_protocols: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
     };
@@ -628,7 +494,7 @@ where
 {
     struct AnyOverTypeVisitor<'db, 'a, U> {
         query: &'a dyn Fn(Type<'db>) -> U,
-        recursion_guard: RecursionGuard<'db>,
+        recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -652,13 +518,13 @@ where
             if new_value != default_value {
                 return;
             }
-            self.recursion_guard.walk(db, ty, self);
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 
     let visitor = AnyOverTypeVisitor {
         query: &query,
-        recursion_guard: RecursionGuard::default(),
+        recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
     };
@@ -669,8 +535,7 @@ where
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
 /// The function guards against infinite recursion
-/// by keeping track of the non-atomic types it has collected and the type identities that are
-/// active in the current recursive path.
+/// by keeping track of the non-atomic types it has already seen.
 ///
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
@@ -692,8 +557,7 @@ pub(super) fn any_over_type<'db>(
 /// function will return `Some(T)`.
 ///
 /// The function guards against infinite recursion
-/// by keeping track of the non-atomic types it has collected and the type identities that are
-/// active in the current recursive path.
+/// by keeping track of the non-atomic types it has already seen.
 ///
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)

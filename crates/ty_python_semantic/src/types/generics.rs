@@ -23,10 +23,13 @@ use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationV
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
+use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
-use crate::types::visitor::{RecursionGuard, TypeVisitor, any_over_type};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -462,7 +465,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: RecursionGuard<'db>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -485,7 +488,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                self.recursion_guard.walk(db, ty, self);
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
@@ -746,40 +749,14 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct FindTypeVarLocations<'db> {
             locations: RefCell<TypeVarLocations<'db>>,
-            recursion_guard: RecursionGuard<'db>,
+            recursion_guard: TypeCollector<'db>,
             in_return_type: bool,
             in_callable_type: Cell<Option<CallableType<'db>>>,
-        }
-
-        impl<'db> FindTypeVarLocations<'db> {
-            fn visit_type_alias_specialization(
-                &self,
-                db: &'db dyn Db,
-                type_alias: TypeAliasType<'db>,
-            ) {
-                let specialization = type_alias.specialization(db).or_else(|| {
-                    type_alias
-                        .generic_context(db)
-                        .map(|generic_context| generic_context.default_specialization(db, None))
-                });
-                if let Some(specialization) = specialization {
-                    for ty in specialization.types(db) {
-                        self.visit_type(db, *ty);
-                    }
-                    if let Some(tuple) = specialization.tuple_inner(db) {
-                        walk_tuple_type(db, tuple, self);
-                    }
-                }
-            }
         }
 
         impl<'db> TypeVisitor<'db> for FindTypeVarLocations<'db> {
             fn should_visit_lazy_type_attributes(&self) -> bool {
                 false
-            }
-
-            fn should_visit_type_alias_value(&self) -> bool {
-                true
             }
 
             fn visit_bound_type_var_type(
@@ -820,13 +797,22 @@ impl<'db> GenericContext<'db> {
                 }
             }
 
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                let cycle = self.recursion_guard.walk_with_fallback(db, ty, self);
-                if let Some(Type::TypeAlias(type_alias)) = cycle {
-                    // Keep recursive aliases finite while still seeing typevars in their current
-                    // specialization.
-                    self.visit_type_alias_specialization(db, type_alias);
+            fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+                // The default implementation would do this for us if we returned `true` from
+                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
+                // attribute that we want to recurse into, so we do it by hand.
+                match type_alias {
+                    TypeAliasType::PEP695(type_alias) => {
+                        walk_pep_695_type_alias(db, type_alias, self);
+                    }
+                    TypeAliasType::ManualPEP695(type_alias) => {
+                        walk_manual_pep_695_type_alias(db, type_alias, self);
+                    }
                 }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
