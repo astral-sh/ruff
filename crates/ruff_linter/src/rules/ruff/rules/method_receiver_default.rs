@@ -83,10 +83,13 @@ fn receiver_kind(
     );
 
     match function_kind {
-        FunctionType::StaticMethod => None,
-        FunctionType::ClassMethod => Some(ReceiverKind::Class),
-        FunctionType::NewMethod => Some(ReceiverKind::Class),
+        // Single @classmethod only
+        FunctionType::ClassMethod if decorator_list.len() == 1 => Some(ReceiverKind::Class),
+        FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
         FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
+        FunctionType::StaticMethod => None,
+        FunctionType::ClassMethod => None,
+        FunctionType::NewMethod => None,
         FunctionType::Method => None,
         FunctionType::Function => None,
     }

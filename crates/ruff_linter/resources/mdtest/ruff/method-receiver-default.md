@@ -46,7 +46,7 @@ def decorator(func):
     return func
 
 
-class StaticMethodWithDefault:
+class StaticMethodWithDefault:  
     @staticmethod
     def helper(arg=None): ...
 
@@ -62,10 +62,21 @@ class ClassReceiverNoDefault:
 
 class OverrideReceiverNoDefault:
     @override
-    def method(self): ...
+    def method(self=None): ...
 
 
 class CustomDecoratorReceiverNoDefault:
     @decorator
-    def method(self): ...
+    def method(self=None): ...
+
+class StackedDecoratorsClassMethod:
+    @decorator
+    @classmethod
+    def build(cls): ...
+
+class StackedDecoratorsNewMethod:
+    @decorator
+    def __new__(cls=None): ...
+
+
 ```
