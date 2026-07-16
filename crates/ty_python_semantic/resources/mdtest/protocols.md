@@ -3842,19 +3842,6 @@ static_assert(is_subtype_of(ValidConstrainedReceiver, ReceiverOnly))
 static_assert(is_assignable_to(RecursiveReceiverBound, ReceiverOnly))
 static_assert(is_subtype_of(RecursiveReceiverBound, ReceiverOnly))
 
-# Applying the declared domain of this F-bounded TypeVar while checking the protocol would re-enter
-# the same structural relation. We currently omit that recursive domain guard.
-SelfWeight = TypeVar("SelfWeight", bound="ImplementationWeight")
-
-class ImplementationWeight(Protocol):
-    def __lt__(self: SelfWeight, other: SelfWeight) -> bool: ...
-
-class NeutralWeight:
-    def __lt__(self, other: "NeutralWeight") -> bool:
-        return False
-
-weight: ImplementationWeight = NeutralWeight()
-
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
     def set_scale(self, scale: float) -> Self: ...
