@@ -36,6 +36,11 @@ impl Name {
         Self(compact_str::CompactString::const_new(name))
     }
 
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(compact_str::CompactString::with_capacity(capacity))
+    }
+
     pub fn shrink_to_fit(&mut self) {
         self.0.shrink_to_fit();
     }
