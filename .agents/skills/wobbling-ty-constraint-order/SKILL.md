@@ -46,4 +46,4 @@ done
 
 Read each failing log and report the mdtest file, section, line, expected result, and actual diagnostic/revealed type. A wobble failure is evidence that inference semantics or displayed solution types still depend on ordering; do not update the mdtest expectations merely to make the wobble run green.
 
-The knob does **not** perturb hashing of Salsa-backed values. In particular, it cannot expose binding-order changes caused solely by draining an `FxHashMap<BoundTypeVarInstance, ...>`; retain the focused fresh-database unit regression for that case.
+The knob does **not** perturb hashing of Salsa-backed values. The `Solution binding order follows constraint source order` section of `regression/constraint_set_ordering.md` separately varies typevar declaration order to catch binding-order changes caused by draining an `FxHashMap<BoundTypeVarInstance, ...>`.

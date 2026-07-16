@@ -7890,57 +7890,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn salsa_typevar_order_preserves_solution_binding_order() {
-        let mut actual = FxIndexSet::default();
-        for order in (0..3).permutations(3) {
-            let db = setup_db();
-            let mut typevars = [None; 3];
-            for index in order {
-                typevars[index] = Some(create_typevar(&db, ["T", "U", "V"][index]));
-            }
-            let [Some(t), Some(u), Some(v)] = typevars else {
-                panic!("all typevars should be initialized");
-            };
-            let int = KnownClass::Int.to_instance(&db);
-            let str = KnownClass::Str.to_instance(&db);
-            let bytes = KnownClass::Bytes.to_instance(&db);
-            let builder = ConstraintSetBuilder::new();
-            let t_int = ConstraintSet::constrain_typevar(&db, &builder, t, int, int);
-            let u_str = ConstraintSet::constrain_typevar(&db, &builder, u, str, str);
-            let v_bytes = ConstraintSet::constrain_typevar(&db, &builder, v, bytes, bytes);
-            let set = t_int
-                .and(&db, &builder, || u_str)
-                .and(&db, &builder, || v_bytes);
-            let inferable = InferableTypeVars::from_typevars(
-                &db,
-                [t.identity(&db), u.identity(&db), v.identity(&db)]
-                    .into_iter()
-                    .collect(),
-            );
-            let Solutions::Constrained(paths) = set.solutions(&db, &builder, inferable) else {
-                panic!("expected a constrained solution");
-            };
-            actual.insert(
-                paths[0]
-                    .iter()
-                    .map(|binding| {
-                        format!(
-                            "{}={}",
-                            binding.bound_typevar.identity(&db).display(&db),
-                            binding.solution.display(&db)
-                        )
-                    })
-                    .join(", "),
-            );
-        }
-
-        assert_eq!(
-            actual,
-            FxIndexSet::from_iter([String::from("T=int, U=str, V=bytes")])
-        );
-    }
-
     #[track_caller]
     fn check_display_graph<'db, 'c>(
         db: &'db dyn Db,
