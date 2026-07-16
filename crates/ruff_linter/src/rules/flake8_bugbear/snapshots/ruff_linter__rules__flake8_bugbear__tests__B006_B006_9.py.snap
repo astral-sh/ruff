@@ -14,7 +14,7 @@ help: Replace with `None`; initialize within function
    - def f5(x=([1, ])):
 17 + def f5(x=None):
 18 +     if x is None:
-19 +         x = [1]
+19 +         x = ([1, ])
 20 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior

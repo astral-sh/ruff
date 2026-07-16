@@ -13,10 +13,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_b006_check_guaranteed_mutable_expr_enabled,
-    is_b006_unsafe_fix_preserve_assignment_expr_enabled,
-};
+use crate::preview::is_b006_check_guaranteed_mutable_expr_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -183,24 +180,15 @@ fn move_initialization(
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.parameter.name(),
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range())
-            )
-        );
-    } else {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.name(),
-            checker.generator().expr(default)
-        );
-    }
+    let _ = write!(
+        &mut content,
+        "{} = {}",
+        parameter.parameter.name(),
+        locator.slice(
+            parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                .unwrap_or(default.range())
+        )
+    );
 
     content.push_str(stylist.line_ending().as_str());
 
