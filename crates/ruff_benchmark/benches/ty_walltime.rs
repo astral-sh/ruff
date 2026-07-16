@@ -185,7 +185,8 @@ static PYDANTIC: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    1601,
+    // TODO: Reduce this once legacy generic method targets are quantified correctly.
+    1620,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
