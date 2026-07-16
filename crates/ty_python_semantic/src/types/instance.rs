@@ -495,6 +495,68 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// Returns whether a viable nominal relation can safely skip structural protocol comparison.
+fn can_skip_structural_protocol_relation<'db>(
+    db: &'db dyn Db,
+    source: NominalInstanceType<'db>,
+    target: NominalInstanceType<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    let source_class = source.class(db);
+    let target_class_literal = target.class(db).class_literal(db);
+    if source_class.class_literal(db) != target_class_literal {
+        return false;
+    }
+
+    if !Type::ProtocolInstance(protocol).has_typevar(db) {
+        return true;
+    }
+
+    let ClassType::Generic(source_alias) = source_class else {
+        return true;
+    };
+
+    let ClassType::Generic(target_alias) = target.class(db) else {
+        return true;
+    };
+
+    if target_alias
+        .specialization(db)
+        .types(db)
+        .iter()
+        .any(|argument| {
+            any_over_type(db, *argument, false, |nested| {
+                let Type::TypeVar(typevar) = nested else {
+                    return false;
+                };
+                typevar.typevar(db).bound_or_constraints(db).is_none()
+                    && !protocol.interface(db).references_typevar(db, typevar)
+            })
+        })
+    {
+        return false;
+    }
+
+    !source_alias
+        .specialization(db)
+        .types(db)
+        .iter()
+        .any(|argument| {
+            any_over_type(db, *argument, false, |nested| {
+                nested
+                    .as_nominal_instance()
+                    .or_else(|| {
+                        nested
+                            .as_protocol_instance()
+                            .and_then(ProtocolInstanceType::to_nominal_instance)
+                    })
+                    .is_some_and(|nested| {
+                        nested.class(db).class_literal(db) == target_class_literal
+                    })
+            })
+        })
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -535,59 +597,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
                 && !result.is_never_satisfied(db)
                 && source_nominal_view.is_some_and(|source| {
-                    let source_class = source.class(db);
-                    let target_class_literal = nominal_instance.class(db).class_literal(db);
-                    if source_class.class_literal(db) != target_class_literal {
-                        return false;
-                    }
-
-                    if !Type::ProtocolInstance(protocol).has_typevar(db) {
-                        return true;
-                    }
-
-                    let ClassType::Generic(source_alias) = source_class else {
-                        return true;
-                    };
-
-                    let ClassType::Generic(target_alias) = nominal_instance.class(db) else {
-                        return true;
-                    };
-
-                    if target_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .any(|argument| {
-                            any_over_type(db, *argument, false, |nested| {
-                                let Type::TypeVar(typevar) = nested else {
-                                    return false;
-                                };
-                                typevar.typevar(db).bound_or_constraints(db).is_none()
-                                    && !protocol.interface(db).references_typevar(db, typevar)
-                            })
-                        })
-                    {
-                        return false;
-                    }
-
-                    !source_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .any(|argument| {
-                            any_over_type(db, *argument, false, |nested| {
-                                nested
-                                    .as_nominal_instance()
-                                    .or_else(|| {
-                                        nested
-                                            .as_protocol_instance()
-                                            .and_then(ProtocolInstanceType::to_nominal_instance)
-                                    })
-                                    .is_some_and(|nested| {
-                                        nested.class(db).class_literal(db) == target_class_literal
-                                    })
-                            })
-                        })
+                    can_skip_structural_protocol_relation(db, source, nominal_instance, protocol)
                 })
             {
                 return result;
