@@ -1115,8 +1115,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     constraints
                 }
             }
-            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.evaluate_simple_expr(expression_node, is_positive)
+            ast::Expr::Attribute(attribute) => {
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                let inference = infer_expression_types(self.db, expression, TypeContext::default());
+                let nominal_constraints = self
+                    .narrow_nominal_attribute_by_truthiness(
+                        inference.expression_type(&*attribute.value),
+                        &attribute.value,
+                        attribute.attr.id(),
+                        is_positive,
+                    )
+                    .map(|(place, constraint)| {
+                        NarrowingConstraints::from_iter([(place, constraint)])
+                    });
+
+                Self::merge_optional_constraints_and(constraints, nominal_constraints)
+            }
+            ast::Expr::Subscript(subscript) => {
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                let inference = infer_expression_types(self.db, expression, TypeContext::default());
+                let typeddict_constraints = self
+                    .narrow_typeddict_subscript_by_truthiness(
+                        inference.expression_type(&*subscript.value),
+                        &subscript.value,
+                        inference.expression_type(&*subscript.slice),
+                        is_positive,
+                    )
+                    .map(|(place, constraint)| {
+                        NarrowingConstraints::from_iter([(place, constraint)])
+                    });
+
+                Self::merge_optional_constraints_and(constraints, typeddict_constraints)
             }
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
@@ -4078,6 +4107,36 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some((place, NarrowingConstraint::intersection(intersection)))
     }
 
+    /// Narrow tagged unions of `TypedDict`s based on the truthiness of a `Literal` key.
+    fn narrow_typeddict_subscript_by_truthiness(
+        &self,
+        subscript_value_type: Type<'db>,
+        subscript_value_expr: &ast::Expr,
+        subscript_key_type: Type<'db>,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        if !is_or_contains_typeddict(self.db, subscript_value_type) {
+            return None;
+        }
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
+        let key_literal = subscript_key_type.as_string_literal()?;
+
+        let excluded_field_type = if is_positive {
+            Type::AlwaysFalsy
+        } else {
+            Type::AlwaysTruthy
+        };
+        let field = TypedDictFieldBuilder::new(excluded_field_type)
+            .required(false)
+            .read_only(true)
+            .build();
+        let schema = TypedDictSchema::from_iter([(Name::from(key_literal.value(self.db)), field)]);
+        let synthesized_typeddict = TypedDictType::from_schema_items(self.db, schema);
+        let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
+        let place = self.expect_place(&subscript_place_expr);
+        Some((place, NarrowingConstraint::intersection(intersection)))
+    }
+
     // TODO: Restructure this helper to return the key-presence constraint and apply it with
     // `NarrowingConstraint::intersection` at the call site instead of constructing a replacement
     // type here.
@@ -4199,6 +4258,37 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         || !attribute_type.is_disjoint_from(self.db, rhs_type)
                 } else {
                     !attribute_type.is_subtype_of(self.db, rhs_type)
+                }
+            })
+        });
+
+        if narrowed == Type::Union(union) {
+            return None;
+        }
+
+        let attribute_value_place_expr = PlaceExpr::try_from_expr(attribute_value_expr)?;
+        let place = self.expect_place(&attribute_value_place_expr);
+        Some((place, NarrowingConstraint::replacement(narrowed)))
+    }
+
+    fn narrow_nominal_attribute_by_truthiness(
+        &self,
+        attribute_value_type: Type<'db>,
+        attribute_value_expr: &ast::Expr,
+        attribute_name: &str,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
+            return None;
+        };
+
+        let narrowed = union.filter(self.db, |element| {
+            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
+                let truthiness = attribute_type.bool(self.db);
+                if is_positive {
+                    !truthiness.is_always_false()
+                } else {
+                    !truthiness.is_always_true()
                 }
             })
         });
