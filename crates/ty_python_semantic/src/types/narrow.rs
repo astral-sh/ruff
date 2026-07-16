@@ -1115,7 +1115,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     constraints
                 }
             }
-            ast::Expr::Attribute(_) => self.evaluate_simple_expr(expression_node, is_positive),
+            ast::Expr::Attribute(attribute) => {
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                let inference = infer_expression_types(self.db, expression, TypeContext::default());
+                let nominal_constraints = self
+                    .narrow_nominal_attribute_by_truthiness(
+                        inference.expression_type(&*attribute.value),
+                        &attribute.value,
+                        attribute.attr.id(),
+                        is_positive,
+                    )
+                    .map(|(place, constraint)| {
+                        NarrowingConstraints::from_iter([(place, constraint)])
+                    });
+
+                Self::merge_optional_constraints_and(constraints, nominal_constraints)
+            }
             ast::Expr::Subscript(subscript) => {
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 let inference = infer_expression_types(self.db, expression, TypeContext::default());
@@ -4243,6 +4258,37 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         || !attribute_type.is_disjoint_from(self.db, rhs_type)
                 } else {
                     !attribute_type.is_subtype_of(self.db, rhs_type)
+                }
+            })
+        });
+
+        if narrowed == Type::Union(union) {
+            return None;
+        }
+
+        let attribute_value_place_expr = PlaceExpr::try_from_expr(attribute_value_expr)?;
+        let place = self.expect_place(&attribute_value_place_expr);
+        Some((place, NarrowingConstraint::replacement(narrowed)))
+    }
+
+    fn narrow_nominal_attribute_by_truthiness(
+        &self,
+        attribute_value_type: Type<'db>,
+        attribute_value_expr: &ast::Expr,
+        attribute_name: &str,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
+            return None;
+        };
+
+        let narrowed = union.filter(self.db, |element| {
+            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
+                let truthiness = attribute_type.bool(self.db);
+                if is_positive {
+                    !truthiness.is_always_false()
+                } else {
+                    !truthiness.is_always_true()
                 }
             })
         });

@@ -628,7 +628,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
         match expr {
             // Simple expressions that directly narrow a place.
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => self.simple_expr(expr),
+            ast::Expr::Name(_) => self.simple_expr(expr),
+            // Attribute truthiness can also narrow its base (nominal tagged unions).
+            ast::Expr::Attribute(attribute) => {
+                let mut places = self.simple_expr(expr);
+                places.extend(self.simple_expr(&attribute.value));
+                places
+            }
             // Subscript truthiness can also narrow its base (`TypedDict` tagged unions).
             ast::Expr::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
