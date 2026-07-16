@@ -57,6 +57,17 @@ pub fn goto_implementation(
     let mut candidate_files: Vec<File> = db.project().files(db).iter().copied().collect();
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
+    let class_reference_implementations = || {
+        let resolved_definitions =
+            goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
+        let resolved_definitions = resolved_definitions
+            .as_ref()
+            .map(|definitions| definitions.iter().as_slice())
+            .unwrap_or(&[]);
+
+        implementation_definitions_for_class_references(db, resolved_definitions, &candidate_files)
+    };
+
     let implementations = match &goto_target {
         GotoTarget::Expression(expression)
         | GotoTarget::Call {
@@ -67,25 +78,14 @@ pub fn goto_implementation(
             ruff_python_ast::ExprRef::Name(_) | ruff_python_ast::ExprRef::Attribute(_)
         ) =>
         {
-            let resolved_definitions =
-                goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
-            let resolved_definitions = resolved_definitions
-                .as_ref()
-                .map(|definitions| definitions.iter().as_slice())
-                .unwrap_or(&[]);
-
-            implementation_definitions_for_class_references(
-                db,
-                resolved_definitions,
-                &candidate_files,
-            )
-            .or_else(|| match expression {
+            class_reference_implementations().or_else(|| match expression {
                 ruff_python_ast::ExprRef::Attribute(attribute) => Some(
                     implementation_definitions_for_attribute(&model, attribute, &candidate_files),
                 ),
                 _ => None,
             })?
         }
+        GotoTarget::StringAnnotationSubexpr { .. } => class_reference_implementations()?,
         GotoTarget::FunctionDef(function) => {
             implementation_definitions_for_method(&model, function, &candidate_files)
         }
@@ -1152,6 +1152,41 @@ class MyClass:
           |       ---
           |
         ");
+    }
+
+    #[test]
+    fn implementation_class_reference_in_string_annotation() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Dog(Animal):
+                pass
+
+            def f(x: "Anim<CURSOR>al"):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+         --> main.py:8:11
+          |
+        8 | def f(x: "Animal"):
+          |           ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
+          |       ---
+          |
+        "#);
     }
 
     #[test]
