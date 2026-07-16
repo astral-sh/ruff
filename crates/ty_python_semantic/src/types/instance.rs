@@ -549,29 +549,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return nominally_satisfied;
             }
 
-            // For lazy inference between specializations of the same protocol declaration, the
-            // viable nominal constraint is sufficient if solving it cannot recursively wrap a
-            // type in another specialization of the same protocol. Structurally comparing the
-            // inherited interface in these cases only expands every overloaded member again.
+            // During lazy inference, a viable nominal relation between specializations of the
+            // same protocol is sufficient; structurally comparing the inherited interface would
+            // only revisit its members. However, the nominal relation must not make a type
+            // variable recursively contain the protocol itself. For example, relating
+            // `P[P[Any]]` to `P[T]` could solve `T` as another `P[...]`, growing the specialization
+            // on every recursive relation.
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
                 && !result.is_never_satisfied(db)
                 && source_nominal_view.is_some_and(|source| {
                     let source_class = source.class(db);
-                    if source_class.class_literal(db)
-                        != nominal_instance.class(db).class_literal(db)
-                    {
+                    let target_class_literal = nominal_instance.class(db).class_literal(db);
+                    if source_class.class_literal(db) != target_class_literal {
                         return false;
+                    }
+
+                    // A fully resolved target cannot produce the recursive inference described
+                    // above.
+                    if !Type::ProtocolInstance(protocol).has_typevar(db) {
+                        return true;
                     }
 
                     let ClassType::Generic(source_alias) = source_class else {
                         return true;
                     };
-                    // This is an occurs check at the protocol-declaration level. For example,
-                    // accepting `P[P[Any]]` nominally as `P[T]` can infer another `P[...]` for
-                    // `T` and make each subsequent specialization one level deeper.
-                    !Type::ProtocolInstance(protocol).has_typevar(db)
-                        || !source_alias.specialization(db).types(db).iter().any(|ty| {
-                            any_over_type(db, *ty, false, |nested| {
+                    let source_contains_same_protocol = source_alias
+                        .specialization(db)
+                        .types(db)
+                        .iter()
+                        .any(|argument| {
+                            any_over_type(db, *argument, false, |nested| {
                                 nested
                                     .as_nominal_instance()
                                     .or_else(|| {
@@ -580,11 +587,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             .and_then(ProtocolInstanceType::to_nominal_instance)
                                     })
                                     .is_some_and(|nested| {
-                                        nested.class(db).class_literal(db)
-                                            == source_class.class_literal(db)
+                                        nested.class(db).class_literal(db) == target_class_literal
                                     })
                             })
-                        })
+                        });
+
+                    !source_contains_same_protocol
                 })
             {
                 return result;
