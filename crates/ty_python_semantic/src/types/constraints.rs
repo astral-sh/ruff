@@ -1292,16 +1292,21 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        constraint_set_order_index(builder.typevar_id(db, self).index())
-            < constraint_set_order_index(builder.typevar_id(db, typevar).index())
+        wobble_index(builder.typevar_id(db, self).index())
+            < wobble_index(builder.typevar_id(db, typevar).index())
     }
 }
 
-/// Returns a builder-local ID in the process-wide constraint-set audit ordering.
+/// Optionally applies a transformation to a builder-local typevar or constraint ID, which lets us
+/// exercise different BDD variable orderings.
 ///
-/// This is intentionally shared by constraint and typevar IDs: changing either ordering can
-/// change the TDD shape and the orientation of derived typevar-to-typevar constraints.
-fn constraint_set_order_index(index: usize) -> usize {
+/// Under normal operation, the IDs won't be modified, and we will construct BDDs based on the
+/// (builder-local) source order that we encounter typevars and constraints.
+///
+/// Our results _shouldn't_ depend on the BDD variable ordering that we choose. You can use the
+/// `TY_CONSTRAINT_SET_ORDER` environment variable to artificially choose different permutations of
+/// the "natural" variable ordering, to ensure that results are consistent.
+fn wobble_index(index: usize) -> usize {
     #[derive(Clone, Copy)]
     enum Order {
         Normal,
@@ -1952,7 +1957,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(constraint_set_order_index(self.index()))
+        std::cmp::Reverse(wobble_index(self.index()))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -7623,6 +7628,14 @@ mod tests {
         }
     }
 
+    /// Tests that we get the same set of solutions for a constraint set, regardless of the
+    /// variable ordering that is chosen for its "atoms" (the raw constraints that the constraint
+    /// set is built from).
+    ///
+    /// TODO: We _don't_ currently get a consistent result for each permutation. Right now,
+    /// `expected` is a list of all of the different results that we get. Once we solve all of the
+    /// sources of nondeterminism, `expected` should become a single string, and we should verify
+    /// that we get that specific result for each permutation.
     #[track_caller]
     fn check_solutions_for_constraint_orderings<'db>(
         db: &'db dyn Db,

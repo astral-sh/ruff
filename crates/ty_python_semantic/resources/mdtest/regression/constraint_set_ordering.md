@@ -1,10 +1,22 @@
-# Constraint-set ordering
+# Constraint set ordering
 
-These regressions exercise solution extraction while changing the builder-local constraint and
-typevar ordering with `TY_CONSTRAINT_SET_ORDER`. `ConstraintSet.solutions_for` exposes each explicit
-per-typevar solution as a `TypeForm`; `ConstraintSet.solutions` additionally preserves path and
-binding order. This keeps duplicate and `Never` solutions visible when they would otherwise
-disappear as paths are unioned.
+This file verifies that constraint set solutions are deterministic, even in the presence of
+different variable orderings in their underlying BDDs.
+
+The current implementation is _stable_ in the sense that multiple runs of `ty` against the same
+source will produce the same result. But there are still some lingering places where the output
+depends on the particular BDD variable ordering that is chosen.
+
+The diagnostic expectations show the output that is produced by the default stable ordering, so that
+if you are not explicitly testing constraint set stability, mdtests should pass. We also include
+TODO comments showing the other potential outputs that might be produced, under different variable
+orderings. (`ConstraintSet.solutions_for` exposes each explicit per-typevar solution;
+`ConstraintSet.solutions` additionally preserves path and binding order. This keeps duplicate and
+`Never` solutions visible when they would otherwise disappear as paths are unioned.)
+
+To test this, you can set the `TY_CONSTRAINT_SET_ORDER` environment variable to either `reverse` or
+to an integer. This lets you choose a different permutation for each run of `ty`. You can also use
+the `wobbling-ty-constraint-order` agent skill to automate this process.
 
 ```toml
 [environment]
@@ -13,24 +25,27 @@ python-version = "3.13"
 
 ## Solution binding order follows constraint source order
 
-The order of bindings within a path must follow the first constraint that introduced each typevar,
-not hashes of their Salsa-backed identities. Reversing either the typevar declaration order or the
-constraint source order exercises both sides of this requirement.
+The order of bindings within a path must follow the first constraint that introduced each typevar.
+Reversing either the typevar declaration order or the constraint source order exercises both sides
+of this requirement.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
 def bindings_tuv[T, U, V]() -> None:
+    # (T = int) ∧ (U = str) ∧ (V = bytes)
     constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_vtu[V, T, U]() -> None:
+    # (T = int) ∧ (U = str) ∧ (V = bytes)
     constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_reverse_source[T, U, V]() -> None:
+    # (V = bytes) ∧ (U = str) ∧ (T = int)
     constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
     # revealed: tuple[Solution[V=bytes, U=str, T=int]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
@@ -38,14 +53,17 @@ def bindings_reverse_source[T, U, V]() -> None:
 
 ## Nested transitive constraints and an unrelated alternative
 
-The `bytes ≤ V` alternative should not acquire `T` or `U` solutions from the nested transitive
-branch.
+In `((T ≤ list[U]) ∧ (U ≤ int) ∧ (list[int] ≤ T)) | (bytes ≤ V)`, the two sides of the union are
+completely independent: the solutions for `T` and `U` should not influence the solutions for `V`,
+and vice versa. Because we combine them with union, we are allowed to _either_ find a solution for
+`T` and `U`, _or_ find a solution for `V`. We are not _obligated_ to find a solution for all three.
 
 ```py
 from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def nested_transitive[T, U, V]() -> None:
+    # ((T ≤ list[U]) ∧ (U ≤ int) ∧ (list[int] ≤ T)) | (bytes ≤ V)
     constraints = (
         ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
     ) | ConstraintSet.range(bytes, V, object)
@@ -55,13 +73,16 @@ def nested_transitive[T, U, V]() -> None:
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[], Solution[]]
     # revealed: tuple[Solution[T=list[int]], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+
     # TODO: sometimes: revealed tuple[Solution[U=int], Solution[U=Never], Solution[]]
     # TODO: sometimes: revealed tuple[Solution[U=int], Solution[], Solution[]]
     # revealed: tuple[Solution[U=int], Solution[]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+
     # TODO: sometimes: revealed tuple[Solution[], Solution[V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[], Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
@@ -71,14 +92,17 @@ def nested_transitive[T, U, V]() -> None:
 
 ## Negated alternatives do not infer positive evidence
 
-The negated branch places no positive restriction on `T`. In particular, satisfying the unrelated
-`bytes ≤ U` branch should not cause a positive `T` solution to appear.
+In `¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)`, the lhs of the union is a negation, and should not
+place any positive restriction on `T`. Like above, we are not obligated to produce a solution that
+includes both sides of the union, so any solution that includes `bytes ≤ U` should not include a
+solution for `T`.
 
 ```py
 from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def negated_alternative[T, U]() -> None:
+    # ¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)
     constraints = ~(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str)) | ConstraintSet.range(
         bytes, U, object
     )
@@ -86,9 +110,11 @@ def negated_alternative[T, U]() -> None:
     # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never], Solution[]]
     # revealed: tuple[Solution[], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
+
     # TODO: sometimes: revealed tuple[Solution[], Solution[U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
+
     # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never, U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
@@ -104,6 +130,7 @@ from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def derived_solution[U, T]() -> None:
+    # (U ≤ int) ∧ (int ≤ T) ∧ ((T ≤ int) | (T ≤ str))
     constraints = (
         ConstraintSet.range(Never, U, int)
         & ConstraintSet.range(int, T, object)
@@ -111,10 +138,13 @@ def derived_solution[U, T]() -> None:
     )
 
     # TODO: The derived relationship should not leave an inferable `U` in the solution for `T`.
+    # TODO: revealed: tuple[Solution[T=int]]
     # TODO: sometimes: revealed tuple[Solution[T=int | U@derived_solution]]
     # revealed: tuple[Solution[T=U@derived_solution | int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
-    # TODO: revealed: tuple[Solution[U=T@derived_solution & int]]
+
+    # TODO: The derived relationship should not leave an inferable `T` in the solution for `U`.
+    # TODO: revealed: tuple[Solution[U=int]]
     # revealed: tuple[Solution[U=Never]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 ```
@@ -122,8 +152,8 @@ def derived_solution[U, T]() -> None:
 ## Bare-typevar orientation and tied source order
 
 `S ≤ T` can be represented as a constraint on either typevar, and `S ≤ T ≤ U` can be either one
-range or two linked constraints. Reorientation combines nodes whose source orders can tie, so
-logical equivalence and solution-element order must remain stable in both declaration orders.
+range or two linked constraints. Logical equivalence and solution-element order must remain stable
+in both declaration orders.
 
 ```py
 from typing import Never
@@ -200,6 +230,7 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.range(bytes, V, object)
 
     # `U` is deliberately non-inferable here.
+    # TODO: We should not include a solution for non-inferable U.
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
@@ -332,7 +363,7 @@ invalid: Array = Concrete[int]()
 
 ## High-fanout sequents and inferred-union truncation
 
-The cross-product between the twelve lower and twelve upper relationships exhausts the shared
+The cross-product between the twelve lower- and twelve upper-bound relationships exhausts the shared
 sequent fuel budget. The remaining solution, its element order, and the elements retained by
 truncated diagnostic display must not depend on which implications were encountered first.
 
@@ -436,6 +467,7 @@ def high_fanout[
     # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     # revealed: tuple[Solution[P=L0@high_fanout | L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
     reveal_type(pivot)
+
     # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
@@ -446,58 +478,7 @@ def high_fanout[
     # revealed: tuple[Solution[R11=L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     reveal_type(result)
 
-    def takes_empty(value: tuple[()]) -> None: ...
-
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 7 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # snapshot: invalid-argument-type
-    takes_empty(pivot)
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=P@high_fanout]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 3, 4, 5, 6, ... omitted 5 literals] | L2@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 4, 5, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 5, 6, 7, ... omitted 4 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 6, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # TODO: sometimes: error [invalid-argument-type] "Expected `tuple[()]`, found `tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 4, ... omitted 5 literals] | L1@high_fanout | ... omitted 10 union elements]]`"
-    # snapshot: invalid-argument-type
-    takes_empty(result)
-
     impossible = constraints & ConstraintSet.range(Never, R11, Literal[0])
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(not impossible.satisfied_by_all_typevars(inferable=inferable))
-```
-
-```snapshot
-error[invalid-argument-type]: Argument to function `takes_empty` is incorrect
-   --> src/mdtest_snippet.py:119:17
-    |
-119 |     takes_empty(pivot)
-    |                 ^^^^^ Expected `tuple[()]`, found `tuple[Solution[P=L0@high_fanout | L1@high_fanout | L2@high_fanout | ... omitted 10 union elements]]`
-    |
-info: a tuple of length 1 is not assignable to a tuple of length 0
-info: Function defined here
-   --> src/mdtest_snippet.py:110:9
-    |
-110 |     def takes_empty(value: tuple[()]) -> None: ...
-    |         ^^^^^^^^^^^ ---------------- Parameter declared here
-    |
-
-
-error[invalid-argument-type]: Argument to function `takes_empty` is incorrect
-   --> src/mdtest_snippet.py:128:17
-    |
-128 |     takes_empty(result)
-    |                 ^^^^^^ Expected `tuple[()]`, found `tuple[Solution[R11=L1@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, ... omitted 5 literals] | ... omitted 10 union elements]]`
-    |
-info: a tuple of length 1 is not assignable to a tuple of length 0
-info: Function defined here
-   --> src/mdtest_snippet.py:110:9
-    |
-110 |     def takes_empty(value: tuple[()]) -> None: ...
-    |         ^^^^^^^^^^^ ---------------- Parameter declared here
-    |
 ```

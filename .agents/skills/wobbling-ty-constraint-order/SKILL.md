@@ -1,7 +1,12 @@
 ---
 name: wobbling-ty-constraint-order
-description: Use when a user asks to wobble ty constraint ordering, check constraint-set or TDD ordering determinism, test reversed constraint/typevar IDs, or investigate nondeterministic ty inference and mdtest results.
-compatibility: Requires Cargo, mktemp, and a POSIX-compatible shell; uses cargo-nextest when available and otherwise falls back to cargo test.
+description: >
+  Use when a user asks to wobble ty constraint ordering, check constraint-set or TDD ordering
+  determinism, test reversed constraint/typevar IDs, or investigate nondeterministic ty inference
+  and mdtest results.
+compatibility: >
+  Requires Cargo, mktemp, and a POSIX-compatible shell; uses cargo-nextest when available and
+  otherwise falls back to cargo test.
 ---
 
 # Wobbling ty constraint order
