@@ -229,22 +229,17 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(_) => ty,
-            CycleDetectorVisit::Pending(ty) => {
+            TypeTransformerVisit::Ready(result) => result,
+            TypeTransformerVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
             }
         }
     }
 
-    fn begin_visit(
-        &self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
+    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
         if let Some(result) = self.cache.borrow().get(&ty) {
-            return CycleDetectorVisit::Ready(*result);
+            return TypeTransformerVisit::Ready(*result);
         }
 
         let identity = ty.to_type_identity(db);
@@ -254,14 +249,14 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
                 || (!matches!(identity, TypeIdentity::RecursiveTypeAlias(_))
                     && active.identity == identity)
         }) {
-            return CycleDetectorVisit::Ready(ty);
+            return TypeTransformerVisit::Ready(ty);
         }
         drop(seen);
 
         self.seen
             .borrow_mut()
             .push(ActiveTypeTransformation { ty, identity });
-        CycleDetectorVisit::Pending(ty)
+        TypeTransformerVisit::Pending(ty)
     }
 
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
@@ -276,6 +271,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
 struct ActiveTypeTransformation<'db> {
     ty: Type<'db>,
     identity: TypeIdentity<'db>,
+}
+
+enum TypeTransformerVisit<'db> {
+    Ready(Type<'db>),
+    Pending(Type<'db>),
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
