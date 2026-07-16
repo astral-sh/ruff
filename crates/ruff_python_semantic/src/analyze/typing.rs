@@ -147,17 +147,13 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
-pub fn is_pep585_generic(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    include_preview_generics: bool,
-) -> bool {
+pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| match qualified_name.segments() {
             ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
-            | ["collections", "deque" | "defaultdict"] => true,
-            ["asyncio", "Future" | "Task"]
+            | ["collections", "deque" | "defaultdict"]
+            | ["asyncio", "Future" | "Task"]
             | ["collections", "ChainMap" | "Counter" | "OrderedDict"]
             | [
                 "contextlib",
@@ -185,7 +181,7 @@ pub fn is_pep585_generic(
                 | "Iterable" | "Iterator" | "KeysView" | "Mapping" | "MappingView"
                 | "MutableMapping" | "MutableSequence" | "MutableSet" | "Reversible" | "Sequence"
                 | "Set" | "ValuesView",
-            ] => include_preview_generics,
+            ] => true,
             _ => false,
         })
 }
