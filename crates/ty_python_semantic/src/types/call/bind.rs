@@ -58,7 +58,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
@@ -4574,7 +4574,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
         variable_argument_length: bool,
-    ) -> Result<(), ()> {
+    ) -> Result<usize, ()> {
         if matches!(argument, Argument::Synthetic) {
             self.num_synthetic_args += 1;
         }
@@ -4599,7 +4599,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             !parameter.is_variadic(),
             variable_argument_length,
         );
-        Ok(())
+        Ok(parameter_index)
     }
 
     fn match_keyword(
@@ -4663,6 +4663,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 variable_element: Option<Type<'db>>,
             },
             Other {
+                tuple: TupleSpec<'db>,
                 argument_types: Vec<Type<'db>>,
                 length: TupleLength,
                 variable_element: Option<Type<'db>>,
@@ -4752,11 +4753,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         }
                     }
                     _ => {
-                        let tuple = argument_type.iterate(db);
+                        let tuple = argument_type.iterate(db).into_owned();
                         VariadicArgumentType::Other {
                             argument_types: tuple.iter_element_types(db).collect(),
                             length: tuple.len(),
                             variable_element: tuple.variable_element_type(db),
+                            tuple,
                         }
                     }
                 },
@@ -4777,6 +4779,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 argument_types,
                 length,
                 variable_element,
+                ..
             } => (argument_types.as_slice(), *length, *variable_element),
             VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
         };
@@ -4787,16 +4790,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
         let has_fixed_union_tail = is_variable && variable_element.is_none();
+        let variadic_parameter_index = self.parameters.variadic().map(|(index, _)| index);
+        let mut fixed_arguments_consumed = 0usize;
+        let mut matched_variadic_parameter = false;
 
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
         for _ in 0..length.minimum() {
-            self.match_positional(
+            let matched_parameter_index = self.match_positional(
                 argument_index,
                 argument,
                 argument_types.next().or(variable_element),
                 is_variable,
             )?;
+            if Some(matched_parameter_index) == variadic_parameter_index {
+                matched_variadic_parameter = true;
+            } else if !matched_variadic_parameter {
+                fixed_arguments_consumed += 1;
+            }
         }
 
         // For a union of fixed-length tuples, positions beyond the guaranteed minimum are only
@@ -4816,7 +4827,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 if parameter.default_type().is_none() {
                     return Err(());
                 }
-                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+                let matched_parameter_index = self.match_positional(
+                    argument_index,
+                    argument,
+                    Some(argument_type),
+                    is_variable,
+                )?;
+                if Some(matched_parameter_index) == variadic_parameter_index {
+                    matched_variadic_parameter = true;
+                } else if !matched_variadic_parameter {
+                    fixed_arguments_consumed += 1;
+                }
             }
         // If the tuple is truly variable-length, we assume that it will soak up all remaining
         // positional parameters, stopping only when we reach a parameter that has an explicit
@@ -4838,7 +4859,13 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 if arg_type.is_none() {
                     break;
                 }
-                self.match_positional(argument_index, argument, arg_type, is_variable)?;
+                let matched_parameter_index =
+                    self.match_positional(argument_index, argument, arg_type, is_variable)?;
+                if Some(matched_parameter_index) == variadic_parameter_index {
+                    matched_variadic_parameter = true;
+                } else if !matched_variadic_parameter {
+                    fixed_arguments_consumed += 1;
+                }
             }
         }
 
@@ -4851,7 +4878,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // instead of silently dropping those extra positions.
         if has_fixed_union_tail {
             for argument_type in argument_types.by_ref() {
-                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+                let matched_parameter_index = self.match_positional(
+                    argument_index,
+                    argument,
+                    Some(argument_type),
+                    is_variable,
+                )?;
+                if Some(matched_parameter_index) == variadic_parameter_index {
+                    matched_variadic_parameter = true;
+                } else if !matched_variadic_parameter {
+                    fixed_arguments_consumed += 1;
+                }
             }
         }
 
@@ -4861,15 +4898,51 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // raise a false positive as "too many arguments".
         if self.parameters.variadic().is_some() {
             if let Some(argument_type) = argument_types.next().or(variable_element) {
-                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+                let matched_parameter_index = self.match_positional(
+                    argument_index,
+                    argument,
+                    Some(argument_type),
+                    is_variable,
+                )?;
+                matched_variadic_parameter |=
+                    Some(matched_parameter_index) == variadic_parameter_index;
                 for argument_type in argument_types {
-                    self.match_positional(
+                    let matched_parameter_index = self.match_positional(
                         argument_index,
                         argument,
                         Some(argument_type),
                         is_variable,
                     )?;
+                    matched_variadic_parameter |=
+                        Some(matched_parameter_index) == variadic_parameter_index;
                 }
+            }
+        }
+
+        if matched_variadic_parameter
+            && let Some(parameter_index) = variadic_parameter_index
+            && let VariadicArgumentType::Other { tuple, .. } = &variadic_type
+        {
+            let residual_tuple = if fixed_arguments_consumed == 0 {
+                Some(tuple.clone())
+            } else {
+                tuple
+                    .py_slice_type(
+                        db,
+                        Some(i32::try_from(fixed_arguments_consumed).unwrap_or(i32::MAX)),
+                        None,
+                        None,
+                    )
+                    .ok()
+                    .and_then(|ty| ty.exact_tuple_instance_spec(db).map(Cow::into_owned))
+            };
+
+            if let Some(tuple) = residual_tuple {
+                self.argument_matches[argument_index].variadic_parameter =
+                    Some(MatchedVariadicParameter {
+                        index: parameter_index,
+                        tuple,
+                    });
             }
         }
 
@@ -5064,6 +5137,26 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
+
+    /// Starred parameters for which tuple-level constraint inference has already emitted an error.
+    /// This also covers failures for empty packs, where there is no argument index to mark in
+    /// `constraint_set_errors`.
+    starred_constraint_error_parameters: FxHashSet<usize>,
+}
+
+struct StarredParameterArguments<'db> {
+    parameter_index: usize,
+    declared_tuple: Type<'db>,
+    provided_tuple: Type<'db>,
+    contributing_argument_indices: SmallVec<[usize; 2]>,
+    diagnostic_argument_index: Option<usize>,
+}
+
+#[derive(Default)]
+struct StarredConstraintInference {
+    owned_parameters: FxHashSet<usize>,
+    failed_parameters: FxOrderSet<usize>,
+    failed_arguments: FxOrderSet<usize>,
 }
 
 /// Result of checking only the key type of a keyword-unpack argument.
@@ -5135,6 +5228,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: InferableTypeVars::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
+            starred_constraint_error_parameters: FxHashSet::default(),
         }
     }
 
@@ -5192,6 +5286,186 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn specialization(&self) -> Option<Specialization<'db>> {
         self.inference
             .map(|inference| inference.specialization(self.db))
+    }
+
+    fn starred_parameter_tuple_type(&self, parameter: &Parameter<'db>) -> Option<Type<'db>> {
+        if !parameter.is_variadic() || !parameter.has_starred_annotation() {
+            return None;
+        }
+
+        let declared_type = parameter.annotated_type();
+        match declared_type {
+            Type::TypeVar(typevar) if typevar.is_typevartuple(self.db) => Some(Type::tuple(Some(
+                TupleType::unpacked_typevartuple(self.db, typevar),
+            ))),
+            _ if declared_type.exact_tuple_instance_spec(self.db).is_some() => Some(declared_type),
+            _ => None,
+        }
+    }
+
+    fn collect_starred_parameter_arguments(
+        &self,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+    ) -> Option<StarredParameterArguments<'db>> {
+        let declared_tuple = self.starred_parameter_tuple_type(parameter)?;
+        let mut provided_tuple = TupleSpecBuilder::with_capacity(0);
+        let mut contributing_argument_indices = SmallVec::new();
+        let mut diagnostic_argument_index = None;
+
+        for (argument_index, adjusted_argument_index, _, argument_types) in
+            self.enumerate_argument_types()
+        {
+            let matched_argument = &self.argument_matches[argument_index];
+            if let Some(variadic_parameter) = &matched_argument.variadic_parameter
+                && variadic_parameter.index == parameter_index
+            {
+                provided_tuple = provided_tuple.concat(self.db, &variadic_parameter.tuple);
+                contributing_argument_indices.push(argument_index);
+                if diagnostic_argument_index.is_none() {
+                    diagnostic_argument_index = adjusted_argument_index;
+                }
+                continue;
+            }
+
+            let mut contributed = false;
+            for matched_parameter in matched_argument
+                .iter()
+                .filter(|matched| matched.index == parameter_index)
+            {
+                provided_tuple.push(
+                    matched_parameter
+                        .argument_type
+                        .or_else(|| argument_types.get_default())
+                        .unwrap_or(Type::unknown()),
+                );
+                contributed = true;
+            }
+
+            if contributed {
+                contributing_argument_indices.push(argument_index);
+                if diagnostic_argument_index.is_none() {
+                    diagnostic_argument_index = adjusted_argument_index;
+                }
+            }
+        }
+
+        let provided_tuple_spec = provided_tuple.build();
+        Some(StarredParameterArguments {
+            parameter_index,
+            declared_tuple,
+            provided_tuple: Type::tuple(TupleType::new(self.db, &provided_tuple_spec)),
+            contributing_argument_indices,
+            diagnostic_argument_index,
+        })
+    }
+
+    fn infer_starred_typevartuple_constraints<'c>(
+        &self,
+        builder: &mut SpecializationBuilder<'db, 'c>,
+        specialization_errors: &mut Vec<BindingError<'db>>,
+    ) -> StarredConstraintInference {
+        let has_unmatched_explicit_argument =
+            self.arguments
+                .iter()
+                .enumerate()
+                .any(|(argument_index, (argument, _))| {
+                    matches!(argument, Argument::Positional | Argument::Keyword(_))
+                        && !self.argument_matches[argument_index].matched
+                });
+
+        let mut inference = StarredConstraintInference::default();
+
+        for (parameter_index, parameter) in self.signature.parameters().iter().enumerate() {
+            let Some(arguments) =
+                self.collect_starred_parameter_arguments(parameter_index, parameter)
+            else {
+                continue;
+            };
+            // Do not infer an empty pack when explicit arguments failed to match. Those arguments
+            // might have been intended for this parameter, and ordinary constraints can still
+            // infer the pack from another parameter such as a callback.
+            if has_unmatched_explicit_argument && arguments.contributing_argument_indices.is_empty()
+            {
+                continue;
+            }
+            let contains_typevartuple = matches!(
+                arguments
+                    .declared_tuple
+                    .exact_tuple_instance_spec(self.db)
+                    .as_deref(),
+                Some(TupleSpec::Variable(variable))
+                    if variable.variable().typevartuple().is_some()
+            );
+            if !contains_typevartuple {
+                continue;
+            }
+
+            inference.owned_parameters.insert(arguments.parameter_index);
+            let provided_tuple = self.starred_typevartuple_inference_actual(
+                arguments.declared_tuple,
+                arguments.provided_tuple,
+            );
+            if let Err(error) = builder.infer(arguments.declared_tuple, provided_tuple) {
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: arguments.diagnostic_argument_index,
+                });
+                inference
+                    .failed_parameters
+                    .insert(arguments.parameter_index);
+                inference
+                    .failed_arguments
+                    .extend(arguments.contributing_argument_indices);
+            }
+        }
+
+        inference
+    }
+
+    fn starred_typevartuple_inference_actual(
+        &self,
+        declared_tuple: Type<'db>,
+        provided_tuple: Type<'db>,
+    ) -> Type<'db> {
+        let (Some(declared), Some(provided)) = (
+            declared_tuple.exact_tuple_instance_spec(self.db),
+            provided_tuple.exact_tuple_instance_spec(self.db),
+        ) else {
+            return provided_tuple;
+        };
+        let (TupleSpec::Variable(declared), TupleSpec::Variable(provided)) =
+            (declared.as_ref(), provided.as_ref())
+        else {
+            return provided_tuple;
+        };
+        if declared.variable().typevartuple().is_none() {
+            return provided_tuple;
+        }
+        let VariableSegment::Homogeneous(element) = provided.variable() else {
+            return provided_tuple;
+        };
+
+        let missing_prefix = declared
+            .prefix_elements()
+            .len()
+            .saturating_sub(provided.prefix_elements().len());
+        let missing_suffix = declared
+            .suffix_elements()
+            .len()
+            .saturating_sub(provided.suffix_elements().len());
+        if missing_prefix == 0 && missing_suffix == 0 {
+            return provided_tuple;
+        }
+
+        Type::tuple(TupleType::mixed_with_segment(
+            self.db,
+            provided
+                .iter_prefix_elements()
+                .chain(std::iter::repeat_n(element, missing_prefix)),
+            provided.variable(),
+            std::iter::repeat_n(element, missing_suffix).chain(provided.iter_suffix_elements()),
+        ))
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -5343,7 +5617,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .unwrap_or_default();
 
         let mut specialization_errors = Vec::new();
-        let assignable_to_declared_type = self.infer_argument_constraints(
+        let (assignable_to_declared_type, mut starred_inference) = self.infer_argument_constraints(
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -5360,7 +5634,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
 
-            self.infer_argument_constraints(
+            (_, starred_inference) = self.infer_argument_constraints(
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -5368,6 +5642,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             );
         }
 
+        debug_assert!(
+            starred_inference
+                .failed_parameters
+                .iter()
+                .all(|index| starred_inference.owned_parameters.contains(index))
+        );
+        for argument_index in starred_inference.failed_arguments {
+            self.constraint_set_errors[argument_index] = true;
+        }
+        self.starred_constraint_error_parameters
+            .extend(starred_inference.failed_parameters);
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
@@ -5464,8 +5749,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
-    ) -> bool {
+    ) -> (bool, StarredConstraintInference) {
         let parameters = self.signature.parameters();
+        let starred_inference =
+            self.infer_starred_typevartuple_constraints(builder, specialization_errors);
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
@@ -5473,20 +5760,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let parameter_index = matched_parameter.index;
                 let parameter = &parameters[parameter_index];
                 let declared_type = parameter.annotated_type();
-                // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
-                // tuple. Until then, skip per-argument inference.
-                if parameter.has_starred_annotation()
-                    && (matches!(
-                        declared_type,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
-                    ) || matches!(
-                        declared_type.exact_tuple_instance_spec(self.db).as_deref(),
-                        Some(TupleSpec::Variable(variable))
-                            if matches!(
-                                variable.variable(),
-                                VariableSegment::TypeVarTuple(_)
-                            )
-                    ))
+                if starred_inference
+                    .owned_parameters
+                    .contains(&parameter_index)
                 {
                     continue;
                 }
@@ -5510,12 +5786,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        preferred_type_mappings
-            .iter()
-            .all(|(&identity, &preferred_ty)| {
-                partially_specialized_declared_type.contains(&identity)
-                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
-            })
+        let assignable_to_declared_type =
+            preferred_type_mappings
+                .iter()
+                .all(|(&identity, &preferred_ty)| {
+                    partially_specialized_declared_type.contains(&identity)
+                        || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+                });
+
+        (assignable_to_declared_type, starred_inference)
     }
 
     fn check_argument_type(
@@ -6040,10 +6319,20 @@ pub struct MatchedArgument<'db> {
     /// against multiple parameters.
     pub parameters: SmallVec<[MatchedParameter<'db>; 1]>,
 
+    /// The residual tuple shape contributed by a splatted argument to a variadic parameter after
+    /// any preceding fixed positional parameters consumed their portion of the splat.
+    variadic_parameter: Option<MatchedVariadicParameter<'db>>,
+
     /// Whether there were errors matching this argument. For a splatted argument, _all_ splatted
     /// elements must have been successfully matched. (That means that this can be `false` while
     /// the `parameters` field is non-empty.)
     pub matched: bool,
+}
+
+#[derive(Clone, Debug)]
+struct MatchedVariadicParameter<'db> {
+    index: usize,
+    tuple: TupleSpec<'db>,
 }
 
 /// One parameter matched to an argument.
