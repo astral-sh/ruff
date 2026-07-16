@@ -15,6 +15,7 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1372,6 +1373,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     && intersection.negative(db).contains(&target) =>
             {
                 self.never()
+            }
+
+            // `to_instance()` is an over-approximation for intersections, which can be nested in
+            // a union or a type-variable constraint. Compare these targets in the class-object
+            // domain instead, preserving source constraints so that `T: (A, B)` can still be
+            // related to `type[A] | type[B]`.
+            (
+                Type::SubclassOf(subclass_of),
+                Type::Union(_) | Type::Intersection(_) | Type::TypeVar(_),
+            ) if any_over_type(db, target, true, Type::is_intersection)
+                && let Some(type_var) = subclass_of
+                    .subclass_of()
+                    .with_transposed_type_var(db)
+                    .into_type_var() =>
+            {
+                self.check_type_pair(db, Type::TypeVar(type_var), target)
             }
 
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype

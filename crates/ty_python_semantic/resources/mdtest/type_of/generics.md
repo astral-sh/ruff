@@ -146,6 +146,21 @@ def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
     return x
 ```
 
+Narrowing a union of `type[T]` and a callable factory must preserve the `type[T]` alternative:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Holder(Generic[T]):
+    value: type[T] | Callable[[], type[T]]
+
+    def narrow(self) -> None:
+        if isinstance(self.value, type):
+            reveal_type(self.value)  # revealed: type[T@Holder] | ((() -> type[T@Holder]) & type)
+```
+
 ## `__class__`
 
 ```py
@@ -181,7 +196,7 @@ A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`
 
 ```py
 from typing import Any, Callable, Protocol
-from ty_extensions import static_assert
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Callback[T](Protocol):
@@ -201,6 +216,9 @@ def _[T](_: T):
 
     static_assert(is_assignable_to(type[T], Callable[..., T] | Callable[..., Any]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T] | Callable[..., Any]))
+
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type]))
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int]))
 
     static_assert(not is_assignable_to(type[T], Callback[int]))
     static_assert(not is_disjoint_from(type[T], Callback[int]))
@@ -277,12 +295,17 @@ def _[T: (int, str)](_: T):
 
     static_assert(is_subtype_of(type[T], type[int] | type[str]))
     static_assert(is_subtype_of(type[T], type[int | str]))
+    static_assert(is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int] | type[str]))
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
 def _[T: (int | str, int)](_: T):
     static_assert(is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
+
+def _[T, U: (Intersection[Callable[[], type], type], type)](_: T):
+    static_assert(not is_subtype_of(type[T], U))
+    static_assert(not is_subtype_of(type[T], U | type[int]))
 ```
 
 ## Type aliases in final upper bounds
