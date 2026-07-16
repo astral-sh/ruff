@@ -1,3 +1,8 @@
+use pyproject_toml::PyProjectToml;
+use serde::Deserialize;
+use toml::Spanned;
+use toml::de::DeTable;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -48,7 +53,22 @@ impl Violation for InvalidPyprojectToml {
 }
 
 /// RUF200
-pub(crate) fn invalid_pyproject_toml(context: &LintContext, err: &toml::de::Error) {
+pub(crate) fn invalid_pyproject_toml(
+    context: &LintContext,
+    document: Result<Spanned<DeTable<'_>>, toml::de::Error>,
+) {
+    let err = match document {
+        Ok(document) => {
+            let deserializer = toml::de::Deserializer::from(document);
+            let Err(mut err) = PyProjectToml::deserialize(deserializer) else {
+                return;
+            };
+            err.set_input(Some(context.source_file().source_text()));
+            err
+        }
+        Err(err) => err,
+    };
+
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
         // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571

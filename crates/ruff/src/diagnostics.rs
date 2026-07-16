@@ -14,10 +14,10 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::package::PackageRoot;
-use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
-use ruff_linter::source_kind::{SourceError, SourceKind};
+use ruff_linter::source_kind::{SourceError, SourceKind, SourceKindDiff};
+use ruff_linter::toml::{TomlFixerResult, lint_fix_toml, lint_toml};
 use ruff_linter::{IOError, Violation, fs};
 use ruff_notebook::{NotebookError, NotebookIndex};
 use ruff_python_ast::{SourceType, TomlSourceType};
@@ -213,11 +213,11 @@ pub(crate) fn lint_path(
     debug!("Checking: {}", path.display());
 
     let source_type = match settings.extension.get_source_type(path) {
-        SourceType::Toml(TomlSourceType::Pyproject) => {
-            let diagnostics = if settings
+        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
+            let (diagnostics, fixed) = if settings
                 .rules
                 .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                .any(|rule_code| rule_code.lint_source().is_toml())
             {
                 let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
                     Ok(contents) => contents,
@@ -225,13 +225,47 @@ pub(crate) fn lint_path(
                         return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
                     }
                 };
-                lint_pyproject_toml(path, &contents, settings)
+                if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+                    let TomlFixerResult {
+                        diagnostics,
+                        transformed,
+                        fixed,
+                    } = lint_fix_toml(path, &contents, settings, source_type, unsafe_fixes);
+
+                    if !fixed.is_empty() {
+                        match fix_mode {
+                            flags::FixMode::Apply => {
+                                File::create(path)?.write_all(transformed.as_bytes())?;
+                            }
+                            flags::FixMode::Diff => {
+                                write!(
+                                    &mut io::stdout().lock(),
+                                    "{}",
+                                    SourceKindDiff::from_text(
+                                        &contents,
+                                        transformed.as_ref(),
+                                        Some(path),
+                                    )
+                                )?;
+                            }
+                            flags::FixMode::Generate => {}
+                        }
+                    }
+
+                    (diagnostics, fixed)
+                } else {
+                    (
+                        lint_toml(path, &contents, settings, source_type),
+                        FixTable::default(),
+                    )
+                }
             } else {
-                vec![]
+                (vec![], FixTable::default())
             };
             return Ok(Diagnostics {
                 inner: diagnostics,
-                ..Diagnostics::default()
+                fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
+                notebook_indexes: FxHashMap::default(),
             });
         }
         SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
@@ -358,26 +392,63 @@ pub(crate) fn lint_stdin(
         .map(|path| settings.linter.extension.get_source_type(path))
         .unwrap_or_default()
     {
-        SourceType::Toml(source_type) if source_type.is_pyproject() => {
+        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
             if !settings
                 .linter
                 .rules
                 .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                .any(|rule_code| rule_code.lint_source().is_toml())
             {
                 return Ok(Diagnostics::default());
             }
 
             let path = path.unwrap();
 
-            match fix_mode {
-                flags::FixMode::Diff | flags::FixMode::Generate => {}
-                flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
-            }
+            let (diagnostics, fixed) =
+                if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+                    let TomlFixerResult {
+                        diagnostics,
+                        transformed,
+                        fixed,
+                    } = lint_fix_toml(
+                        path,
+                        &contents,
+                        &settings.linter,
+                        source_type,
+                        settings.unsafe_fixes,
+                    );
+
+                    match fix_mode {
+                        flags::FixMode::Apply => {
+                            write!(&mut io::stdout().lock(), "{transformed}")?;
+                        }
+                        flags::FixMode::Diff => {
+                            if !fixed.is_empty() {
+                                write!(
+                                    &mut io::stdout().lock(),
+                                    "{}",
+                                    SourceKindDiff::from_text(
+                                        &contents,
+                                        transformed.as_ref(),
+                                        Some(path),
+                                    )
+                                )?;
+                            }
+                        }
+                        flags::FixMode::Generate => {}
+                    }
+
+                    (diagnostics, fixed)
+                } else {
+                    (
+                        lint_toml(path, &contents, &settings.linter, source_type),
+                        FixTable::default(),
+                    )
+                };
 
             return Ok(Diagnostics {
-                inner: lint_pyproject_toml(path, &contents, &settings.linter),
-                fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
+                inner: diagnostics,
+                fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
                 notebook_indexes: FxHashMap::default(),
             });
         }

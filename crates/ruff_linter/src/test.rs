@@ -134,6 +134,24 @@ pub(crate) fn test_path(
     Ok(test_contents(&source_kind, &path, settings).0)
 }
 
+/// Run the configuration TOML linter on a file in the `resources/test/fixtures` directory.
+#[cfg(test)]
+pub(crate) fn test_toml_path(
+    path: impl AsRef<Path>,
+    settings: &LinterSettings,
+    source_type: ruff_python_ast::TomlSourceType,
+) -> Result<Vec<Diagnostic>> {
+    let path = test_resource_path("fixtures").join(path);
+    let filename = path.file_name().unwrap_or_else(|| path.as_os_str());
+    let contents = std::fs::read_to_string(&path)?;
+    Ok(crate::toml::lint_toml(
+        Path::new(filename),
+        &contents,
+        settings,
+        source_type,
+    ))
+}
+
 /// Test a file with two different settings and return the differences
 #[cfg(test)]
 pub(crate) fn test_path_with_settings_diff(

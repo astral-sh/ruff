@@ -7,22 +7,20 @@ pub(crate) mod typing;
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::{PythonVersion, TomlSourceType};
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_path, test_resource_path, test_snippet};
+    use crate::test::{test_contents, test_path, test_resource_path, test_snippet, test_toml_path};
     use crate::{UnresolvedRuleSelector, assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
@@ -788,17 +786,13 @@ mod tests {
     #[test_case(Rule::InvalidPyprojectToml, Path::new("pep639"))]
     fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let path = test_resource_path("fixtures")
-            .join("ruff")
-            .join("pyproject_toml")
-            .join(path)
-            .join("pyproject.toml");
-        let contents = fs::read_to_string(path)?;
-        let messages = lint_pyproject_toml(
-            Path::new("pyproject.toml"),
-            &contents,
+        let messages = test_toml_path(
+            Path::new("ruff/pyproject_toml")
+                .join(path)
+                .join("pyproject.toml"),
             &settings::LinterSettings::for_rule(Rule::InvalidPyprojectToml),
-        );
+            TomlSourceType::Pyproject,
+        )?;
         assert_diagnostics!(snapshot, messages);
         Ok(())
     }

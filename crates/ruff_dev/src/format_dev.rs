@@ -554,7 +554,10 @@ fn format_dir_entry(
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
     let resolved_file = resolved_file.context("Iterating the files in the repository failed")?;
     // For some reason it does not filter in the beginning
-    if resolved_file.file_name() == "pyproject.toml" {
+    if ["pyproject.toml", "ruff.toml", ".ruff.toml"]
+        .iter()
+        .any(|&path| resolved_file.file_name() == path)
+    {
         return Ok((Ok(Statistics::default()), resolved_file.into_path()));
     }
 
