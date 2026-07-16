@@ -1247,11 +1247,21 @@ impl<'db> Specialization<'db> {
         let Some(tuple) = self.tuple_inner(db) else {
             return self;
         };
+        // Ordinary tuple specializations already use their runtime element type as the tuple
+        // class's generic argument. Rebuilding them would add allocation and interning work to
+        // every tuple member and MRO lookup, both of which are hot paths in tuple-heavy programs.
+        if !matches!(
+            tuple.tuple(db),
+            TupleSpec::Variable(tuple)
+                if matches!(tuple.variable(), VariableSegment::TypeVarTuple(_))
+        ) {
+            return self;
+        }
 
         Self::new(
             db,
             self.generic_context(db),
-            Box::from([tuple.tuple(db).homogeneous_element_type(db)]),
+            [tuple.tuple(db).homogeneous_element_type(db)].as_slice(),
             self.materialization_kind(db),
             None,
         )
