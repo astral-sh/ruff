@@ -94,13 +94,10 @@ fn is_custom_exception(
     semantic: &SemanticModel,
     target_version: PythonVersion,
 ) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+    let Expr::Name(name) = expr else {
         return false;
     };
-    let Some(symbol) = qualified_name.segments().last() else {
-        return false;
-    };
-    let Some(binding_id) = semantic.lookup_symbol(symbol).binding_id() else {
+    let Some(binding_id) = semantic.resolve_name(name) else {
         return false;
     };
     let binding = semantic.binding(binding_id);
