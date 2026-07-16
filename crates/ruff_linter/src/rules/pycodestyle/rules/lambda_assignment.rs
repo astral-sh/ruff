@@ -34,6 +34,15 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///     return 2 * x
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe because converting a lambda assignment into a
+/// function definition changes observable properties of the callable.
+///
+/// In particular, a lambda function has the name `"<lambda>"`, while the
+/// generated function uses the name of the assigned variable. Code that relies
+/// on function metadata, such as logging, registration, or introspection, may
+/// therefore behave differently after the fix.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.28")]
