@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
+pub(crate) use self::cyclic::{ActiveRecursionDetector, TransformerKind, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -290,7 +290,13 @@ fn definition_expression_annotation<'db>(
     }
 }
 
-struct ApplyTypeMappingTag;
+struct ApplyDefaultTypeMapping;
+struct ApplyTopMaterialization;
+struct ApplyBottomMaterialization;
+struct ApplyTopSpecializationMaterialization;
+struct ApplyBottomSpecializationMaterialization;
+struct ApplyPromotion;
+struct ApplySkipPromotion;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
@@ -303,14 +309,23 @@ type MaterializationEquivalenceVisitor<'db> =
 /// reuse the result of another.
 #[derive(Default)]
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
-    default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    default: OnceCell<Box<TypeTransformer<'db, ApplyDefaultTypeMapping>>>,
+    top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTopMaterialization>>>,
+    bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyBottomMaterialization>>>,
+    top_specialization_materialization:
+        OnceCell<Box<TypeTransformer<'db, ApplyTopSpecializationMaterialization>>>,
+    bottom_specialization_materialization:
+        OnceCell<Box<TypeTransformer<'db, ApplyBottomSpecializationMaterialization>>>,
+    promotion: OnceCell<Box<TypeTransformer<'db, ApplyPromotion>>>,
+    skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplySkipPromotion>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+
+    /// The mapping mode whose transformer hit the recursive-alias unfold limit.
+    ///
+    /// This is shared because nested transformations can switch mapping modes. While it is set,
+    /// every mode must stop descending and caching until the initiating transformer reaches its
+    /// fallback frame.
+    unwinding_to_fallback: Cell<Option<TransformerKind>>,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
@@ -326,24 +341,44 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let type_transformer = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
-            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
+        match type_mapping {
+            TypeMapping::Materialize(MaterializationKind::Top) => self
+                .top_materialization
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
+            TypeMapping::Materialize(MaterializationKind::Bottom) => self
+                .bottom_materialization
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization_kind: MaterializationKind::Top,
                 ..
-            } => &self.top_specialization_materialization,
+            } => self
+                .top_specialization_materialization
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization_kind: MaterializationKind::Bottom,
                 ..
-            } => &self.bottom_specialization_materialization,
-            TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
-            TypeMapping::Promote(PromotionMode::Off, _) => &self.skip_promotion,
-            _ => &self.default,
-        };
-        type_transformer
-            .get_or_init(Box::default)
-            .visit_type(db, ty, func)
+            } => self
+                .bottom_specialization_materialization
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
+            TypeMapping::Promote(PromotionMode::On, _) => self
+                .promotion
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
+            TypeMapping::Promote(PromotionMode::Off, _) => self
+                .skip_promotion
+                .get_or_init(Box::default)
+                .visit_type(db, ty, &self.unwinding_to_fallback, func),
+            _ => self.default.get_or_init(Box::default).visit_type(
+                db,
+                ty,
+                &self.unwinding_to_fallback,
+                func,
+            ),
+        }
     }
 
     pub(crate) fn is_equivalent_to_materialization(
