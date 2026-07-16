@@ -495,68 +495,6 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
-/// Returns whether a viable nominal relation can safely skip structural protocol comparison.
-fn can_skip_structural_protocol_relation<'db>(
-    db: &'db dyn Db,
-    source: NominalInstanceType<'db>,
-    target: NominalInstanceType<'db>,
-    protocol: ProtocolInstanceType<'db>,
-) -> bool {
-    let source_class = source.class(db);
-    let target_class_literal = target.class(db).class_literal(db);
-    if source_class.class_literal(db) != target_class_literal {
-        return false;
-    }
-
-    if !Type::ProtocolInstance(protocol).has_typevar(db) {
-        return true;
-    }
-
-    let ClassType::Generic(source_alias) = source_class else {
-        return true;
-    };
-
-    let ClassType::Generic(target_alias) = target.class(db) else {
-        return true;
-    };
-
-    if target_alias
-        .specialization(db)
-        .types(db)
-        .iter()
-        .any(|argument| {
-            any_over_type(db, *argument, false, |nested| {
-                let Type::TypeVar(typevar) = nested else {
-                    return false;
-                };
-                typevar.typevar(db).bound_or_constraints(db).is_none()
-                    && !protocol.interface(db).references_typevar(db, typevar)
-            })
-        })
-    {
-        return false;
-    }
-
-    !source_alias
-        .specialization(db)
-        .types(db)
-        .iter()
-        .any(|argument| {
-            any_over_type(db, *argument, false, |nested| {
-                nested
-                    .as_nominal_instance()
-                    .or_else(|| {
-                        nested
-                            .as_protocol_instance()
-                            .and_then(ProtocolInstanceType::to_nominal_instance)
-                    })
-                    .is_some_and(|nested| {
-                        nested.class(db).class_literal(db) == target_class_literal
-                    })
-            })
-        })
-}
-
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -713,6 +651,88 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             _ => self.check_class_pair(db, source.class(db), target.class(db)),
         }
     }
+}
+
+/// Returns whether a viable nominal relation can safely skip structural protocol comparison.
+///
+/// This avoids recursively expanding members when relating specializations of the same protocol:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def child(self) -> P[list[T]]: ...
+/// ```
+fn can_skip_structural_protocol_relation<'db>(
+    db: &'db dyn Db,
+    source: NominalInstanceType<'db>,
+    target: NominalInstanceType<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    let source_class = source.class(db);
+    let target_class_literal = target.class(db).class_literal(db);
+
+    // Only skip structural comparison for specializations of the same protocol. A subclass can
+    // override a member and structurally satisfy a different specialization, such as
+    // `class Child(P[int], Protocol): ...` being related to `P[bool]`.
+    if source_class.class_literal(db) != target_class_literal {
+        return false;
+    }
+
+    // A fully resolved target such as `P[int]` cannot recursively bind an inferable TypeVar.
+    if !Type::ProtocolInstance(protocol).has_typevar(db) {
+        return true;
+    }
+
+    // Without source specialization arguments (for example, an unspecialized `P`), there is no
+    // nested source argument that can make an inferred target specialization grow.
+    let ClassType::Generic(source_alias) = source_class else {
+        return true;
+    };
+
+    // Likewise, a non-generic target has no specialization argument to infer into.
+    let ClassType::Generic(target_alias) = target.class(db) else {
+        return true;
+    };
+
+    // Do not let the nominal relation bind an unconstrained TypeVar that the protocol interface
+    // does not otherwise constrain. In `P[T] | Iterable[T]`, for example, the sibling arm can
+    // feed another specialization into `T` before the structural relation is checked.
+    if target_alias
+        .specialization(db)
+        .types(db)
+        .iter()
+        .any(|argument| {
+            any_over_type(db, *argument, false, |nested| {
+                let Type::TypeVar(typevar) = nested else {
+                    return false;
+                };
+                typevar.typevar(db).bound_or_constraints(db).is_none()
+                    && !protocol.interface(db).references_typevar(db, typevar)
+            })
+        })
+    {
+        return false;
+    }
+
+    // Reject direct self-embedding as well: relating `P[P[Any]]` to `P[T]` could infer another
+    // `P[...]` for `T` and grow the specialization on every recursive relation.
+    !source_alias
+        .specialization(db)
+        .types(db)
+        .iter()
+        .any(|argument| {
+            any_over_type(db, *argument, false, |nested| {
+                nested
+                    .as_nominal_instance()
+                    .or_else(|| {
+                        nested
+                            .as_protocol_instance()
+                            .and_then(ProtocolInstanceType::to_nominal_instance)
+                    })
+                    .is_some_and(|nested| {
+                        nested.class(db).class_literal(db) == target_class_literal
+                    })
+            })
+        })
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
