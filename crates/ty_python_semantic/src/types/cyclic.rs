@@ -198,9 +198,9 @@ pub(crate) enum CycleDetectorVisit<T, R> {
 
 /// Guards recursive type transformations.
 pub(crate) struct TypeTransformer<'db, Tag> {
-    /// A type already present in `seen` forms a recursive cycle and is returned unchanged.
+    /// The active transformation stack and its recursive identities.
     /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[Type<'db>; 3]>>,
+    seen: RefCell<SmallVec<[ActiveTypeTransformation<'db>; 3]>>,
 
     /// Memoized transformations from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
@@ -245,40 +245,35 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             return CycleDetectorVisit::Ready(*result);
         }
 
+        let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen.contains(&ty) {
-            return CycleDetectorVisit::Ready(ty);
-        }
-        if seen
-            .iter()
-            .any(|active| Self::same_type_identity(db, *active, ty))
-        {
+        if seen.iter().any(|active| {
+            active.ty == ty
+                || (!matches!(identity, TypeIdentity::RecursiveTypeAlias(_))
+                    && active.identity == identity)
+        }) {
             return CycleDetectorVisit::Ready(ty);
         }
         drop(seen);
 
-        self.seen.borrow_mut().push(ty);
+        self.seen
+            .borrow_mut()
+            .push(ActiveTypeTransformation { ty, identity });
         CycleDetectorVisit::Pending(ty)
     }
 
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
         let active = self.seen.borrow_mut().pop();
-        debug_assert_eq!(active, Some(ty));
+        debug_assert_eq!(active.map(|active| active.ty), Some(ty));
         self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
+}
 
-    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-        match (left, right) {
-            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
-                left.literal(db) == right.literal(db)
-            }
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                left.definition(db) == right.definition(db)
-            }
-            _ => false,
-        }
-    }
+#[derive(Debug, Clone, Copy)]
+struct ActiveTypeTransformation<'db> {
+    ty: Type<'db>,
+    identity: TypeIdentity<'db>,
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
