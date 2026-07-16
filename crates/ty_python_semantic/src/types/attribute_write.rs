@@ -42,13 +42,12 @@ pub(super) enum AttributeWriteRequirement<'db> {
     ///
     /// `None` represents an unresolved module attribute rather than an unconstrained write.
     Module(Option<Type<'db>>),
-    /// The effective instance-write type of a declared protocol member.
+    /// The effective instance-write requirement of a declared protocol member.
     ///
-    /// `write_ty` is `None` for a read-only member. Qualifiers are retained so assignment
-    /// inference can distinguish `Final` and `ClassVar` diagnostics from other non-writable
-    /// members.
+    /// `write` is `None` for a read-only member. Qualifiers are retained so assignment inference
+    /// can distinguish `Final` and `ClassVar` diagnostics from other non-writable members.
     ProtocolMember {
-        write_ty: Option<Type<'db>>,
+        write: Option<ProtocolMemberWriteRequirement<'db>>,
         qualifiers: TypeQualifiers,
     },
     /// A write through an instance, resolved against its class and instance attributes.
@@ -60,6 +59,23 @@ pub(super) enum AttributeWriteRequirement<'db> {
     Class {
         object_ty: Type<'db>,
         member: ClassAttributeWriteMember<'db>,
+    },
+}
+
+/// How a writable protocol member validates an assigned value.
+pub(super) enum ProtocolMemberWriteRequirement<'db> {
+    /// Check the assigned value against a directly representable write type.
+    AssignableTo(Type<'db>),
+    /// Invoke every possible descriptor setter with the assigned value.
+    ///
+    /// `domain` is the precisely derived write type when that domain fits in [`Type`]. It is used
+    /// for contextual inference and protocol compatibility, while descriptor calls remain the
+    /// authority for real assignments. `None` preserves a known write capability whose generic or
+    /// set-theoretic domain cannot be represented precisely.
+    Descriptor {
+        descriptor_ty: Type<'db>,
+        receiver_ty: Type<'db>,
+        domain: Option<Type<'db>>,
     },
 }
 
@@ -243,8 +259,8 @@ pub(super) fn attribute_write_requirement<'db>(
             .instance_write_requirement(db, object_ty, attribute)
             .map_or_else(
                 || instance_attribute_write_requirement(db, object_ty, attribute),
-                |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
-                    write_ty,
+                |(write, qualifiers)| AttributeWriteRequirement::ProtocolMember {
+                    write,
                     qualifiers,
                 },
             ),
@@ -277,7 +293,7 @@ pub(super) fn attribute_write_requirement<'db>(
             .map_or_else(
                 || class_attribute_write_requirement(db, object_ty, attribute),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
-                    write_ty,
+                    write: write_ty.map(ProtocolMemberWriteRequirement::AssignableTo),
                     qualifiers,
                 },
             ),

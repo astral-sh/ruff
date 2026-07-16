@@ -2658,8 +2658,8 @@ reveal_protocol_interface(StoresDescriptor)
 
 An overloaded `__set__` method can accept different values for different receiver types. For
 `HasValue`, the overloads with an `object` receiver accept `int` and `bytes`; the overload for
-`Other` does not apply. Until these overloads can be analyzed, `Unknown` is used as the write type.
-This preserves the writable requirement without rejecting assignments.
+`Other` does not apply. Therefore, assignments of `int` and `bytes` are valid, but assignments of
+`str` are not.
 
 ```py
 from typing import Protocol, final, overload
@@ -2694,14 +2694,151 @@ read_only: HasValue = ReadOnlyValue()  # error: [invalid-assignment]
 def update_value(value: HasValue) -> None:
     value.value = 1
     value.value = b"valid"
-    # TODO: This assignment should be rejected.
-    value.value = "bad"
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Descriptor setters on union protocol receivers
+
+When assigning through a union of protocols, each descriptor setter is called with its matching
+union element as the receiver. The other elements of the union do not participate in that call. The
+`a_only` and `b_only` methods keep the two protocol types distinct.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class ADescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: A, value: int) -> None: ...
+
+class BDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: B, value: int) -> None: ...
+
+class A(Protocol):
+    @ADescriptor
+    def value(self) -> int: ...
+    def a_only(self) -> None: ...
+
+class B(Protocol):
+    @BDescriptor
+    def value(self) -> int: ...
+    def b_only(self) -> None: ...
+
+def update_union_value(value: A | B) -> None:
+    value.value = 1
+```
+
+### Static, class, and callable setters
+
+The examples below use the same property implementations to check both assignment and protocol
+compatibility:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class IntPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: int) -> None: ...
+
+class StrPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None: ...
+```
+
+A static `__set__` method receives the instance and assigned value directly:
+
+```py
+class StaticSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+
+class HasStaticSetter(Protocol):
+    @StaticSetterDescriptor
+    def value(self) -> int: ...
+
+static_assert(is_subtype_of(IntPropertySetter, HasStaticSetter))
+static_assert(not is_subtype_of(StrPropertySetter, HasStaticSetter))
+
+def update_static_setter(value: HasStaticSetter) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+A class `__set__` method also receives the descriptor class implicitly:
+
+```py
+class ClassSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @classmethod
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class HasClassSetter(Protocol):
+    @ClassSetterDescriptor
+    def value(self) -> int: ...
+
+static_assert(is_subtype_of(IntPropertySetter, HasClassSetter))
+static_assert(not is_subtype_of(StrPropertySetter, HasClassSetter))
+
+def update_class_setter(value: HasClassSetter) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+An object stored in `__set__` is called with the instance and assigned value:
+
+```py
+class IntSetterCallable:
+    def __call__(self, instance: object, value: int) -> None: ...
+
+class CallableSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__ = IntSetterCallable()
+
+class HasCallableSetter(Protocol):
+    @CallableSetterDescriptor
+    def value(self) -> int: ...
+
+static_assert(is_subtype_of(IntPropertySetter, HasCallableSetter))
+static_assert(not is_subtype_of(StrPropertySetter, HasCallableSetter))
+
+def update_callable_setter(value: HasCallableSetter) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Union descriptor types
 
 If a decorator can return either of two descriptors, an assignment must be accepted by both possible
-descriptors. Here, only `str` is accepted by both.
+descriptors. Here, only `str` is accepted by both, so an `int` assignment is invalid even though one
+of the descriptors accepts it.
 
 ```py
 from typing import Generic, Protocol, TypeVar
@@ -2723,8 +2860,105 @@ class HasEitherValue(Protocol):
 
 def update_either_value(value: HasEitherValue) -> None:
     value.either_value = "valid"
-    # TODO: This assignment should be rejected.
-    value.either_value = 1
+    value.either_value = 1  # error: [invalid-assignment]
+```
+
+### Aliased union descriptor types
+
+Top-level PEP 695 aliases do not change which assignments a descriptor union accepts. As with the
+unaliased form above, only `str` is accepted by both possible descriptors. The alias also does not
+make the protocol member read-only.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+type DescriptorAlias = Descriptor[int | str] | Descriptor[str | bytes]
+
+def aliased_descriptor(getter: object) -> DescriptorAlias:
+    raise NotImplementedError
+
+class HasAliasedValue(Protocol):
+    @aliased_descriptor
+    def value(self) -> object: ...
+
+class ReadOnlyAliasedValue:
+    @property
+    def value(self) -> object:
+        return "value"
+
+read_only: HasAliasedValue = ReadOnlyAliasedValue()  # error: [invalid-assignment]
+
+def update_aliased_value(value: HasAliasedValue) -> None:
+    value.value = "valid"
+    value.value = 1  # error: [invalid-assignment]
+```
+
+### Large unions of descriptor types
+
+A value assigned through the protocol must be accepted by every possible descriptor. Here, `AX` is
+accepted by both descriptors, while `A` is accepted only by the first. Because the protocol member
+is writable, a read-only property cannot implement it.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class X: ...
+class Y: ...
+class Z: ...
+class AX(A, X): ...
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def large_union_descriptor(
+    getter: object,
+) -> Descriptor[A | B | C] | Descriptor[X | Y | Z]:
+    raise NotImplementedError
+
+class HasLargeUnionValue(Protocol):
+    @large_union_descriptor
+    def value(self) -> object: ...
+
+class ReadOnlyLargeUnionValue:
+    @property
+    def value(self) -> object:
+        return "value"
+
+read_only: HasLargeUnionValue = ReadOnlyLargeUnionValue()  # error: [invalid-assignment]
+
+def update_large_union_value(
+    value: HasLargeUnionValue,
+    valid: AX,
+    invalid: A,
+) -> None:
+    value.value = valid
+    value.value = invalid  # error: [invalid-assignment]
 ```
 
 ### Overloaded setters selected by descriptor type
@@ -2758,14 +2992,13 @@ class HasIntValue(Protocol):
 
 def update_int_value(value: HasIntValue) -> None:
     value.int_value = 1
-    # TODO: This assignment should be rejected.
-    value.int_value = "bad"
+    value.int_value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Generic setter value types
 
 A setter that uses a method type variable directly as its value parameter accepts every value
-allowed by that type variable's upper bound.
+allowed by that type variable's upper bound. The setter below therefore accepts `int` values.
 
 ```py
 from typing import Protocol, TypeVar
@@ -2787,8 +3020,350 @@ class HasBoundedValue(Protocol):
 
 def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = 1
-    # TODO: This assignment should be rejected.
-    value.bounded_value = "bad"
+    value.bounded_value = "bad"  # error: [invalid-assignment]
+```
+
+### Type variables from the surrounding function
+
+A type variable supplied by the surrounding function is still the descriptor's value type. Assigning
+a value of that type is valid.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor(Generic[T]):
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+class HasGenericValue(Protocol[T]):
+    @Descriptor[T]
+    def value(self) -> T: ...
+
+def update_generic_value(value: HasGenericValue[U], new_value: U) -> None:
+    value.value = new_value
+```
+
+### Setter type variables inside aliases
+
+A type alias does not hide that `T` belongs to `__set__`. The descriptor below still accepts `int`,
+so it remains writable with `int` but not with `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Alias[T] = T
+
+class AliasedReceiverDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: Alias[T], value: int) -> None: ...
+
+class HasAliasedReceiver(Protocol):
+    @AliasedReceiverDescriptor
+    def value(self) -> int: ...
+```
+
+A property setter that accepts only `Never` cannot implement this protocol member:
+
+```py
+class NeverPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: Never) -> None: ...
+
+static_assert(not is_subtype_of(NeverPropertySetter, HasAliasedReceiver))
+```
+
+Assignments through the protocol accept `int` but reject `str`:
+
+```py
+def update_aliased_receiver(value: HasAliasedReceiver) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Constrained generic setters
+
+A setter with a constrained type variable must choose one constraint for each call. It accepts `int`
+and `str` separately, but not a value whose type is `int | str`.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T", int, str)
+
+class ConstrainedDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int | str:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def constrained_descriptor(getter: object) -> ConstrainedDescriptor:
+    raise NotImplementedError
+
+class HasConstrainedValue(Protocol):
+    @constrained_descriptor
+    def constrained_value(self) -> int | str: ...
+```
+
+The setter is still present, so a read-only property cannot implement the protocol:
+
+```py
+class ReadOnlyConstrainedValue:
+    @property
+    def constrained_value(self) -> int | str:
+        return "value"
+
+read_only: HasConstrainedValue = ReadOnlyConstrainedValue()  # error: [invalid-assignment]
+```
+
+Literal values select one constraint, while a union of the constraints does not:
+
+```py
+def update_constrained_value(value: HasConstrainedValue, new_value: int | str) -> None:
+    value.constrained_value = 1
+    value.constrained_value = "valid"
+    value.constrained_value = new_value  # error: [invalid-assignment]
+```
+
+### Setters that accept `Never`
+
+A `Never` value cannot normally exist, but a `__set__` parameter of type `Never` still makes the
+protocol member writable. A read-only property therefore cannot implement it.
+
+```py
+from typing import Protocol
+from typing_extensions import Never
+
+class NeverDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: Never) -> None: ...
+
+def never_descriptor(getter: object) -> NeverDescriptor:
+    raise NotImplementedError
+
+class HasNeverValue(Protocol):
+    @never_descriptor
+    def never_value(self) -> object: ...
+
+class ReadOnlyNeverValue:
+    @property
+    def never_value(self) -> object:
+        return "value"
+
+read_only: HasNeverValue = ReadOnlyNeverValue()  # error: [invalid-assignment]
+```
+
+If the assigned expression itself has type `Never`, the assignment is valid:
+
+```py
+def update_never_value(value: HasNeverValue, new_value: Never) -> None:
+    value.never_value = new_value
+```
+
+### Optional parameters after the setter value
+
+Attribute assignment calls `__set__` with the instance and assigned value. Any later parameters can
+be present if they can all be omitted.
+
+```py
+from typing import Protocol
+
+class OptionalTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(
+        self,
+        instance: object,
+        value: int,
+        notify: bool = False,
+        *metadata: str,
+        log: bool = False,
+        **named_metadata: str,
+    ) -> None: ...
+
+class HasOptionalTrailingValue(Protocol):
+    @OptionalTrailingDescriptor
+    def value(self) -> int: ...
+
+def update_optional_trailing_value(value: HasOptionalTrailingValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Gradual variadic tails after the setter value
+
+A `*args: Any, **kwargs: Any` tail can also be omitted. It does not make the protocol member
+read-only or change the `int` value accepted by the setter.
+
+```py
+from typing import Any, Protocol
+
+class GradualTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int, *args: Any, **kwargs: Any) -> None: ...
+
+class HasGradualTrailingValue(Protocol):
+    @GradualTrailingDescriptor
+    def value(self) -> int: ...
+
+class ReadOnlyGradualTrailingValue:
+    @property
+    def value(self) -> int:
+        return 1
+
+read_only: HasGradualTrailingValue = ReadOnlyGradualTrailingValue()  # error: [invalid-assignment]
+
+def update_gradual_trailing_value(value: HasGradualTrailingValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Required parameters after the setter value
+
+If `__set__` requires another parameter after the assigned value, attribute assignment cannot call
+it because that argument is missing.
+
+```py
+from typing import Protocol
+
+class RequiredTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int, required: bool) -> None: ...
+
+class HasRequiredTrailingValue(Protocol):
+    @RequiredTrailingDescriptor
+    def value(self) -> int: ...
+
+def update_required_trailing_value(value: HasRequiredTrailingValue) -> None:
+    value.value = 1  # error: [invalid-assignment]
+```
+
+### Setter values captured by `*args`
+
+When `__set__` declares `(instance, *values: int)`, attribute assignment supplies the value as the
+first element of `values`. The descriptor therefore accepts `int` but not `str`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class VariadicValueDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, *values: int) -> None: ...
+
+class HasVariadicValue(Protocol):
+    @VariadicValueDescriptor
+    def value(self) -> int: ...
+```
+
+A property setter restricted to `str` cannot implement this protocol member:
+
+```py
+class StrPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None: ...
+
+static_assert(not is_subtype_of(StrPropertySetter, HasVariadicValue))
+```
+
+Assignments through the protocol follow the `int` annotation on `*values`:
+
+```py
+def update_variadic_value(value: HasVariadicValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Gradually typed setter signatures
+
+When `__set__` is `Callable[..., None]`, ty cannot determine which values it accepts. Assignment is
+allowed, but a property setter limited to `int` is not guaranteed to implement the same member.
+
+```py
+from typing import Any, Callable, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class IntPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: int) -> None: ...
+
+class CallableSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__: Callable[..., None]
+
+class HasCallableSetter(Protocol):
+    @CallableSetterDescriptor
+    def value(self) -> int: ...
+
+static_assert(not is_subtype_of(IntPropertySetter, HasCallableSetter))
+
+def update_callable_setter(value: HasCallableSetter) -> None:
+    value.value = object()
+```
+
+The same applies when the type of `__set__` is `Any`:
+
+```py
+class AnySetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__: Any
+
+class HasAnySetter(Protocol):
+    @AnySetterDescriptor
+    def value(self) -> int: ...
+
+static_assert(not is_subtype_of(IntPropertySetter, HasAnySetter))
+
+def update_any_setter(value: HasAnySetter) -> None:
+    value.value = object()
 ```
 
 ## Variance of generic protocols with `Final` members
