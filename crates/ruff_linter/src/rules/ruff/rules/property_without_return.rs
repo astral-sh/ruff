@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Detects class `@property` methods that does not have a `return` statement.
+/// Detects class `@property` methods that do not have a `return` statement.
 ///
 /// ## Why is this bad?
 /// Property methods are expected to return a computed value, a missing return in a property usually indicates an implementation mistake.
@@ -36,7 +36,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The property class](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.7")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct PropertyWithoutReturn {
     name: String,
 }
