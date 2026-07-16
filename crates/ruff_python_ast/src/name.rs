@@ -64,7 +64,12 @@ impl Name {
         Self(CharStr::from_static_str(name))
     }
 
-    /// Creates a name by joining string slices with a separator.
+    /// Creates an exactly-sized name by joining string slices with a separator.
+    ///
+    /// The combined length is computed up front, so heap storage is allocated at most once. For
+    /// dynamically formatted names, use [`Name::from`] with
+    /// [`format_char!`](char_str::format_char). If a [`CharStr`] is sufficient, use
+    /// [`format_char_str!`](char_str::format_char_str) instead.
     #[inline]
     pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
         Self(CharStr::join(slices, separator))
