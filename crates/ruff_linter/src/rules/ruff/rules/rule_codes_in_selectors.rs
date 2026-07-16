@@ -92,42 +92,58 @@ pub(crate) fn rule_codes_in_selectors(
     }
 }
 
-const SELECTORS: &[&str] = &[
+/// Selectors that are themselves arrays.
+///
+/// For example:
+///
+/// ```toml
+/// select = ["F401"]
+/// ```
+const ARRAY_SELECTORS: &[&str] = &[
     "select",
     "extend-select",
     "fixable",
     "extend-fixable",
     "ignore",
     "extend-ignore",
-    "per-file-ignores",
-    "extend-per-file-ignores",
     "unfixable",
     "extend-unfixable",
     "extend-safe-fixes",
     "extend-unsafe-fixes",
 ];
 
+/// Selectors that are tables containing arrays.
+///
+/// For example:
+///
+/// ```toml
+/// per-file-ignores = { "*.py" = ["F401"] }
+/// ```
+const TABLE_SELECTORS: &[&str] = &["per-file-ignores", "extend-per-file-ignores"];
+
 fn check_selectors(context: &LintContext, table: &DeTable<'_>, in_lint_table: bool) {
-    for &selector in SELECTORS {
+    for &selector in ARRAY_SELECTORS {
         let Some(value) = table.get(selector) else {
             continue;
         };
 
-        match value.get_ref() {
-            // select = [values...]
-            DeValue::Array(values) => {
+        if let DeValue::Array(values) = value.get_ref() {
+            check_selector_array(context, values, selector, in_lint_table);
+        }
+    }
+
+    for &selector in TABLE_SELECTORS {
+        let Some(value) = table.get(selector) else {
+            continue;
+        };
+
+        if let DeValue::Table(per_file) = value.get_ref() {
+            for value in per_file.values() {
+                let Some(values) = value.get_ref().as_array() else {
+                    continue;
+                };
                 check_selector_array(context, values, selector, in_lint_table);
             }
-            // per-file-ignores = { file = [values...] }
-            DeValue::Table(per_file) => {
-                for value in per_file.values() {
-                    let Some(values) = value.get_ref().as_array() else {
-                        continue;
-                    };
-                    check_selector_array(context, values, selector, in_lint_table);
-                }
-            }
-            _ => {}
         }
     }
 }

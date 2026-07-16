@@ -109,6 +109,19 @@ help: Replace rule code with `import-shadowed-by-loop-var`
   |
 ```
 
+## Invalid selector shapes
+
+Just in case these ever make it past our actual config deserialization, the rule skips over
+malformed selectors (e.g. table for `select`, non-table for `per-file-ignores`):
+
+`ruff.toml`:
+
+```toml
+[lint]
+select = { nested = ["F401"] }
+per-file-ignores = ["F401"]
+```
+
 ## Prefixes and names
 
 Prefixes and rule names are also left alone:
