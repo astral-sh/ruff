@@ -34,7 +34,7 @@ impl EnvVars {
 
     /// Perturbs constraint-set variable ordering to help detect order-dependent inference.
     ///
-    /// Set to `reverse` to reverse builder-local IDs, or to an integer to rotate their bits left.
+    /// Set to `reverse` to reverse builder-local IDs, or to an integer XOR mask.
     #[attr_hidden]
     pub const TY_CONSTRAINT_SET_ORDER: &'static str = "TY_CONSTRAINT_SET_ORDER";
 

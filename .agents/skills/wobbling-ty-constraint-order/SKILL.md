@@ -9,13 +9,13 @@ description: Use when a user asks to wobble ty constraint ordering, check constr
 
 - unset/`0`: normal ordering;
 - `reverse`: reverse both orderings;
-- an integer: rotate each local ID left by that many bits. On a 64-bit host, `63` partitions IDs by parity and is the most useful small-arena rotation; smaller rotations may leave short ID sequences effectively ordered.
+- an integer: XOR each local ID with that mask. Small masks immediately perturb dense arena IDs: `1` swaps adjacent IDs, `3` reverses blocks of four, and powers of two exchange neighboring blocks.
 
 This deliberately changes internal TDD shape. Run **mdtests only**: graph-structure unit snapshots are expected to differ. Never enable snapshot updates for a wobble run, since updating would hide the failures being sought.
 
 ## Run
 
-From the Ruff root, first establish the normal baseline, then run the reversed and rotated orders sequentially:
+From the Ruff root, first establish the normal baseline, then run the reversed and XOR-masked orders sequentially:
 
 ```bash
 set -uo pipefail
@@ -26,7 +26,7 @@ export INSTA_UPDATE=no
 export MDTEST_UPDATE_SNAPSHOTS=0
 unset INSTA_FORCE_PASS || true
 
-for order in normal reverse 63 62; do
+for order in normal reverse 1 2 3 4 7 8 15; do
     if test "$order" = normal; then
         unset TY_CONSTRAINT_SET_ORDER || true
     else

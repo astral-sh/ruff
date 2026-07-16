@@ -1306,7 +1306,7 @@ fn constraint_set_order_index(index: usize) -> usize {
     enum Order {
         Normal,
         Reverse,
-        Rotate(u32),
+        Xor(usize),
     }
 
     static ORDER: LazyLock<Order> = LazyLock::new(|| {
@@ -1318,14 +1318,14 @@ fn constraint_set_order_index(index: usize) -> usize {
         }
         value
             .to_str()
-            .and_then(|value| value.parse::<u32>().ok())
-            .map_or(Order::Normal, Order::Rotate)
+            .and_then(|value| value.parse::<usize>().ok())
+            .map_or(Order::Normal, Order::Xor)
     });
 
     match *ORDER {
         Order::Normal => index,
         Order::Reverse => !index,
-        Order::Rotate(bits) => index.rotate_left(bits),
+        Order::Xor(mask) => index ^ mask,
     }
 }
 
