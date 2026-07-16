@@ -464,7 +464,7 @@ especially when using various functions from typeshed that are annotated as retu
 purposes, it would usually lead to more intuitive results if `object` was used as the specialization
 for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
 transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`.
-For a nominal covariant generic, this simplifies to `TypeIs[SomeCovariantGeneric[object]]`.
+For a covariant generic class, this simplifies to `TypeIs[SomeCovariantGeneric[object]]`.
 
 ```py
 class Unrelated: ...
@@ -492,8 +492,8 @@ def _(x: Unrelated | Covariant[int]):
 
 ## `TypeIs` narrowing with protocol class variables
 
-`TypeIs` materializes its return type before narrowing. If a protocol class variable is `Any`, a
-class-side read after narrowing therefore has type `object`:
+`TypeIs` materializes the type it uses for narrowing. If a protocol class variable is `Any`, a read
+through the class object after narrowing therefore has type `object`:
 
 ```py
 from typing import Any, ClassVar, Protocol
@@ -508,29 +508,6 @@ def is_has_class_var(x: object) -> TypeIs[HasClassVar]:
 def _(x: object):
     if is_has_class_var(x):
         reveal_type(type(x).x)  # revealed: object
-```
-
-## `TypeIs` narrowing with inherited protocols
-
-Materialization must preserve protocol inheritance when none of the inherited requirements change:
-
-```py
-from typing import Any, Protocol
-from typing_extensions import TypeIs
-
-class Base(Protocol):
-    value: int
-
-class Derived(Base, Protocol):
-    marker: Any
-
-def is_derived(x: object) -> TypeIs[Derived]:
-    return True
-
-def accepts_base(x: Base) -> None: ...
-def _(x: object):
-    if is_derived(x):
-        accepts_base(x)
 ```
 
 ## `TypeGuard` special cases

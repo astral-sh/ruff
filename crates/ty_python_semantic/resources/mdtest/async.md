@@ -241,7 +241,7 @@ async def f(fn: Callable[[int], int | Awaitable[int]]) -> None:
     if is_async_callable(fn):
         reveal_type(fn)  # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Top[Awaitable[object]]]
         result = fn(1)
-        # This includes `int & Awaitable[object]`: an `int` subtype could define `__await__`.
+        # This includes `int & Top[Awaitable[object]]`: an `int` subtype could define `__await__`.
         reveal_type(result)  # revealed: (int & Top[Awaitable[object]]) | Awaitable[int]
         reveal_type(await result)  # revealed: object
 ```

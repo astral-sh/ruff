@@ -1828,8 +1828,8 @@ asdict(Foo)
 
 ## `dataclasses.is_dataclass`
 
-`is_dataclass` narrows its argument to the `DataclassInstance` protocol. A concrete dataclass
-instance always satisfies that protocol, so the negative branch is unreachable:
+`is_dataclass` recognizes both dataclass instances and dataclass classes. A concrete dataclass
+instance always satisfies the `DataclassInstance` protocol, so the negative branch is unreachable:
 
 ```py
 from dataclasses import dataclass, is_dataclass
