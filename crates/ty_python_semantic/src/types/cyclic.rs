@@ -20,8 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::any::TypeId;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -34,13 +33,6 @@ use ty_python_core::definition::Definition;
 use crate::Db;
 use crate::types::Type;
 use crate::types::function::FunctionLiteral;
-
-/// Maximum number of recursive alias applications explored after the initial application.
-///
-/// Determining whether alias expansion eventually reaches a finite fixed point is possible in
-/// principle, but a general decision procedure is too expensive for normal type operations. Type
-/// transformations and union normalization therefore share this operational limit.
-pub(super) const MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS: usize = 10;
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -206,18 +198,15 @@ pub(crate) enum CycleDetectorVisit<T, R> {
 
 /// Guards recursive type transformations.
 pub(crate) struct TypeTransformer<'db, Tag> {
-    /// Exact types and their recursive identities on the active transformation stack.
+    /// A type already present in `seen` forms a recursive cycle and is returned unchanged.
     /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[ActiveTypeTransformation<'db>; 3]>>,
+    seen: RefCell<SmallVec<[Type<'db>; 3]>>,
 
     /// Memoized transformations from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
 
     _tag: PhantomData<fn() -> Tag>,
 }
-
-/// Identifies the [`TypeTransformer`] tag that initiated a shared fallback unwind.
-pub(crate) type TransformerKind = TypeId;
 
 impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
@@ -229,20 +218,20 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-impl<'db, Tag: 'static> TypeTransformer<'db, Tag> {
+impl<'db, Tag> TypeTransformer<'db, Tag> {
     #[inline]
     pub(crate) fn visit_type(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        unwinding_to_fallback: &Cell<Option<TransformerKind>>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match self.begin_visit(db, ty, unwinding_to_fallback) {
-            TypeTransformerVisit::Return(result) => result,
-            TypeTransformerVisit::Pending(ty) => {
+        match self.begin_visit(db, ty) {
+            CycleDetectorVisit::Ready(result) => result,
+            CycleDetectorVisit::Cycle(_) => ty,
+            CycleDetectorVisit::Pending(ty) => {
                 let result = compute();
-                self.finish_visit(ty, result, unwinding_to_fallback)
+                self.finish_visit(ty, result)
             }
         }
     }
@@ -251,89 +240,45 @@ impl<'db, Tag: 'static> TypeTransformer<'db, Tag> {
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        unwinding_to_fallback: &Cell<Option<TransformerKind>>,
-    ) -> TypeTransformerVisit<'db> {
-        // Everything computed before the fallback frame finishes will be discarded.
-        if unwinding_to_fallback.get().is_some() {
-            return TypeTransformerVisit::Return(ty);
-        }
-
+    ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
         if let Some(result) = self.cache.borrow().get(&ty) {
-            return TypeTransformerVisit::Return(*result);
+            return CycleDetectorVisit::Ready(*result);
         }
 
-        let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen.iter().any(|active| active.ty == ty) {
-            return TypeTransformerVisit::Return(ty);
+        if seen.contains(&ty) {
+            return CycleDetectorVisit::Ready(ty);
         }
-        let active_occurrences = seen
+        if seen
             .iter()
-            .filter(|active| active.identity == identity)
-            .count();
-        let should_stop = match identity {
-            TypeIdentity::RecursiveTypeAlias(_) => {
-                active_occurrences > MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS
-            }
-            _ => active_occurrences > 0,
-        };
-        if should_stop {
-            if matches!(identity, TypeIdentity::RecursiveTypeAlias(_)) {
-                unwinding_to_fallback.set(Some(TypeId::of::<Tag>()));
-            }
-            return TypeTransformerVisit::Return(ty);
+            .any(|active| Self::same_type_identity(db, *active, ty))
+        {
+            return CycleDetectorVisit::Ready(ty);
         }
         drop(seen);
 
-        self.seen
-            .borrow_mut()
-            .push(ActiveTypeTransformation { ty, identity });
-        TypeTransformerVisit::Pending(ty)
+        self.seen.borrow_mut().push(ty);
+        CycleDetectorVisit::Pending(ty)
     }
 
-    fn finish_visit(
-        &self,
-        ty: Type<'db>,
-        mut result: Type<'db>,
-        unwinding_to_fallback: &Cell<Option<TransformerKind>>,
-    ) -> Type<'db> {
+    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
         let active = self.seen.borrow_mut().pop();
-        debug_assert_eq!(active.map(|active| active.ty), Some(ty));
-
-        let active_recursive_aliases = self
-            .seen
-            .borrow()
-            .iter()
-            .filter(|active| matches!(active.identity, TypeIdentity::RecursiveTypeAlias(_)))
-            .count();
-
-        let unwinding = unwinding_to_fallback.get();
-        if unwinding == Some(TypeId::of::<Tag>())
-            && active.is_some_and(|active| {
-                matches!(active.identity, TypeIdentity::RecursiveTypeAlias(_))
-            })
-            && active_recursive_aliases == 1
-        {
-            result = ty;
-            unwinding_to_fallback.set(None);
-        }
-
-        if unwinding.is_none() {
-            self.cache.borrow_mut().insert_completed(ty, result);
-        }
+        debug_assert_eq!(active, Some(ty));
+        self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-struct ActiveTypeTransformation<'db> {
-    ty: Type<'db>,
-    identity: TypeIdentity<'db>,
-}
-
-enum TypeTransformerVisit<'db> {
-    Return(Type<'db>),
-    Pending(Type<'db>),
+    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        match (left, right) {
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                left.literal(db) == right.literal(db)
+            }
+            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+                left.definition(db) == right.definition(db)
+            }
+            _ => false,
+        }
+    }
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default

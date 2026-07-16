@@ -59,7 +59,9 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
-use crate::types::visitor::{RecursionGuard, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{
+    RecursionGuard, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
+};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,

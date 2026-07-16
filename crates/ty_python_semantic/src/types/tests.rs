@@ -1,7 +1,6 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
-use crate::types::tuple::TupleType;
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
@@ -41,19 +40,6 @@ fn typing_vs_typeshed_no_default() {
         typing_extensions_no_default.display(&db).to_string(),
         "NoDefault"
     );
-}
-
-#[test]
-fn tuple_class_type_uses_relation_aware_element_union() {
-    let db = setup_db();
-    let int_instance = KnownClass::Int.to_instance(&db);
-    let tuple = TupleType::heterogeneous(&db, [Type::int_literal(1), int_instance]).unwrap();
-    let tuple_class = tuple
-        .to_class_type(&db)
-        .into_generic_alias()
-        .expect("`tuple` should have a generic specialization");
-
-    assert_eq!(tuple_class.specialization(&db).types(&db), &[int_instance]);
 }
 
 fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {

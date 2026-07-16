@@ -14,6 +14,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -869,19 +870,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    fn is_redundant_with(&self, db: &'db dyn Db, candidate: Type<'db>, current: Type<'db>) -> bool {
-        Self {
-            inferable: InferableTypeVars::None,
-            relation: TypeRelation::Redundancy { pure: false },
-            typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: None,
-            given: ConstraintSet::from_bool(self.constraints, false),
-            ..self.clone()
-        }
-        .check_type_pair(db, candidate, current)
-        .is_always_satisfied(db)
-    }
-
     /// Overwrite the error context tree with a new root context and child nodes.
     pub(super) fn set_context(
         &self,
@@ -1189,10 +1177,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let expanded = union.expand_aliases_structurally(db, |remainder, current| {
-                        self.is_redundant_with(db, remainder, current)
-                    });
-                    self.check_type_pair(db, source, expanded)
+                    self.check_type_pair(db, source, union.expand_aliases(db))
                 })
             }
 

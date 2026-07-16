@@ -241,13 +241,6 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    fn class_for_relation(&self, db: &'db dyn Db) -> ClassType<'db> {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type_for_relation(db),
-            _ => self.class(db),
-        }
-    }
-
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
         self.class(db).class_literal(db)
@@ -642,11 +635,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),
             ) => self.check_tuple_type_pair(db, source_tuple, target_tuple),
-            _ => self.check_class_pair(
-                db,
-                source.class_for_relation(db),
-                target.class_for_relation(db),
-            ),
+            _ => self.check_class_pair(db, source.class(db), target.class(db)),
         }
     }
 }
@@ -691,12 +680,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             ConstraintSet::from_bool(
                 self.constraints,
                 !left
-                    .class_for_relation(db)
-                    .could_coexist_in_mro_with_disjointness_checker(
-                        db,
-                        right.class_for_relation(db),
-                        self,
-                    ),
+                    .class(db)
+                    .could_coexist_in_mro_with_disjointness_checker(db, right.class(db), self),
             )
         })
     }

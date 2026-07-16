@@ -20,7 +20,9 @@ use crate::types::relation::{
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
-use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::tuple::{
+    TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
+};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };

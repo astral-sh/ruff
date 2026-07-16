@@ -28,7 +28,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
@@ -136,21 +136,6 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-enum TupleClassTypeContext {
-    General,
-    TypeRelation,
-}
-
-impl TupleClassTypeContext {
-    fn union_builder(self, db: &dyn Db) -> UnionBuilder<'_> {
-        match self {
-            Self::General => UnionBuilder::new(db),
-            Self::TypeRelation => UnionBuilder::structural(db),
-        }
-    }
-}
-
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
@@ -243,32 +228,30 @@ impl<'db> TupleType<'db> {
         }
     }
 
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.to_class_type_with_context(db, TupleClassTypeContext::General)
+    /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
+    pub(crate) fn unpacked_typevartuple(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        debug_assert!(typevar.is_typevartuple(db));
+        TupleType::new_internal(
+            db,
+            VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
+        )
     }
 
-    pub(super) fn to_class_type_for_relation(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.to_class_type_with_context(db, TupleClassTypeContext::TypeRelation)
-    }
-
-    // N.B. If this computation is not Salsa-tracked, we take 10 minutes to check
+    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    fn to_class_type_with_context(
-        self,
-        db: &'db dyn Db,
-        context: TupleClassTypeContext,
-    ) -> ClassType<'db> {
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                let element_type = self
-                    .tuple(db)
-                    .homogeneous_element_type_with_context(db, context);
+                let element_type = self.tuple(db).tuple_class_type(db);
                 generic_context.specialize_tuple(db, element_type, self)
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -743,7 +726,6 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     self_: TupleType<'db>,
-    _context: TupleClassTypeContext,
 ) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(db)
@@ -2325,22 +2307,46 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     }
 
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.homogeneous_element_type_with_context(db, TupleClassTypeContext::General)
+        match self {
+            Tuple::Fixed(tuple) => {
+                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
+            }
+            Tuple::Variable(tuple) => {
+                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements(db))
+            }
+        }
     }
 
-    fn homogeneous_element_type_with_context(
+    fn tuple_class_type(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Tuple::Fixed(tuple) => {
+                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
+            }
+            Tuple::Variable(tuple) => UnionType::from_elements_leave_aliases(
+                db,
+                tuple
+                    .iter_prefix_elements()
+                    .chain(std::iter::once(tuple.variable().tuple_class_type()))
+                    .chain(tuple.iter_suffix_elements()),
+            ),
+        }
+    }
+
+    pub(crate) fn variable_element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Tuple::Fixed(_) => None,
+            Tuple::Variable(tuple) => Some(tuple.variable().element_type(db)),
+        }
+    }
+
+    pub(crate) fn iter_element_types(
         &self,
         db: &'db dyn Db,
-        context: TupleClassTypeContext,
-    ) -> Type<'db> {
-        self.all_elements()
-            .iter()
-            .copied()
-            .fold(
-                context.union_builder(db).unpack_aliases(false),
-                UnionBuilder::add,
-            )
-            .build()
+    ) -> impl DoubleEndedIterator<Item = Type<'db>> + '_ {
+        match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
+            Tuple::Variable(tuple) => Either::Right(tuple.iter_all_elements(db)),
+        }
     }
 
     /// Returns the type of a static slice into this tuple.
