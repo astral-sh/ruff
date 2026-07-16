@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
@@ -9,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -18,7 +19,8 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_interface,
+    walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
@@ -26,6 +28,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -494,6 +497,55 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// Returns whether a protocol interface contains a recursive reference to its class-backed origin.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn interface_references_protocol_origin<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    protocol: ProtocolClass<'db>,
+) -> bool {
+    struct ProtocolReferenceFinder<'db> {
+        origin: ClassLiteral<'db>,
+        found: Cell<bool>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+            self.visit_type(db, type_alias.value_type(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            if ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .is_some_and(|instance| instance.class_literal(db) == self.origin)
+            {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = ProtocolReferenceFinder {
+        origin: protocol.class_literal(db),
+        found: Cell::new(false),
+        recursion_guard: TypeCollector::default(),
+    };
+    walk_protocol_instance_interface(db, interface, Type::instance(db, *protocol), &visitor);
+    visitor.found.get()
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -530,6 +582,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                && !self.is_context_collection_enabled()
                 && let Some(source_instance) = ty
                     .as_protocol_instance()
                     .and_then(ProtocolInstanceType::to_nominal_instance)
@@ -540,10 +593,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .origin(db)
                     .identity_specialization(db)
                     .into_protocol_class(db)
+                && interface_references_protocol_origin(
+                    db,
+                    identity_protocol.interface(db),
+                    identity_protocol,
+                )
             {
-                // A protocol's structural relation is determined by its interface. Relating
-                // the arguments using the identity interface's variance avoids expanding
-                // recursive members (and their freshly bound method typevars) at every step.
+                // Non-recursive protocol members can yield solutions that cannot be inferred
+                // from the raw specialization arguments. For a recursive interface, use its
+                // variance to avoid repeatedly expanding members and their freshly bound method
+                // typevars.
                 let interface = identity_protocol.interface(db);
                 let structurally_satisfied = self.check_specialization_pair_with_variance(
                     db,

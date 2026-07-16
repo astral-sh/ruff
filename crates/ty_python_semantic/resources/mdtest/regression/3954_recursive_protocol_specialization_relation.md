@@ -176,6 +176,68 @@ def convert(value: Source[int]) -> Target[int]:
     return value  # error: [invalid-return-type]
 ```
 
+## Transformed parameters retain structural solutions
+
+A structural relation can admit a narrower solution than relating the raw specialization arguments.
+The shortcut must not discard that solution before the protocol interface has been expanded once.
+
+`transformed.py`:
+
+```py
+from typing import Protocol
+
+class Inner[T](Protocol):
+    def get(self) -> T | int: ...
+
+class Outer[T](Protocol):
+    def inner(self) -> Inner[T]: ...
+
+def consume[T](value: Outer[T], exact: list[T]) -> T:
+    raise NotImplementedError
+
+def check(value: Outer[str | int], exact: list[str]) -> None:
+    reveal_type(consume(value, exact))  # revealed: str
+```
+
+## Lazy overload checks retain protocol-member context
+
+Overload implementation consistency uses lazy evaluation and still needs the structural mismatch
+context when a protocol member is incompatible.
+
+`overload_context.py`:
+
+```py
+from typing import Protocol, overload
+
+class P[T](Protocol):
+    def get(self) -> T: ...
+
+@overload
+def consume(value: int) -> None: ...
+@overload
+# snapshot: invalid-overload
+def consume(value: P[int]) -> None: ...
+def consume(value: P[str] | int) -> None: ...
+```
+
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/overload_context.py:10:5
+   |
+10 | def consume(value: P[int]) -> None: ...
+   |     ^^^^^^^
+11 | def consume(value: P[str] | int) -> None: ...
+   |     ------- Implementation defined here
+   |
+info: Implementation signature `(value: P[str] | int) -> None` is not assignable to overload signature `(value: P[int]) -> None`
+info: parameter `value` has an incompatible type: `P[int]` is not assignable to `P[str] | int`
+info: └── type `P[int]` is not assignable to any element of the union `P[str] | int`
+info:     ├── protocol `P[int]` is not assignable to protocol `P[str]`
+info:     │   └── protocol member `get` is incompatible
+info:     │       └── incompatible return types: `int` is not assignable to `str`
+info:     └── ... omitted 1 union element without additional context
+```
+
 `attribute.py`:
 
 ```py
