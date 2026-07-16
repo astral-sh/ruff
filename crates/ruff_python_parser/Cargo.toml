@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_parser"
-version = "0.0.4"
+version = "0.0.5"
 description = "This is an internal component crate of Ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }

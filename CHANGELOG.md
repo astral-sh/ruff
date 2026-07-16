@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.15.22
+
+Released on 2026-07-16.
+
+### Preview features
+
+- \[`pycodestyle`\] Add an autofix for `E402` ([#22212](https://github.com/astral-sh/ruff/pull/22212))
+- \[`refurb`\] Allow subclassing builtins in stub files (`FURB189`) ([#26812](https://github.com/astral-sh/ruff/pull/26812))
+- \[`ruff`\] Add rule to replace `noqa` comments with `ruff:ignore` (`RUF105`) ([#26423](https://github.com/astral-sh/ruff/pull/26423))
+- \[`ruff`\] Add rule to use human-readable names in `ruff:ignore` comments (`RUF106`) ([#26682](https://github.com/astral-sh/ruff/pull/26682))
+- \[`ruff`\] Add rule to use human-readable names in configuration selectors (`RUF201`) ([#26772](https://github.com/astral-sh/ruff/pull/26772))
+
+### Bug fixes
+
+- \[`flake8-pyi`\] Fix false positive in `__all__` (`PYI053`) ([#26872](https://github.com/astral-sh/ruff/pull/26872))
+
+### Rule changes
+
+- \[`pylint`\] Ignore mutable type updates in `redefined-loop-name` (`PLW2901`) ([#25733](https://github.com/astral-sh/ruff/pull/25733))
+
+### Performance
+
+- Avoid redundant lexer token bookkeeping ([#26765](https://github.com/astral-sh/ruff/pull/26765))
+- Avoid redundant pending-indentation writes ([#26774](https://github.com/astral-sh/ruff/pull/26774))
+- Avoid unnecessary identifier lookahead ([#26525](https://github.com/astral-sh/ruff/pull/26525))
+- Reuse parser scratch buffers ([#26798](https://github.com/astral-sh/ruff/pull/26798))
+
+### Documentation
+
+- Document argfile support ([#26803](https://github.com/astral-sh/ruff/pull/26803))
+- \[`flake8-datetimez`\] Clarify naming guidance for `datetime.today` (`DTZ002`) ([#26658](https://github.com/astral-sh/ruff/pull/26658))
+- \[`pycodestyle`\] Document `E731` fix safety ([#26847](https://github.com/astral-sh/ruff/pull/26847))
+- \[`ruff`\] Clarify intentional async contexts for `unused-async` (`RUF029`) ([#26641](https://github.com/astral-sh/ruff/pull/26641))
+
+### Contributors
+
+- [@dwego](https://github.com/dwego)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@Joosboy](https://github.com/Joosboy)
+- [@KaufmanDmitriy](https://github.com/KaufmanDmitriy)
+- [@PeterJCLaw](https://github.com/PeterJCLaw)
+- [@ntBre](https://github.com/ntBre)
+- [@charliermarsh](https://github.com/charliermarsh)
+
 ## 0.15.21
 
 Released on 2026-07-09.
