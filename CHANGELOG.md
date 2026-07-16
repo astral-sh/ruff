@@ -8,9 +8,9 @@ Released on 2026-07-16.
 
 - \[`pycodestyle`\] Add an autofix for `E402` ([#22212](https://github.com/astral-sh/ruff/pull/22212))
 - \[`refurb`\] Allow subclassing builtins in stub files (`FURB189`) ([#26812](https://github.com/astral-sh/ruff/pull/26812))
-- \[`ruff`\] Add `rule-codes-in-selectors` (`RUF201`) ([#26772](https://github.com/astral-sh/ruff/pull/26772))
 - \[`ruff`\] Add rule to replace `noqa` comments with `ruff:ignore` (`RUF105`) ([#26423](https://github.com/astral-sh/ruff/pull/26423))
 - \[`ruff`\] Add rule to use human-readable names in `ruff:ignore` comments (`RUF106`) ([#26682](https://github.com/astral-sh/ruff/pull/26682))
+- \[`ruff`\] Add rule to use human-readable names in configuration selectors (`RUF201`) ([#26772](https://github.com/astral-sh/ruff/pull/26772))
 
 ### Bug fixes
 
@@ -33,10 +33,6 @@ Released on 2026-07-16.
 - \[`flake8-datetimez`\] Clarify naming guidance for `datetime.today` (`DTZ002`) ([#26658](https://github.com/astral-sh/ruff/pull/26658))
 - \[`pycodestyle`\] Document `E731` fix safety ([#26847](https://github.com/astral-sh/ruff/pull/26847))
 - \[`ruff`\] Clarify intentional async contexts for `unused-async` (`RUF029`) ([#26641](https://github.com/astral-sh/ruff/pull/26641))
-
-### Other changes
-
-- [ty] Revert deferred call-gate optimization ([#26792](https://github.com/astral-sh/ruff/pull/26792))
 
 ### Contributors
 
