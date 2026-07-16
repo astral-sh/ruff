@@ -249,11 +249,6 @@ pub(crate) const fn is_typing_extensions_str_alias_enabled(settings: &LinterSett
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/19045
-pub(crate) const fn is_extended_i18n_function_matching_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/21374
 pub(crate) const fn is_extended_snmp_api_path_detection_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
