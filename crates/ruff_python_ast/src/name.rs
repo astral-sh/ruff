@@ -64,10 +64,18 @@ impl Name {
         Self(CharStr::from_static_str(name))
     }
 
+    /// Creates an exactly-sized name by concatenating string slices.
+    ///
+    /// The combined length is computed up front, so heap storage is allocated at most once.
+    #[inline]
+    pub fn concat<T: AsRef<str>>(slices: &[T]) -> Self {
+        Self(CharStr::concat(slices))
+    }
+
     /// Creates an exactly-sized name by joining string slices with a separator.
     ///
-    /// The combined length is computed up front, so heap storage is allocated at most once. For
-    /// dynamically formatted names, use [`Name::from`] with
+    /// Like [`Name::concat`], this computes the combined length up front, so heap storage is
+    /// allocated at most once. For dynamically formatted names, use [`Name::from`] with
     /// [`format_char!`](char_str::format_char). If a [`CharStr`] is sufficient, use
     /// [`format_char_str!`](char_str::format_char_str) instead.
     #[inline]
