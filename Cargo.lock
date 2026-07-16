@@ -436,9 +436,9 @@ dependencies = [
 
 [[package]]
 name = "char_str"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f826e1dd81cad0bcd59e3ba09153b87b1d0630423af6083204d08c310eb0cccf"
+checksum = "576ba56f6ca18ebb069d0d07260407171712aff4dfe15ee3f8982dc16a455bcf"
 dependencies = [
  "castaway",
  "get-size2",

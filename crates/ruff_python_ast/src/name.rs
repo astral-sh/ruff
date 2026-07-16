@@ -46,9 +46,6 @@ use crate::generated::ExprName;
 pub struct Name(CharStr);
 
 impl Name {
-    /// The maximum number of UTF-8 bytes stored inline in a name.
-    pub const INLINE_CAPACITY: usize = CharStr::INLINE_CAPACITY;
-
     #[inline]
     pub fn empty() -> Self {
         Self(CharStr::new())
@@ -57,6 +54,18 @@ impl Name {
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
         Self(CharStr::from(name.as_ref()))
+    }
+
+    /// Creates an inline name, returning `None` if `name` does not fit inline.
+    #[inline]
+    pub fn new_inline(name: impl AsRef<str>) -> Option<Self> {
+        CharStr::new_inline(name.as_ref()).map(Self)
+    }
+
+    /// Creates an exactly-sized, heap-allocated name.
+    #[inline]
+    pub fn new_heap(name: impl AsRef<str>) -> Self {
+        Self(CharStr::new_heap(name.as_ref()))
     }
 
     #[inline]

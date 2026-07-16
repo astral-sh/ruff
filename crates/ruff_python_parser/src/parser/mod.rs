@@ -46,15 +46,15 @@ struct NameInterner {
 impl NameInterner {
     /// Returns an inline name directly, or a shared clone of a heap-allocated name.
     fn intern(&mut self, text: &str) -> Name {
-        if text.len() <= Name::INLINE_CAPACITY {
-            return Name::new(text);
+        if let Some(name) = Name::new_inline(text) {
+            return name;
         }
 
         if let Some(name) = self.names.get(text) {
             return name.clone();
         }
 
-        let name = Name::new(text);
+        let name = Name::new_heap(text);
         self.names.insert(name.clone());
         name
     }
