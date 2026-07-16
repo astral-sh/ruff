@@ -10,8 +10,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
@@ -55,24 +53,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::EnumerateForLoop, Path::new("SIM113.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_simplify").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
