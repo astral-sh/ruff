@@ -7609,19 +7609,11 @@ mod tests {
         });
     }
 
-    #[derive(Clone, Copy)]
-    enum OrderingAuditToken {
-        Atom(usize),
-        And,
-        Or,
-        Not,
-    }
-
     fn solutions_for_constraint_orderings<'db>(
         db: &'db dyn Db,
         typevars: &[BoundTypeVarInstance<'db>],
         atoms: &[Constraint<'db>],
-        expression: &[OrderingAuditToken],
+        build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
     ) -> FxIndexSet<String> {
         let inferable = InferableTypeVars::from_typevars(
             db,
@@ -7641,39 +7633,7 @@ mod tests {
                 builder.intern_constraint(db, atoms[index]);
             }
 
-            let mut stack = Vec::new();
-            for token in expression {
-                match *token {
-                    OrderingAuditToken::Atom(index) => {
-                        let atom = atoms[index];
-                        stack.push(Constraint::new_node_with_bounds(
-                            db,
-                            &builder,
-                            atom.typevar,
-                            atom.bounds.lower,
-                            atom.bounds.upper,
-                        ));
-                    }
-                    OrderingAuditToken::And => {
-                        let right = stack.pop().expect("rhs should exist");
-                        let left = stack.pop().expect("lhs should exist");
-                        stack.push(left.and_with_offset(&builder, right));
-                    }
-                    OrderingAuditToken::Or => {
-                        let right = stack.pop().expect("rhs should exist");
-                        let left = stack.pop().expect("lhs should exist");
-                        stack.push(left.or_with_offset(&builder, right));
-                    }
-                    OrderingAuditToken::Not => {
-                        let node = stack.pop().expect("operand should exist");
-                        stack.push(node.negate(&builder));
-                    }
-                }
-            }
-            let [node] = stack.as_slice() else {
-                panic!("expression should leave one node");
-            };
-            let set = ConstraintSet::from_node(&builder, *node);
+            let set = ConstraintSet::from_node(&builder, build_bdd(&builder));
             let solutions = set.solutions(db, &builder, inferable);
             let mut merged = FxHashMap::default();
             if let Solutions::Constrained(paths) = &solutions {
@@ -7753,17 +7713,22 @@ mod tests {
                 bounds: ConstraintBounds::new(Some(bytes), None),
             },
         ];
-        let expression = [
-            OrderingAuditToken::Atom(0),
-            OrderingAuditToken::Atom(1),
-            OrderingAuditToken::And,
-            OrderingAuditToken::Atom(2),
-            OrderingAuditToken::And,
-            OrderingAuditToken::Atom(3),
-            OrderingAuditToken::Or,
-        ];
 
-        let actual = solutions_for_constraint_orderings(&db, &[t, u, v], &atoms, &expression);
+        let actual = solutions_for_constraint_orderings(&db, &[t, u, v], &atoms, |builder| {
+            let [t_list_u, u_int, list_int_t, bytes_v] = atoms.map(|atom| {
+                Constraint::new_node_with_bounds(
+                    &db,
+                    builder,
+                    atom.typevar,
+                    atom.bounds.lower,
+                    atom.bounds.upper,
+                )
+            });
+            t_list_u
+                .and_with_offset(builder, u_int)
+                .and_with_offset(builder, list_int_t)
+                .or_with_offset(builder, bytes_v)
+        });
         // TODO: All permutations should produce the first result. TDD traversal currently leaks
         // irrelevant positive constraints onto the `V = bytes` alternative.
         assert_eq!(
@@ -7807,16 +7772,22 @@ mod tests {
                 bounds: ConstraintBounds::new(Some(bytes), None),
             },
         ];
-        let expression = [
-            OrderingAuditToken::Atom(0),
-            OrderingAuditToken::Atom(1),
-            OrderingAuditToken::Or,
-            OrderingAuditToken::Not,
-            OrderingAuditToken::Atom(2),
-            OrderingAuditToken::Or,
-        ];
 
-        let actual = solutions_for_constraint_orderings(&db, &[t, u], &atoms, &expression);
+        let actual = solutions_for_constraint_orderings(&db, &[t, u], &atoms, |builder| {
+            let [t_int, t_str, bytes_u] = atoms.map(|atom| {
+                Constraint::new_node_with_bounds(
+                    &db,
+                    builder,
+                    atom.typevar,
+                    atom.bounds.lower,
+                    atom.bounds.upper,
+                )
+            });
+            t_int
+                .or_with_offset(builder, t_str)
+                .negate(builder)
+                .or_with_offset(builder, bytes_u)
+        });
         // TODO: All permutations should produce the first result. A satisfied alternative should
         // not infer `T` from unrelated positive decisions made earlier in a BDD path.
         assert_eq!(
@@ -7858,27 +7829,32 @@ mod tests {
                 bounds: ConstraintBounds::new(None, Some(int)),
             },
         ];
-        let expression = [
-            OrderingAuditToken::Atom(0),
-            OrderingAuditToken::Atom(1),
-            OrderingAuditToken::Or,
-            OrderingAuditToken::Atom(2),
-            OrderingAuditToken::And,
-            OrderingAuditToken::Atom(3),
-            OrderingAuditToken::And,
-        ];
 
         let actual: FxIndexSet<_> =
-            solutions_for_constraint_orderings(&db, &[t, u], &atoms, &expression)
-                .into_iter()
-                .map(|signature| {
-                    signature
-                        .split_once(" paths=")
-                        .expect("solution signature should contain paths")
-                        .0
-                        .to_string()
-                })
-                .collect();
+            solutions_for_constraint_orderings(&db, &[t, u], &atoms, |builder| {
+                let [t_int, t_str, int_t, u_int] = atoms.map(|atom| {
+                    Constraint::new_node_with_bounds(
+                        &db,
+                        builder,
+                        atom.typevar,
+                        atom.bounds.lower,
+                        atom.bounds.upper,
+                    )
+                });
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .and_with_offset(builder, int_t)
+                    .and_with_offset(builder, u_int)
+            })
+            .into_iter()
+            .map(|signature| {
+                signature
+                    .split_once(" paths=")
+                    .expect("solution signature should contain paths")
+                    .0
+                    .to_string()
+            })
+            .collect();
         // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not source
         // order. That changes which equivalent upper-bound intersection is constructed first.
         assert_eq!(
