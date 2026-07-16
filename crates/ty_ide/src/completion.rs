@@ -287,7 +287,9 @@ pub struct Completion<'db> {
     /// The name used when matching the query and ranking this suggestion.
     pub name: CompactString,
     /// The label shown to the user for this suggestion.
-    pub label: CompactString,
+    ///
+    /// This is only set when the label differs from the insert text.
+    label: Option<CompactString>,
     /// The fully qualified name, when available.
     ///
     /// This is only set when `module_name` is available.
@@ -352,6 +354,13 @@ pub struct Completion<'db> {
 }
 
 impl<'db> Completion<'db> {
+    pub fn label(&self) -> &str {
+        self.label
+            .as_deref()
+            .or(self.insert.as_deref())
+            .unwrap_or(self.name.as_str())
+    }
+
     fn builder(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder::new(name)
     }
@@ -478,17 +487,26 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let label = self.insert.as_ref().unwrap_or(&self.name).clone();
-        let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
+        let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
+        {
+            let label = self.insert.unwrap_or_else(|| self.name.clone());
             if ctx.capabilities.snippets {
                 let insert = compact_str::format_compact!("{label}($0)");
-                (Some(insert), CompletionInsertTextFormat::Snippet)
+                (
+                    Some(label),
+                    Some(insert),
+                    CompletionInsertTextFormat::Snippet,
+                )
             } else {
                 let insert = compact_str::format_compact!("{label}()");
-                (Some(insert), CompletionInsertTextFormat::PlainText)
+                (
+                    Some(label),
+                    Some(insert),
+                    CompletionInsertTextFormat::PlainText,
+                )
             }
         } else {
-            (self.insert, CompletionInsertTextFormat::PlainText)
+            (None, self.insert, CompletionInsertTextFormat::PlainText)
         };
         Completion {
             name: self.name,
@@ -7928,7 +7946,7 @@ x: Literal["can't", "won't"] = '<CURSOR>'
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.label.as_str())
+                    .unwrap_or(completion.label())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -7952,7 +7970,7 @@ x: Literal['say "hi"', 'say "bye"'] = "<CURSOR>"
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.label.as_str())
+                    .unwrap_or(completion.label())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -10922,7 +10940,7 @@ raise <CURSOR>
             self.filtered
                 .iter()
                 .map(|c| {
-                    let mut snapshot = c.insert.as_deref().unwrap_or(c.label.as_str()).to_string();
+                    let mut snapshot = c.insert.as_deref().unwrap_or(c.label()).to_string();
                     if self.type_signatures {
                         let ty =
                             c.ty.map(|ty| ty.display(self.db).to_string())
