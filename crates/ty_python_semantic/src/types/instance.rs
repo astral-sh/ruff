@@ -10,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -28,7 +28,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{RecursionGuard, TypeVisitor};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -729,7 +729,7 @@ fn non_recursive_protocol_interface<'db>(
     struct ProtocolReferenceFinder<'db> {
         origin: ClassLiteral<'db>,
         found: Cell<bool>,
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: RecursionGuard<'db>,
     }
 
     impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'db> {
@@ -737,8 +737,8 @@ fn non_recursive_protocol_interface<'db>(
             false
         }
 
-        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-            self.visit_type(db, type_alias.value_type(db));
+        fn should_visit_type_alias_value(&self) -> bool {
+            true
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -755,7 +755,7 @@ fn non_recursive_protocol_interface<'db>(
                 return;
             }
 
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            self.recursion_guard.walk(db, ty, self);
         }
     }
 
@@ -763,7 +763,7 @@ fn non_recursive_protocol_interface<'db>(
         let visitor = ProtocolReferenceFinder {
             origin: protocol.class_literal(db),
             found: Cell::new(false),
-            recursion_guard: TypeCollector::default(),
+            recursion_guard: RecursionGuard::default(),
         };
         walk_protocol_instance_member(db, member, receiver_ty, &visitor);
         !visitor.found.get()
