@@ -761,6 +761,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // This is prohibited by the typing spec because a TypeVarTuple consumes
     // all remaining positional type arguments.
     if let Some(type_params) = class_node.type_params.as_deref() {
+        super::type_param_validation::check_single_typevar_tuple_pep695(
+            context,
+            type_params,
+            super::type_param_validation::TypeParameterOwner::GenericClass(&class_node.name.id),
+        );
         super::type_param_validation::check_no_default_after_typevar_tuple_pep695(
             context,
             type_params,

@@ -25,15 +25,13 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `TypeVarTuple` properly
-# (these should include the `TypeVarTuple`s in their generic contexts)
 # revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
 # revealed: ty_extensions._internal.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions._internal.GenericContext[]
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
@@ -997,6 +995,7 @@ class Quux[*Ts, T1 = int, **P = [int, str]]: ...
 class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 
 # error: [invalid-type-variable-default]
+# error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"
 class Grault[*Us, *Ts = *tuple[int, str]]: ...
 
 # These are fine:

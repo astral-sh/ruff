@@ -285,6 +285,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
             }
+            Self::TypeVar(typevar_instance) if typevar_instance.is_typevartuple(db) => {
+                KnownClass::TypeVarTuple
+            }
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
                 KnownClass::GenericAlias

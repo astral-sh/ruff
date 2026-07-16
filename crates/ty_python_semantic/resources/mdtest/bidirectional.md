@@ -1555,7 +1555,7 @@ reveal_type(f5_paramspec)  # revealed: (x: int) -> int
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
 f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None
-reveal_type(f6)  # revealed: (tuple[int, ...], /) -> None
+reveal_type(f6)  # revealed: (*tuple[int, ...]) -> None
 
 f7: Callable[[int, str], None] = lambda *args: None
 reveal_type(f7)  # revealed: (*args) -> None
@@ -1565,9 +1565,11 @@ reveal_type(f7)  # revealed: (*args) -> None
 f8: Callable[[int], None] = lambda *, x=1: None
 reveal_type(f8)  # revealed: (int, /) -> None
 
-# TODO: This should reveal `(*args: int, *, x=1) -> None` once we support `Unpack`.
+# `Callable` annotations only describe positional parameters, so the keyword-only `x` is not
+# compatible with the positional suffix in the annotation.
+# error: [invalid-assignment]
 f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f9)  # revealed: (*args, *, x=1) -> None
+reveal_type(f9)  # revealed: (*tuple[int, ...], int) -> None
 
 f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
 reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]

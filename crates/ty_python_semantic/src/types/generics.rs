@@ -20,7 +20,9 @@ use crate::types::relation::{
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
-use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::tuple::{
+    TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
+};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
@@ -570,8 +572,16 @@ impl<'db> GenericContext<'db> {
                 };
                 Some(typevar.with_binding_context(db, binding_context))
             }
-            // TODO: Support this!
-            ast::TypeParam::TypeVarTuple(_) => None,
+            ast::TypeParam::TypeVarTuple(node) => {
+                let definition = index.expect_single_definition(node);
+                let declared = inferred_declaration(db, definition).declared()?;
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declared.inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.with_binding_context(db, binding_context))
+            }
         }
     }
 
@@ -883,12 +893,20 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self.len(db) {
-            0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
-        }
+        self.specialize(
+            db,
+            self.variables(db)
+                .map(|typevar| match typevar.kind(db) {
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                        Type::homogeneous_tuple(db, Type::unknown())
+                    }
+                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    }
+                    _ => Type::unknown(),
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -1026,11 +1044,15 @@ impl<'db> GenericContext<'db> {
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         let mut expanded = Vec::with_capacity(types.len());
         for typevar in variables.clone() {
-            if typevar.is_paramspec(db) {
-                expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
-            } else {
-                expanded.push(Type::unknown());
-            }
+            expanded.push(match typevar.kind(db) {
+                TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    Type::homogeneous_tuple(db, Type::unknown())
+                }
+                TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                    Type::paramspec_value_callable(db, Parameters::unknown())
+                }
+                _ => Type::unknown(),
+            });
         }
 
         for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
@@ -1212,6 +1234,37 @@ impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
     pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
         self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
+    }
+
+    /// Returns the specialization to use when the builtin tuple type parameter represents an
+    /// individual runtime element.
+    ///
+    /// The builtin tuple class's type parameter describes the type produced by runtime element
+    /// access. An unpacked `TypeVarTuple` describes those elements collectively, so project it to
+    /// `object` for tuple members and base classes while retaining the symbolic pack in the tuple's
+    /// own specialization.
+    pub(crate) fn tuple_runtime_element_specialization(self, db: &'db dyn Db) -> Self {
+        let Some(tuple) = self.tuple_inner(db) else {
+            return self;
+        };
+        // Ordinary tuple specializations already use their runtime element type as the tuple
+        // class's generic argument. Rebuilding them would add allocation and interning work to
+        // every tuple member and MRO lookup, both of which are hot paths in tuple-heavy programs.
+        if !matches!(
+            tuple.tuple(db),
+            TupleSpec::Variable(tuple)
+                if matches!(tuple.variable(), VariableSegment::TypeVarTuple(_))
+        ) {
+            return self;
+        }
+
+        Self::new(
+            db,
+            self.generic_context(db),
+            [tuple.tuple(db).homogeneous_element_type(db)].as_slice(),
+            self.materialization_kind(db),
+            None,
+        )
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -2102,10 +2155,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
         if generic_context
             .variables_inner(self.db)
             .values()
-            .any(|typevar| typevar.is_paramspec(self.db))
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
             return self.solve_hash_map_with(generic_context, choose);
         }
@@ -2360,17 +2414,45 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let identity = bound_typevar.identity(self.db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
-                // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
-                // the type checker can solve it to a common behavioral supertype. We don't
-                // implement that yet so in case there are multiple ParamSpecs, use the
-                // specialization from the first occurrence.
-                // https://github.com/astral-sh/ty/issues/1778
-                // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
-                if bound_typevar.is_paramspec(self.db) {
-                    return;
+                match bound_typevar.kind(self.db) {
+                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                        // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
+                        // the type checker can solve it to a common behavioral supertype. We don't
+                        // implement that yet so in case there are multiple ParamSpecs, use the
+                        // specialization from the first occurrence.
+                        // https://github.com/astral-sh/ty/issues/1778
+                        // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
+                    }
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                        // Repeated uses of a `TypeVarTuple` must have the same length, but the typing
+                        // spec leaves the exact inference behavior unspecified. Merge equal-length
+                        // candidates element-wise using unions.
+                        // https://typing.python.org/en/latest/spec/generics.html#type-variable-tuple-equality
+                        let accumulator = entry.get_mut();
+                        let existing = accumulator.get_or_build(self.db);
+                        if existing == ty {
+                            return;
+                        }
+                        let Some(existing_tuple) = existing.exact_tuple_instance_spec(self.db)
+                        else {
+                            return;
+                        };
+                        let Some(new_tuple) = ty.exact_tuple_instance_spec(self.db) else {
+                            return;
+                        };
+                        if existing_tuple.len() != new_tuple.len() {
+                            return;
+                        }
+                        let unioned = TupleSpecBuilder::from(existing_tuple.as_ref())
+                            .union(self.db, &new_tuple)
+                            .build();
+                        *accumulator =
+                            UnionAccumulator::new(Type::tuple(TupleType::new(self.db, &unioned)));
+                    }
+                    _ => {
+                        entry.get_mut().add(self.db, ty);
+                    }
                 }
-
-                entry.get_mut().add(self.db, ty);
             }
             Entry::Vacant(entry) => {
                 entry.insert(UnionAccumulator::new(ty));
@@ -2459,7 +2541,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         for solution in solutions {
             for binding in solution {
-                self.insert_hash_map_type_mapping(binding.bound_typevar, binding.solution);
+                let solution = self.remove_inferable_typevar_artifacts_from_solution(
+                    binding.bound_typevar,
+                    binding.solution,
+                );
+                self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
         }
         Ok(())
@@ -3097,6 +3183,69 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     formal.tuple_instance_spec(self.db),
                     actual_nominal.tuple_spec(self.db),
                 ) {
+                    if let TupleSpec::Variable(formal_variable) = formal_tuple.as_ref()
+                        && let VariableSegment::TypeVarTuple(typevartuple) =
+                            formal_variable.variable()
+                    {
+                        let formal_prefix_len = formal_variable.prefix_elements().len();
+                        let formal_suffix_len = formal_variable.suffix_elements().len();
+                        let (actual_prefix, packed, actual_suffix) = match actual_tuple.as_ref() {
+                            TupleSpec::Fixed(actual) => {
+                                let Some(middle_end) = actual.len().checked_sub(formal_suffix_len)
+                                else {
+                                    return Ok(());
+                                };
+                                if middle_end < formal_prefix_len {
+                                    return Ok(());
+                                }
+
+                                let elements = actual.elements_slice();
+                                (
+                                    &elements[..formal_prefix_len],
+                                    Type::heterogeneous_tuple(
+                                        self.db,
+                                        elements[formal_prefix_len..middle_end].iter().copied(),
+                                    ),
+                                    &elements[middle_end..],
+                                )
+                            }
+                            TupleSpec::Variable(actual) => {
+                                let actual_prefix_elements = actual.prefix_elements();
+                                let actual_suffix_elements = actual.suffix_elements();
+                                if actual_prefix_elements.len() < formal_prefix_len
+                                    || actual_suffix_elements.len() < formal_suffix_len
+                                {
+                                    return Ok(());
+                                }
+
+                                let suffix_start = actual_suffix_elements.len() - formal_suffix_len;
+                                (
+                                    &actual_prefix_elements[..formal_prefix_len],
+                                    Type::tuple(TupleType::mixed_with_segment(
+                                        self.db,
+                                        actual_prefix_elements[formal_prefix_len..].iter().copied(),
+                                        actual.variable(),
+                                        actual_suffix_elements[..suffix_start].iter().copied(),
+                                    )),
+                                    &actual_suffix_elements[suffix_start..],
+                                )
+                            }
+                        };
+                        let variance = TypeVarVariance::Covariant.compose(polarity);
+                        for (formal_element, actual_element) in
+                            formal_variable.prefix_elements().iter().zip(actual_prefix)
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+                        for (formal_element, actual_element) in
+                            formal_variable.suffix_elements().iter().zip(actual_suffix)
+                        {
+                            self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        }
+                        self.add_type_mapping(typevartuple, packed, variance);
+                        return Ok(());
+                    }
+
                     let Some(most_precise_length) =
                         formal_tuple.len().most_precise(actual_tuple.len())
                     else {
@@ -3109,12 +3258,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     };
                     for (formal_element, actual_element) in formal_tuple
-                        .all_elements()
-                        .iter()
-                        .zip(actual_tuple.all_elements())
+                        .iter_element_types(self.db)
+                        .zip(actual_tuple.iter_element_types(self.db))
                     {
                         let variance = TypeVarVariance::Covariant.compose(polarity);
-                        self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        self.infer_map_impl(formal_element, actual_element, variance, seen)?;
                     }
                     return Ok(());
                 }

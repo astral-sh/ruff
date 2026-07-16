@@ -626,7 +626,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
-                        for ty in rhs_tuple.iter_all_elements() {
+                        for ty in rhs_tuple.iter_element_types(db) {
                             let eq_result = infer_binary_type_comparison(
                                 context,
                                 left,
@@ -1084,7 +1084,7 @@ fn infer_tuple_rich_comparison<'db>(
         // We use `try_for_each_element_pair` to iterate over all possible pairings.
         (left @ TupleSpec::Variable(_), right) | (left, right @ TupleSpec::Variable(_)) => {
             let mut results = SmallVec::<[Type<'db>; 8]>::new();
-            left.try_for_each_element_pair(right, |l_ty, r_ty| {
+            left.try_for_each_element_pair(db, right, |l_ty, r_ty| {
                 results.push(infer_binary_type_comparison(
                     context,
                     l_ty,

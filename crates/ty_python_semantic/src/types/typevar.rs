@@ -225,6 +225,10 @@ impl<'db> TypeVarInstance<'db> {
         self.kind(db).is_paramspec()
     }
 
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
+    }
+
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -577,17 +581,19 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::standard(
-                            tuple_spec
-                                .iter_all_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        )
+                        match tuple_spec.as_ref() {
+                            Tuple::Fixed(tuple) => {
+                                Parameters::standard(tuple.iter_all_elements().map(|ty| {
+                                    Parameter::positional_only(None).with_annotated_type(ty)
+                                }))
+                            }
+                            // A `ParamSpec` default cannot contain a variable-length tuple, so this
+                            // branch only recovers from an invalid type expression.
+                            Tuple::Variable(_) => Parameters::unknown(),
+                        }
                     }),
                 Type::Dynamic(dynamic) => match dynamic {
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple => Parameters::todo(),
+                    DynamicType::Todo(_) => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
@@ -639,6 +645,11 @@ impl<'db> TypeVarInstance<'db> {
                 let default_ty =
                     definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
                 convert_type_to_paramspec_value(db, default_ty)
+            }
+            // PEP 695 TypeVarTuple
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                let typevartuple_node = typevartuple.node(&module);
+                definition_expression_type(db, definition, typevartuple_node.default.as_ref()?)
             }
             _ => return None,
         };
@@ -925,6 +936,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
     }
 
     /// Returns a new bound typevar instance with the given `ParamSpec` attribute set.
@@ -1309,6 +1324,10 @@ pub enum TypeVarKind {
     LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
+    /// `Ts = TypeVarTuple("Ts")`
+    LegacyTypeVarTuple,
+    /// `def foo[*Ts]() -> None: ...`
+    Pep695TypeVarTuple,
     /// `Alias: typing.TypeAlias = T`
     Pep613Alias,
 }
@@ -1316,6 +1335,10 @@ pub enum TypeVarKind {
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
+    }
+
+    pub(super) const fn is_typevartuple(self) -> bool {
+        matches!(self, Self::LegacyTypeVarTuple | Self::Pep695TypeVarTuple)
     }
 }
 

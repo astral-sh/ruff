@@ -23,8 +23,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType, TypedDictType,
+    UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -144,6 +144,8 @@ pub(crate) enum SubscriptErrorKind<'db> {
     },
     /// A `TypeVarTuple` was provided to `Generic` or `Protocol` without being unpacked.
     TypeVarTupleNotUnpacked { origin: LegacyGenericOrigin },
+    /// More than one `TypeVarTuple` was provided to `Generic` or `Protocol`.
+    MultipleTypeVarTuples { origin: LegacyGenericOrigin },
 }
 
 impl<'db> SubscriptError<'db> {
@@ -348,6 +350,13 @@ impl<'db> SubscriptErrorKind<'db> {
                     builder.into_diagnostic(format_args!(
                         "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when \
                         used as an argument to `{origin}`",
+                    ));
+                }
+            }
+            Self::MultipleTypeVarTuples { origin } => {
+                if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Only one `TypeVarTuple` parameter is allowed in a `{origin}` subscription",
                     ));
                 }
             }
@@ -781,7 +790,8 @@ impl<'db> Type<'db> {
             }
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
-                Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
+                // TODO: Emit an invalid-type-form diagnostic for runtime subscripting of `Unpack`.
+                Some(Ok(Type::unknown()))
             }
 
             (Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)), _) => {
