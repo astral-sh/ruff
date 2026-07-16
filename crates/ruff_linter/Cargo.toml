@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.15.21"
+version = "0.15.22"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
