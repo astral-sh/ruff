@@ -548,42 +548,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return result;
             }
 
-            if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                && !self.is_context_collection_enabled()
-                && let Type::ProtocolInstance(source_protocol) = ty
-                && let Some(source_instance) = source_protocol_as_nominal
-                && let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
-                    (source_instance.class(db), nominal_instance.class(db))
-                && source_alias.origin(db) == target_alias.origin(db)
-                && let Some(identity_protocol) = target_alias
-                    .origin(db)
-                    .identity_specialization(db)
-                    .into_protocol_class(db)
-            {
-                let source_interface = source_protocol.interface(db);
-                let target_interface = protocol.interface(db);
-                let source_non_recursive =
-                    non_recursive_protocol_interface(db, source_interface, identity_protocol, ty);
-                let target_non_recursive = non_recursive_protocol_interface(
-                    db,
-                    target_interface,
-                    identity_protocol,
-                    Type::ProtocolInstance(protocol),
-                );
-
-                if source_non_recursive != source_interface
-                    || target_non_recursive != target_interface
-                {
-                    // Finite members retain structural solutions (such as `T | int`), while
-                    // recursive members are the coinductive edge currently being proved.
-                    let structurally_satisfied = self.check_protocol_interface_pair(
-                        db,
-                        ty,
-                        source_non_recursive,
-                        target_non_recursive,
-                    );
-                    return result.or(db, self.constraints, || structurally_satisfied);
-                }
+            if let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
+                db,
+                ty,
+                protocol,
+                source_protocol_as_nominal,
+                nominal_instance,
+            ) {
+                return result.or(db, self.constraints, || structurally_satisfied);
             }
 
             // For union simplification, failing the nominal relation between two
@@ -638,6 +610,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
+    }
+
+    /// Tries to relate the finite members of two specializations of the same protocol.
+    ///
+    /// This retains structural solutions such as `T | int`, while recursive members are the
+    /// coinductive edge currently being proved. Returns `None` when the shortcut is inapplicable.
+    fn try_check_non_recursive_protocol_members(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+        source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
+        nominal_instance: NominalInstanceType<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || self.is_context_collection_enabled()
+        {
+            return None;
+        }
+
+        let Type::ProtocolInstance(source_protocol) = ty else {
+            return None;
+        };
+        let source_instance = source_protocol_as_nominal?;
+        let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
+            (source_instance.class(db), nominal_instance.class(db))
+        else {
+            return None;
+        };
+        if source_alias.origin(db) != target_alias.origin(db) {
+            return None;
+        }
+        let identity_protocol = target_alias
+            .origin(db)
+            .identity_specialization(db)
+            .into_protocol_class(db)?;
+
+        let source_interface = source_protocol.interface(db);
+        let target_interface = protocol.interface(db);
+        let source_non_recursive =
+            non_recursive_protocol_interface(db, source_interface, identity_protocol, ty);
+        let target_non_recursive = non_recursive_protocol_interface(
+            db,
+            target_interface,
+            identity_protocol,
+            Type::ProtocolInstance(protocol),
+        );
+
+        if source_non_recursive == source_interface && target_non_recursive == target_interface {
+            return None;
+        }
+
+        Some(self.check_protocol_interface_pair(db, ty, source_non_recursive, target_non_recursive))
     }
 
     /// Return whether a class-object type inhabits `type[protocol]`.
