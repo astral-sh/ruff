@@ -5123,6 +5123,26 @@ def _(t: TypeVarRecursive):
     reveal_type(t.y)  # revealed: TypeVarRecursive
 ```
 
+### Self-recursive TypeVar bounds
+
+Applying a recursive protocol's bound while comparing its generic method must not recursively
+re-enter the same signature relation:
+
+```py
+from typing import Protocol, TypeVar
+
+SelfT = TypeVar("SelfT", bound="Comparable")
+
+class Comparable(Protocol):
+    def __lt__(self: SelfT, other: SelfT) -> bool: ...
+
+class Concrete:
+    def __lt__(self, other: "Concrete") -> bool:
+        return False
+
+value: Comparable = Concrete()
+```
+
 ### Nested occurrences of self-reference
 
 Make sure that we handle self-reference correctly, even if the self-reference appears deeply nested

@@ -1072,7 +1072,17 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
-            receiver.when_constraint_set_assignable_to_owned(db, annotation)
+            let receiver_constraint =
+                receiver.when_constraint_set_assignable_to_owned(db, annotation);
+            if receiver_constraint.is_trivially_always_satisfied() {
+                return receiver_constraint;
+            }
+            let builder = ConstraintSetBuilder::new();
+            std::borrow::Cow::Owned(builder.into_owned(|builder| {
+                builder
+                    .load(db, receiver_constraint.as_ref())
+                    .and_valid_typevar_specializations(db, builder)
+            }))
         });
         let receiver_constraints = merge_receiver_constraints(
             db,

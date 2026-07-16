@@ -590,8 +590,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
     /// were inferable when this constraint set was created, and which should be abstracted away.
     /// Those typevars will be removed from the constraint set, and the constraint set will return
-    /// true whenever there was _any valid_ specialization of those typevars that returned true
-    /// before.
+    /// true whenever there was _any_ specialization of those typevars that returned true before.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
@@ -599,23 +598,38 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
+        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+    }
+
+    /// Intersects this set with the declared domain of every constrained type variable.
+    ///
+    /// Receiver constraints need this explicitly so that a nested type variable cannot be inferred
+    /// outside of its declared domain:
+    ///
+    /// ```python
+    /// class C:
+    ///     def method[T: int](self: list[T]) -> None: ...
+    /// ```
+    ///
+    /// This is separate from [`Self::reduce_inferable`], because applying domains during every
+    /// signature abstraction would recursively reapply self-referential protocol bounds.
+    pub(crate) fn and_valid_typevar_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
         let mut constrained = self.node;
         let mut typevars = FxOrderSet::default();
-        // Existential abstraction must be restricted to each typevar's declared domain. Otherwise,
-        // a constraint such as `Receiver ≤ T` could be satisfied by `T = object` even when `T` is
-        // declared with an incompatible upper bound or set of constraints.
         self.node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
-                let typevar = builder.constraint_data(constraint).typevar;
-                if typevar.is_inferable(db, to_remove) {
-                    typevars.insert(typevar);
-                }
+                typevars.insert(builder.constraint_data(constraint).typevar);
             });
         for typevar in typevars {
             constrained =
                 constrained.and_with_offset(builder, typevar.valid_specializations(db, builder));
         }
-        Self::from_node(builder, constrained.exists(db, builder, to_remove))
+        Self::from_node(builder, constrained)
     }
 
     /// Applies a type mapping to every constraint in this constraint set.
