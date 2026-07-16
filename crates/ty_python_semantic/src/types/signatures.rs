@@ -39,8 +39,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1072,19 +1072,6 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
-            // TODO: Also intersect nested receiver type variables, such as the `T` in
-            // `self: list[T]`, with their valid specializations when constructing or solving the
-            // receiver constraint set.
-            let receiver_typevar = match annotation {
-                Type::TypeVar(typevar) => Some(typevar),
-                Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
-                _ => None,
-            };
-            if receiver_typevar.is_some_and(|typevar| {
-                Self::receiver_violates_typevar_domain(db, receiver, typevar)
-            }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
-            }
             receiver.when_constraint_set_assignable_to_owned(db, annotation)
         });
         let receiver_constraints = merge_receiver_constraints(
@@ -1113,40 +1100,6 @@ impl<'db> Signature<'db> {
             receiver_constraints,
             parameters,
             return_ty,
-        }
-    }
-
-    /// Returns whether a concrete receiver violates a direct receiver type variable's domain.
-    ///
-    /// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
-    /// leaving the original receiver relation available to normal inference. Transparent PEP 695
-    /// receiver aliases are resolved by the caller before this check.
-    ///
-    /// ```python
-    /// class C:
-    ///     def method[T: int](self: T) -> None: ...
-    /// ```
-    fn receiver_violates_typevar_domain(
-        db: &'db dyn Db,
-        receiver: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        let Some(domain) = typevar.typevar(db).bound_or_constraints(db) else {
-            return false;
-        };
-        if receiver.has_typevar(db) {
-            return false;
-        }
-
-        !match domain {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                receiver.is_assignable_to(db, bound.top_materialization(db))
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                constraints.elements(db).iter().any(|constraint| {
-                    receiver.is_assignable_to(db, constraint.top_materialization(db))
-                })
-            }
         }
     }
 
