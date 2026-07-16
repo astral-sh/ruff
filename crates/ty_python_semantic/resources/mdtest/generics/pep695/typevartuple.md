@@ -640,12 +640,12 @@ def forward_mixed[*Ts](
     accept_mixed_forwarded(callback, args)
 ```
 
-### Callable checks temporarily deferred
+### Callable checks
 
 Call binding now infers a `TypeVarTuple` from `*args` before ordinary callback constraints. A
-temporary callable-check workaround still avoids false positives for generic callbacks and
-correlated overloads; a later task removes that workaround while preserving these valid cases and
-reporting genuinely incompatible callbacks.
+generic callback continues through the standard assignability check. Overloaded callbacks are
+validated against the pack requirements inferred from the other call arguments; finite outer
+constraints preserve overload correlations, while a genuinely incompatible callback is rejected.
 
 ```py
 from collections.abc import Awaitable, Callable
@@ -680,8 +680,27 @@ def returns_int(value: str) -> int: ...
 def returns_int(value: int | str) -> int:
     return 1
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type]
 invoke_str(returns_int, 1)
+
+@overload
+def accepts_int_or_str(value: int) -> str: ...
+@overload
+def accepts_int_or_str(value: str) -> str: ...
+def accepts_int_or_str(value: int | str) -> str:
+    return ""
+
+invoke_str(accepts_int_or_str, 1)
+invoke_str(accepts_int_or_str, "value")
+
+# error: [invalid-argument-type]
+invoke_str(accepts_int_or_str, 1.0)
+
+def invalid_wrapper[T](value: T) -> str:
+    # error: [invalid-argument-type]
+    return invoke_str(accepts_int_or_str, value)
+
+invalid_wrapper(1.0)
 ```
 
 ### Callable inference with fixed positional parameters
