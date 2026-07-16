@@ -83,13 +83,30 @@ help: Replace rule code with name
 
 ## Invalid rule codes
 
-Invalid rule codes are not flagged, including nested quoting issues like `"'F401'"`:
+Invalid rule codes are not flagged, including nested quoting issues like `"'F401'"`, but valid codes
+in the same selector are still analyzed:
 
 `ruff.toml`:
 
 ```toml
 [lint]
-select = ["'F401'"]
+# snapshot: rule-codes-in-selectors
+select = ["'F401'", "F402"]
+```
+
+```snapshot
+error[RUF201]: Rule code used instead of name in `lint.select`
+ --> src/ruff.toml:3:22
+  |
+3 | select = ["'F401'", "F402"]
+  |                      ^^^^
+  |
+help: Replace rule code with name
+  |
+2 | # snapshot: rule-codes-in-selectors
+  - select = ["'F401'", "F402"]
+3 + select = ["'F401'", "import-shadowed-by-loop-var"]
+  |
 ```
 
 ## Prefixes and names
