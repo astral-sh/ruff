@@ -325,7 +325,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Extract name.
         let name = name_type
             .as_string_literal()
-            .map(|literal| Name::new(literal.value(db)));
+            .map(|literal| literal.value(db));
 
         if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -338,7 +338,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
-        } else if let Some(actual_name) = name.as_deref()
+        } else if let Some(actual_name) = name
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && assigned_name.as_str() != actual_name
@@ -353,7 +353,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
+        let name = name.unwrap_or("<unknown>");
 
         // Handle fields based on which namedtuple variant.
         let anchor = match definition {

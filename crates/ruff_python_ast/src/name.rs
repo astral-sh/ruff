@@ -151,6 +151,27 @@ impl salsa::Lookup<compact_str::CompactString> for &Name {
 }
 
 #[cfg(feature = "salsa")]
+impl salsa::Lookup<Name> for &str {
+    #[inline]
+    fn into_owned(self) -> Name {
+        Name::new(self)
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&str> for Name {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(self.as_str(), state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&str) -> bool {
+        self.as_str() == *data
+    }
+}
+
+#[cfg(feature = "salsa")]
 impl salsa::HashEqLike<Name> for compact_str::CompactString {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {

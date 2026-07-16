@@ -254,7 +254,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name = name_type
             .as_string_literal()
-            .map(|literal| Name::new(literal.value(db)));
+            .map(|literal| literal.value(db));
 
         if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -269,19 +269,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         } else if let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
+            && Some(assigned_name.as_str()) != name
         {
             report_mismatched_type_name(
                 &self.context,
                 name_arg,
                 "TypedDict",
                 &assigned_name,
-                name.as_deref(),
+                name,
                 name_type,
             );
         }
 
-        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
+        let name = name.unwrap_or("<unknown>");
 
         self.validate_fields_arg(fields_arg);
 

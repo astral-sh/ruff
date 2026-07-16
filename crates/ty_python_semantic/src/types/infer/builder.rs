@@ -3342,10 +3342,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
-            db,
-            ast::name::Name::from(name),
-            definition,
-            None,
+            db, name, definition, None,
         )))
     }
 
@@ -3678,11 +3675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                db,
-                ast::name::Name::new(name),
-                definition,
-            )),
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition)),
         ))
     }
 
