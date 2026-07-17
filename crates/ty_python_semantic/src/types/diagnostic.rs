@@ -134,6 +134,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
+    registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
@@ -955,6 +956,15 @@ declare_lint! {
     pub(crate) static FINAL_WITHOUT_VALUE = {
         summary: "detects `Final` declarations without a value",
         status: LintStatus::stable("0.0.15"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/abstract-and-final-method.md")]
+    pub(crate) static ABSTRACT_AND_FINAL_METHOD = {
+        summary: "detects methods that are both abstract and final",
+        status: LintStatus::stable("0.0.61"),
         default_level: Level::Error,
     }
 }
