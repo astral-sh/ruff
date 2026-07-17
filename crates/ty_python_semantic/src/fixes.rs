@@ -818,6 +818,7 @@ mod tests {
     use crate::Db;
     use crate::db::tests::TestDbBuilder;
     use crate::fixes::{FixMode, fix_all};
+    use crate::is_unused_ignore_comment_lint;
 
     #[test]
     fn simple_suppression() {
@@ -1585,7 +1586,11 @@ class B(A):
             .iter()
             .filter(|diagnostic| FixMode::Suppress.is_fixable(diagnostic))
             .count();
-        let unsuppressible_diagnostics = total_diagnostics - suppressible_diagnostics;
+        let unsuppressible_diagnostics: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            .cloned()
+            .collect();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes =
             suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
@@ -1602,9 +1607,21 @@ class B(A):
                     .iter()
                     .all(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
             );
-            // Adding a code to an empty suppression can also resolve its
-            // `unused-ignore-comment`.
-            assert!(fixes.diagnostics.len() <= unsuppressible_diagnostics);
+
+            let unexpected_diagnostics =
+                diff_diagnostics(&unsuppressible_diagnostics, &fixes.diagnostics);
+            assert!(unexpected_diagnostics.is_empty());
+
+            let incidentally_fixed_diagnostics =
+                diff_diagnostics(&fixes.diagnostics, &unsuppressible_diagnostics);
+            // Adding a code to an empty suppression also resolves its
+            // `unused-ignore-comment`, without adding another suppression.
+            assert!(incidentally_fixed_diagnostics.iter().all(|diagnostic| {
+                diagnostic
+                    .id()
+                    .as_lint()
+                    .is_some_and(is_unused_ignore_comment_lint)
+            }));
         }
 
         File::sync_path(&mut db, SystemPath::new("test.py"));
