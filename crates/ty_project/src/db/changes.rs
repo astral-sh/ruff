@@ -91,7 +91,7 @@ impl ProjectDatabase {
                             reload_project_files = true;
                         } else if project.is_directory_included(self, directory)
                             && ignore_files.as_mut().is_none_or(|ignore_files| {
-                                ignore_files.is_ignored(directory, true).is_uncertain()
+                                !ignore_files.is_ignored(directory, true)
                             })
                         {
                             tracing::debug!(
@@ -142,8 +142,8 @@ impl ProjectDatabase {
                     }
 
                     // A created file can be indexed directly unless project indexing needs the
-                    // walker to apply ignore-file semantics. The ignore fast path below skips
-                    // that walk when it can prove a root ignore file already prunes the path.
+                    // walker to apply ignore-file semantics. The ignore check below skips that
+                    // walk when the path is ignored.
                     if !project.file_set(self).is_lazy() {
                         if self.system().is_file(path) {
                             if !project
@@ -153,17 +153,17 @@ impl ProjectDatabase {
                                 continue;
                             }
 
-                            if let Some(ignore_files) = ignore_files.as_mut() {
-                                if ignore_files.is_ignored(path, false).is_uncertain() {
-                                    added_paths.insert(path.to_path_buf());
-                                }
-                            } else if let Ok(file) = system_path_to_file(self, path) {
+                            if ignore_files
+                                .as_mut()
+                                .is_none_or(|ignore_files| !ignore_files.is_ignored(path, false))
+                                && let Ok(file) = system_path_to_file(self, path)
+                            {
                                 project.add_file(self, file);
                             }
                         } else if project.is_directory_included(self, path)
-                            && ignore_files.as_mut().is_none_or(|ignore_files| {
-                                ignore_files.is_ignored(path, true).is_uncertain()
-                            })
+                            && ignore_files
+                                .as_mut()
+                                .is_none_or(|ignore_files| !ignore_files.is_ignored(path, true))
                         {
                             // Unlike a new file, a new directory needs walking to discover
                             // project files that exist below it.

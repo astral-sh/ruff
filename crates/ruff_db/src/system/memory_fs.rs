@@ -13,7 +13,7 @@ use crate::system::{
 };
 
 use super::walk_directory::{
-    DirectoryWalker, IgnoreIncremental, Ignored, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitor, WalkDirectoryVisitorBuilder, WalkState,
 };
 
@@ -569,16 +569,12 @@ struct MemoryIgnoreIncremental {
 }
 
 impl IgnoreIncremental for MemoryIgnoreIncremental {
-    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
         // This matches the semantics of the in-memory recursive
         // directory traversal. That is, the only thing we care
         // about filtering is hidden files. We let everything else
         // through.
-        if self.ignore_hidden && !is_directory && is_hidden(path) {
-            Ignored::Yes
-        } else {
-            Ignored::Uncertain
-        }
+        self.ignore_hidden && !is_directory && is_hidden(path)
     }
 }
 
