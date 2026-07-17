@@ -47,7 +47,7 @@
 </tspan>
     <tspan x="10px" y="262px"><tspan>  </tspan><tspan class="fg-bright-blue bold">= </tspan><tspan class="bold">note</tspan><tspan>: expected reference `&amp;[u8]`</tspan>
 </tspan>
-    <tspan x="10px" y="280px"><tspan>             found reference `&amp;'static str`</tspan>
+    <tspan x="10px" y="280px"><tspan>   found reference `&amp;'static str`</tspan>
 </tspan>
   </text>
 

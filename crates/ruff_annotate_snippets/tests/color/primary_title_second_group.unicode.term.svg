@@ -34,7 +34,7 @@
 </tspan>
     <tspan x="10px" y="136px"><tspan class="fg-bright-green bold">note</tspan><tspan class="bold">: expected type: `snippet::Annotation`</tspan>
 </tspan>
-    <tspan x="10px" y="154px"><tspan>      </tspan><tspan class="bold">   found type: `__&amp;__snippet::Annotation`</tspan>
+    <tspan x="10px" y="154px"><tspan class="bold">   found type: `__&amp;__snippet::Annotation`</tspan>
 </tspan>
   </text>
 

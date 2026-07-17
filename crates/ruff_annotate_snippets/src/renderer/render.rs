@@ -447,12 +447,13 @@ fn render_title(
         (normalize_whitespace(title.text()), title_element_style)
     };
     for (i, text) in title_str.split('\n').enumerate() {
+        #[allow(clippy::collapsible_if, reason = "reduce upstream divergence")]
         if i != 0 {
-            buffer.append(buffer_msg_line_offset + i, &padding, ElementStyle::NoStyle);
             if title_style == TitleStyle::Secondary
                 && is_cont
                 && matches!(renderer.decor_style, DecorStyle::Unicode)
             {
+                buffer.append(buffer_msg_line_offset + i, &padding, ElementStyle::NoStyle);
                 // There's another note after this one, associated to the subwindow above.
                 // We write additional vertical lines to join them:
                 //   ╭▸ test.rs:3:3

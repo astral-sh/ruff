@@ -2243,7 +2243,7 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
   |                 ^^^^^^^ `EqAlias` is not dyn compatible
   |
 note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
  --> $SRC_DIR/core/src/cmp.rs:334:14
   |
   = note: ...because it uses `Self` as a type parameter
@@ -2265,7 +2265,7 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
   │                 ━━━━━━━ `EqAlias` is not dyn compatible
   ╰╴
 note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
   ╭▸ $SRC_DIR/core/src/cmp.rs:334:14
   │
   ├ note: ...because it uses `Self` as a type parameter
@@ -3296,7 +3296,7 @@ error[E0308]: mismatched types
   |            expected due to this
   |
   = note: expected reference `&[u8]`
-             found reference `&'static str`
+   found reference `&'static str`
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -3316,7 +3316,7 @@ error[E0308]: mismatched types
   │            expected due to this
   │
   ╰ note: expected reference `&[u8]`
-             found reference `&'static str`
+   found reference `&'static str`
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -3362,7 +3362,7 @@ error[E0308]: mismatched types
   |            expected due to this
   |
   = note: expected reference `&str`
-             found reference `&'static [u8; 0]`
+   found reference `&'static [u8; 0]`
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -3377,7 +3377,7 @@ error[E0308]: mismatched types
   │            expected due to this
   │
   ╰ note: expected reference `&str`
-             found reference `&'static [u8; 0]`
+   found reference `&'static [u8; 0]`
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -4139,14 +4139,14 @@ error[E0599]: the method `quote_into_iter` exists for struct `Ipv4Addr`, but its
    |             ^^^^^^^^^^^^^^^^^^ method cannot be called on `Ipv4Addr` due to unsatisfied trait bounds
    |
    = note: the following trait bounds were not satisfied:
-           `Ipv4Addr: Iterator`
-           which is required by `Ipv4Addr: proc_macro::ext::RepIteratorExt`
-           `&Ipv4Addr: Iterator`
-           which is required by `&Ipv4Addr: proc_macro::ext::RepIteratorExt`
-           `Ipv4Addr: ToTokens`
-           which is required by `Ipv4Addr: proc_macro::ext::RepToTokensExt`
-           `&mut Ipv4Addr: Iterator`
-           which is required by `&mut Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`Ipv4Addr: Iterator`
+which is required by `Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`&Ipv4Addr: Iterator`
+which is required by `&Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`Ipv4Addr: ToTokens`
+which is required by `Ipv4Addr: proc_macro::ext::RepToTokensExt`
+`&mut Ipv4Addr: Iterator`
+which is required by `&mut Ipv4Addr: proc_macro::ext::RepIteratorExt`
 note: the traits `Iterator` and `ToTokens` must be implemented
   --> $SRC_DIR/proc_macro/src/to_tokens.rs:11:0
   --> $SRC_DIR/core/src/iter/traits/iterator.rs:39:0
@@ -4165,14 +4165,14 @@ error[E0599]: the method `quote_into_iter` exists for struct `Ipv4Addr`, but its
    │             ━━━━━━━━━━━━━━━━━━ method cannot be called on `Ipv4Addr` due to unsatisfied trait bounds
    │
    ╰ note: the following trait bounds were not satisfied:
-           `Ipv4Addr: Iterator`
-           which is required by `Ipv4Addr: proc_macro::ext::RepIteratorExt`
-           `&Ipv4Addr: Iterator`
-           which is required by `&Ipv4Addr: proc_macro::ext::RepIteratorExt`
-           `Ipv4Addr: ToTokens`
-           which is required by `Ipv4Addr: proc_macro::ext::RepToTokensExt`
-           `&mut Ipv4Addr: Iterator`
-           which is required by `&mut Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`Ipv4Addr: Iterator`
+which is required by `Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`&Ipv4Addr: Iterator`
+which is required by `&Ipv4Addr: proc_macro::ext::RepIteratorExt`
+`Ipv4Addr: ToTokens`
+which is required by `Ipv4Addr: proc_macro::ext::RepToTokensExt`
+`&mut Ipv4Addr: Iterator`
+which is required by `&mut Ipv4Addr: proc_macro::ext::RepIteratorExt`
 note: the traits `Iterator` and `ToTokens` must be implemented
    ─▸ $SRC_DIR/proc_macro/src/to_tokens.rs:11:0
    ─▸ $SRC_DIR/core/src/iter/traits/iterator.rs:39:0
@@ -4248,7 +4248,6 @@ error[E0220]: associated type `Pr` not found for `S<bool>` in the current scope
    |                       ^^ associated item not found in `S<bool>`
    |
    = note: the associated type was found for
-           
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -4264,7 +4263,6 @@ error[E0220]: associated type `Pr` not found for `S<bool>` in the current scope
    │                       ━━ associated item not found in `S<bool>`
    │
    ╰ note: the associated type was found for
-           
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -4778,7 +4776,7 @@ error[E0038]: the trait `Ord` is not dyn compatible
    │                                 ━━━ `Ord` is not dyn compatible
    ╰╴
 note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
    ╭▸ $SRC_DIR/core/src/cmp.rs:961:20
    │
    ├ note: the trait is not dyn compatible because it uses `Self` as a type parameter
@@ -4801,7 +4799,7 @@ error[E0038]: the trait `Ord` is not dyn compatible
    │                                 ━━━ `Ord` is not dyn compatible
    ╰╴
 note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
    ╭▸ $SRC_DIR/core/src/cmp.rs:961:20
    │
    ├ note: the trait is not dyn compatible because it uses `Self` as a type parameter
@@ -5603,7 +5601,7 @@ If your compilation actually takes a long time, you can safely allow the lint.";
 error: constant evaluation is taking a long time
  --> $SRC_DIR/core/src/num/mod.rs:1151:4
   = note: this lint makes sure the compiler doesn't get stuck due to infinite loops in const eval.
-          If your compilation actually takes a long time, you can safely allow the lint.
+If your compilation actually takes a long time, you can safely allow the lint.
 help: the constant being evaluated
  --> $DIR/timeout.rs:7:1
   |
@@ -5619,7 +5617,7 @@ help: the constant being evaluated
 error: constant evaluation is taking a long time
   ╭▸ $SRC_DIR/core/src/num/mod.rs:1151:4
   ╰ note: this lint makes sure the compiler doesn't get stuck due to infinite loops in const eval.
-          If your compilation actually takes a long time, you can safely allow the lint.
+If your compilation actually takes a long time, you can safely allow the lint.
 help: the constant being evaluated
   ╭▸ $DIR/timeout.rs:7:1
   │
@@ -5773,7 +5771,7 @@ note: expected `usize`, found fn item
 4 |     generate_setter,
   |     ^^^^^^^^^^^^^^^
   = note: expected type `[22;1;35musize[22;39m`
-          found fn item `[22;1;35mfn() {generate_setter}[22;39m`
+found fn item `[22;1;35mfn() {generate_setter}[22;39m`
 note: associated function defined here
  --> $SRC_DIR/alloc/src/string.rs:480:11
 help: remove the extra arguments
@@ -5809,7 +5807,7 @@ note: expected `usize`, found fn item
 4 │     generate_setter,
   │     ━━━━━━━━━━━━━━━
   ╰ note: expected type `[22;1;35musize[22;39m`
-          found fn item `[22;1;35mfn() {generate_setter}[22;39m`
+found fn item `[22;1;35mfn() {generate_setter}[22;39m`
 note: associated function defined here
   ─▸ $SRC_DIR/alloc/src/string.rs:480:11
 help: remove the extra arguments
