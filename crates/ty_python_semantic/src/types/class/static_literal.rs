@@ -34,7 +34,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
-        dedicated::pydantic,
+        dedicated::{attrs, pydantic},
         definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
@@ -864,7 +864,7 @@ impl<'db> StaticClassLiteral<'db> {
             return None;
         }
 
-        if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+        if let field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)) =
             CodeGeneratorKind::from_class(db, self.into())?
         {
             // Otherwise, if this class is a dataclass-like class, determine its frozen status based on
@@ -1277,6 +1277,16 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
+        if matches!(
+            member.inner.place.raw_type(),
+            Some(Type::KnownInstance(KnownInstanceType::Field(_)))
+        ) && let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self)
+            && field_policy.is_attrs()
+            && let Some(field) = self.own_fields(db, specialization, field_policy).get(name)
+        {
+            return Member::definitely_declared(field.declared_ty);
+        }
+
         if member.is_undefined() {
             if let Some(synthesized_member) =
                 self.own_synthesized_member(db, specialization, inherited_generic_context, name)
@@ -1574,8 +1584,16 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                 } else {
                     // Use the alias name if provided, otherwise use the field name.
-                    let parameter_name =
-                        Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                    let parameter_name = alias.map_or_else(
+                        || {
+                            if field_policy.is_attrs() {
+                                attrs::init_parameter_name(db, field_name, field.first_declaration)
+                            } else {
+                                field_name.clone()
+                            }
+                        },
+                        |alias| Name::new(&**alias),
+                    );
                     add_parameter_with_name(parameter_name, default_ty);
                 }
             }
@@ -1667,7 +1685,7 @@ impl<'db> StaticClassLiteral<'db> {
                 )
             }
             (
-                field_policy @ CodeGeneratorKind::DataclassLike(_),
+                field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
                 "__lt__" | "__le__" | "__gt__" | "__ge__",
             ) => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
@@ -1688,7 +1706,10 @@ impl<'db> StaticClassLiteral<'db> {
 
                 Some(Type::function_like_callable(db, signature))
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__hash__") => {
+            (
+                field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
+                "__hash__",
+            ) => {
                 let unsafe_hash =
                     self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
                 let frozen = self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN);
@@ -1711,9 +1732,10 @@ impl<'db> StaticClassLiteral<'db> {
                     None
                 }
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__match_args__")
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
-            {
+            (
+                field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
+                "__match_args__",
+            ) if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::MATCH_ARGS) {
                     return None;
                 }
@@ -1734,9 +1756,10 @@ impl<'db> StaticClassLiteral<'db> {
                     .map(|(name, _)| Type::string_literal(db, name));
                 Some(Type::heterogeneous_tuple(db, match_args))
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__weakref__")
-                if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
-            {
+            (
+                field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
+                "__weakref__",
+            ) if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
                     || !self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
                 {
@@ -1775,7 +1798,7 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     })
             }
-            (CodeGeneratorKind::DataclassLike(_), "__replace__")
+            (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_), "__replace__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
             {
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
@@ -1785,6 +1808,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (
                 field_policy @ (CodeGeneratorKind::DataclassLike(_)
+                | CodeGeneratorKind::Attrs(_)
                 | CodeGeneratorKind::Pydantic(_)),
                 "__setattr__",
             ) => {
@@ -1805,16 +1829,16 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__")
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
-            {
-                self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
-                    .then(|| {
-                        let fields = self.fields(db, specialization, field_policy);
-                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                        Type::heterogeneous_tuple(db, slots)
-                    })
-            }
+            (
+                field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
+                "__slots__",
+            ) if Program::get(db).python_version(db) >= PythonVersion::PY310 => self
+                .has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
+                .then(|| {
+                    let fields = self.fields(db, specialization, field_policy);
+                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                    Type::heterogeneous_tuple(db, slots)
+                }),
             (CodeGeneratorKind::TypedDict, name) => synthesize_typed_dict_method(
                 db,
                 instance_ty
@@ -1905,7 +1929,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if base_class.is_frozen_dataclass(db) == Some(true) {
-                let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+                let field_policy @ (CodeGeneratorKind::DataclassLike(_)
+                | CodeGeneratorKind::Attrs(_)) =
                     CodeGeneratorKind::from_static_class(db, base_class)?
                 else {
                     return None;
@@ -2158,6 +2183,40 @@ impl<'db> StaticClassLiteral<'db> {
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
 
+        let mut attrs_field_specifiers = FxIndexMap::default();
+        if field_policy.is_attrs() {
+            for (symbol_id, mut bindings) in use_def.all_end_of_scope_symbol_bindings() {
+                if let Some(specifier) = bindings.find_map(|binding| {
+                    let definition = binding.binding.definition()?;
+                    let (inferred_type, field_type) = attrs::field_specifier(db, definition)?;
+                    Some((binding.binding_order, definition, inferred_type, field_type))
+                }) {
+                    attrs_field_specifiers.insert(symbol_id, specifier);
+                }
+            }
+        }
+
+        let attrs_auto_attribs =
+            field_policy
+                .is_attrs()
+                .then(|| match attrs::auto_attribs(db, self) {
+                    attrs::AutoAttribs::Enabled => true,
+                    attrs::AutoAttribs::Disabled => false,
+                    attrs::AutoAttribs::Infer => attrs_field_specifiers.keys().all(|symbol_id| {
+                        use_def
+                            .reachable_symbol_declarations(*symbol_id)
+                            .first_reachable_declaration_order(db, |declaration| {
+                                declaration.is_defined_and(|declaration| {
+                                    matches!(
+                                        declaration.kind(db),
+                                        DefinitionKind::AnnotatedAssignment(..)
+                                    )
+                                })
+                            })
+                            .is_some()
+                    }),
+                });
+
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2179,7 +2238,7 @@ impl<'db> StaticClassLiteral<'db> {
 
             // Field contents come from the declarations live at end of scope, but field order is
             // anchored to the first reachable annotated declaration in the class body.
-            let Some(first_declaration_order) = use_def
+            let first_annotated_declaration_order = use_def
                 .reachable_symbol_declarations(symbol_id)
                 .first_reachable_declaration_order(db, |declaration| {
                     declaration.is_defined_and(|declaration| {
@@ -2188,28 +2247,63 @@ impl<'db> StaticClassLiteral<'db> {
                             DefinitionKind::AnnotatedAssignment(..)
                         )
                     })
-                })
-            else {
-                continue;
+                });
+
+            let attrs_field_specifier = attrs_field_specifiers.get(&symbol_id).copied();
+            let first_declaration_order = match attrs_auto_attribs {
+                Some(true) | None => {
+                    let Some(first_declaration_order) = first_annotated_declaration_order else {
+                        continue;
+                    };
+                    first_declaration_order
+                }
+                Some(false) => {
+                    let Some((binding_order, _, _, _)) = attrs_field_specifier else {
+                        continue;
+                    };
+                    first_annotated_declaration_order.unwrap_or(binding_order)
+                }
             };
 
             let result = place_from_declarations(db, declarations.clone());
-            field_declarations.push((first_declaration_order, symbol_id, result));
+            field_declarations.push((
+                first_declaration_order,
+                symbol_id,
+                result,
+                attrs_field_specifier,
+            ));
         }
 
         field_declarations
-            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+            .sort_unstable_by_key(|(first_declaration_order, _, _, _)| *first_declaration_order);
 
         let mut attributes = FxIndexMap::default();
-        for (_, symbol_id, result) in field_declarations {
+        for (_, symbol_id, result, attrs_field_specifier) in field_declarations {
             let symbol = table.symbol(symbol_id);
-            let first_declaration = result.first_declaration;
+            let first_declaration = result
+                .first_declaration
+                .or_else(|| attrs_field_specifier.map(|(_, definition, _, _)| definition));
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
             }
 
-            if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
+            let attrs_inferred_type =
+                attrs_field_specifier.map(|(_, _, inferred_type, field_type)| {
+                    field_type.unwrap_or_else(|| match inferred_type {
+                        Type::KnownInstance(KnownInstanceType::Field(field)) => field
+                            .default_type(db)
+                            .or_else(|| field.converter(db).map(|(_, output)| output))
+                            .unwrap_or_else(Type::any),
+                        _ => inferred_type,
+                    })
+                });
+
+            if let Some(attr_ty) = attr
+                .place
+                .ignore_possibly_undefined()
+                .or(attrs_inferred_type)
+            {
                 let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict {
                     None
                 } else {
@@ -2246,14 +2340,16 @@ impl<'db> StaticClassLiteral<'db> {
 
                 let kind = match field_policy {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
-                    CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
-                        default_ty,
-                        init_only: attr.is_init_var(),
-                        init,
-                        kw_only,
-                        alias,
-                        converter,
-                    },
+                    CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_) => {
+                        FieldKind::Dataclass {
+                            default_ty,
+                            init_only: attr.is_init_var(),
+                            init,
+                            kw_only,
+                            alias,
+                            converter,
+                        }
+                    }
                     CodeGeneratorKind::Pydantic(_) => FieldKind::Pydantic {
                         default_ty,
                         // Pydantic treats underscore-prefixed annotations as private attributes,
@@ -2938,7 +3034,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<Type<'db>> {
-        let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+        let field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)) =
             CodeGeneratorKind::from_static_class(db, self)?
         else {
             return None;

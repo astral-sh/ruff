@@ -201,7 +201,12 @@ fn check_class_declaration<'db>(
                 policy,
             );
         }
-        Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
+        Some(
+            CodeGeneratorKind::Attrs(_)
+            | CodeGeneratorKind::Pydantic(_)
+            | CodeGeneratorKind::TypedDict,
+        )
+        | None => {}
     }
 
     if configuration.check_invalid_named_tuple_field_overrides()

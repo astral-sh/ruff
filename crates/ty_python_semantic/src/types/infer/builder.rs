@@ -51,7 +51,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
-use crate::types::dedicated::pydantic;
+use crate::types::dedicated::{attrs, pydantic};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
@@ -359,7 +359,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     discards_dict_key_assignments: bool,
 
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
-    /// the right hand side of an annotated assignment in a class that is a dataclass).
+    /// the right hand side of a field assignment in a dataclass-like class).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
@@ -796,31 +796,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a class body scope of a dataclass-like class, populate
     /// `self.dataclass_field_specifiers` with the field specifiers from the class's
     /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that
-    /// calls to field-specifier functions are recognized during type inference of the
-    /// right-hand side of annotated assignments.
-    fn setup_dataclass_field_specifiers(&mut self) {
+    /// calls to field-specifier functions are recognized during type inference of field
+    /// assignments. Unannotated assignments are only fields for `attrs` classes.
+    fn setup_dataclass_field_specifiers(&mut self, attrs_only: bool) {
         fn field_specifiers<'db>(
             db: &'db dyn Db,
             index: &'db SemanticIndex<'db>,
             scope: ScopeId<'db>,
+            attrs_only: bool,
         ) -> Option<SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>> {
             let enclosing_scope = index.scope(scope.file_scope_id(db));
             let class_node = enclosing_scope.node().as_class()?;
             let class_definition = index.expect_single_definition(class_node);
             let class_literal = original_class_type(db, class_definition)?.as_static()?;
+            let field_policy = CodeGeneratorKind::from_class(db, class_literal.into())?;
+
+            if attrs_only && !field_policy.is_attrs() {
+                return None;
+            }
 
             class_literal
                 .dataclass_params(db)
                 .map(|params| SmallVec::from(params.field_specifiers(db)))
-                .or_else(|| {
-                    Some(SmallVec::from(
-                        CodeGeneratorKind::from_class(db, class_literal.into())?
-                            .field_specifiers(db)?,
-                    ))
-                })
+                .or_else(|| Some(SmallVec::from(field_policy.field_specifiers(db)?)))
         }
 
-        if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope()) {
+        if let Some(specifiers) = field_specifiers(self.db(), self.index, self.scope(), attrs_only)
+        {
             self.dataclass_field_specifiers = specifiers;
         }
     }
@@ -1347,7 +1349,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
-        self.setup_dataclass_field_specifiers();
+        self.setup_dataclass_field_specifiers(false);
 
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
@@ -3141,11 +3143,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let target = assignment.target(self.module());
 
+        self.setup_dataclass_field_specifiers(true);
         let add = self.add_binding(target.into(), definition);
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
         add.insert(self, target_ty);
+        self.dataclass_field_specifiers.clear();
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
@@ -3190,6 +3194,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         call_expr.func.as_ref(),
                         TypeContext::default(),
                     );
+
+                    if attrs::is_legacy_field_specifier(self.db(), callable_type)
+                        && call_expr
+                            .arguments
+                            .find_keyword("type")
+                            .is_some_and(|keyword| keyword.value.is_string_literal_expr())
+                    {
+                        self.deferred.insert(definition);
+                    }
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -3506,6 +3519,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_ty = self
             .try_expression_type(func)
             .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
+        if attrs::is_legacy_field_specifier(self.db(), func_ty) {
+            if let Some(field_type) = arguments.find_keyword("type")
+                && field_type.value.is_string_literal_expr()
+            {
+                self.infer_type_expression(&field_type.value);
+            }
+            return;
+        }
         if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
             // Only the `fields` argument is deferred for `NamedTuple`;
             // other arguments are inferred eagerly.
@@ -4004,7 +4025,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let annotation = assignment.annotation(self.module());
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
-        self.setup_dataclass_field_specifiers();
+        self.setup_dataclass_field_specifiers(false);
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
@@ -4120,6 +4141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     Some(
                         class_kind @ (CodeGeneratorKind::DataclassLike(_)
+                        | CodeGeneratorKind::Attrs(_)
                         | CodeGeneratorKind::Pydantic(_)),
                     ) => match qualifier {
                         TypeQualifier::NotRequired
@@ -4210,7 +4232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
-            self.setup_dataclass_field_specifiers();
+            self.setup_dataclass_field_specifiers(false);
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
             let previous_deferred_state = self.deferred_state;

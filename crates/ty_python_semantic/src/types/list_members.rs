@@ -588,7 +588,7 @@ impl<'db> AllMembers<'db> {
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
-            Some(CodeGeneratorKind::DataclassLike(_)) => {
+            Some(CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)) => {
                 for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,

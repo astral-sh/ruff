@@ -898,8 +898,9 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
-    if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(db, class.into())
+    if let Some(
+        field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Attrs(_)),
+    ) = CodeGeneratorKind::from_class(db, class.into())
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);

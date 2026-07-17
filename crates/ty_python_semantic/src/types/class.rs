@@ -13,7 +13,7 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
-use super::dedicated::pydantic;
+use super::dedicated::{attrs, pydantic};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
@@ -87,6 +87,8 @@ impl get_size2::GetSize for ClassInstanceFlags {}
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
+    /// Classes decorated with an `attrs` decorator.
+    Attrs(Option<DataclassTransformerParams<'db>>),
     /// Classes inheriting from Pydantic's `BaseModel`.
     Pydantic(pydantic::ModelMetadata<'db>),
     /// Classes inheriting from `typing.NamedTuple`
@@ -136,8 +138,14 @@ impl<'db> CodeGeneratorKind<'db> {
             // in which case we assume the subclass is itself also meant for use
             // as a metaclass dataclass transformer, not itself supposed to be a
             // dataclass.)
-            if class.dataclass_params(db).is_some() {
-                Some(CodeGeneratorKind::DataclassLike(None))
+            if let Some(params) = class.dataclass_params(db) {
+                Some(
+                    if attrs::field_specifiers_reference_attrs(db, params.field_specifiers(db)) {
+                        CodeGeneratorKind::Attrs(None)
+                    } else {
+                        CodeGeneratorKind::DataclassLike(None)
+                    },
+                )
             } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
                     db,
@@ -187,7 +195,9 @@ impl<'db> CodeGeneratorKind<'db> {
         class: StaticClassLiteral<'db>,
         transformer_params: DataclassTransformerParams<'db>,
     ) -> Self {
-        if pydantic::is_model(db, class) {
+        if attrs::field_specifiers_reference_attrs(db, transformer_params.field_specifiers(db)) {
+            Self::Attrs(Some(transformer_params))
+        } else if pydantic::is_model(db, class) {
             Self::Pydantic(pydantic::ModelMetadata::from_class(
                 db,
                 class,
@@ -209,8 +219,14 @@ impl<'db> CodeGeneratorKind<'db> {
             class: DynamicClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
             // Check if the dynamic class was passed to `dataclass()` as a function.
-            if class.dataclass_params(db).is_some() {
-                return Some(CodeGeneratorKind::DataclassLike(None));
+            if let Some(params) = class.dataclass_params(db) {
+                return Some(
+                    if attrs::field_specifiers_reference_attrs(db, params.field_specifiers(db)) {
+                        CodeGeneratorKind::Attrs(None)
+                    } else {
+                        CodeGeneratorKind::DataclassLike(None)
+                    },
+                );
             }
 
             // Dynamic classes can also inherit from classes with dataclass_transform.
@@ -219,7 +235,16 @@ impl<'db> CodeGeneratorKind<'db> {
                     class
                         .static_class_literal(db)
                         .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
-                        .map(|params| CodeGeneratorKind::DataclassLike(Some(params)))
+                        .map(|params| {
+                            if attrs::field_specifiers_reference_attrs(
+                                db,
+                                params.field_specifiers(db),
+                            ) {
+                                CodeGeneratorKind::Attrs(Some(params))
+                            } else {
+                                CodeGeneratorKind::DataclassLike(Some(params))
+                            }
+                        })
                 })
             })
         }
@@ -231,6 +256,7 @@ impl<'db> CodeGeneratorKind<'db> {
         matches!(
             (CodeGeneratorKind::from_class(db, class), self),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
+                | (Some(Self::Attrs(_)), Self::Attrs(_))
                 | (Some(Self::Pydantic(_)), Self::Pydantic(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
                 | (Some(Self::TypedDict), Self::TypedDict)
@@ -239,14 +265,14 @@ impl<'db> CodeGeneratorKind<'db> {
 
     pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
         match self {
-            Self::DataclassLike(params) => params,
+            Self::DataclassLike(params) | Self::Attrs(params) => params,
             Self::Pydantic(_) | Self::NamedTuple | Self::TypedDict => None,
         }
     }
 
     pub(super) fn field_specifiers(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
         match self {
-            Self::DataclassLike(params) => Some(params?.field_specifiers(db)),
+            Self::DataclassLike(params) | Self::Attrs(params) => Some(params?.field_specifiers(db)),
             Self::Pydantic(metadata) => Some(metadata.field_specifiers(db)),
             Self::NamedTuple | Self::TypedDict => None,
         }
@@ -255,6 +281,7 @@ impl<'db> CodeGeneratorKind<'db> {
     pub(super) const fn name(self) -> &'static str {
         match self {
             Self::DataclassLike(_) => "dataclass",
+            Self::Attrs(_) => "attrs class",
             Self::Pydantic(_) => "Pydantic model",
             Self::NamedTuple => "named tuple",
             Self::TypedDict => "TypedDict",
@@ -262,7 +289,11 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     pub(super) const fn is_dataclass_like(self) -> bool {
-        matches!(self, Self::DataclassLike(_))
+        matches!(self, Self::DataclassLike(_) | Self::Attrs(_))
+    }
+
+    pub(super) const fn is_attrs(self) -> bool {
+        matches!(self, Self::Attrs(_))
     }
 
     pub(super) const fn is_pydantic(self) -> bool {
@@ -284,7 +315,10 @@ impl<'db> CodeGeneratorKind<'db> {
     ///     c.value  # okay, `value` will be set by `C`'s constructor
     /// ```
     pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
-        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+        matches!(
+            self,
+            Self::DataclassLike(_) | Self::Attrs(_) | Self::Pydantic(_)
+        )
     }
 
     /// Return `true` if the class constructor is synthesized from its fields.
@@ -299,13 +333,16 @@ impl<'db> CodeGeneratorKind<'db> {
     /// C(value=42)
     /// ```
     pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
-        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+        matches!(
+            self,
+            Self::DataclassLike(_) | Self::Attrs(_) | Self::Pydantic(_)
+        )
     }
 
     pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
         match self {
             Self::Pydantic(metadata) => Some(metadata),
-            Self::DataclassLike(_) | Self::NamedTuple | Self::TypedDict => None,
+            Self::DataclassLike(_) | Self::Attrs(_) | Self::NamedTuple | Self::TypedDict => None,
         }
     }
 }
