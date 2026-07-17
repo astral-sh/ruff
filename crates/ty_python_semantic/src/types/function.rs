@@ -1890,10 +1890,9 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-/// Return whether a fixed `isinstance` tuple covers every member of a nominal input union.
+/// Return whether a fixed `isinstance` tuple covers every member of an input union.
 ///
-/// Only exact class literals with the inferred default metaclass are considered; other classinfo
-/// forms remain ambiguous.
+/// Each class in the tuple uses the same truthiness inference as a single-class `isinstance` check.
 ///
 /// ```python
 /// def f(x: A | B) -> bool:
@@ -1907,27 +1906,17 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
     else {
         return false;
     };
-    if tuple.is_variadic()
-        || !tuple.fixed_elements().all(|element| {
-            let Type::ClassLiteral(class) = element else {
-                return false;
-            };
-            class.into_protocol_class(db).is_none()
-                && class.metaclass(db) == KnownClass::Type.to_class_literal(db)
-        })
-    {
+    if tuple.is_variadic() {
         return false;
     }
 
     let is_covered = |ty: Type<'db>| {
-        ty.is_nominal_instance()
-            && !ty.is_instance_of(db, KnownClass::Type)
-            && tuple.fixed_elements().any(|element| {
-                let Type::ClassLiteral(class) = element else {
-                    return false;
-                };
-                is_instance_truthiness(db, ty, *class).is_always_true()
-            })
+        tuple.fixed_elements().any(|element| {
+            let Type::ClassLiteral(class) = element else {
+                return false;
+            };
+            is_instance_truthiness(db, ty, *class).is_always_true()
+        })
     };
 
     match ty {

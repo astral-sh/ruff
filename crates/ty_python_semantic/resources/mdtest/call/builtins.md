@@ -214,11 +214,9 @@ def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-ty
         return True
 ```
 
-A class with a custom metaclass can reject values that would otherwise match by inheritance, and a
-runtime-checkable protocol can reject a class that only appears structurally compatible. Keep the
-false branch reachable for both kinds of tuple member. A custom check that appears before an
-otherwise matching class must also keep the result uncertain, since instance checks run in order and
-can have side effects.
+The single-class path already leaves runtime-checkable protocol checks as `bool`. Tuple members use
+the same inference, so a class that only appears structurally compatible does not make the tuple
+check certain.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -230,11 +228,15 @@ class RuntimeProtocol(Protocol):
 class StructuralImplementation:
     value: int
 
-def protocol_target(x: StructuralImplementation) -> bool:
-    if isinstance(x, (RuntimeProtocol, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
+reveal_type(isinstance(StructuralImplementation(), RuntimeProtocol))  # revealed: bool
+reveal_type(isinstance(StructuralImplementation(), (RuntimeProtocol,)))  # revealed: bool
+```
 
+Single-class `isinstance` inference does not account for an overridden `__instancecheck__`. Tuple
+members again use the same inference. Python returns `False` for these checks, while ty infers
+`Literal[True]`.
+
+```py
 class RejectingMeta(type):
     def __instancecheck__(self, instance: object, /) -> bool:
         return False
@@ -242,48 +244,28 @@ class RejectingMeta(type):
 class RejectingBase(metaclass=RejectingMeta): ...
 class RejectingChild(RejectingBase): ...
 
-def custom_target(x: RejectingChild) -> bool:
-    if isinstance(x, (RejectingBase, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def custom_target_before_match(x: A) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (RejectingBase, A)):
-        return True
-```
-
-Single-class `isinstance` inference currently assumes normal inheritance and does not account for an
-overridden `__instancecheck__`. This assertion documents the existing limitation: Python returns
-`False` for this check, while ty infers `Literal[True]`.
-
-```py
 reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
+reveal_type(isinstance(RejectingChild(), (RejectingBase,)))  # revealed: Literal[True]
 ```
 
-Finally, `list[int]` is accepted where `type` is expected, but `isinstance(list[int], type)` is
-false at runtime. A tuple containing `type` must therefore remain uncertain for a bare `type`, a
-type variable bound to `type`, and a `type` value narrowed by an earlier check.
+The same limitation applies to `type`: `list[int]` is accepted where `type` is expected, but
+`isinstance(list[int], type)` is false at runtime. Single-class and tuple checks both infer
+`Literal[True]` for a bare `type` and a type variable bound to `type`.
 
 ```py
 T_bound_type = TypeVar("T_bound_type", bound=type)
 
-def bare_type(x: type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (type,)):
-        return True
+def bare_type(x: type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
 
 bare_type(list[int])
 
-def type_variable_bound_to_type(x: T_bound_type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (type,)):
-        return True
+def type_variable_bound_to_type(x: T_bound_type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
 
 type_variable_bound_to_type(list[int])
-
-def narrowed_type(x: type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, A):
-        return True
-    if isinstance(x, (type,)):
-        return True
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
