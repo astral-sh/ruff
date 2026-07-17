@@ -297,6 +297,40 @@ def expects_str_return(c: Callable[[int | str], str]) -> None:
 expects_str_return(wide_return_converter)
 ```
 
+## Overloaded callable parameter compatibility
+
+Aggregating overloads must preserve whether the target parameter accepts keywords, and the keyword
+name that callers can use.
+
+```pyi
+from typing import Protocol, overload
+
+class KeywordCallable(Protocol):
+    def __call__(self, value: int | str) -> int | str: ...
+
+class MatchingKeywords:
+    @overload
+    def __call__(self, value: int) -> int: ...
+    @overload
+    def __call__(self, value: str) -> str: ...
+
+class WrongKeywords:
+    @overload
+    def __call__(self, left: int) -> int: ...
+    @overload
+    def __call__(self, right: str) -> str: ...
+
+class PositionalOnly:
+    @overload
+    def __call__(self, value: int, /) -> int: ...
+    @overload
+    def __call__(self, value: str, /) -> str: ...
+
+matching_keywords: KeywordCallable = MatchingKeywords()
+wrong_keywords: KeywordCallable = WrongKeywords()  # error: [invalid-assignment]
+positional_only: KeywordCallable = PositionalOnly()  # error: [invalid-assignment]
+```
+
 ## Union
 
 ```py

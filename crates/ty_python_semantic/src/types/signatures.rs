@@ -2237,6 +2237,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 continue;
             }
 
+            let source_parameter = self_signature.parameters().get(0)?;
+            let target_parameter = target_signature.parameters().get(0)?;
+            if target_parameter
+                .keyword_name()
+                .is_some_and(|target_name| source_parameter.keyword_name() != Some(target_name))
+            {
+                continue;
+            }
+
             has_overlapping_domain = true;
             parameter_type_union = parameter_type_union.add(self_parameter_type);
             return_type_union = return_type_union.add(self_signature.return_ty);
