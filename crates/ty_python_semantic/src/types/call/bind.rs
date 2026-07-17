@@ -5060,10 +5060,15 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
-    ///
-    /// TODO: Once specialization inference fully owns generic argument validation, this field can
-    /// be removed.
     constraint_set_errors: Vec<bool>,
+}
+
+struct ArgumentRelation<'db> {
+    argument_index: usize,
+    adjusted_argument_index: Option<usize>,
+    declared_type: Type<'db>,
+    argument_type: Type<'db>,
+    has_starred_annotation: bool,
 }
 
 /// Result of checking only the key type of a keyword-unpack argument.
@@ -5194,6 +5199,45 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .map(|inference| inference.specialization(self.db))
     }
 
+    fn argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + '_ {
+        self.enumerate_argument_types().flat_map(
+            move |(argument_index, adjusted_argument_index, _, argument_types)| {
+                self.argument_matches[argument_index]
+                    .iter()
+                    .filter_map(move |matched_parameter| {
+                        let parameter_index = matched_parameter.index;
+                        if self.is_gradual_variadic_parameter(parameter_index) {
+                            return None;
+                        }
+
+                        let parameter = &self.signature.parameters()[parameter_index];
+                        let mut declared_type = parameter.annotated_type();
+                        // An unpacked homogeneous tuple describes each matched argument, not the
+                        // tuple containing those arguments.
+                        if parameter.has_starred_annotation()
+                            && let Some(TupleSpec::Variable(variable)) =
+                                declared_type.exact_tuple_instance_spec(self.db).as_deref()
+                            && variable.prefix_elements().is_empty()
+                            && variable.suffix_elements().is_empty()
+                            && let VariableSegment::Homogeneous(element) = variable.variable()
+                        {
+                            declared_type = element;
+                        }
+                        let argument_type = matched_parameter
+                            .argument_type
+                            .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
+                        Some(ArgumentRelation {
+                            argument_index,
+                            adjusted_argument_index,
+                            declared_type,
+                            argument_type,
+                            has_starred_annotation: parameter.has_starred_annotation(),
+                        })
+                    })
+            },
+        )
+    }
+
     /// Returns `true` if every argument relation that contributes to specialization inference is
     /// fully static.
     ///
@@ -5203,59 +5247,52 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ///
     /// TODO: Replace this call-wide check with path-level gradual-evidence tracking.
     fn argument_relations_are_fully_static(&self) -> bool {
-        let parameters = self.signature.parameters();
-        self.enumerate_argument_types()
-            .all(|(argument_index, _, _, argument_types)| {
-                self.argument_matches[argument_index]
-                    .iter()
-                    .all(|matched_parameter| {
-                        let parameter_index = matched_parameter.index;
-                        if self.is_gradual_variadic_parameter(parameter_index) {
-                            return true;
-                        }
+        self.argument_relations().all(|relation| {
+            if inferable_typevar_occurrences(
+                self.db,
+                relation.declared_type,
+                self.inferable_typevars,
+            ) == 0
+            {
+                return true;
+            }
 
-                        let declared_type = parameters[parameter_index].annotated_type();
-                        let argument_type = argument_types.get_for_declared_type(declared_type);
-                        let argument_type =
-                            matched_parameter.argument_type.unwrap_or(argument_type);
-                        argument_type.bottom_materialization(self.db)
-                            == argument_type.top_materialization(self.db)
-                            && !declared_type.has_dynamic(self.db)
-                    })
-            })
+            relation.argument_type.bottom_materialization(self.db)
+                == relation.argument_type.top_materialization(self.db)
+                && !relation.declared_type.has_dynamic(self.db)
+        })
     }
 
     /// Returns `true` if `specialization` independently validates every argument relation that
     /// contributes to specialization inference.
     fn specialization_validates_arguments(&self, specialization: Specialization<'db>) -> bool {
-        let parameters = self.signature.parameters();
-        self.enumerate_argument_types()
-            .all(|(argument_index, _, _, argument_types)| {
-                self.argument_matches[argument_index]
-                    .iter()
-                    .all(|matched_parameter| {
-                        let parameter_index = matched_parameter.index;
-                        let parameter = &parameters[parameter_index];
-                        if self.is_gradual_variadic_parameter(parameter_index)
-                            || parameter.has_starred_annotation()
-                        {
-                            return true;
-                        }
+        self.argument_relations().all(|relation| {
+            if inferable_typevar_occurrences(
+                self.db,
+                relation.declared_type,
+                self.inferable_typevars,
+            ) == 0
+            {
+                return true;
+            }
 
-                        let declared_type = parameter.annotated_type();
-                        let argument_type = argument_types.get_for_declared_type(declared_type);
-                        let argument_type =
-                            matched_parameter.argument_type.unwrap_or(argument_type);
-                        let argument_type =
-                            argument_type.apply_specialization(self.db, specialization);
-                        let expected_type =
-                            declared_type.apply_specialization(self.db, specialization);
-                        argument_type.is_subtype_of(self.db, expected_type)
-                    })
-            })
+            relation
+                .argument_type
+                .apply_specialization(self.db, specialization)
+                .is_subtype_of(
+                    self.db,
+                    relation
+                        .declared_type
+                        .apply_specialization(self.db, specialization),
+                )
+        })
     }
 
-    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    fn infer_specialization(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        allow_path_return_inference: bool,
+    ) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
@@ -5490,74 +5527,64 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             maybe_promote(typevar, bounds)
         };
-        let merged_inference = match builder.build_inference_with(generic_context, &mut choose) {
-            Ok(inference) => inference,
-            Err(()) => {
-                let parameters = self.signature.parameters();
-                let mut argument_relations = Vec::new();
-                for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
-                    for matched_parameter in self.argument_matches[argument_index].iter() {
-                        let parameter_index = matched_parameter.index;
-                        if self.is_gradual_variadic_parameter(parameter_index) {
-                            continue;
+        let original_return_ty = self.return_ty;
+        let can_refine_paths = allow_path_return_inference
+            && builder.has_actual_intersection_constraint()
+            && self.argument_relations_are_fully_static();
+        let path_result = can_refine_paths
+            .then(|| builder.build_inference_paths_with(generic_context, &mut choose))
+            .flatten()
+            .and_then(|paths| {
+                // Every retained path independently validates the entire call. For a static
+                // argument type `S`, parameter type `P`, and solution `T`, `S <= P[T]`
+                // establishes the instantiated return `R[T]`. The same call therefore satisfies
+                // every retained `R[T]`, so their intersection is sound regardless of why
+                // `pending` is disjunctive.
+                let returns: Vec<_> = paths
+                    .iter()
+                    .copied()
+                    .filter_map(|inference| {
+                        if !inference.is_complete_for(self.db, original_return_ty)
+                            || !inference.is_fully_static(self.db)
+                        {
+                            return None;
                         }
 
-                        let formal = parameters[parameter_index].annotated_type();
-                        let actual = matched_parameter
-                            .argument_type
-                            .unwrap_or_else(|| argument_types.get_for_declared_type(formal));
-                        argument_relations.push((formal, actual));
-                    }
-                }
+                        let specialization = inference.specialization(self.db);
+                        if !self.specialization_validates_arguments(specialization) {
+                            return None;
+                        }
 
-                builder.build_diagnostic_inference_with(
+                        let return_ty =
+                            original_return_ty.apply_specialization(self.db, specialization);
+                        (return_ty.bottom_materialization(self.db)
+                            == return_ty.top_materialization(self.db))
+                        .then_some((inference, return_ty))
+                    })
+                    .collect();
+                let inference = returns.first()?.0;
+                let return_ty = IntersectionType::from_elements(
+                    self.db,
+                    returns.into_iter().map(|(_, return_ty)| return_ty),
+                );
+                Some((inference, return_ty))
+            });
+
+        let (inference, return_ty) = path_result.unwrap_or_else(|| {
+            let inference = match builder.build_inference_with(generic_context, &mut choose) {
+                Ok(inference) => inference,
+                Err(()) => builder.build_diagnostic_inference_with(
                     generic_context,
-                    argument_relations,
+                    self.argument_relations()
+                        .map(|relation| (relation.declared_type, relation.argument_type)),
                     &mut choose,
-                )
-            }
-        };
-
-        let original_return_ty = self.return_ty;
-        let path_inferences = self
-            .argument_relations_are_fully_static()
-            .then(|| builder.build_inference_paths_with(generic_context, &mut choose))
-            .flatten();
-        let specialization = merged_inference.specialization(self.db);
-        let merged_return_ty = original_return_ty.apply_specialization(self.db, specialization);
-        let path_return_ty = path_inferences.as_deref().and_then(|paths| {
-            // Every retained path independently validates the entire call. For a static argument
-            // type `S`, parameter type `P`, and solution `T`, `S <= P[T]` establishes the
-            // instantiated return `R[T]`. The same call therefore satisfies every retained
-            // `R[T]`, so their intersection is sound regardless of why `pending` is disjunctive.
-            let returns: Vec<_> = paths
-                .iter()
-                .copied()
-                .filter(|inference| {
-                    inference.is_complete_for(self.db, original_return_ty)
-                        && inference.is_fully_static(self.db)
-                        && self
-                            .specialization_validates_arguments(inference.specialization(self.db))
-                })
-                .map(|inference| {
-                    original_return_ty
-                        .apply_specialization(self.db, inference.specialization(self.db))
-                })
-                .filter(|ty| ty.bottom_materialization(self.db) == ty.top_materialization(self.db))
-                .collect();
-            (!returns.is_empty()).then(|| IntersectionType::from_elements(self.db, returns))
+                ),
+            };
+            let return_ty =
+                original_return_ty.apply_specialization(self.db, inference.specialization(self.db));
+            (inference, return_ty)
         });
-
-        let inference = if path_return_ty.is_some() {
-            path_inferences
-                .as_deref()
-                .and_then(|paths| paths.first())
-                .copied()
-                .unwrap_or(merged_inference)
-        } else {
-            merged_inference
-        };
-        self.return_ty = path_return_ty.unwrap_or(merged_return_ty);
+        self.return_ty = return_ty;
         self.inference = Some(inference);
     }
 
@@ -5568,47 +5595,32 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
-        let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_types) in
-            self.enumerate_argument_types()
-        {
-            for matched_parameter in self.argument_matches[argument_index].iter() {
-                let parameter_index = matched_parameter.index;
-                let parameter = &parameters[parameter_index];
-                let declared_type = parameter.annotated_type();
-                // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
-                // tuple. Until then, skip per-argument inference.
-                if parameter.has_starred_annotation()
-                    && (matches!(
-                        declared_type,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
-                    ) || matches!(
-                        declared_type.exact_tuple_instance_spec(self.db).as_deref(),
-                        Some(TupleSpec::Variable(variable))
-                            if matches!(
-                                variable.variable(),
-                                VariableSegment::TypeVarTuple(_)
-                            )
-                    ))
-                {
-                    continue;
-                }
-                if self.is_gradual_variadic_parameter(parameter_index) {
-                    continue;
-                }
+        for relation in self.argument_relations() {
+            let declared_type = relation.declared_type;
+            // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
+            // tuple. Until then, skip per-argument inference.
+            if relation.has_starred_annotation
+                && (matches!(
+                    declared_type,
+                    Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                ) || matches!(
+                    declared_type.exact_tuple_instance_spec(self.db).as_deref(),
+                    Some(TupleSpec::Variable(variable))
+                        if matches!(
+                            variable.variable(),
+                            VariableSegment::TypeVarTuple(_)
+                        )
+                ))
+            {
+                continue;
+            }
 
-                let argument_type = argument_types.get_for_declared_type(declared_type);
-                let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
-                match builder.infer(declared_type, argument_type) {
-                    Ok(()) => {}
-                    Err(error) => {
-                        self.constraint_set_errors[argument_index] = true;
-                        specialization_errors.push(BindingError::SpecializationError {
-                            error,
-                            argument_index: adjusted_argument_index,
-                        });
-                    }
-                }
+            if let Err(error) = builder.infer(declared_type, relation.argument_type) {
+                self.constraint_set_errors[relation.argument_index] = true;
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: relation.adjusted_argument_index,
+                });
             }
         }
 
@@ -5662,10 +5674,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
         //
-        // Note that we silence diagnostics here if we already got a SpecializationError from the
-        // new constraint set solver for this argument. The constraint-set solver is the authority
-        // for these parameters, and this assignability check would re-detect the same
-        // incompatibility against a less-informative fallback specialization.
+        // Note that we silence diagnostics here if specialization inference already produced a
+        // sufficiently precise error for this argument.
         //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
@@ -6379,6 +6389,9 @@ pub(crate) struct Binding<'db> {
     /// The type-variable inference result for this binding, if the callable is generic.
     inference: Option<TypeVarInference<'db>>,
 
+    /// Whether constraint-set paths may refine this binding's return type.
+    allow_path_return_inference: bool,
+
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -6439,6 +6452,7 @@ impl<'db> Binding<'db> {
             constructor_context: None,
             inferable_typevars: InferableTypeVars::None,
             inference: None,
+            allow_path_return_inference: true,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -6883,7 +6897,7 @@ impl<'db> Binding<'db> {
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
+        checker.infer_specialization(constraints, self.allow_path_return_inference);
         checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
@@ -6987,6 +7001,9 @@ impl<'db> Binding<'db> {
     fn clear_missing_argument_errors_for_partial_application(&mut self) {
         self.errors
             .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
+        // TODO: Preserve every correlated inference path and synthesize the corresponding partial
+        // signatures. A single path can incorrectly narrow the remaining parameters and return.
+        self.allow_path_return_inference = false;
     }
 
     /// Downstream constructor validation is deferred until after partial signatures are merged.

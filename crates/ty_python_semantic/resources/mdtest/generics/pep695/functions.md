@@ -268,23 +268,31 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first_constrained` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(first_constrained(x))  # revealed: Unknown
 
-# The same diagnostic should survive invariant inference, where a path has both lower and upper
-# bounds, if one bound independently rules out every constraint.
+# Incompatible invariant specializations are disjoint, so two valid positive elements must agree
+# on the constrained type. A single matching element can still select either constraint.
 
 class Box[T]:
     value: T
 
+class Sub1Box(Box[Sub1]): ...
+class OtherSub1Box(Box[Sub1]): ...
 class Marker: ...
 
 def unbox[Constrained: (Sub1, Sub2)](x: Box[Constrained]) -> Constrained:
     raise NotImplementedError
 
+def _(x: Intersection[Sub1Box, OtherSub1Box]) -> None:
+    reveal_type(unbox(x))  # revealed: Sub1
+
+def _(x: Intersection[Box[Sub2], Marker]) -> None:
+    reveal_type(unbox(x))  # revealed: Sub2
+
 def _(x: Intersection[Box[Unrelated1], Marker]) -> None:
     # error: [invalid-argument-type] "Argument to function `unbox` is incorrect: Argument type `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(unbox(x))  # revealed: Unknown
 
-# Contravariant inference contributes upper-bound evidence instead. If that upper bound rules out
-# every constraint, it should also produce the usual constraint violation.
+# Contravariant inference contributes upper-bound evidence instead. Matching elements contribute to
+# the result; if every element rules out the constraints, report the constraint violation.
 
 class ConstrainedSink[T]:
     def put(self, value: T) -> None: ...
@@ -293,6 +301,12 @@ def sink_constrained[Constrained: (Sub1, Sub2)](
     x: ConstrainedSink[Constrained],
 ) -> Constrained:
     raise NotImplementedError
+
+def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Sub2]]) -> None:
+    reveal_type(sink_constrained(x))  # revealed: Sub1 & Sub2
+
+def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Unrelated1]]) -> None:
+    reveal_type(sink_constrained(x))  # revealed: Sub1
 
 def _(x: Intersection[ConstrainedSink[Unrelated1], ConstrainedSink[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `sink_constrained` is incorrect: Argument type `Unrelated1 | Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
@@ -321,8 +335,12 @@ def f(x: ASource) -> None:
         reveal_type(element(x))  # revealed: A & B
 ```
 
-The return-type intersection comes from multiple valid call specializations, not from treating an
-arbitrary covariant generic as preserving intersections:
+An outer covariant generic in the return type remains outside the intersection. A meet-preserving
+generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
+`F[A & B] <: F[A] & F[B]`, not the reverse. Here, an object usable as both `F[A]` and `F[B]` can
+call its callback with an `A` or a `B`, respectively. It cannot safely accept a callback that only
+handles values that are both `A` and `B`, as `F[A & B]` would allow. Thus `F` is not
+meet-preserving, and inferring `F[A & B]` from `F[A] & F[B]` would be unsound:
 
 ```py
 from collections.abc import Callable
@@ -332,20 +350,23 @@ class F[T]:
     def use(self, callback: Callable[[T], int]) -> int:
         raise NotImplementedError
 
-def f_element[T](x: F[T]) -> T:
-    raise NotImplementedError
+def return_f[T](x: F[T]) -> F[T]:
+    return x
 
 def takes_f_intersection(x: F[Intersection[A, B]]) -> None: ...
 def _(x: Intersection[F[A], F[B]]) -> None:
+    # `F[A] & F[B]` is not assignable to `F[A & B]`.
     # error: [invalid-argument-type]
     takes_f_intersection(x)
-    reveal_type(f_element(x))  # revealed: A & B
+    # This cannot safely be `F[A & B]`.
+    reveal_type(return_f(x))  # revealed: F[A] & F[B]
 ```
 
 Constraints from every argument are solved together before each valid call specialization is
 instantiated:
 
 ```py
+from collections.abc import Callable
 from ty_extensions import Intersection
 
 class D: ...
@@ -358,6 +379,38 @@ def _(
     y: Intersection[Source[B], Source[D]],
 ) -> None:
     reveal_type(correlated(x, y))  # revealed: (A & B) | (D & B)
+
+def invariant_correlated[T](x: Box[T], y: Box[T]) -> T:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[B], D],
+) -> None:
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
+    reveal_type(invariant_correlated(x, y))  # revealed: A | B
+
+def invariant_paramspec[T, **P](
+    x: Box[T], y: Box[T], callback: Callable[P, None]
+) -> T:
+    raise NotImplementedError
+
+def invariant_typevartuple[T, *Ts](
+    x: Box[T], y: Box[T], values: tuple[*Ts]
+) -> T:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[B], D],
+) -> None:
+    # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
+    reveal_type(invariant_paramspec(x, y, lambda value: None))  # revealed: A | B
+    # error: [invalid-argument-type] "Argument to function `invariant_typevartuple` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `invariant_typevartuple` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
+    reveal_type(invariant_typevartuple(x, y, (1, "x")))  # revealed: A | B
 ```
 
 Callable constraints can add their own alternatives to the call-wide constraint set. Each complete
@@ -378,6 +431,21 @@ def accepts(value: B) -> None: ...
 def accepts(value: A | B) -> None: ...
 def _(x: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(with_callback(x, accepts))  # revealed: A & B
+```
+
+Homogeneous unpacked tuple annotations on starred parameters can be validated for each
+specialization, just like `*args: T`. Both direct and unpacked arguments contribute to the inferred
+return type:
+
+```py
+from typing import Unpack
+
+def with_starred[T](x: Source[T], *args: Unpack[tuple[T, ...]]) -> T:
+    raise NotImplementedError
+
+def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) -> None:
+    reveal_type(with_starred(x, value))  # revealed: (A & B) | D
+    reveal_type(with_starred(x, *values))  # revealed: (A & B) | D
 ```
 
 PEP 695 can infer a bivariant class parameter when it is unused. Such a parameter should remain
@@ -430,10 +498,6 @@ from ty_extensions import Intersection
 def _(x: Intersection[ASource, BSource, object]) -> None:
     reveal_type(element(x))  # revealed: A & B
 
-def _(x) -> None:
-    assert isinstance(x, ASource)
-    reveal_type(element(x))  # revealed: Unknown
-
 class Sink[T]:
     def put(self, value: T) -> None: ...
 
@@ -459,8 +523,76 @@ def _(
     reveal_type(choose(x, sink))  # revealed: C
 ```
 
-Gradual actual intersections still use constraint-set inference, but fall back from path-wise return
-refinement until gradual path provenance is tracked:
+Gradual positives can make an inference-relevant intersection relation unconditionally assignable,
+which hides its static specialization paths. Direct member access retains the static information
+that generic inference should also preserve:
+
+```py
+from typing import Any
+
+def _(x) -> None:
+    assert isinstance(x, ASource)
+    reveal_type(x.get())  # revealed: Unknown & A
+    # TODO: revealed: Unknown & A
+    reveal_type(element(x))  # revealed: Unknown
+    assert isinstance(x, BSource)
+    reveal_type(x.get())  # revealed: Unknown & A & B
+    # TODO: revealed: Unknown & A & B
+    reveal_type(element(x))  # revealed: Unknown
+
+def _(x: Any) -> None:
+    assert isinstance(x, ASource)
+    reveal_type(x.get())  # revealed: Any & A
+    # TODO: revealed: Any & A
+    reveal_type(element(x))  # revealed: Unknown
+    assert isinstance(x, BSource)
+    reveal_type(x.get())  # revealed: Any & A & B
+    # TODO: revealed: Any & A & B
+    reveal_type(element(x))  # revealed: Unknown
+```
+
+Unrelated gradual arguments do not affect `T` and should not prevent static paths from refining the
+return type:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+def element_with_other[T](x: Source[T], other: object) -> T:
+    return x.get()
+
+def element_with_dynamic_formal[T](x: Source[T], other: Any) -> T:
+    return x.get()
+
+def _(x: Intersection[Source[A], Source[B]], other) -> None:
+    reveal_type(element_with_other(x, other))  # revealed: A & B
+    reveal_type(element_with_dynamic_formal(x, A()))  # revealed: A & B
+```
+
+When a gradual argument does contribute to `T`, it can hide a constraint from an otherwise complete
+solution. Checking `Unknown & Source[D]` against `Source[T]` reduces to `Always | (D <= T)`, and
+therefore loses the `D` constraint. The fallback both widens the static `A & B` contribution to
+`A | B`, causing false positives, and incorrectly drops the known `D` contribution entirely:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class DSource(Source[D]): ...
+
+def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
+    assert isinstance(unknown, DSource)
+    assert isinstance(any_, DSource)
+    reveal_type(unknown.get())  # revealed: Unknown & D
+    reveal_type(any_.get())  # revealed: Any & D
+    # TODO: revealed: (A & B) | (Unknown & D)
+    reveal_type(correlated(x, unknown))  # revealed: A | B
+    # TODO: revealed: (A & B) | (Any & D)
+    reveal_type(correlated(x, any_))  # revealed: A | B
+```
+
+An untyped value narrowed to `list` remains gradual. `enumerate` should accept it and preserve the
+unknown element type:
 
 ```py
 def _(x):
