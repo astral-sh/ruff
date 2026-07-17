@@ -6539,6 +6539,9 @@ pub(crate) struct PathAssignments {
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
+    /// Derived assignments that have been queued up to add because of the most recent BDD
+    /// assignment
+    assignment_queue: FxIndexMap<ConstraintAssignment, (Option<u16>, u16)>,
 }
 
 impl PathAssignments {
@@ -6557,6 +6560,7 @@ impl PathAssignments {
             additional_fuels: FxIndexSet::default(),
             discovered,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            assignment_queue: FxIndexMap::default(),
         }
     }
 
@@ -6614,17 +6618,14 @@ impl PathAssignments {
             edge = %assignment.display(db, builder),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(
-            db,
-            builder,
-            assignment,
-            source_order,
-            None,
-            PATH_FUEL_BUDGET,
-        );
+        debug_assert!(self.assignment_queue.is_empty());
+        self.enqueue_assignment(assignment, None, PATH_FUEL_BUDGET);
+        let found_conflict = self.drain_assignment_queue(db, builder, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
-            // without invoking the callback.
+            // without invoking the callback, and clear any other assignments that were enqueued to
+            // be added to the path.
+            self.assignment_queue.clear();
             None
         } else {
             // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
@@ -6711,6 +6712,27 @@ impl PathAssignments {
             let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
             self.map.merge(&pair_map);
         }
+    }
+
+    fn drain_assignment_queue<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        source_order: usize,
+    ) -> Result<(), PathAssignmentConflict> {
+        while let Some((assignment, (derived_fuel_cost, path_fuel))) =
+            self.assignment_queue.shift_remove_index(0)
+        {
+            self.add_assignment(
+                db,
+                builder,
+                assignment,
+                source_order,
+                derived_fuel_cost,
+                path_fuel,
+            )?;
+        }
+        Ok(())
     }
 
     /// Adds a new assignment, along with any derived information that we can infer from the new
@@ -6865,24 +6887,8 @@ impl PathAssignments {
             }
         }
 
-        let mut new_constraints: FxIndexMap<ConstraintId, (u16, u16)> = FxIndexMap::default();
-        let mut add_new_constraint = |constraint, available_fuel: u16, fuel_cost: u16| {
-            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-                let new_fuel = (post_fuel, fuel_cost);
-                new_constraints
-                    .entry(constraint)
-                    .and_modify(|existing_fuel| {
-                        *existing_fuel = std::cmp::max_by_key(
-                            *existing_fuel,
-                            new_fuel,
-                            |&(post_fuel, fuel_cost)| (post_fuel, std::cmp::Reverse(fuel_cost)),
-                        );
-                    })
-                    .or_insert(new_fuel);
-            }
-        };
-
-        for sequent in &self.map.pair_implications {
+        for i in 0..self.map.pair_implications.len() {
+            let sequent = self.map.pair_implications[i];
             let Some(ante1_fuel) = self.fuel_for(sequent.ante1.when_true()) else {
                 continue;
             };
@@ -6897,10 +6903,13 @@ impl PathAssignments {
             let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
             let fuel_cost =
                 builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth);
-            add_new_constraint(sequent.post, available_fuel, fuel_cost);
+            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+                self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
+            }
         }
 
-        for sequent in &self.map.single_implications {
+        for i in 0..self.map.single_implications.len() {
+            let sequent = self.map.single_implications[i];
             let Some(available_fuel) = self.fuel_for(sequent.ante.when_true()) else {
                 continue;
             };
@@ -6913,21 +6922,33 @@ impl PathAssignments {
             } else {
                 builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth)
             };
-            add_new_constraint(sequent.post, available_fuel, fuel_cost);
-        }
-
-        for (new_constraint, (available_fuel, fuel_cost)) in new_constraints {
-            self.add_assignment(
-                db,
-                builder,
-                new_constraint.when_true(),
-                source_order,
-                Some(fuel_cost),
-                available_fuel,
-            )?;
+            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+                self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
+            }
         }
 
         Ok(())
+    }
+
+    fn enqueue_assignment(
+        &mut self,
+        assignment: ConstraintAssignment,
+        derived_fuel_cost: Option<u16>,
+        path_fuel: u16,
+    ) {
+        let new_fuel = (derived_fuel_cost, path_fuel);
+        self.assignment_queue
+            .entry(assignment)
+            .and_modify(|existing_fuel| {
+                *existing_fuel = std::cmp::max_by_key(
+                    *existing_fuel,
+                    new_fuel,
+                    |&(derived_fuel_cost, path_fuel)| {
+                        (path_fuel, std::cmp::Reverse(derived_fuel_cost))
+                    },
+                );
+            })
+            .or_insert(new_fuel);
     }
 }
 
