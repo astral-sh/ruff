@@ -1430,10 +1430,10 @@ reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
 ```
 
-### Gradual return types
+### Decorators with gradual return types
 
-Gradual return types must not widen a `ParamSpec` captured from a generic function into a union of
-parameter lists. The original generic signature should remain available to the decorated callable.
+A decorator that accepts a callable returning `Any` must preserve the parameter list of a decorated
+generic function. Valid calls should still succeed, and the original arity should still be checked:
 
 ```py
 from collections.abc import Callable, Generator
@@ -1454,7 +1454,12 @@ reveal_type(identity)  # revealed: Wrapped[(value: T@identity)]
 identity.call("value")
 # error: [too-many-positional-arguments]
 identity.call(1, 2)
+```
 
+The return type is ignored only when it is gradual. A decorator that requires an `int` return must
+still reject a function that returns `str`:
+
+```py
 def requires_int[**P](func: Callable[P, int]) -> Wrapped[P]:
     return Wrapped()
 
@@ -1462,7 +1467,11 @@ def requires_int[**P](func: Callable[P, int]) -> Wrapped[P]:
 @requires_int
 def returns_str(value: str) -> str:
     return value
+```
 
+Legacy `ParamSpec` and TypeVar syntax behaves the same way:
+
+```py
 P = ParamSpec("P")
 T = TypeVar("T")
 
@@ -1480,7 +1489,12 @@ reveal_type(legacy_identity)  # revealed: LegacyWrapped[(value: T@legacy_identit
 legacy_identity.call("value")
 # error: [too-many-positional-arguments]
 legacy_identity.call(1, 2)
+```
 
+`types.coroutine` is a standard-library example: a decorated generator must remain generic and
+produce an awaitable callable:
+
+```py
 @types.coroutine
 def stdlib_yield(value: T) -> Generator[T, None, None]:
     yield value

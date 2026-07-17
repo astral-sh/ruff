@@ -2552,8 +2552,10 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
-Property accessors can use a callable-local receiver TypeVar instead of `Self`. The receiver must be
-specialized before the getter return or setter value type is compared:
+## Generic receiver annotations on properties
+
+A property getter can use a TypeVar in its `self` annotation. The return type then refers to the
+class that implements the protocol, including when the annotation uses a type alias:
 
 ```py
 from typing import Protocol, TypeAlias, TypeVar
@@ -2580,10 +2582,13 @@ class IntProperty:
         return 1
 
 generic_property: HasGenericSelfProperty = GenericSelfProperty()
-invalid_property: HasGenericSelfProperty = IntProperty()  # error: [invalid-assignment]
 aliased_property: HasAliasedSelfProperty = GenericSelfProperty()
 invalid_aliased_property: HasAliasedSelfProperty = IntProperty()  # error: [invalid-assignment]
+```
 
+The same applies to a setter value whose type refers to `self`:
+
+```py
 class HasMutableSelfProperty(Protocol):
     @property
     def value(self) -> object: ...
@@ -2606,7 +2611,11 @@ class InvalidMutableSelfProperty:
 
 mutable_property: HasMutableSelfProperty = MutableSelfProperty()
 invalid_mutable_property: HasMutableSelfProperty = InvalidMutableSelfProperty()  # error: [invalid-assignment]
+```
 
+A bound on the TypeVar still requires the implementing class to satisfy that bound:
+
+```py
 class PropertyBase: ...
 
 BoundedPropertyT = TypeVar("BoundedPropertyT", bound=PropertyBase)
@@ -2629,8 +2638,10 @@ bounded_property: HasBoundedSelfProperty = BoundedSelfProperty()
 invalid_bounded_property: HasBoundedSelfProperty = InvalidBoundedSelfProperty()  # error: [invalid-assignment]
 ```
 
-Specializing a property's receiver must not allow a non-generic or inconsistently specialized method
-to satisfy an unrelated generic protocol method:
+## Independent generic protocol methods
+
+A TypeVar used by a property receiver does not make another protocol method non-generic. An
+implementation of that method must still work for every allowed type:
 
 ```py
 from typing import Callable, Protocol, TypeVar
@@ -2643,38 +2654,22 @@ class HasPropertyProto(Protocol):
     def f(self: T) -> T: ...
     def m(self, item: T, callback: Callable[[T], str]) -> str: ...
 
-class ConcreteHasProperty1:
+class GenericMethod:
     @property
     def f(self: T) -> T:
         return self
     def m(self, item: T, callback: Callable[[T], str]) -> str:
         return ""
 
-class ConcreteHasProperty2:
+class IntMethod:
     @property
     def f(self) -> Self:
         return self
     def m(self, item: int, callback: Callable[[int], str]) -> str:
         return ""
 
-class ConcreteHasProperty3:
-    @property
-    def f(self) -> int:
-        return 0
-    def m(self, item: int, callback: Callable[[int], str]) -> str:
-        return ""
-
-class ConcreteHasProperty4:
-    @property
-    def f(self) -> Self:
-        return self
-    def m(self, item: str, callback: Callable[[int], str]) -> str:
-        return ""
-
-hp1: HasPropertyProto = ConcreteHasProperty1()
-hp2: HasPropertyProto = ConcreteHasProperty2()  # error: [invalid-assignment]
-hp3: HasPropertyProto = ConcreteHasProperty3()  # error: [invalid-assignment]
-hp4: HasPropertyProto = ConcreteHasProperty4()  # error: [invalid-assignment]
+generic_method: HasPropertyProto = GenericMethod()
+int_method: HasPropertyProto = IntMethod()  # error: [invalid-assignment]
 ```
 
 ## Protocol members defined using descriptor decorators
@@ -3981,8 +3976,10 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
-A receiver TypeVar's bound limits the specializations for which a protocol method must be
-compatible. It is not an additional constraint that must hold for every possible specialization:
+## Generic receiver annotations on protocol methods
+
+A protocol method can use a TypeVar in its `self` annotation and return that same type. A function
+can then preserve the concrete type of an object implementing the protocol:
 
 ```py
 from typing import Any, Protocol, TypeVar
@@ -4014,7 +4011,12 @@ parent = generic_get_parent(ConcreteHasParent())
 assert_type(parent, ConcreteHasParent)
 invalid_parent: HasParent = InvalidHasParent()  # error: [invalid-assignment]
 gradual_parent: HasParent = GradualHasParent()
+```
 
+The TypeVar can be bounded by the protocol itself. Checking the implementation must not reject a
+valid `copy` method because the bound is recursive:
+
+```py
 C = TypeVar("C", bound="Copyable")
 
 class Copyable(Protocol):
@@ -4025,16 +4027,13 @@ class One:
     def copy(self) -> "One":
         return One()
 
-OtherT = TypeVar("OtherT", bound="Other")
+copyable: Copyable = One()
+```
 
-class Other:
-    def copy(self: OtherT) -> OtherT:
-        return self
+The TypeVar in the receiver annotation can also appear in another parameter. In particular,
+comparison protocols used by libraries such as Pydantic must continue to accept integers:
 
-copyable: Copyable
-copyable = One()
-copyable = Other()
-
+```py
 class SupportsGt(Protocol):
     def __gt__(self: T, other: T, /) -> bool: ...
 
@@ -4042,7 +4041,6 @@ class InvalidSupportsGt:
     def __gt__(self, other: str, /) -> bool:
         return False
 
-supports_gt: SupportsGt = 1
 invalid_supports_gt: SupportsGt = InvalidSupportsGt()  # error: [invalid-assignment]
 
 SupportsGtT = TypeVar("SupportsGtT", bound=SupportsGt)
@@ -4052,7 +4050,11 @@ def field(*, gt: SupportsGt | None = None) -> None: ...
 
 accepts_gt(1)
 field(gt=0)
+```
 
+An unrelated bound on the TypeVar still has to be satisfied by the implementing class:
+
+```py
 class HasValue(Protocol):
     value: int
 
@@ -4075,8 +4077,14 @@ valid_bound_receiver: BoundReceiver = ValidBoundReceiver()
 invalid_bound_receiver: BoundReceiver = InvalidBoundReceiver()  # error: [invalid-assignment]
 ```
 
-Receiver TypeVars are distinct from unrelated method TypeVars. Binding the receiver limits the
-former, but the latter must still work for every specialization:
+## Generic receivers and generic methods
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A type alias around the receiver annotation must not hide its TypeVar:
 
 ```py
 from typing import Protocol
@@ -4092,7 +4100,11 @@ class AliasedCopy:
         return self
 
 aliased_copy: AliasedReceiver = AliasedCopy()
+```
 
+Other method TypeVars are independent of the receiver and must still work for every allowed type:
+
+```py
 class ReceiverAndMethodLocal(Protocol):
     def apply[ReceiverT, T](self: ReceiverT, value: T) -> T: ...
 
@@ -4106,7 +4118,11 @@ class IntApply:
 
 generic_apply: ReceiverAndMethodLocal = GenericApply()
 int_apply: ReceiverAndMethodLocal = IntApply()  # error: [invalid-assignment]
+```
 
+The corresponding `cls` annotation on a class method can also use a TypeVar:
+
+```py
 class GenericClassReceiver(Protocol):
     @classmethod
     def make[T](cls: type[T]) -> T: ...
@@ -4125,9 +4141,15 @@ class_factory: GenericClassReceiver = ClassFactory()
 invalid_class_factory: GenericClassReceiver = InvalidClassFactory()  # error: [invalid-assignment]
 ```
 
-Receiver TypeVars can also occur inside type arguments (including deferred `type[Box[T]]`
-receivers). Discover those variables without traversing the members of a protocol-valued receiver
-annotation or the bounds of a TypeVar:
+## Nested generic receivers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A method TypeVar that appears only in a parameter or return type is unrelated to the receiver, even
+when `self` is annotated with a protocol. A non-generic implementation of `apply` is invalid:
 
 ```py
 from typing import Protocol
@@ -4140,7 +4162,11 @@ class BadProtocolReceiver:
         return value
 
 bad_protocol_receiver: ProtocolReceiver = BadProtocolReceiver()  # error: [invalid-assignment]
+```
 
+In contrast, a TypeVar that appears inside a generic receiver annotation is tied to that receiver:
+
+```py
 class Box[T]:
     value: T
 
@@ -4157,7 +4183,11 @@ class BadIntBox(Box[int]):
 
 good_int_box: NestedNominalReceiver = GoodIntBox()
 bad_int_box: NestedNominalReceiver = BadIntBox()  # error: [invalid-assignment]
+```
 
+This also works for a generic `cls` annotation:
+
+```py
 class NestedClassReceiver(Protocol):
     @classmethod
     def make[T](cls: type[Box[T]], value: T) -> T: ...
@@ -4174,7 +4204,12 @@ class BadClassBox(Box[int]):
 
 good_class_box: NestedClassReceiver = GoodClassBox()
 bad_class_box: NestedClassReceiver = BadClassBox()  # error: [invalid-assignment]
+```
 
+When the receiver is itself a generic protocol, its type argument determines which argument type the
+method must accept:
+
+```py
 class NestedReceiver[T](Protocol):
     def apply[U](self: "NestedReceiver[U]", value: U) -> U: ...
 
@@ -4190,8 +4225,15 @@ generic_nested_receiver: NestedReceiver[str] = GenericNestedReceiver()
 bad_nested_receiver: NestedReceiver[str] = BadNestedReceiver()  # error: [invalid-assignment]
 ```
 
-A receiver domain includes the TypeVar's declared bound. This both permits valid bounded overrides
-and prevents a protocol method with an impossible receiver bound from being satisfied vacuously:
+## Bounds and constraints on generic receivers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+An overriding method can replace a bounded TypeVar in the receiver annotation with the base class.
+This is valid for both modern and legacy TypeVar syntax:
 
 ```py
 from typing import Protocol, TypeVar
@@ -4209,7 +4251,12 @@ class LegacyBase:
 
 class LegacyChild(LegacyBase):
     def method(self, other: LegacyBase) -> None: ...
+```
 
+The same rule applies to class methods. An override can accept the base class, but it cannot narrow
+the other parameter to the subclass:
+
+```py
 class ClassBase:
     @classmethod
     def method[T: "ClassBase"](cls: type[T], other: T) -> T:
@@ -4224,7 +4271,11 @@ class InvalidClassChild(ClassBase):
     @classmethod
     def method(cls, other: "InvalidClassChild") -> ClassBase:  # error: [invalid-method-override]
         return other
+```
 
+A protocol with a bounded receiver can only be implemented by a class that satisfies the bound:
+
+```py
 class BoundedProtocol(Protocol):
     def method[T: int](self: T) -> None: ...
 
@@ -4232,7 +4283,11 @@ class InvalidBoundedProtocolImplementation:
     def method(self) -> None: ...
 
 bounded_protocol: BoundedProtocol = InvalidBoundedProtocolImplementation()  # error: [invalid-assignment]
+```
 
+The bound is checked for class-method receivers as well:
+
+```py
 class BoundedClassProtocol(Protocol):
     @classmethod
     def method[T: int](cls: type[T]) -> None: ...
@@ -4247,7 +4302,11 @@ class InvalidBoundedClassImplementation:
 
 bounded_class_protocol: BoundedClassProtocol = BoundedClassImplementation()
 invalid_bounded_class_protocol: BoundedClassProtocol = InvalidBoundedClassImplementation()  # error: [invalid-assignment]
+```
 
+Bounds and constraints nested inside a receiver annotation also have to be respected:
+
+```py
 class NonRecursiveProtocol(Protocol):
     def method(self) -> None: ...
 
@@ -4261,8 +4320,11 @@ invalid_nested_bounded: NonRecursiveProtocol = InvalidNestedBoundedImplementatio
 invalid_union_constrained: NonRecursiveProtocol = InvalidUnionConstrainedImplementation()  # error: [invalid-assignment]
 ```
 
-A receiver TypeVar can be bounded by the protocol that declares the method. Binding it to the
-concrete receiver must not recursively check the same protocol while constructing its domain:
+## Recursive protocol bounds
+
+A TypeVar in a receiver annotation can be bounded by the protocol that declares the method. The
+bound must accept a compatible implementation and reject an incompatible one without recursing
+indefinitely:
 
 ```py
 from typing import Generic, Protocol, TypeVar
