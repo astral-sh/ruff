@@ -340,6 +340,24 @@ help: Use the `type` keyword
 86 |
    |
 
+UP040 [*] Type alias `AnyList` uses `TypeAliasType` assignment instead of the `type` keyword
+  --> UP040.py:95:1
+   |
+93 | # `default` was added in Python 3.13
+94 | T = typing.TypeVar("T", default=Any)
+95 | AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |
+97 | # unsafe fix if comments within the fix
+   |
+help: Use the `type` keyword
+   |
+94 | T = typing.TypeVar("T", default=Any)
+   - AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+95 + type AnyList[T = Any] = list[T]
+96 |
+   |
+
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    --> UP040.py:99:1
     |
