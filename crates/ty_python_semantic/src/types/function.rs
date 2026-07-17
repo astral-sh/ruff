@@ -1890,7 +1890,16 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-/// Return whether every possible value of `ty` is accepted by a member of a fixed `isinstance` tuple.
+/// Return whether a fixed `isinstance` tuple covers every member of a nominal input union.
+///
+/// Only exact class literals with the inferred default metaclass are considered; other classinfo
+/// forms remain ambiguous.
+///
+/// ```python
+/// def f(x: A | B) -> bool:
+///     if isinstance(x, (A, B)):
+///         return True
+/// ```
 fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: Type<'db>) -> bool {
     let Some(tuple) = classinfo
         .as_nominal_instance()

@@ -84,16 +84,10 @@ str(b"M\xc3\xbcsli", b"utf-8")
 We infer `Literal[True]` for a limited set of cases where we can be sure that the answer is correct,
 but fall back to `bool` otherwise.
 
-For tuple targets, this is intentionally limited to fixed, top-level tuples of exact class literals
-with the default metaclass. Every member of an ordinary nominal input union must be covered. Nested
-or variadic tuples, PEP 604 union members, typing special forms, protocols, custom metaclasses, and
-subclass-typed targets remain `bool`, as do flow-narrowed, type-alias, `TypeVar`, and `type[...]`
-inputs.
-
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import TypeVar
 
 class Answer(Enum):
     NO = 0
@@ -134,14 +128,8 @@ reveal_type(isinstance(s, SubclassOfA))  # revealed: Literal[True]
 reveal_type(isinstance(s, A))  # revealed: Literal[True]
 
 def _(x: A | B, y: list[int]):
-    targets = (A, B)
-
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
-    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
-    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
-    reveal_type(isinstance(x, targets))  # revealed: Literal[True]
-    reveal_type(isinstance(x, (A, bytes)))  # revealed: bool
 
     if isinstance(x, A):
         pass
@@ -149,89 +137,9 @@ def _(x: A | B, y: list[int]):
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
 
-def returns_bool(x: A) -> bool:
-    if isinstance(x, (B, A)):
-        return True
-
-def returns_bool_union(x: A | B) -> bool:
-    if isinstance(x, (A, B)):
-        return True
-
-def returns_bool_object(x: object) -> bool:
-    if isinstance(x, (object,)):
-        return True
-
-def returns_bool_stored_tuple(x: A | B) -> bool:
-    targets = (A, B)
-    if isinstance(x, targets):
-        return True
-
-def partial_targets_are_not_exhaustive(x: A | B) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (A, bytes)):
-        return True
-
-def variadic_targets_are_not_exhaustive(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, targets):
-        return True
-
-def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (target,)):
-        return True
-
-@runtime_checkable
-class RuntimeProtocol(Protocol):
-    value: int
-
-class StructuralImplementation:
-    value: int
-
-def protocol_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
-    if isinstance(x, (RuntimeProtocol, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-class RejectingMeta(type):
-    def __instancecheck__(self, instance: object, /) -> bool:
-        return False
-
-class RejectingBase(metaclass=RejectingMeta): ...
-class RejectingChild(RejectingBase): ...
-
-# `isinstance` truthiness does not model `__instancecheck__` for single-class targets: this is
-# inferred as `Literal[True]` from nominal subtyping, even though it returns `False` at runtime.
-reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
-
-def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
-    if isinstance(x, (RejectingBase, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def custom_instancecheck_before_target_is_not_exhaustive(x: A) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (RejectingBase, A)):
-        return True
-
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
-T_bound_type = TypeVar("T_bound_type", bound=type)
-
-def bare_type_is_not_exhaustive(x: type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (type,)):
-        return True
-
-bare_type_is_not_exhaustive(list[int])
-
-def indirect_bare_type_is_not_exhaustive(x: T_bound_type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, (type,)):
-        return True
-
-indirect_bare_type_is_not_exhaustive(list[int])
-
-def narrowed_bare_type_is_not_exhaustive(x: type) -> bool:  # error: [invalid-return-type]
-    if isinstance(x, A):
-        return True
-    if isinstance(x, (type,)):
-        return True
 
 def _(
     x: T,
@@ -251,6 +159,131 @@ def _(
     reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
+```
+
+An `isinstance` check against a tuple is always true when each possible type of the checked value is
+accepted by at least one class in the tuple. This avoids a false implicit-return error when the
+check is the only path that returns a value. The same applies when the tuple is assigned to a local
+variable.
+
+```py
+def reveal_tuple_result(x: A | B):
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+
+def accepts_a(x: A) -> bool:
+    if isinstance(x, (B, A)):
+        return True
+
+def accepts_a_or_b(x: A | B) -> bool:
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_object(x: object) -> bool:
+    if isinstance(x, (object,)):
+        return True
+
+def accepts_stored_tuple(x: A | B) -> bool:
+    targets = (A, B)
+    if isinstance(x, targets):
+        return True
+```
+
+The tuple must contain a fixed set of known classes. A partial tuple cannot cover a union, a
+variadic tuple can be empty, and a value annotated as `type[A]` can refer to a subclass of `A`.
+Nested tuples, unions used as tuple elements, and aliases such as `typing.List` are also left as
+`bool`.
+
+```py
+from typing import List
+
+def reveal_unsupported_tuple_results(x: A | B, items: list[int]):
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
+    reveal_type(isinstance(x, (A | B,)))  # revealed: bool
+    reveal_type(isinstance(items, (List,)))  # revealed: bool
+
+def partial_tuple(x: A | B) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (A, bytes)):
+        return True
+
+def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, targets):
+        return True
+
+def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (target,)):
+        return True
+```
+
+A class with a custom metaclass can reject values that would otherwise match by inheritance, and a
+runtime-checkable protocol can reject a class that only appears structurally compatible. Keep the
+false branch reachable for both kinds of tuple member. A custom check that appears before an
+otherwise matching class must also keep the result uncertain, since instance checks run in order and
+can have side effects.
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocol(Protocol):
+    value: int
+
+class StructuralImplementation:
+    value: int
+
+def protocol_target(x: StructuralImplementation) -> bool:
+    if isinstance(x, (RuntimeProtocol, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+class RejectingMeta(type):
+    def __instancecheck__(self, instance: object, /) -> bool:
+        return False
+
+class RejectingBase(metaclass=RejectingMeta): ...
+class RejectingChild(RejectingBase): ...
+
+def custom_target(x: RejectingChild) -> bool:
+    if isinstance(x, (RejectingBase, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def custom_target_before_match(x: A) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (RejectingBase, A)):
+        return True
+```
+
+Single-class `isinstance` inference currently assumes normal inheritance and does not account for an
+overridden `__instancecheck__`. This assertion documents the existing limitation: Python returns
+`False` for this check, while ty infers `Literal[True]`.
+
+```py
+reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
+```
+
+Finally, `list[int]` is accepted where `type` is expected, but `isinstance(list[int], type)` is
+false at runtime. A tuple containing `type` must therefore remain uncertain for a bare `type`, a
+type variable bound to `type`, and a `type` value narrowed by an earlier check.
+
+```py
+T_bound_type = TypeVar("T_bound_type", bound=type)
+
+def bare_type(x: type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (type,)):
+        return True
+
+bare_type(list[int])
+
+def type_variable_bound_to_type(x: T_bound_type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (type,)):
+        return True
+
+type_variable_bound_to_type(list[int])
+
+def narrowed_type(x: type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, A):
+        return True
+    if isinstance(x, (type,)):
+        return True
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
