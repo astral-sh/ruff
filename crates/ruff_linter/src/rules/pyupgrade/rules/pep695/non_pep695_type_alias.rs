@@ -259,9 +259,9 @@ fn create_diagnostic(
 ) {
     // If any type variables have defaults, skip the rule unless
     // running with preview mode enabled and targeting Python 3.13+.
-    if type_vars.iter().any(|type_var| type_var.default.is_some())
-        && (checker.target_version() < PythonVersion::PY313
-            || !is_type_var_default_enabled(checker.settings()))
+    if (checker.target_version() < PythonVersion::PY313
+        || !is_type_var_default_enabled(checker.settings()))
+        && type_vars.iter().any(|type_var| type_var.default.is_some())
     {
         return;
     }
