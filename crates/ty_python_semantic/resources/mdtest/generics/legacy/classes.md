@@ -159,6 +159,111 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Specializing classes with unavailable generic context
+
+Failure to determine a class's generic context is not proof that the class is non-generic. Avoid
+emitting a cascading `not-subscriptable` diagnostic when the class definition still contains
+evidence that it may be generic.
+
+### Conditional typing compatibility imports
+
+Libraries commonly support multiple Python versions by importing generic machinery from either
+`typing_extensions` or `typing`. The resulting union currently prevents ty from constructing a
+generic context, but either runtime branch creates a generic class.
+
+```py
+try:
+    import typing_extensions as typing
+except ImportError:
+    import typing
+
+T = typing.TypeVar("T")
+
+# error: [invalid-argument-type]
+class Parser(typing.Protocol, typing.Generic[T]): ...
+
+parser: Parser[int]
+```
+
+### Decorated generic bases
+
+A decorator that ty cannot fully understand can obscure the generic context of a base class. A
+subclass that forwards type variables to that base remains possibly generic.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# error: [unresolved-attribute]
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+class FrozenDict(Mapping[K, V]): ...
+
+mapping: FrozenDict[str, int]
+```
+
+### Unresolved generic bases
+
+An unresolved base can still be generic at runtime. A type variable in the base specialization is
+enough evidence to avoid claiming that the subclass is definitely non-generic.
+
+```py
+from typing import TypeVar
+
+from missing import Base  # error: [unresolved-import]
+
+T = TypeVar("T")
+
+class Child(Base[T]): ...
+
+child: Child[int]
+```
+
+### Conditional generic bases
+
+When every possible base is generic, the subclass is possibly generic even if ty does not yet
+support a union of class-literal bases.
+
+`base1.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+`base2.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+```py
+from typing import TypeVar
+
+try:
+    from base1 import Base
+except ImportError:
+    from base2 import Base
+
+T = TypeVar("T")
+
+# error: [unsupported-base]
+class Child(Base[T]): ...
+
+child: Child[int]
+```
+
 ## Errors for inconsistent type arguments
 
 <!-- snapshot-diagnostics -->

@@ -21,11 +21,11 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
-    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, GenericContextState,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
+    TypeAliasType, TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
+    UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1313,8 +1313,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .unwrap_or_else(|| class_literal.default_specialization(self.db()));
                             SubclassOfType::from(self.db(), class_type)
                         } else {
-                            match class_literal.generic_context(self.db()) {
-                                Some(generic_context) => {
+                            match class_literal.generic_context_state(self.db()) {
+                                GenericContextState::Known(generic_context) => {
                                     let db = self.db();
                                     let specialize = &|types: &[Option<Type<'db>>]| {
                                         let class = class_literal.apply_specialization(db, |_| {
@@ -1339,10 +1339,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         specialize,
                                     )
                                 }
-                                None => {
+                                state => {
                                     self.infer_expression(parameters, TypeContext::default());
-                                    if let Some(builder) =
-                                        self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                                    if state == GenericContextState::DefinitelyAbsent
+                                        && let Some(builder) =
+                                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                                     {
                                         builder
                                             .into_diagnostic("Cannot subscript non-generic type");
@@ -1777,8 +1778,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match (class.generic_context(self.db()), class.as_static()) {
-                    (Some(generic_context), Some(static_class)) => {
+                match (class.generic_context_state(self.db()), class.as_static()) {
+                    (GenericContextState::Known(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,
                             value_ty,
@@ -1795,10 +1796,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                             .unwrap_or(Type::unknown())
                     }
-                    _ => {
+                    (state, _) => {
                         self.infer_expression(slice, TypeContext::default());
-                        if let Some(builder) =
-                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                        if state == GenericContextState::DefinitelyAbsent
+                            && let Some(builder) =
+                                self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                         {
                             builder.into_diagnostic("Cannot subscript non-generic type");
                         }

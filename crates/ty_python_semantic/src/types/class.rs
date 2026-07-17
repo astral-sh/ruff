@@ -10,7 +10,7 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
+    ExpandedClassBaseEntry, GenericContextState, StaticClassLiteral, expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::dedicated::pydantic;
@@ -662,7 +662,17 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns the generic context if this is a generic class.
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.as_static().and_then(|class| class.generic_context(db))
+        self.generic_context_state(db).context()
+    }
+
+    pub(crate) fn generic_context_state(self, db: &'db dyn Db) -> GenericContextState<'db> {
+        match self {
+            Self::Static(class) => class.generic_context_state(db),
+            Self::Dynamic(_) => GenericContextState::Unknown,
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => {
+                GenericContextState::DefinitelyAbsent
+            }
+        }
     }
 
     /// Returns whether this class is a protocol.
