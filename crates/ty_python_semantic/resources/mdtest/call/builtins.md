@@ -84,10 +84,16 @@ str(b"M\xc3\xbcsli", b"utf-8")
 We infer `Literal[True]` for a limited set of cases where we can be sure that the answer is correct,
 but fall back to `bool` otherwise.
 
+For tuple targets, this is intentionally limited to fixed, top-level tuples of exact class literals
+with the default metaclass. Every member of an ordinary nominal input union must be covered. Nested
+or variadic tuples, PEP 604 union members, typing special forms, protocols, custom metaclasses, and
+subclass-typed targets remain `bool`, as do flow-narrowed, type-alias, `TypeVar`, and `type[...]`
+inputs.
+
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import Any, Dict, List, Protocol, Tuple, Type, TypeVar, runtime_checkable
+from typing import Protocol, TypeVar, runtime_checkable
 
 class Answer(Enum):
     NO = 0
@@ -133,7 +139,7 @@ def _(x: A | B, y: list[int]):
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
     reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
-    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
     reveal_type(isinstance(x, targets))  # revealed: Literal[True]
     reveal_type(isinstance(x, (A, bytes)))  # revealed: bool
 
@@ -147,54 +153,17 @@ def returns_bool(x: A) -> bool:
     if isinstance(x, (B, A)):
         return True
 
-def returns_bool_nested(x: A) -> bool:
-    if isinstance(x, (B, (bytes, A))):
-        return True
-
 def returns_bool_union(x: A | B) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-def returns_bool_union_type(x: A | B) -> bool:
-    if isinstance(x, (A | B,)):
-        return True
-
-def returns_bool_optional_union_type(x: A | None) -> bool:
-    if isinstance(x, (A | None,)):
-        return True
-
-def returns_bool_typing_list(x: list[int]) -> bool:
-    if isinstance(x, (List,)):
-        return True
-
-def returns_bool_typing_dict(x: dict[str, int]) -> bool:
-    if isinstance(x, (Dict,)):
-        return True
-
-def returns_bool_typing_tuple(x: tuple[int, ...]) -> bool:
-    if isinstance(x, (Tuple,)):
-        return True
-
-def returns_bool_typing_type(x: type[A]) -> bool:
-    if isinstance(x, (Type,)):
+def returns_bool_object(x: object) -> bool:
+    if isinstance(x, (object,)):
         return True
 
 def returns_bool_stored_tuple(x: A | B) -> bool:
     targets = (A, B)
     if isinstance(x, targets):
-        return True
-
-def returns_bool_variadic_with_fixed_target(x: A, targets: tuple[type[B], ...]) -> bool:
-    if isinstance(x, (A, *targets)):
-        return True
-
-def returns_bool_annotated_local(condition: bool) -> bool:
-    value: A | B = A() if condition else B()
-    if isinstance(value, (A, B)):
-        return True
-
-def returns_bool_object(x: object) -> bool:
-    if isinstance(x, (object,)):
         return True
 
 def partial_targets_are_not_exhaustive(x: A | B) -> bool:  # error: [invalid-return-type]
@@ -208,15 +177,6 @@ def variadic_targets_are_not_exhaustive(x: A, targets: tuple[type[A], ...]) -> b
 def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
     if isinstance(x, (target,)):
         return True
-
-def alternative_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:  # error: [invalid-return-type]
-    target = A if condition else B
-    if isinstance(x, (target,)):
-        return True
-
-def object_and_any_are_not_exhaustive(x: object, y: Any):
-    reveal_type(isinstance(x, (A, B)))  # revealed: bool
-    reveal_type(isinstance(y, (A, B)))  # revealed: bool
 
 @runtime_checkable
 class RuntimeProtocol(Protocol):
@@ -237,31 +197,40 @@ class RejectingMeta(type):
 class RejectingBase(metaclass=RejectingMeta): ...
 class RejectingChild(RejectingBase): ...
 
+# `isinstance` truthiness does not model `__instancecheck__` for single-class targets: this is
+# inferred as `Literal[True]` from nominal subtyping, even though it returns `False` at runtime.
+reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
+
 def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
     if isinstance(x, (RejectingBase, bytes)):
         return True
     return ""  # error: [invalid-return-type]
 
-class UnionMeta(type):
-    def __or__(self, other: object, /) -> type[int]:
-        return int
-
-    def __ror__(self, other: object, /) -> type[int]:
-        return int
-
-class UnionBase(metaclass=UnionMeta): ...
-
-def custom_union_targets_are_not_exhaustive(x: B) -> bool:
-    if isinstance(x, (UnionBase | B,)):
+def custom_instancecheck_before_target_is_not_exhaustive(x: A) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (RejectingBase, A)):
         return True
-    return ""  # error: [invalid-return-type]
 
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
+T_bound_type = TypeVar("T_bound_type", bound=type)
 
-def returns_bool_unconstrained_typevar(x: T) -> bool:
-    if isinstance(x, (object,)):
+def bare_type_is_not_exhaustive(x: type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (type,)):
+        return True
+
+bare_type_is_not_exhaustive(list[int])
+
+def indirect_bare_type_is_not_exhaustive(x: T_bound_type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (type,)):
+        return True
+
+indirect_bare_type_is_not_exhaustive(list[int])
+
+def narrowed_bare_type_is_not_exhaustive(x: type) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, A):
+        return True
+    if isinstance(x, (type,)):
         return True
 
 def _(
@@ -270,21 +239,18 @@ def _(
     x_constrained_sub_a: T_constrained,
 ):
     reveal_type(isinstance(x, object))  # revealed: Literal[True]
-    reveal_type(isinstance(x, (object,)))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
 
     reveal_type(isinstance(x_bound_a, object))  # revealed: Literal[True]
     reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_bound_a, B))  # revealed: bool
-    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: Literal[True]
 
     reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
-    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: Literal[True]
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking

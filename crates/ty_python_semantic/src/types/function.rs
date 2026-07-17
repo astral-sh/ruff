@@ -1890,72 +1890,40 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-/// Return whether every possible value of `ty` is accepted by a fixed `isinstance` tuple member.
+/// Return whether every possible value of `ty` is accepted by a member of a fixed `isinstance` tuple.
 fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: Type<'db>) -> bool {
-    match ty {
-        Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_instance_tuple_exhaustive(db, *element, classinfo)),
-        Type::TypeAlias(alias) => is_instance_tuple_exhaustive(db, alias.value_type(db), classinfo),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_instance_tuple_exhaustive(db, bound, classinfo)
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .all(|element| is_instance_tuple_exhaustive(db, *element, classinfo)),
-            None => is_instance_tuple_exhaustive(db, Type::object(), classinfo),
-        },
-        ty => match classinfo {
-            Type::ClassLiteral(class) => {
-                class.into_protocol_class(db).is_none()
-                    && class.metaclass(db) == KnownClass::Type.to_class_literal(db)
-                    && is_instance_truthiness(db, ty, class).is_always_true()
-            }
-            Type::TypeAlias(alias) => is_instance_tuple_exhaustive(db, ty, alias.value_type(db)),
-            Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|tuple| {
-                tuple
-                    .fixed_elements()
-                    .any(|element| is_instance_tuple_exhaustive(db, ty, *element))
-            }),
-            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                let Ok(elements) = instance.value_expression_types(db) else {
+    let Some(tuple) = classinfo
+        .as_nominal_instance()
+        .and_then(|nominal| nominal.tuple_spec(db))
+    else {
+        return false;
+    };
+    if tuple.is_variadic()
+        || !tuple.fixed_elements().all(|element| {
+            let Type::ClassLiteral(class) = element else {
+                return false;
+            };
+            class.into_protocol_class(db).is_none()
+                && class.metaclass(db) == KnownClass::Type.to_class_literal(db)
+        })
+    {
+        return false;
+    }
+
+    let is_covered = |ty: Type<'db>| {
+        ty.is_nominal_instance()
+            && !ty.is_instance_of(db, KnownClass::Type)
+            && tuple.fixed_elements().any(|element| {
+                let Type::ClassLiteral(class) = element else {
                     return false;
                 };
+                is_instance_truthiness(db, ty, *class).is_always_true()
+            })
+    };
 
-                let mut is_exhaustive = false;
-                for element in elements {
-                    let element = if element.is_none(db) {
-                        KnownClass::NoneType.to_class_literal(db)
-                    } else {
-                        element
-                    };
-                    let Type::ClassLiteral(class) = element else {
-                        return false;
-                    };
-                    if class.into_protocol_class(db).is_some()
-                        || class.metaclass(db) != KnownClass::Type.to_class_literal(db)
-                    {
-                        return false;
-                    }
-                    is_exhaustive |= is_instance_truthiness(db, ty, class).is_always_true();
-                }
-                is_exhaustive
-            }
-            Type::SpecialForm(SpecialFormType::LegacyStdlibAlias(alias)) => {
-                is_instance_tuple_exhaustive(db, ty, alias.aliased_class().to_class_literal(db))
-            }
-            Type::SpecialForm(SpecialFormType::Tuple) => {
-                is_instance_tuple_exhaustive(db, ty, KnownClass::Tuple.to_class_literal(db))
-            }
-            Type::SpecialForm(SpecialFormType::Type) => {
-                matches!(ty, Type::ClassLiteral(_) | Type::SubclassOf(_))
-            }
-            _ => false,
-        },
+    match ty {
+        Type::Union(union) => union.elements(db).iter().copied().all(is_covered),
+        ty => is_covered(ty),
     }
 }
 
@@ -2634,12 +2602,8 @@ impl KnownFunction {
                 if self == KnownFunction::IsInstance {
                     let truthiness = match second_argument {
                         Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
-                        Type::NominalInstance(nominal) if nominal.tuple_spec(db).is_some() => {
-                            if is_instance_tuple_exhaustive(db, *first_arg, *second_argument) {
-                                Truthiness::AlwaysTrue
-                            } else {
-                                Truthiness::Ambiguous
-                            }
+                        _ if is_instance_tuple_exhaustive(db, *first_arg, *second_argument) => {
+                            Truthiness::AlwaysTrue
                         }
                         _ => Truthiness::Ambiguous,
                     };
