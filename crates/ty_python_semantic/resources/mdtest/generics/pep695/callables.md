@@ -687,6 +687,35 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
     return wrapper
 ```
 
+The overloads can also refer to type variables captured from the enclosing factory rather than
+declaring their own type parameters:
+
+```py
+type Func[T] = Callable[[int], T]
+type Coro[T] = Coroutine[Any, Any, T]
+
+def captured_singleton[S, T, U]() -> Callable[[Func[S]], Func[S]]:
+    @overload
+    def wrapper(func: Func[Coro[T]]) -> Func[Coro[T]]: ...
+    @overload
+    def wrapper(func: Func[U]) -> Func[U]: ...
+    def wrapper(func: Func[Coro[T] | U]) -> Func[Coro[T] | U]:
+        return func
+
+    return wrapper
+
+def invalid_captured_singleton[S, T, U]() -> Callable[[Func[S]], Func[S]]:
+    @overload
+    def wrapper(func: Func[Coro[T]]) -> Func[Coro[T]]: ...
+    @overload
+    def wrapper(func: Func[U]) -> Func[int]: ...
+    def wrapper(func: Func[Coro[T] | U]) -> Func[Coro[T] | int]:
+        raise NotImplementedError
+
+    # error: [invalid-return-type]
+    return wrapper
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

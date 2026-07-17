@@ -16,7 +16,7 @@ use crate::{
             OverloadLiteral, function_body_kind, is_implicit_classmethod,
             same_module_uncached_raw_signature,
         },
-        generics::{enclosing_generic_contexts, typing_self},
+        generics::{GenericContext, enclosing_generic_contexts, typing_self},
         infer::{
             InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
@@ -62,6 +62,8 @@ struct ExpectedReturnType<'db> {
     public: Type<'db>,
     /// The lexical return type, if the public return type contains a type variable.
     lexical: Option<Type<'db>>,
+    /// The enclosing generic context available to a nested callable returned from this function.
+    lexical_generic_context: Option<GenericContext<'db>>,
 }
 
 impl<'db> ExpectedReturnType<'db> {
@@ -80,19 +82,20 @@ impl<'db> ExpectedReturnType<'db> {
             same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
-        let lexical = public.has_typevar(db).then(|| {
-            normalize(
-                db,
-                same_module_uncached_raw_signature(
-                    db,
-                    function,
-                    ReturnCallableTypeVarScope::Lexical,
-                )
-                .return_ty,
-            )
+        let lexical_signature = public.has_typevar(db).then(|| {
+            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
         });
+        let lexical = lexical_signature
+            .as_ref()
+            .map(|signature| normalize(db, signature.return_ty));
+        let lexical_generic_context =
+            lexical_signature.and_then(|signature| signature.generic_context);
 
-        Self { public, lexical }
+        Self {
+            public,
+            lexical,
+            lexical_generic_context,
+        }
     }
 
     /// Returns the externally-visible return type.
@@ -107,6 +110,12 @@ impl<'db> ExpectedReturnType<'db> {
             || self
                 .lexical
                 .is_some_and(|lexical| ty.is_assignable_to(db, lexical))
+            || matches!(
+                (ty, self.lexical_generic_context),
+                (Type::FunctionLiteral(function), Some(generic_context))
+                    if Type::FunctionLiteral(function.with_inherited_generic_context(db, generic_context))
+                        .is_assignable_to(db, self.public)
+            )
     }
 }
 

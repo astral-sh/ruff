@@ -2487,11 +2487,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Keep this higher-rank source check to unary declared callables for now. More complex
         // overload and multi-parameter constraints still require the ordinary inference path.
         let check_generic_source = source.definition.is_some()
-            && target.definition.is_some()
+            && self.inferable == InferableTypeVars::None
             && source_inferable != InferableTypeVars::None
             && target_inferable != InferableTypeVars::None
             && source.parameters.len() == 1
-            && target.parameters.len() == 1;
+            && target.parameters.len() == 1
+            && !target.return_ty.has_dynamic(db)
+            && target
+                .parameters
+                .iter()
+                .all(|parameter| !parameter.annotated_type().has_dynamic(db));
         // A generic target must be compared lazily so its obligations survive until universal
         // quantification, including when the source signature is generic too.
         // Keep recursive protocol members on the existing eager path to avoid expanding cycles.
