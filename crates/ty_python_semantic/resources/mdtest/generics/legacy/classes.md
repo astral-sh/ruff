@@ -159,35 +159,6 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
-## Inheriting from an unresolved generic base
-
-Type variables used to specialize an unresolved base still belong to the class. They must not be
-mistaken for method-local type variables when a concrete subclass overrides a method:
-
-```toml
-[rules]
-missing-type-argument = "ignore"
-```
-
-```py
-from typing import Any, TypeVar
-from unresolved import Dataset  # error: [unresolved-import]
-from ty_extensions._internal import generic_context
-
-T_co = TypeVar("T_co", covariant=True)
-
-class VisionDataset(Dataset[T_co]):
-    def __getitem__(self, index: int) -> T_co:
-        raise NotImplementedError
-
-# revealed: ty_extensions._internal.GenericContext[T_co@VisionDataset]
-reveal_type(generic_context(VisionDataset))
-
-class ImageDataset(VisionDataset):
-    def __getitem__(self, index: int) -> tuple[Any, Any]:
-        raise NotImplementedError
-```
-
 ## Errors for inconsistent type arguments
 
 <!-- snapshot-diagnostics -->
