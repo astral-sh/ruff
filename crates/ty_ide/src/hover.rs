@@ -1187,7 +1187,7 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
@@ -1228,7 +1228,7 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
@@ -2075,7 +2075,7 @@ mod tests {
           --> main.py:14:5
            |
         14 | foo.a
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
@@ -5935,7 +5935,7 @@ def function():
          --> main.py:2:12
           |
         2 | result = 5 + 3
-          |            -
+          |            ^
           |            |
           |            source
           |            Cursor offset
@@ -5978,7 +5978,7 @@ def function():
           --> main.py:15:8
            |
         15 | Test() + Test()
-           |        -
+           |        ^
            |        |
            |        source
            |        Cursor offset

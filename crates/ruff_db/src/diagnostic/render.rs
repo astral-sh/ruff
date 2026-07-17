@@ -2347,7 +2347,7 @@ watermelon
         3 | canary
         4 | dog
         5 | elephant
-          |   ----
+          |   ^^^^
           |   |
           |   giant land mammal
           |   but afraid of mice

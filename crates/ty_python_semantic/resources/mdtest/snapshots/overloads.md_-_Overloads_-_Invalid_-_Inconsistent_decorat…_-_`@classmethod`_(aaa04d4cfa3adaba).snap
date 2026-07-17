@@ -129,7 +129,7 @@ error[invalid-overload]: Overloaded function `try_from3` does not use the `@clas
   --> src/mdtest_snippet.py:40:9
    |
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
-   |         ---------
+   |         ^^^^^^^^^
    |         |
    |         Missing here
 
