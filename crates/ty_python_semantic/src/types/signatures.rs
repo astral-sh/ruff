@@ -2461,17 +2461,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        // Receiver constraints and deferred receiver specialization both require lazy typevar
-        // evaluation: specializing the receiver can still leave unrelated method TypeVars that
-        // must be checked universally.
-        if source
-            .receiver_binding
-            .iter()
-            .chain(target.receiver_binding.iter())
-            .any(|binding| {
-                !binding.constraints.is_trivially_always_satisfied()
-                    || signature_inferable != InferableTypeVars::None
-            })
+        // A non-generic source cannot choose a specialization that satisfies a generic target;
+        // use lazy typevar evaluation so the target's obligations can be universally quantified.
+        // Keep recursive protocol members on the existing eager path to avoid expanding cycles.
+        if (source_inferable == InferableTypeVars::None
+            && target_inferable != InferableTypeVars::None
+            && !source.is_recursive_protocol_member(db)
+            && !target.is_recursive_protocol_member(db))
+            || source
+                .receiver_binding
+                .iter()
+                .chain(target.receiver_binding.iter())
+                .any(|binding| {
+                    !binding.constraints.is_trivially_always_satisfied()
+                        || signature_inferable != InferableTypeVars::None
+                })
         {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }

@@ -880,10 +880,9 @@ class C(A):
     def method(self, x: object) -> Never: ...  # fine
 
 class D(A):
-    # TODO: we should emit [invalid-method-override] here:
     # `A.method` accepts an argument of any type,
     # but `D.method` only accepts `int`s
-    def method(self, x: int) -> int: ...
+    def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 
 class A2:
     def method(self, x: int) -> int: ...
@@ -952,11 +951,10 @@ class A4:
     def method[T: int](self, x: T) -> T: ...
 
 class B4(A4):
-    # TODO: we should emit `invalid-method-override` here.
     # `A4.method` promises that if it is passed a `bool`, it will return a `bool`,
     # but this is not necessarily true for `B4.method`: if passed a `bool`,
     # it could return a non-`bool` `int`!
-    def method(self, x: int) -> int: ...
+    def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 ```
 
 ## Generic methods on generic classes work as expected

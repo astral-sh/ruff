@@ -2629,6 +2629,54 @@ bounded_property: HasBoundedSelfProperty = BoundedSelfProperty()
 invalid_bounded_property: HasBoundedSelfProperty = InvalidBoundedSelfProperty()  # error: [invalid-assignment]
 ```
 
+Specializing a property's receiver must not allow a non-generic or inconsistently specialized method
+to satisfy an unrelated generic protocol method:
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class HasPropertyProto(Protocol):
+    @property
+    def f(self: T) -> T: ...
+    def m(self, item: T, callback: Callable[[T], str]) -> str: ...
+
+class ConcreteHasProperty1:
+    @property
+    def f(self: T) -> T:
+        return self
+    def m(self, item: T, callback: Callable[[T], str]) -> str:
+        return ""
+
+class ConcreteHasProperty2:
+    @property
+    def f(self) -> Self:
+        return self
+    def m(self, item: int, callback: Callable[[int], str]) -> str:
+        return ""
+
+class ConcreteHasProperty3:
+    @property
+    def f(self) -> int:
+        return 0
+    def m(self, item: int, callback: Callable[[int], str]) -> str:
+        return ""
+
+class ConcreteHasProperty4:
+    @property
+    def f(self) -> Self:
+        return self
+    def m(self, item: str, callback: Callable[[int], str]) -> str:
+        return ""
+
+hp1: HasPropertyProto = ConcreteHasProperty1()
+hp2: HasPropertyProto = ConcreteHasProperty2()  # error: [invalid-assignment]
+hp3: HasPropertyProto = ConcreteHasProperty3()  # error: [invalid-assignment]
+hp4: HasPropertyProto = ConcreteHasProperty4()  # error: [invalid-assignment]
+```
+
 ## Protocol members defined using descriptor decorators
 
 ### Descriptor reads and writes
@@ -3872,9 +3920,8 @@ static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
