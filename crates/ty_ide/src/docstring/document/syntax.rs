@@ -62,157 +62,115 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
 ///
 /// For example, this returns `true` for ``"`value`"`` and `false` for
 /// ``"`value` trailing"``.
-pub(in crate::docstring) fn is_markdown_code_span(text: &str) -> bool {
-    find_backtick_run(text, TextSize::ZERO).and_then(|opening| markdown_code_span(text, opening))
-        == Some(TextRange::up_to(TextSize::of(text)))
+pub(crate) fn is_markdown_code_span(text: &str) -> bool {
+    let mut tokens = InlineMarkupScanner::new(text);
+    let Some(InlineMarkupToken::Code(_)) = tokens.next() else {
+        return false;
+    };
+
+    tokens.next().is_none()
 }
 
-/// Returns the byte range of the first consecutive backtick run at or after `from`.
+/// Emits non-overlapping tokens that completely span the source text.
 ///
-/// For example, searching ``"value `code`"`` from the start returns the range covering the
-/// opening ``"`"``.
-pub(in crate::docstring) fn find_backtick_run(text: &str, from: TextSize) -> Option<TextRange> {
-    let from = from.to_usize();
-    let start = from + text.get(from..)?.find('`')?;
-    let len = text[start..]
-        .bytes()
-        .take_while(|byte| *byte == b'`')
-        .count();
-    Some(TextRange::new(
-        TextSize::of(&text[..start]),
-        TextSize::of(&text[..start + len]),
-    ))
-}
-
-/// Returns the Markdown code span delimited by `opening`, if it has a matching closing run.
-///
-/// For example, the opening run in "``value`with:ticks`` trailing" produces the range covering
-/// "``value`with:ticks``".
-pub(in crate::docstring) fn markdown_code_span(
-    text: &str,
-    opening: TextRange,
-) -> Option<TextRange> {
-    let mut search_from = opening.end();
-    loop {
-        let closing = find_backtick_run(text, search_from)?;
-        if closing.len() == opening.len() {
-            return Some(opening.cover(closing));
-        }
-        search_from = closing.end();
-    }
-}
-
-/// Returns whether the backtick run at `index` is escaped by a preceding backslash.
-///
-/// For example, the backtick in ``"\`"`` is escaped, while the backtick in ``"\\`"`` is not.
-pub(in crate::docstring) fn is_backtick_run_escaped(text: &str, index: usize) -> bool {
-    !text[..index]
-        .bytes()
-        .rev()
-        .take_while(|byte| *byte == b'\\')
-        .count()
-        .is_multiple_of(2)
-}
-
-/// Losslessly partitions source text around complete, unescaped backtick spans.
+/// Currently supports `Code` for complete, unescaped backtick-delimited segments and `Text`
+/// for everything else.
 ///
 /// For example:
 ///
 /// ```text
-/// BacktickFragments::new("before `code` after")
-///     => Text("before "), Span("code"), Text(" after")
+/// InlineMarkupScanner::new("before `code` after")
+///     => Text("before "), Code("code"), Text(" after")
 /// ```
-struct BacktickFragments<'a> {
-    /// The scanner used to find complete spans.
+struct InlineMarkupScanner<'a> {
+    /// The scanner used to find complete code spans.
     scanner: BacktickScanner<'a>,
-    /// The end of the last fragment returned to the caller.
-    last_fragment_end: TextSize,
-    /// A span saved while the preceding text is returned first.
+    /// The end of the last token returned to the caller.
+    last_token_end: TextSize,
+    /// A span saved while its preceding text is returned first.
     pending_span: Option<BacktickSpan<'a>>,
 }
 
-impl<'a> BacktickFragments<'a> {
-    /// Creates a lossless iterator over plain text and complete backtick-delimited spans.
+impl<'a> InlineMarkupScanner<'a> {
+    /// Creates a lossless iterator over plain text and complete backtick-delimited code spans.
     ///
-    /// Escaped or unmatched backtick runs remain part of a [`BacktickFragment::Text`] fragment.
+    /// Escaped or unmatched backticks remain part of an [`InlineMarkupToken::Text`] token.
     fn new(source: &'a str) -> Self {
         Self {
             scanner: BacktickScanner::new(source),
-            last_fragment_end: TextSize::ZERO,
+            last_token_end: TextSize::ZERO,
             pending_span: None,
         }
     }
 
-    fn take_remaining_text(&mut self) -> Option<BacktickFragment<'a>> {
+    fn take_remaining_text(&mut self) -> Option<InlineMarkupToken<'a>> {
         let source_end = self.scanner.source.text_len();
-        let remaining = TextRange::new(self.last_fragment_end, source_end);
-        self.last_fragment_end = source_end;
-        (!remaining.is_empty()).then(|| BacktickFragment::Text(&self.scanner.source[remaining]))
+        let remaining = TextRange::new(self.last_token_end, source_end);
+        self.last_token_end = source_end;
+        (!remaining.is_empty()).then(|| InlineMarkupToken::Text(&self.scanner.source[remaining]))
     }
 }
 
-impl<'a> Iterator for BacktickFragments<'a> {
-    type Item = BacktickFragment<'a>;
+impl<'a> Iterator for InlineMarkupScanner<'a> {
+    type Item = InlineMarkupToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.last_fragment_end == TextSize::of(self.scanner.source) {
-            return None;
-        }
-
-        let span = loop {
+        let span = if let Some(span) = self.pending_span.take() {
             // Emit the span saved while returning its preceding text on the previous call.
-            if let Some(span) = self.pending_span.take() {
+            span
+        } else {
+            loop {
+                // Without another backtick run, the remaining source is all plain text.
+                let Some(opening) = self.scanner.next() else {
+                    return self.take_remaining_text();
+                };
+
+                // Escaped runs are literal source text, so continue looking for the next possible
+                // opening without emitting a token boundary.
+                if opening.is_escaped() {
+                    continue;
+                }
+
+                // Without a closing delimiter, callers cannot treat the opening or any later runs as
+                // structured markup. Emit the remainder as one text token.
+                let Some(span) = self.scanner.eat_span(opening) else {
+                    return self.take_remaining_text();
+                };
                 break span;
             }
-
-            // Without another backtick run, the remaining source is all plain text.
-            let Some(opening) = self.scanner.next() else {
-                return self.take_remaining_text();
-            };
-
-            // Escaped runs are literal source text, so continue looking for the next possible
-            // opening without emitting a fragment boundary.
-            if opening.is_escaped() {
-                continue;
-            }
-
-            // Without a closing delimiter, callers cannot treat the opening or any later runs as
-            // structured markup. Emit the remainder as one text fragment.
-            let Some(span) = self.scanner.eat_span(opening) else {
-                return self.take_remaining_text();
-            };
-            break span;
         };
 
-        if self.last_fragment_end < span.start() {
-            let preceding_text = TextRange::new(self.last_fragment_end, span.start());
-            self.last_fragment_end = span.start();
+        if self.last_token_end < span.start() {
+            let preceding_text = TextRange::new(self.last_token_end, span.start());
+            self.last_token_end = span.start();
             self.pending_span = Some(span);
-            return Some(BacktickFragment::Text(&self.scanner.source[preceding_text]));
+            return Some(InlineMarkupToken::Text(
+                &self.scanner.source[preceding_text],
+            ));
         }
 
-        debug_assert_eq!(self.last_fragment_end, span.start());
-        self.last_fragment_end = span.end();
-        Some(BacktickFragment::Span(span))
+        debug_assert_eq!(self.last_token_end, span.start());
+        self.last_token_end = span.end();
+        Some(InlineMarkupToken::Code(span))
     }
 }
 
-/// One lossless fragment produced by [`BacktickFragments`].
+/// One lossless token produced by [`InlineMarkupScanner`].
 ///
 /// For example:
 ///
 /// ```text
 /// source      "before `code` after"
-/// fragments   Text("before "), Span("code"), Text(" after")
+/// tokens      Text("before "), Code("code"), Text(" after")
 /// ```
 ///
 /// Escaped and unmatched backticks remain text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BacktickFragment<'a> {
+enum InlineMarkupToken<'a> {
     /// Source text outside a complete, unescaped backtick span.
     Text(&'a str),
-    /// A complete span whose delimiters have equal lengths.
-    Span(BacktickSpan<'a>),
+    /// A complete code span whose backtick delimiters have equal lengths.
+    Code(BacktickSpan<'a>),
 }
 
 /// Source text delimited by ordered backtick runs of equal length.
@@ -328,11 +286,6 @@ impl<'a> BacktickScanner<'a> {
             range: opening.range.cover(closing.range),
             delimiter_len: opening.range.len(),
         })
-    }
-
-    /// Returns the scanner's cursor at its current position.
-    pub(in crate::docstring) fn into_cursor(self) -> Cursor<'a> {
-        self.cursor
     }
 }
 
@@ -514,18 +467,31 @@ pub(super) fn split_trailing_parenthetical(value: &str) -> Option<(&str, &str)> 
     let mut outermost_opening = None;
     let mut cursor = Cursor::new(value);
 
-    while let Some(character) = cursor.bump() {
-        let index = cursor.offset().to_usize() - character.len_utf8();
+    loop {
+        let start = cursor.offset();
+        let Some(character) = cursor.bump() else {
+            break;
+        };
+
         match character {
-            '\'' | '"' => consume_quoted_string(&mut cursor, character),
-            '`' if !is_backtick_run_escaped(value, index) => {
-                let opening = find_backtick_run(value, TextSize::of(&value[..index]))?;
-                let span = markdown_code_span(value, opening).unwrap_or(opening);
-                cursor.skip_bytes((span.end() - cursor.offset()).to_usize());
+            quote @ ('\'' | '"') => consume_quoted_string(&mut cursor, quote),
+            '`' => {
+                let mut scanner = BacktickScanner::starts_at(start, value);
+                let opening = scanner.next()?;
+                if opening.is_escaped() {
+                    // The loop has consumed only the first, escaped backtick. Leave the rest of
+                    // the run for the next iteration, where it may open a shorter span.
+                    continue;
+                }
+
+                let end = scanner
+                    .eat_span(opening)
+                    .map_or_else(|| opening.end(), |span| span.end());
+                cursor.skip_bytes((end - cursor.offset()).to_usize());
             }
             '(' => {
                 if depth == 0 {
-                    outermost_opening = Some(index);
+                    outermost_opening = Some(start);
                 }
                 depth += 1;
             }
@@ -533,9 +499,9 @@ pub(super) fn split_trailing_parenthetical(value: &str) -> Option<(&str, &str)> 
                 depth = depth.checked_sub(1)?;
                 if depth == 0 && cursor.is_eof() {
                     let opening = outermost_opening?;
-                    let prefix = value[..opening].trim();
-                    let contents = value[opening + '('.len_utf8()..index].trim();
-                    return Some((prefix, contents));
+                    let (prefix, parenthetical) = value.split_at(opening.to_usize());
+                    let contents = parenthetical.strip_prefix('(')?.strip_suffix(')')?;
+                    return Some((prefix.trim(), contents.trim()));
                 }
             }
             _ => {}
@@ -560,7 +526,7 @@ pub(super) fn indentation(line: &str) -> TextSize {
 #[cfg(test)]
 mod tests {
     use super::{
-        BacktickFragment, BacktickFragments, BacktickScanner, TextSize, is_markdown_code_span,
+        BacktickScanner, InlineMarkupScanner, InlineMarkupToken, TextSize, is_markdown_code_span,
         split_once_at_top_level_colon, split_trailing_parenthetical,
     };
 
@@ -576,30 +542,30 @@ mod tests {
         let span = scanner.eat_span(opening).expect("a matching backtick run");
         assert!(!span.is_single());
         assert_eq!(span.content(), "code");
-        assert_eq!(scanner.into_cursor().as_str(), " suffix");
+        assert_eq!(scanner.as_str(), " suffix");
     }
 
     #[test]
-    fn partitions_text_and_backtick_spans() {
+    fn scans_text_and_code_tokens() {
         let source = "é :class:`~pkg.Widget` or ``literal`tick`` β";
 
         assert_eq!(
-            fragment_contents(source),
+            token_contents(source),
             vec![
                 ("text", "é :class:"),
-                ("span", "~pkg.Widget"),
+                ("code", "~pkg.Widget"),
                 ("text", " or "),
-                ("span", "literal`tick"),
+                ("code", "literal`tick"),
                 ("text", " β"),
             ]
         );
     }
 
     #[test]
-    fn partitions_spans_at_source_boundaries() {
+    fn scans_code_at_source_boundaries() {
         assert_eq!(
-            fragment_contents("`first` and `last`"),
-            vec![("span", "first"), ("text", " and "), ("span", "last")]
+            token_contents("`first` and `last`"),
+            vec![("code", "first"), ("text", " and "), ("code", "last")]
         );
     }
 
@@ -607,7 +573,7 @@ mod tests {
     fn preserves_escaped_and_unmatched_backticks_as_text() {
         let source = r"\`literal\` and `unfinished";
 
-        assert_eq!(fragment_contents(source), vec![("text", source)]);
+        assert_eq!(token_contents(source), vec![("text", source)]);
     }
 
     #[test]
@@ -701,6 +667,22 @@ mod tests {
     }
 
     #[test]
+    fn ignores_parentheses_inside_code_spans_after_escaped_backtick() {
+        assert_eq!(
+            split_trailing_parenthetical(r"value (\``)`)"),
+            Some(("value", r"\``)`"))
+        );
+    }
+
+    #[test]
+    fn treats_unmatched_backticks_as_plain_parenthetical_text() {
+        assert_eq!(
+            split_trailing_parenthetical("value (`unfinished)"),
+            Some(("value", "`unfinished"))
+        );
+    }
+
+    #[test]
     fn ignores_parentheses_after_escaped_quotes() {
         assert_eq!(
             split_trailing_parenthetical(r#"value (Literal["a\"b)c"])"#),
@@ -718,11 +700,11 @@ mod tests {
         assert_eq!(split_trailing_parenthetical("value (str) or None"), None);
     }
 
-    fn fragment_contents(source: &str) -> Vec<(&'static str, &str)> {
-        BacktickFragments::new(source)
-            .map(|fragment| match fragment {
-                BacktickFragment::Text(text) => ("text", text),
-                BacktickFragment::Span(span) => ("span", span.content()),
+    fn token_contents(source: &str) -> Vec<(&'static str, &str)> {
+        InlineMarkupScanner::new(source)
+            .map(|token| match token {
+                InlineMarkupToken::Text(text) => ("text", text),
+                InlineMarkupToken::Code(code) => ("code", code.content()),
             })
             .collect()
     }
