@@ -825,7 +825,7 @@ pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
     /// [`OwnedConstraintSet::query`] to create a [`ConstraintSetBuilder`] that is initially a
@@ -869,7 +869,6 @@ struct ConstraintSetStorage<'db> {
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
-    retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
@@ -5373,7 +5372,7 @@ impl ConstraintAssignment {
 /// new constraint, and then merges those cached sequents into its own sequent map. (That means we
 /// also share the work of calculating the sequent map across `PathAssignments` for _different_
 /// constraint sets.)
-#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Default)]
 struct SequentMap {
     /// Sequents of the form `¬C₁ → false`
     single_tautologies: FxHashSet<ConstraintId>,
