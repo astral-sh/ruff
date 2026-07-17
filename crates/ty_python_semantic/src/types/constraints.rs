@@ -5346,21 +5346,6 @@ impl ConstraintAssignment {
 /// pruned from the search), and new constraints that we can assume to be true even if we haven't
 /// seen them directly.
 ///
-/// We support several kinds of sequent:
-///
-/// - `¬C₁ → false`: This indicates that `C₁` is always true. Any path that assumes it is false is
-///   impossible and can be pruned.
-///
-/// - `C₁ ∧ C₂ → false`: This indicates that `C₁` and `C₂` are disjoint: it is not possible for
-///   both to hold. Any path that assumes both is impossible and can be pruned.
-///
-/// - `C₁ ∧ C₂ → D`: This indicates that the intersection of `C₁` and `C₂` can be simplified to
-///   `D`. Any path that assumes both `C₁` and `C₂` hold, but assumes `D` does _not_, is impossible
-///   and can be pruned.
-///
-/// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
-///   holds but `D` does _not_ is impossible and can be pruned.
-///
 /// Sequent maps are primarily used when walking a BDD path with a [`PathAssignments`]. The
 /// `PathAssignments` will hold a sequent map containing all of the constraints that are
 /// encountered during the walk. It builds up its sequent map lazily, so that it only has to
@@ -5374,14 +5359,51 @@ impl ConstraintAssignment {
 /// constraint sets.)
 #[derive(Debug, Default)]
 struct SequentMap {
-    /// Sequents of the form `¬C₁ → false`
-    single_tautologies: FxHashSet<ConstraintId>,
-    /// Sequents of the form `C₁ ∧ C₂ → false`
-    pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
-    /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
-    /// Sequents of the form `C → D`
-    single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
+    single_tautologies: Vec<SingleTautology>,
+    pair_impossibilities: Vec<PairImpossibility>,
+    pair_implications: Vec<PairImplication>,
+    single_implications: Vec<SingleImplication>,
+}
+
+/// Sequent of the form `¬C → false`
+///
+/// This indicates that `C` is always true. Any path that assumes it is false is impossible and can
+/// be pruned.
+#[derive(Clone, Copy, Debug)]
+struct SingleTautology {
+    ante: ConstraintId,
+}
+
+/// Sequent of the form `C₁ ∧ C₂ → false`
+///
+/// This indicates that `C₁` and `C₂` are disjoint: it is not possible for both to hold. Any path
+/// that assumes both is impossible and can be pruned.
+#[derive(Clone, Copy, Debug)]
+struct PairImpossibility {
+    ante1: ConstraintId,
+    ante2: ConstraintId,
+}
+
+/// Sequent of the form `C₁ ∧ C₂ → D`
+///
+/// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as well.
+/// For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if it
+/// doesn't appear in the BDD.
+#[derive(Clone, Copy, Debug)]
+struct SingleImplication {
+    ante: ConstraintId,
+    post: ConstraintId,
+}
+
+/// Sequent of the form `C → D`
+///
+/// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C` holds,
+/// we can add `D` to the path even if it doesn't appear in the BDD.
+#[derive(Clone, Copy, Debug)]
+struct PairImplication {
+    ante1: ConstraintId,
+    ante2: ConstraintId,
+    post: ConstraintId,
 }
 
 impl SequentMap {
@@ -5453,67 +5475,23 @@ impl SequentMap {
 
     /// Merges the sequents from another sequent map into this one.
     fn merge(&mut self, other: &Self) {
-        self.single_tautologies.extend(&other.single_tautologies);
+        self.single_tautologies
+            .extend_from_slice(&other.single_tautologies);
         self.pair_impossibilities
-            .extend(&other.pair_impossibilities);
-        for ((ante1, ante2), post) in &other.pair_implications {
-            self.pair_implications
-                .entry(Self::pair_key(*ante1, *ante2))
-                .or_default()
-                .extend(post);
-        }
-        for (ante, post) in &other.single_implications {
-            self.single_implications
-                .entry(*ante)
-                .or_default()
-                .extend(post);
-        }
+            .extend_from_slice(&other.pair_impossibilities);
+        self.pair_implications
+            .extend_from_slice(&other.pair_implications);
+        self.single_implications
+            .extend_from_slice(&other.single_implications);
     }
 
-    fn pair_key(ante1: ConstraintId, ante2: ConstraintId) -> (ConstraintId, ConstraintId) {
-        if ante1.ordering() < ante2.ordering() {
-            (ante1, ante2)
-        } else {
-            (ante2, ante1)
-        }
+    fn add_single_tautology(&mut self, ante: ConstraintId) {
+        self.single_tautologies.push(SingleTautology { ante });
     }
 
-    fn add_single_tautology<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante: ConstraintId,
-    ) {
-        if self.single_tautologies.insert(ante) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!("¬{} → false", ante.display(db, builder)),
-                "add sequent",
-            );
-        }
-    }
-
-    fn add_pair_impossibility<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-    ) {
-        if self
-            .pair_impossibilities
-            .insert(Self::pair_key(ante1, ante2))
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} ∧ {} → false",
-                    ante1.display(db, builder),
-                    ante2.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+    fn add_pair_impossibility(&mut self, ante1: ConstraintId, ante2: ConstraintId) {
+        self.pair_impossibilities
+            .push(PairImpossibility { ante1, ante2 });
     }
 
     fn add_pair_implication<'db>(
@@ -5534,7 +5512,7 @@ impl SequentMap {
                 .when_constraint_set_assignable_to_owned(db, post_data.bounds.materialized_upper()),
         );
         if when.is_never_satisfied(db) {
-            self.add_pair_impossibility(db, builder, ante1, ante2);
+            self.add_pair_impossibility(ante1, ante2);
             return;
         }
 
@@ -5542,51 +5520,18 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
-        if self
-            .pair_implications
-            .entry(Self::pair_key(ante1, ante2))
-            .or_default()
-            .insert(post)
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} ∧ {} → {}",
-                    ante1.display(db, builder),
-                    ante2.display(db, builder),
-                    post.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+
+        self.pair_implications
+            .push(PairImplication { ante1, ante2, post });
     }
 
-    fn add_single_implication<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) {
+    fn add_single_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
         if ante == post {
             return;
         }
-        if self
-            .single_implications
-            .entry(ante)
-            .or_default()
-            .insert(post)
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} → {}",
-                    ante.display(db, builder),
-                    post.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+
+        self.single_implications
+            .push(SingleImplication { ante, post });
     }
 
     fn add_sequents_for_single<'db>(
@@ -5601,7 +5546,7 @@ impl SequentMap {
         let lower = constraint_data.bounds.materialized_lower();
         let upper = constraint_data.bounds.materialized_upper();
         if lower.is_never() && upper.is_object() {
-            self.add_single_tautology(db, builder, constraint);
+            self.add_single_tautology(constraint);
             return;
         }
 
@@ -5710,10 +5655,10 @@ impl SequentMap {
                 Node::Interior(interior) => {
                     let interior = builder.interior_node_data(interior.node());
                     if interior.if_true != ALWAYS_FALSE {
-                        self.add_single_implication(db, builder, constraint, interior.constraint);
+                        self.add_single_implication(constraint, interior.constraint);
                         node = interior.if_true;
                     } else {
-                        self.add_pair_impossibility(db, builder, constraint, interior.constraint);
+                        self.add_pair_impossibility(constraint, interior.constraint);
                         node = interior.if_false;
                     }
                 }
@@ -6428,7 +6373,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, builder),
                 "left implies right",
             );
-            self.add_single_implication(db, builder, left_constraint, right_constraint);
+            self.add_single_implication(left_constraint, right_constraint);
         }
         if builder.cached_constraint_implies(db, right_constraint, left_constraint) {
             tracing::trace!(
@@ -6437,7 +6382,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, builder),
                 "right implies left",
             );
-            self.add_single_implication(db, builder, right_constraint, left_constraint);
+            self.add_single_implication(right_constraint, left_constraint);
         }
 
         match left_constraint.intersect(db, builder, right_constraint) {
@@ -6458,8 +6403,8 @@ impl SequentMap {
                     right_constraint,
                     intersection_constraint,
                 );
-                self.add_single_implication(db, builder, intersection_constraint, left_constraint);
-                self.add_single_implication(db, builder, intersection_constraint, right_constraint);
+                self.add_single_implication(intersection_constraint, left_constraint);
+                self.add_single_implication(intersection_constraint, right_constraint);
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -6474,7 +6419,7 @@ impl SequentMap {
                     right = %right_constraint.display(db, builder),
                     "left and right are disjoint",
                 );
-                self.add_pair_impossibility(db, builder, left_constraint, right_constraint);
+                self.add_pair_impossibility(left_constraint, right_constraint);
             }
         }
     }
@@ -6505,43 +6450,35 @@ impl SequentMap {
                     }
                 };
 
-                #[expect(
-                    clippy::iter_over_hash_type,
-                    reason = "this debug-only formatter has no stable ordering contract"
-                )]
-                for (ante1, ante2) in &self.map.pair_impossibilities {
+                for sequent in &self.map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
                         f,
                         "{} ∧ {} → false",
-                        ante1.display(self.db, self.builder),
-                        ante2.display(self.db, self.builder),
+                        sequent.ante1.display(self.db, self.builder),
+                        sequent.ante2.display(self.db, self.builder),
                     )?;
                 }
 
-                for ((ante1, ante2), posts) in &self.map.pair_implications {
-                    for post in posts {
-                        maybe_write_prefix(f)?;
-                        write!(
-                            f,
-                            "{} ∧ {} → {}",
-                            ante1.display(self.db, self.builder),
-                            ante2.display(self.db, self.builder),
-                            post.display(self.db, self.builder),
-                        )?;
-                    }
+                for sequent in &self.map.pair_implications {
+                    maybe_write_prefix(f)?;
+                    write!(
+                        f,
+                        "{} ∧ {} → {}",
+                        sequent.ante1.display(self.db, self.builder),
+                        sequent.ante2.display(self.db, self.builder),
+                        sequent.post.display(self.db, self.builder),
+                    )?;
                 }
 
-                for (ante, posts) in &self.map.single_implications {
-                    for post in posts {
-                        maybe_write_prefix(f)?;
-                        write!(
-                            f,
-                            "{} → {}",
-                            ante.display(self.db, self.builder),
-                            post.display(self.db, self.builder)
-                        )?;
-                    }
+                for sequent in &self.map.single_implications {
+                    maybe_write_prefix(f)?;
+                    write!(
+                        f,
+                        "{} → {}",
+                        sequent.ante.display(self.db, self.builder),
+                        sequent.post.display(self.db, self.builder)
+                    )?;
                 }
 
                 if first {
@@ -6887,17 +6824,13 @@ impl PathAssignments {
 
         self.discover_constraint(db, builder, assignment.constraint());
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "any matching tautology yields the same conflict result"
-        )]
-        for ante in &self.map.single_tautologies {
-            if self.assignment_holds(ante.when_false()) {
+        for sequent in &self.map.single_tautologies {
+            if self.assignment_holds(sequent.ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante = %ante.display(db, builder),
+                    ante = %sequent.ante.display(db, builder),
                     facts = %format_args!(
                         "[{}]",
                         self.assignments.iter().map(|(assignment, _)| {
@@ -6910,19 +6843,16 @@ impl PathAssignments {
             }
         }
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "any matching impossibility yields the same conflict result"
-        )]
-        for (ante1, ante2) in &self.map.pair_impossibilities {
-            if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
+        for sequent in &self.map.pair_impossibilities {
+            if self.assignment_holds(sequent.ante1.when_true())
+                && self.assignment_holds(sequent.ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
                 // current path asserts that both are true.
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante1 = %ante1.display(db, builder),
-                    ante2 = %ante2.display(db, builder),
+                    ante1 = %sequent.ante1.display(db, builder),
+                    ante2 = %sequent.ante2.display(db, builder),
                     facts = %format_args!(
                         "[{}]",
                         self.assignments.iter().map(|(assignment, _)| {
@@ -6952,39 +6882,38 @@ impl PathAssignments {
             }
         };
 
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
-            let Some(ante1_fuel) = self.fuel_for(ante1.when_true()) else {
+        for sequent in &self.map.pair_implications {
+            let Some(ante1_fuel) = self.fuel_for(sequent.ante1.when_true()) else {
                 continue;
             };
-            let Some(ante2_fuel) = self.fuel_for(ante2.when_true()) else {
+            let Some(ante2_fuel) = self.fuel_for(sequent.ante2.when_true()) else {
                 continue;
             };
             let available_fuel = ante1_fuel.min(ante2_fuel);
-            let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante1);
-            let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante2);
+            let (ante1_constructor_depth, _) =
+                builder.cached_constraint_bound_depth(db, sequent.ante1);
+            let (ante2_constructor_depth, _) =
+                builder.cached_constraint_bound_depth(db, sequent.ante2);
             let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-            for post in posts {
-                let fuel_cost = builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth);
-                add_new_constraint(*post, available_fuel, fuel_cost);
-            }
+            let fuel_cost =
+                builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth);
+            add_new_constraint(sequent.post, available_fuel, fuel_cost);
         }
 
-        for (ante, posts) in &self.map.single_implications {
-            let Some(available_fuel) = self.fuel_for(ante.when_true()) else {
+        for sequent in &self.map.single_implications {
+            let Some(available_fuel) = self.fuel_for(sequent.ante.when_true()) else {
                 continue;
             };
-            let ante_data = builder.constraint_data(*ante);
+            let ante_data = builder.constraint_data(sequent.ante);
             let (antecedent_constructor_depth, _) =
-                builder.cached_constraint_bound_depth(db, *ante);
-            for post in posts {
-                let post_data = builder.constraint_data(*post);
-                let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-                    1
-                } else {
-                    builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth)
-                };
-                add_new_constraint(*post, available_fuel, fuel_cost);
-            }
+                builder.cached_constraint_bound_depth(db, sequent.ante);
+            let post_data = builder.constraint_data(sequent.post);
+            let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+                1
+            } else {
+                builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth)
+            };
+            add_new_constraint(sequent.post, available_fuel, fuel_cost);
         }
 
         for (new_constraint, (available_fuel, fuel_cost)) in new_constraints {
