@@ -3987,6 +3987,45 @@ class Other:
 copyable: Copyable
 copyable = One()
 copyable = Other()
+
+class SupportsGt(Protocol):
+    def __gt__(self: T, other: T, /) -> bool: ...
+
+class InvalidSupportsGt:
+    def __gt__(self, other: str, /) -> bool:
+        return False
+
+supports_gt: SupportsGt = 1
+invalid_supports_gt: SupportsGt = InvalidSupportsGt()  # error: [invalid-assignment]
+
+SupportsGtT = TypeVar("SupportsGtT", bound=SupportsGt)
+
+def accepts_gt(value: SupportsGtT) -> None: ...
+def field(*, gt: SupportsGt | None = None) -> None: ...
+
+accepts_gt(1)
+field(gt=0)
+
+class HasValue(Protocol):
+    value: int
+
+BoundT = TypeVar("BoundT", bound=HasValue)
+
+class BoundReceiver(Protocol):
+    def same(self: BoundT) -> BoundT: ...
+
+class ValidBoundReceiver:
+    value = 1
+
+    def same(self) -> Self:
+        return self
+
+class InvalidBoundReceiver:
+    def same(self) -> Self:
+        return self
+
+valid_bound_receiver: BoundReceiver = ValidBoundReceiver()
+invalid_bound_receiver: BoundReceiver = InvalidBoundReceiver()  # error: [invalid-assignment]
 ```
 
 Receiver TypeVars are distinct from unrelated method TypeVars. Binding the receiver limits the

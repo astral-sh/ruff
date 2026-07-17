@@ -134,20 +134,39 @@ fn merge_receiver_constraints<'db>(
     }
 }
 
-/// The constraint domain introduced by binding an explicitly annotated receiver.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ReceiverBindingKind {
+    Constrained,
+    Specialized,
+}
+
+/// The constraint domain or specialization introduced by binding an explicitly annotated receiver.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ReceiverBinding<'db> {
     constraints: OwnedConstraintSet<'db>,
     generic_context: Option<GenericContext<'db>>,
+    kind: ReceiverBindingKind,
 }
 
 impl<'db> ReceiverBinding<'db> {
     fn merge(db: &'db dyn Db, first: Option<&Self>, second: Option<&Self>) -> Option<Self> {
+        let kind = if first
+            .into_iter()
+            .chain(second)
+            .any(|binding| binding.kind == ReceiverBindingKind::Specialized)
+        {
+            ReceiverBindingKind::Specialized
+        } else {
+            ReceiverBindingKind::Constrained
+        };
         let constraints = merge_receiver_constraints(
             db,
             first.map(|binding| &binding.constraints),
             second.map(|binding| &binding.constraints),
-        )?;
+        );
+        let constraints = constraints.or_else(|| {
+            (kind == ReceiverBindingKind::Specialized).then(OwnedConstraintSet::always)
+        })?;
         let generic_context = GenericContext::merge_optional(
             db,
             first.and_then(|binding| binding.generic_context),
@@ -156,6 +175,7 @@ impl<'db> ReceiverBinding<'db> {
         Some(Self {
             constraints,
             generic_context,
+            kind,
         })
     }
 }
@@ -578,7 +598,7 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
-    /// The constraint domain introduced by binding an explicitly annotated receiver, if any.
+    /// The constraint domain or specialization introduced by binding an explicitly annotated receiver.
     receiver_binding: Option<ReceiverBinding<'db>>,
 
     /// Parameters, in source order.
@@ -1071,6 +1091,74 @@ impl<'db> Signature<'db> {
             .parameters
             .get(0)
             .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation);
+        let binding_context = self.definition.map(BindingContext::Definition);
+
+        // Protocol interfaces bind their receiver before the concrete implementation is known.
+        // A direct receiver `TypeVar` in that deferred path is the eventual receiver exactly, so
+        // substitute it through the visible parameters and return before removing the receiver.
+        // Ordinary descriptor binding retains its lower-bound inference semantics.
+        if receiver_type.is_none()
+            && let Some(parameter) = explicit_receiver
+        {
+            let receiver = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                Type::object(),
+                BindingContext::Synthetic,
+            ));
+            let annotation = if let Some(typing_self_type) = typing_self_type {
+                parameter.annotated_type().apply_type_mapping(
+                    db,
+                    &TypeMapping::BindSelf(SelfBinding::new(db, typing_self_type, binding_context)),
+                    TypeContext::default(),
+                )
+            } else {
+                parameter.annotated_type()
+            }
+            .resolve_type_alias(db);
+            let specialization = match annotation {
+                Type::TypeVar(typevar) if !typevar.typevar(db).is_self(db) => {
+                    Some((typevar, receiver))
+                }
+                Type::SubclassOf(subclass_of) => subclass_of
+                    .into_type_var()
+                    .filter(|typevar| !typevar.typevar(db).is_self(db))
+                    .map(|typevar| {
+                        let specialization = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                            db,
+                            Type::object(),
+                            binding_context.unwrap_or(BindingContext::Synthetic),
+                        ));
+                        (typevar, specialization)
+                    }),
+                _ => None,
+            };
+            if let Some((typevar, specialization)) = specialization
+                && !matches!(
+                    specialization,
+                    Type::TypeVar(receiver_typevar)
+                        if receiver_typevar.is_same_typevar_as(db, typevar)
+                )
+            {
+                let receiver_domain =
+                    Self::specialized_receiver_domain(db, specialization, typevar);
+                let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                    typevar,
+                    specialization,
+                ));
+                let mut specialized = self.apply_type_mapping_impl(
+                    db,
+                    &mapping,
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                );
+                specialized.receiver_binding = ReceiverBinding::merge(
+                    db,
+                    specialized.receiver_binding.as_ref(),
+                    Some(&receiver_domain),
+                );
+                return specialized.bind_self_with_receiver(db, receiver_type, typing_self_type);
+            }
+        }
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
@@ -1080,7 +1168,6 @@ impl<'db> Signature<'db> {
             self.parameters.clone()
         };
         let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
         let receiver_binding = explicit_receiver.and_then(|parameter| {
             let receiver = receiver_type.unwrap_or_else(|| {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
@@ -1137,6 +1224,7 @@ impl<'db> Signature<'db> {
                 return Some(ReceiverBinding {
                     constraints,
                     generic_context: receiver_generic_context,
+                    kind: ReceiverBindingKind::Constrained,
                 });
             }
             if receiver_typevar.is_some_and(|typevar| {
@@ -1145,6 +1233,7 @@ impl<'db> Signature<'db> {
                 return Some(ReceiverBinding {
                     constraints: OwnedConstraintSet::default(),
                     generic_context: None,
+                    kind: ReceiverBindingKind::Constrained,
                 });
             }
             let receiver_constraint =
@@ -1154,6 +1243,7 @@ impl<'db> Signature<'db> {
             Some(ReceiverBinding {
                 constraints,
                 generic_context: receiver_generic_context,
+                kind: ReceiverBindingKind::Constrained,
             })
         });
         let receiver_binding = ReceiverBinding::merge(
@@ -1182,6 +1272,45 @@ impl<'db> Signature<'db> {
             receiver_binding,
             parameters,
             return_ty,
+        }
+    }
+
+    /// Returns the declared-domain obligation that remains after specializing a receiver `TypeVar`.
+    fn specialized_receiver_domain(
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> ReceiverBinding<'db> {
+        let constraints = typevar.typevar(db).bound_or_constraints(db).map_or_else(
+            OwnedConstraintSet::always,
+            |domain| {
+                ConstraintSetBuilder::new().into_owned(|builder| match domain {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => receiver
+                        .when_constraint_set_assignable_to(
+                            db,
+                            bound.top_materialization(db),
+                            builder,
+                        ),
+                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
+                        typevar_constraints.elements(db).iter().when_any(
+                            db,
+                            builder,
+                            |constraint| {
+                                receiver.when_constraint_set_assignable_to(
+                                    db,
+                                    constraint.top_materialization(db),
+                                    builder,
+                                )
+                            },
+                        )
+                    }
+                })
+            },
+        );
+        ReceiverBinding {
+            constraints,
+            generic_context: None,
+            kind: ReceiverBindingKind::Specialized,
         }
     }
 
@@ -1372,26 +1501,43 @@ impl<'db> Signature<'db> {
                     TypeContext::default(),
                     &self_visitor,
                 );
-                (!constraints.query(|_builder, constraints| constraints.is_always_satisfied(db)))
-                    .then_some(ReceiverBinding {
-                        constraints,
-                        generic_context: binding.generic_context,
-                    })
+                (binding.kind == ReceiverBindingKind::Specialized
+                    || !constraints
+                        .query(|_builder, constraints| constraints.is_always_satisfied(db)))
+                .then_some(ReceiverBinding {
+                    constraints,
+                    generic_context: binding.generic_context,
+                    kind: binding.kind,
+                })
             });
+        let parameters = self.parameters.apply_type_mapping_impl(
+            db,
+            &receiver_mapping,
+            TypeContext::default(),
+            &receiver_visitor,
+        );
+        let return_ty = self.return_ty.apply_type_mapping_impl(
+            db,
+            &receiver_mapping,
+            TypeContext::default(),
+            &receiver_visitor,
+        );
         if !self.needs_self_mapping(db, false) {
             return Self {
                 receiver_binding,
+                parameters,
+                return_ty,
                 ..self.clone()
             };
         }
 
-        let parameters = self.parameters.apply_type_mapping_impl(
+        let parameters = parameters.apply_type_mapping_impl(
             db,
             &self_mapping,
             TypeContext::default(),
             &self_visitor,
         );
-        let return_ty = self.return_ty.apply_type_mapping_impl(
+        let return_ty = return_ty.apply_type_mapping_impl(
             db,
             &self_mapping,
             TypeContext::default(),
@@ -1474,7 +1620,9 @@ impl<'db> Signature<'db> {
         let binding = self.receiver_binding.as_ref()?;
         let constraints =
             Self::map_constraints(db, &binding.constraints, type_mapping, tcx, visitor);
-        if constraints.query(|_builder, constraints| constraints.is_always_satisfied(db)) {
+        if binding.kind != ReceiverBindingKind::Specialized
+            && constraints.query(|_builder, constraints| constraints.is_always_satisfied(db))
+        {
             return None;
         }
         let generic_context = binding.generic_context.and_then(|generic_context| {
@@ -1485,6 +1633,7 @@ impl<'db> Signature<'db> {
         Some(ReceiverBinding {
             constraints,
             generic_context,
+            kind: binding.kind,
         })
     }
 
@@ -1939,13 +2088,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        // Aggregation summarizes visible parameters and return types, but receiver bindings are
-        // additional per-signature obligations. Leave those signatures to the ordinary relation,
-        // which checks each receiver binding before comparing the visible signature.
-        if target_signature.receiver_binding.is_some()
+        // Aggregation summarizes visible parameters and return types, but receiver constraints
+        // are additional per-signature obligations. Leave those signatures to the ordinary
+        // relation, which checks each receiver binding before comparing the visible signature.
+        if target_signature
+            .receiver_binding
+            .as_ref()
+            .is_some_and(|binding| !binding.constraints.is_trivially_always_satisfied())
             || source_signatures
                 .iter()
-                .any(|signature| signature.receiver_binding.is_some())
+                .filter_map(|signature| signature.receiver_binding.as_ref())
+                .any(|binding| !binding.constraints.is_trivially_always_satisfied())
         {
             return None;
         }
@@ -2308,10 +2461,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
-        // sets are discarded when receiver constraints are merged, so presence alone is enough to
-        // require lazy typevar evaluation here.
-        if source.receiver_binding.is_some() || target.receiver_binding.is_some() {
+        // Receiver constraints and deferred receiver specialization both require lazy typevar
+        // evaluation: specializing the receiver can still leave unrelated method TypeVars that
+        // must be checked universally.
+        if source
+            .receiver_binding
+            .iter()
+            .chain(target.receiver_binding.iter())
+            .any(|binding| {
+                !binding.constraints.is_trivially_always_satisfied()
+                    || signature_inferable != InferableTypeVars::None
+            })
+        {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
