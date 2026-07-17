@@ -5470,11 +5470,6 @@ impl SequentMap {
         Ref::map(storage, |storage| &storage.pair_sequent_cache[&key])
     }
 
-    /// Merges the sequents from another sequent map into this one.
-    fn merge(&mut self, other: &Self) {
-        self.sequents.extend_from_slice(&other.sequents);
-    }
-
     fn add_single_tautology(&mut self, ante: ConstraintId) {
         self.sequents.push(Sequent::SingleTautology { ante });
     }
@@ -6521,7 +6516,8 @@ impl SequentMap {
 /// constraint that we are currently considering.
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
-    map: SequentMap,
+    /// All of the rules that we know for inferring derived constraints on the current path.
+    sequents: Vec<Sequent>,
     /// Each assignment's source order and the first per-path fuel value with which it was derived.
     assignments: FxIndexMap<ConstraintAssignment, (usize, AssignmentFuel)>,
     /// Additional per-path fuel values that can derive an assignment, keyed by its index in
@@ -6586,7 +6582,7 @@ impl PathAssignments {
             .map(|constraint| (constraint, false))
             .collect();
         Self {
-            map: SequentMap::default(),
+            sequents: Vec::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -6731,12 +6727,12 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, builder, constraint);
-        self.map.merge(&single_map);
+        self.sequents.extend_from_slice(&single_map.sequents);
         drop(single_map);
 
         for existing in self.discovered.keys().dropping_back(1) {
             let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
-            self.map.merge(&pair_map);
+            self.sequents.extend_from_slice(&pair_map.sequents);
         }
     }
 
@@ -6881,8 +6877,8 @@ impl PathAssignments {
 
         self.discover_constraint(db, builder, assignment.constraint());
 
-        for i in 0..self.map.sequents.len() {
-            let sequent = self.map.sequents[i];
+        for i in 0..self.sequents.len() {
+            let sequent = self.sequents[i];
             self.check_sequent(db, builder, sequent)?;
         }
 
