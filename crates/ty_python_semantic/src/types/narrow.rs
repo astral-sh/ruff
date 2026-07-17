@@ -3057,6 +3057,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         constrained.then(|| builder.build())
     }
 
+    /// Preserve the precise element types of an immediately consumed list or set literal.
+    ///
+    /// These expressions cannot be mutated before membership is evaluated. Representing them as
+    /// fixed-length tuples also lets negative narrowing exclude values that are guaranteed present.
+    fn inline_membership_rhs_type(
+        &self,
+        rhs: &ast::Expr,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<Type<'db>> {
+        let elements = match rhs.expression_value() {
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Set(set) => &set.elts,
+            _ => return None,
+        };
+
+        if elements.iter().any(ast::Expr::is_starred_expr) {
+            return None;
+        }
+
+        Some(Type::heterogeneous_tuple(
+            self.db,
+            elements
+                .iter()
+                .map(|element| inference.expression_type(element)),
+        ))
+    }
+
     fn evaluate_expr_compare_op(
         &mut self,
         lhs_ty: Type<'db>,
@@ -3478,6 +3505,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
+            let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
+                self.inline_membership_rhs_type(right, inference)
+                    .unwrap_or(rhs_ty)
+            } else {
+                rhs_ty
+            };
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -3540,7 +3573,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+                && let Some(ty) =
+                    self.evaluate_expr_compare_op(lhs_ty, lhs_narrowing_rhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
