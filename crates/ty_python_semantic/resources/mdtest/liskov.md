@@ -1003,7 +1003,23 @@ class InvalidReceiver(Mixin):
 
 class InvalidArgument(Mixin):
     value: int
-    def method(self: HasValue, argument: str) -> None: ...  # error: [invalid-method-override]
+    def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:28:9
+   |
+28 |     def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Mixin.method`
+   |
+  ::: src/mdtest_snippet.pyi:7:9
+   |
+ 7 |     def method(self: HasValue, argument: int) -> None: ...
+   |         --------------------------------------------- `Mixin.method` defined here
+   |
+info: parameter `argument` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
 ```
 
 The receiver annotation can also accept more than one protocol:

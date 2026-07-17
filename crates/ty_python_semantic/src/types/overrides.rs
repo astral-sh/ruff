@@ -559,7 +559,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if is_assignable_method_override(db, type_on_subclass_instance, superclass_type) {
+            let Some((subclass_override_type, superclass_override_type)) =
+                method_override_types(db, type_on_subclass_instance, superclass_type)
+            else {
+                continue;
+            };
+
+            if subclass_override_type.is_assignable_to(db, superclass_override_type) {
                 continue;
             }
 
@@ -581,12 +587,6 @@ fn check_class_declaration<'db>(
                 }
             }
 
-            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
-            else {
-                continue;
-            };
-            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
-
             report_invalid_method_override(
                 context,
                 &member.name,
@@ -596,10 +596,7 @@ fn check_class_declaration<'db>(
                 superclass,
                 superclass_type,
                 method_kind,
-                || {
-                    type_on_subclass_instance
-                        .assignability_error_context(db, superclass_type_as_type)
-                },
+                || subclass_override_type.assignability_error_context(db, superclass_override_type),
             );
 
             liskov_diagnostic_emitted = true;
@@ -689,6 +686,16 @@ fn is_assignable_method_override<'db>(
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
 ) -> bool {
+    method_override_types(db, subclass_type, superclass_type).is_some_and(
+        |(subclass_type, superclass_type)| subclass_type.is_assignable_to(db, superclass_type),
+    )
+}
+
+fn method_override_types<'db>(
+    db: &'db dyn Db,
+    subclass_type: Type<'db>,
+    superclass_type: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
             let superclass_signature = superclass_method.function(db).signature(db);
@@ -724,11 +731,9 @@ fn is_assignable_method_override<'db>(
         }
         _ => (subclass_type, superclass_type),
     };
-    let Some(superclass_callable) = superclass_type.try_upcast_to_callable(db) else {
-        return false;
-    };
+    let superclass_callable = superclass_type.try_upcast_to_callable(db)?;
 
-    subclass_type.is_assignable_to(db, superclass_callable.into_type(db))
+    Some((subclass_type, superclass_callable.into_type(db)))
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.
