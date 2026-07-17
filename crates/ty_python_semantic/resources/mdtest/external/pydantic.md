@@ -940,6 +940,23 @@ class ModelWithAliasField(BaseModel):
 ModelWithAliasField()
 ```
 
+Field metadata is also collected through a generic alias, where the `Field(...)` default is carried
+on a type variable that is only specialized at the use site:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GenericAliasField = Annotated[T, Field(default=0)]
+
+class ModelWithGenericAliasField(BaseModel):
+    value: GenericAliasField[int]
+
+# `value` is optional because the alias supplies `Field(default=0)`.
+ModelWithGenericAliasField()
+ModelWithGenericAliasField(value=1)
+```
+
 ## Frozen models and fields
 
 There are various ways to make a field immutable. A model can be globally frozen using a class
