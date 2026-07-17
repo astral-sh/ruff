@@ -1000,3 +1000,43 @@ class DeferredChild1(DeferredBase):
 class DeferredChild2(DeferredBase):
     def method(self) -> None: ...
 ```
+
+## Gradual overrides of generic methods
+
+An untyped or explicitly gradual implementation can override a generic method. This includes the
+generic overloads used by methods such as `dict.get` and `dict.pop`:
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+class Base:
+    def method(self, value: T) -> T:
+        return value
+
+class AnyChild(Base):
+    def method(self, value: Any) -> Any:
+        return value
+
+class UntypedChild(Base):
+    def method(self, value):
+        return value
+
+class InvalidChild(Base):
+    # error: [invalid-method-override]
+    def method(self, value: int) -> int:
+        return value
+
+class UntypedDict(dict[Any, Any]):
+    def get(self, key, default=None):
+        return super().get(key, default)
+    def pop(self, key, default=None):
+        return super().pop(key, default)
+
+class AnyDict(dict[object, Any]):
+    def get(self, key: object, default: Any = None) -> Any:
+        return super().get(key, default)
+    def pop(self, key: object, default: Any = None) -> Any:
+        return super().pop(key, default)
+```

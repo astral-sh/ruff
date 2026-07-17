@@ -344,6 +344,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -381,6 +382,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -588,6 +590,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation,
             typevar_evaluation,
             context_tree: None,
@@ -743,6 +746,8 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
+    /// Target-signature type variables that will be universally quantified after comparison.
+    pub(super) universally_quantified: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -772,6 +777,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -793,6 +799,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
@@ -814,6 +821,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
@@ -835,6 +843,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -1064,6 +1073,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
+            // `Any` and `Unknown` are assignable to every specialization of a universally
+            // quantified target type variable. Ordinary inference still needs to record gradual
+            // evidence as a constraint so that it can infer `Any` or `Unknown`.
+            if self.relation.is_assignability()
+                && matches!(
+                    (source, target),
+                    (Type::TypeVar(typevar), Type::Dynamic(_))
+                        | (Type::Dynamic(_), Type::TypeVar(typevar))
+                        if typevar.is_inferable(db, self.universally_quantified)
+                )
+            {
+                return self.always();
+            }
+
             // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
             // tautology! We're moving the caller's subtyping/assignability requirement into a
             // constraint set. If the typevar has an upper bound or constraints, then the relation
@@ -2403,6 +2426,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: None,
             given: self.given,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2486,6 +2510,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
+            universally_quantified: InferableTypeVars::None,
             context_tree: None,
             given: self.given,
             relation_visitor: self.relation_visitor,

@@ -2465,6 +2465,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
+        if target_inferable != InferableTypeVars::None {
+            checker.universally_quantified =
+                checker.universally_quantified.merge(db, target_inferable);
+        }
         // A non-generic source cannot choose a specialization that satisfies a generic target;
         // use lazy typevar evaluation so the target's obligations can be universally quantified.
         // Keep recursive protocol members on the existing eager path to avoid expanding cycles.
