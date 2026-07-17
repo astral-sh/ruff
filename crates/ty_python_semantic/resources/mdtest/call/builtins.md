@@ -128,14 +128,32 @@ reveal_type(isinstance(s, SubclassOfA))  # revealed: Literal[True]
 reveal_type(isinstance(s, A))  # revealed: Literal[True]
 
 def _(x: A | B, y: list[int]):
+    targets = (A, B)
+
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: Literal[True]
+    reveal_type(isinstance(x, targets))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (A, bytes)))  # revealed: bool
 
     if isinstance(x, A):
         pass
     else:
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
+
+def returns_bool(x: A) -> bool:
+    if isinstance(x, (B, A)):
+        return True
+
+def returns_bool_nested(x: A) -> bool:
+    if isinstance(x, (B, (bytes, A))):
+        return True
+
+def returns_bool_union(x: A | B) -> bool:
+    if isinstance(x, (A, B)):
+        return True
 
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
@@ -153,12 +171,14 @@ def _(
     reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_bound_a, B))  # revealed: bool
+    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: Literal[True]
 
     reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: Literal[True]
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking

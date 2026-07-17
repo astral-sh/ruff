@@ -2562,13 +2562,28 @@ impl KnownFunction {
                     call_expression.arguments.args.get(1),
                 );
 
-                if let Type::ClassLiteral(class) = second_argument
-                    && self == KnownFunction::IsInstance
-                {
-                    overload.set_return_type(Type::from_truthiness(
-                        db,
-                        is_instance_truthiness(db, *first_arg, *class),
-                    ));
+                if self == KnownFunction::IsInstance {
+                    let truthiness = match second_argument {
+                        Type::ClassLiteral(class) => {
+                            Some(is_instance_truthiness(db, *first_arg, *class))
+                        }
+                        Type::NominalInstance(nominal) if nominal.tuple_spec(db).is_some() => {
+                            ClassInfoConstraintFunction::IsInstance
+                                .generate_constraint(db, *second_argument, true)
+                                .map(|constraint| {
+                                    if first_arg.is_subtype_of(db, constraint) {
+                                        Truthiness::AlwaysTrue
+                                    } else {
+                                        Truthiness::Ambiguous
+                                    }
+                                })
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(truthiness) = truthiness {
+                        overload.set_return_type(Type::from_truthiness(db, truthiness));
+                    }
                 }
             }
 
