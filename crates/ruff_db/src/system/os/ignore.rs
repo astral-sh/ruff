@@ -9,18 +9,18 @@ pub(super) struct IgnoreFiles {
 
 impl IgnoreIncremental for IgnoreFiles {
     fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
-        let Some(root) = self
+        let Some((root, relative)) = self
             .root_matchers
             .iter_mut()
-            .filter(|root| path.as_std_path().starts_with(root.root()))
-            .max_by_key(|root| root.root().as_os_str().len())
+            .filter_map(|root| {
+                let relative = path.as_std_path().strip_prefix(root.root()).ok()?;
+                Some((root, relative))
+            })
+            .max_by_key(|(root, _)| root.root().as_os_str().len())
         else {
             return false;
         };
-        let Some(norm) = root.normalize(path.as_std_path()) else {
-            return false;
-        };
-        root.matched(norm, is_directory).is_ignore()
+        root.matched(relative, is_directory).is_ignore()
     }
 }
 
