@@ -36,7 +36,7 @@ use ruff_text_size::Ranged;
 /// collector.create_asset(uri="s3://bucket/key")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct Airflow3IncompatibleFunctionSignature {
     function_name: String,
     change: FunctionSignatureChange,
