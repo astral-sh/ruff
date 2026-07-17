@@ -154,26 +154,28 @@ pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
             matches!(
                 qualified_name.segments(),
                 ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
-                    | ["collections", "deque" | "defaultdict"]
+                    | [
+                        "collections",
+                        "deque" | "defaultdict" | "ChainMap" | "Counter" | "OrderedDict"
+                    ]
                     | ["asyncio", "Future" | "Task"]
-                    | ["collections", "ChainMap" | "Counter" | "OrderedDict"]
                     | [
                         "contextlib",
-                        "AbstractAsyncContextManager" | "AbstractContextManager",
+                        "AbstractAsyncContextManager" | "AbstractContextManager"
                     ]
                     | ["dataclasses", "Field"]
                     | ["functools", "cached_property" | "partialmethod"]
                     | ["os", "PathLike"]
                     | [
                         "queue",
-                        "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue",
+                        "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue"
                     ]
                     | ["re", "Match" | "Pattern"]
                     | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
                     | ["types", "MappingProxyType"]
                     | [
                         "weakref",
-                        "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary",
+                        "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary"
                     ]
                     | [
                         "collections",
@@ -200,7 +202,7 @@ pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
                             | "Reversible"
                             | "Sequence"
                             | "Set"
-                            | "ValuesView",
+                            | "ValuesView"
                     ]
             )
         })
