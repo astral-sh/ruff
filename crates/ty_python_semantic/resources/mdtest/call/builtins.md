@@ -161,6 +161,113 @@ def _(
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
 ```
 
+An `isinstance` check against a tuple is always true when each possible type of the checked value is
+accepted by at least one class in the tuple. This avoids a false implicit-return error when the
+check is the only path that returns a value. The same applies when the tuple is assigned to a local
+variable.
+
+```py
+def reveal_tuple_result(x: A | B):
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+
+def accepts_a(x: A) -> bool:
+    if isinstance(x, (B, A)):
+        return True
+
+def accepts_a_or_b(x: A | B) -> bool:
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_object(x: object) -> bool:
+    if isinstance(x, (object,)):
+        return True
+
+def accepts_stored_tuple(x: A | B) -> bool:
+    targets = (A, B)
+    if isinstance(x, targets):
+        return True
+```
+
+The tuple must contain a fixed set of known classes. A partial tuple cannot cover a union, a
+variadic tuple can be empty, and a value annotated as `type[A]` can refer to a subclass of `A`.
+Nested tuples, unions used as tuple elements, and aliases such as `typing.List` are also left as
+`bool`.
+
+```py
+from typing import List
+
+def reveal_unsupported_tuple_results(x: A | B, items: list[int]):
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
+    reveal_type(isinstance(x, (A | B,)))  # revealed: bool
+    reveal_type(isinstance(items, (List,)))  # revealed: bool
+
+def partial_tuple(x: A | B) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (A, bytes)):
+        return True
+
+def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, targets):
+        return True
+
+def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (target,)):
+        return True
+```
+
+The single-class path already leaves runtime-checkable protocol checks as `bool`. Tuple members use
+the same inference, so a class that only appears structurally compatible does not make the tuple
+check certain.
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocol(Protocol):
+    value: int
+
+class StructuralImplementation:
+    value: int
+
+reveal_type(isinstance(StructuralImplementation(), RuntimeProtocol))  # revealed: bool
+reveal_type(isinstance(StructuralImplementation(), (RuntimeProtocol,)))  # revealed: bool
+```
+
+Single-class `isinstance` inference does not account for an overridden `__instancecheck__`. Tuple
+members again use the same inference. Python returns `False` for these checks, while ty infers
+`Literal[True]`.
+
+```py
+class RejectingMeta(type):
+    def __instancecheck__(self, instance: object, /) -> bool:
+        return False
+
+class RejectingBase(metaclass=RejectingMeta): ...
+class RejectingChild(RejectingBase): ...
+
+reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
+reveal_type(isinstance(RejectingChild(), (RejectingBase,)))  # revealed: Literal[True]
+```
+
+The same limitation applies to `type`: `list[int]` is accepted where `type` is expected, but
+`isinstance(list[int], type)` is false at runtime. Single-class and tuple checks both infer
+`Literal[True]` for a bare `type` and a type variable bound to `type`.
+
+```py
+T_bound_type = TypeVar("T_bound_type", bound=type)
+
+def bare_type(x: type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
+
+bare_type(list[int])
+
+def type_variable_bound_to_type(x: T_bound_type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
+
+type_variable_bound_to_type(list[int])
+```
+
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
 disallowed as the second argument to `isinstance()` according to typeshed's annotations. However, at
 runtime they work fine as the second argument, and we implement that special case in ty:

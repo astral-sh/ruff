@@ -1890,6 +1890,41 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Return whether a fixed `isinstance` tuple covers every member of an input union.
+///
+/// Each class in the tuple uses the same truthiness inference as a single-class `isinstance` check.
+///
+/// ```python
+/// def f(x: A | B) -> bool:
+///     if isinstance(x, (A, B)):
+///         return True
+/// ```
+fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: Type<'db>) -> bool {
+    let Some(tuple) = classinfo
+        .as_nominal_instance()
+        .and_then(|nominal| nominal.tuple_spec(db))
+    else {
+        return false;
+    };
+    if tuple.is_variadic() {
+        return false;
+    }
+
+    let is_covered = |ty: Type<'db>| {
+        tuple.fixed_elements().any(|element| {
+            let Type::ClassLiteral(class) = element else {
+                return false;
+            };
+            is_instance_truthiness(db, ty, *class).is_always_true()
+        })
+    };
+
+    match ty {
+        Type::Union(union) => union.elements(db).iter().copied().all(is_covered),
+        ty => is_covered(ty),
+    }
+}
+
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
 pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
     let suite = ast::helpers::body_without_leading_docstring(&node.body);
@@ -2562,13 +2597,15 @@ impl KnownFunction {
                     call_expression.arguments.args.get(1),
                 );
 
-                if let Type::ClassLiteral(class) = second_argument
-                    && self == KnownFunction::IsInstance
-                {
-                    overload.set_return_type(Type::from_truthiness(
-                        db,
-                        is_instance_truthiness(db, *first_arg, *class),
-                    ));
+                if self == KnownFunction::IsInstance {
+                    let truthiness = match second_argument {
+                        Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
+                        _ if is_instance_tuple_exhaustive(db, *first_arg, *second_argument) => {
+                            Truthiness::AlwaysTrue
+                        }
+                        _ => Truthiness::Ambiguous,
+                    };
+                    overload.set_return_type(Type::from_truthiness(db, truthiness));
                 }
             }
 
