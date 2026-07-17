@@ -1025,6 +1025,18 @@ pub enum Type<'db> {
 /// where `to_meta_type` is a faithful inverse, it round-trips semantically. An over-approximation
 /// may discard class-object constraints and cannot establish a subtype relation in target
 /// position.
+///
+/// For example, given these Python classes:
+///
+/// ```py
+/// class Base: ...
+/// class Child(Base): ...
+/// ```
+///
+/// `type[Base]` projects to `Base` exactly: both admit `Child`. In contrast,
+/// `TypeOf[Base]` (the type of the expression `Base`) admits only the `Base` class object, but
+/// also projects to `Base`, which admits `Child` instances. That projection is an
+/// over-approximation.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InstanceProjection<T> {
     Exact(T),

@@ -1103,6 +1103,21 @@ impl<'db> IntersectionType<'db> {
     /// projected positive element, we cannot tell whether the intersection contains class objects
     /// at all. The result is exact only when every positive element projects exactly and there are
     /// no negative elements.
+    ///
+    /// For example, Python narrowing can produce `type[Base] & ~TypeOf[Base]`:
+    ///
+    /// ```py
+    /// class Base: ...
+    /// class Child(Base): ...
+    ///
+    /// def make(cls: type[Base]) -> Base:
+    ///     if cls is not Base:
+    ///         return cls()  # `cls` can be `Child`, so this can return a `Child` instance.
+    ///     return Base()
+    /// ```
+    ///
+    /// Projecting the negative `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child`
+    /// instances too, so only the positive `type[Base]` is projected.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
         let mut builder = IntersectionBuilder::new(db);
         let mut has_projected_positive = false;
