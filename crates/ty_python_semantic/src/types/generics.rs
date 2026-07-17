@@ -2661,29 +2661,44 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let formal_paramspec = formal_signature.is_single_paramspec();
 
         for actual_callable in actual_callables.as_slice() {
-            if let Some((paramspec, _)) = formal_paramspec {
+            if let Some((paramspec, formal_return)) = formal_paramspec {
                 // Capture the actual parameter signature independently of return constraints. A
                 // gradual return can introduce relationships such as `T <= Any`, which must not
-                // widen the captured `ParamSpec` through transitivity. Overloaded callables still
-                // rely on the relation below to filter signatures by their return type.
+                // widen the captured `ParamSpec` through transitivity. Generic overloads can be
+                // captured together only when the formal return does not filter any overload arm.
                 let paramspec_identity = paramspec.identity(self.db);
                 let paramspec_was_inferred = self.types.contains_key(&paramspec_identity);
                 let actual_signatures = actual_callable.signatures(self.db);
-                let paramspec_value = match actual_signatures.overloads.as_slice() {
-                    [signature] if signature.generic_context.is_some() => {
-                        Some(Type::Callable(CallableType::new(
-                            self.db,
-                            CallableSignature::single(Signature::new_generic(
-                                signature.generic_context,
-                                signature.parameters().clone(),
-                                Type::unknown(),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                            CallableFunctionProvenance::None,
+                let paramspec_value = (actual_signatures
+                    .overloads
+                    .iter()
+                    .all(|signature| signature.generic_context.is_some())
+                    && (actual_signatures.overloads.len() == 1
+                        || formal_return.is_dynamic()
+                        || matches!(
+                            formal_return,
+                            Type::TypeVar(typevar)
+                                if typevar
+                                    .typevar(self.db)
+                                    .bound_or_constraints(self.db)
+                                    .is_none()
                         )))
-                    }
-                    _ => None,
-                };
+                .then(|| {
+                    Type::Callable(CallableType::new(
+                        self.db,
+                        CallableSignature::from_overloads(actual_signatures.overloads.iter().map(
+                            |signature| {
+                                Signature::new_generic(
+                                    signature.generic_context,
+                                    signature.parameters().clone(),
+                                    Type::unknown(),
+                                )
+                            },
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                        CallableFunctionProvenance::None,
+                    ))
+                });
 
                 let when = actual_signatures.when_constraint_set_assignable_to(
                     self.db,

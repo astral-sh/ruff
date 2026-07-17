@@ -1007,7 +1007,8 @@ An untyped or explicitly gradual implementation can override a generic method. T
 generic overloads used by methods such as `dict.get` and `dict.pop`:
 
 ```py
-from typing import Any, TypeVar
+from concurrent.futures import Executor, Future
+from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
@@ -1039,4 +1040,15 @@ class AnyDict(dict[object, Any]):
         return super().get(key, default)
     def pop(self, key: object, default: Any = None) -> Any:
         return super().pop(key, default)
+
+class UntypedExecutor(Executor):
+    def submit(self, fn, *args, **kwargs):
+        future = Future()
+        future.set_result(fn(*args, **kwargs))
+        return future
+
+class InvalidExecutor(Executor):
+    # error: [invalid-method-override]
+    def submit(self, fn: Callable[[int], int], value: int) -> Future[int]:
+        return super().submit(fn, value)
 ```

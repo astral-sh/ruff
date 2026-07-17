@@ -957,6 +957,29 @@ class AnnotableMeta(type):
         return self  # No `invalid-type-form` error: runtime use of `self`, not the `Self` type form
 ```
 
+## Assigning methods to runtime-created classes
+
+The synthesized `Self` type of an assigned method is compatible with the receiver of a
+runtime-created class:
+
+```py
+from collections import namedtuple
+from typing import Generic, TypeVar
+
+value_cls = namedtuple("value_cls", "name value")
+value_cls.__le__ = lambda self, other: True
+# error: [invalid-assignment]
+value_cls.__ge__ = lambda self: True
+
+T = TypeVar("T")
+
+class classproperty(Generic[T]):
+    def __get__(self, instance, owner) -> T:
+        raise NotImplementedError
+
+classproperty.__get__ = lambda self, instance, owner: self
+```
+
 ## Indirect metaclass inheritance
 
 Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses:

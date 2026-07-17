@@ -181,7 +181,9 @@ reveal_type(decorator_factory()(1))
 The returned callable can also be inferred from a lambda expression:
 
 ```py
-from typing import Any
+import copy
+import pickle
+from typing import Any, cast
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -199,6 +201,22 @@ reveal_type(bounded_lambda_decorator_factory())
 def invalid_lambda_decorator_factory() -> Callable[[T], T]:
     # error: [invalid-return-type]
     return lambda value: 1
+
+def callable_factory() -> Callable[..., T]:
+    def wrapper(*args: Any) -> Any:
+        return args
+    return cast(Callable[..., T], wrapper)
+
+def invalid_callable_factory() -> Callable[..., T]:
+    def wrapper(*args: Any) -> Any:
+        return args
+    # error: [invalid-return-type]
+    return cast(Callable[..., str], wrapper)
+
+copiers = [copy.copy, copy.deepcopy]
+copiers += [lambda x: pickle.loads(pickle.dumps(x, 1))]
+# error: [unsupported-operator]
+copiers += [lambda x: 1]
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned

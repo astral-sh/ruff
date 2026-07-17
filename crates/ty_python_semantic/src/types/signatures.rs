@@ -3010,6 +3010,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `P`
                 (None, Some(([], target_bound_typevar))) => {
+                    // A gradual source accepts every target parameter list. Constraining a
+                    // universally quantified ParamSpec to `...` would incorrectly reject it.
+                    if self.relation.is_assignability()
+                        && source.parameters.is_gradual()
+                        && target_bound_typevar.is_inferable(db, self.universally_quantified)
+                    {
+                        return result;
+                    }
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -3156,6 +3164,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let source_params = source
                         .parameters
                         .with_transformed_parameters(source_params.cloned());
+                    // The fixed prefix has been checked above; a gradual remainder accepts every
+                    // specialization of the target ParamSpec.
+                    if self.relation.is_assignability()
+                        && source_params.is_gradual()
+                        && target_bound_typevar.is_inferable(db, self.universally_quantified)
+                    {
+                        return result;
+                    }
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(

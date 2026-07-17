@@ -4738,7 +4738,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             TypeContext::default()
         };
-        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
+        // A legacy type variable that only occurs in a returned `Callable` is not part of the
+        // function's public generic context, but type forms in the return expression still need
+        // to bind it to this function's lexical context.
+        let previous_typevar_binding_context = self.typevar_binding_context;
+        self.typevar_binding_context = previous_typevar_binding_context.or_else(|| {
+            nearest_enclosing_function(self.db(), self.index, self.scope())
+                .map(|function| function.definition(self.db()))
+        });
+        let inferred_ty = self.infer_optional_expression(ret.value.as_deref(), tcx);
+        self.typevar_binding_context = previous_typevar_binding_context;
+
+        if let Some(ty) = inferred_ty {
             let range = ret
                 .value
                 .as_ref()
@@ -7955,9 +7966,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let generic_context = callable_tcx.and_then(|signature| {
+            let generic_context = signature.generic_context?;
+            (return_ty.is_dynamic()
+                || return_ty.has_typevar(self.db())
+                || generic_context
+                    .variables(self.db())
+                    .all(|typevar| typevar.typevar(self.db()).is_self(self.db())))
+            .then_some(generic_context)
+        });
         Type::Callable(CallableType::new(
             self.db(),
-            CallableSignature::single(Signature::new(parameters, return_ty)),
+            // Contextual parameter types can refer to callable-local type variables (including an
+            // implicit `Self`). Keep their binder when the lambda return remains compatible.
+            CallableSignature::single(Signature::new_generic(
+                generic_context,
+                parameters,
+                return_ty,
+            )),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::ImplicitReturn,
         ))

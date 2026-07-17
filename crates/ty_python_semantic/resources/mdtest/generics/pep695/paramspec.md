@@ -1437,8 +1437,9 @@ generic function. Valid calls should still succeed, and the original arity shoul
 
 ```py
 from collections.abc import Callable, Generator
+import contextvars
 import types
-from typing import Any, Generic, ParamSpec, TypeVar
+from typing import Any, Generic, ParamSpec, TypeVar, overload
 
 class Wrapped[**P]:
     def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
@@ -1504,6 +1505,23 @@ reveal_type(stdlib_yield(1))  # revealed: Awaitable[None]
 
 async def example() -> None:
     await stdlib_yield(1)
+
+def step(result: Generator[object, None, None]) -> object:
+    return contextvars.copy_context().run(next, result)
+
+@overload
+def overloaded(value: int) -> int: ...
+@overload
+def overloaded(value: str) -> str: ...
+def overloaded(value: int | str) -> int | str:
+    return value
+
+def requires_int[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+    return func(*args, **kwargs)
+
+requires_int(overloaded, 1)
+# error: [invalid-argument-type]
+requires_int(overloaded, "value")
 ```
 
 ### Chained decorators with generic functions
