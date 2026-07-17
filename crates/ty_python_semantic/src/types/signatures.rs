@@ -1573,12 +1573,26 @@ impl<'db> Signature<'db> {
         checker: &TypeRelationChecker<'_, 'c, 'db>,
         db: &'db dyn Db,
     ) -> ConstraintSet<'db, 'c> {
-        self.receiver_binding
-            .as_ref()
-            .and_then(|binding| binding.generic_context)
-            .into_iter()
-            .flat_map(|generic_context| generic_context.variables(db))
-            .filter(|typevar| !self.receiver_typevar_has_enclosing_protocol_bound(db, *typevar))
+        Self::declared_domain_when_satisfied(
+            checker,
+            db,
+            self.receiver_binding
+                .as_ref()
+                .and_then(|binding| binding.generic_context)
+                .into_iter()
+                .flat_map(|generic_context| generic_context.variables(db))
+                .filter(|typevar| {
+                    !self.receiver_typevar_has_enclosing_protocol_bound(db, *typevar)
+                }),
+        )
+    }
+
+    fn declared_domain_when_satisfied<'c>(
+        checker: &TypeRelationChecker<'_, 'c, 'db>,
+        db: &'db dyn Db,
+        typevars: impl Iterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> ConstraintSet<'db, 'c> {
+        typevars
             .filter_map(|typevar| {
                 typevar
                     .typevar(db)
@@ -2540,8 +2554,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //
         // Target signature typevars require the opposite quantifier: the relation must hold for
         // every target specialization. Receiver typevars are quantified over the domain imposed
-        // by binding the receiver; the remaining target variables are unconditional.
-        when.reduce_inferable(db, self.constraints, source_inferable)
+        // by binding the receiver; the remaining target variables use their declared domains.
+        let target_declared_domain = Signature::declared_domain_when_satisfied(
+            &checker,
+            db,
+            target
+                .generic_context
+                .into_iter()
+                .flat_map(|generic_context| generic_context.variables(db))
+                .filter(|typevar| typevar.is_inferable(db, target_non_receiver_inferable)),
+        );
+        target_declared_domain
+            .implies(db, self.constraints, || {
+                when.reduce_inferable(db, self.constraints, source_inferable)
+            })
             .for_all(db, self.constraints, target_receiver_inferable)
             .for_all(db, self.constraints, target_non_receiver_inferable)
     }
@@ -3196,6 +3222,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: callable without ParamSpec
                 (Some(([], source_bound_typevar)), None) => {
+                    // A gradual target is consistent with every specialization of a universally
+                    // quantified source ParamSpec in this contravariant comparison.
+                    if self.relation.is_assignability()
+                        && target.parameters.is_gradual()
+                        && source_bound_typevar.is_inferable(db, self.universally_quantified)
+                    {
+                        return result;
+                    }
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
@@ -3310,6 +3344,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let target_params = target
                         .parameters
                         .with_transformed_parameters(target_params.cloned());
+                    // The fixed prefix has been checked above; a gradual remainder is consistent
+                    // with every specialization of the universally quantified ParamSpec.
+                    if self.relation.is_assignability()
+                        && target_params.is_gradual()
+                        && source_bound_typevar.is_inferable(db, self.universally_quantified)
+                    {
+                        return result;
+                    }
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(

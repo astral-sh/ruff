@@ -1006,11 +1006,22 @@ class DeferredChild2(DeferredBase):
 An untyped or explicitly gradual implementation can override a generic method. This includes the
 generic overloads used by methods such as `dict.get` and `dict.pop`:
 
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "ignore"
+```
+
 ```py
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from concurrent.futures import Executor, Future
-from typing import Any, Callable, TypeVar
+from typing import Any, Generic, NoReturn, ParamSpec, TypeVar, TypeVarTuple, Unpack, overload
 
 T = TypeVar("T")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
 
 class Base:
     def method(self, value: T) -> T:
@@ -1051,4 +1062,105 @@ class InvalidExecutor(Executor):
     # error: [invalid-method-override]
     def submit(self, fn: Callable[[int], int], value: int) -> Future[int]:
         return super().submit(fn, value)
+
+class Builder(Generic[T]):
+    def apply(self, fn: Callable[P, Generator[T, None, T]]) -> Callable[P, Iterable[T]]:
+        raise NotImplementedError
+
+class SeqBuilder(Builder[T]):
+    def apply(self, fn: Callable[..., Generator[T, None, T]]) -> Callable[..., Iterable[T]]:
+        raise NotImplementedError
+
+class Frame: ...
+
+FrameT = TypeVar("FrameT", bound=Frame)
+
+class Grouper:
+    def get_iterator(self, data: FrameT) -> Iterator[tuple[int, FrameT]]:
+        raise NotImplementedError
+
+class BinGrouper(Grouper):
+    def get_iterator(self, data: Frame):
+        raise NotImplementedError
+
+class EventLoop:
+    def call_soon(self, callback: Callable[[Unpack[Ts]], object], *args: Unpack[Ts]) -> object:
+        raise NotImplementedError
+
+class WebLoop(EventLoop):
+    def call_soon(self, callback: Callable[..., Any], *args: Any) -> object:
+        raise NotImplementedError
+
+SelectableT = TypeVar("SelectableT", bound="Selectable")
+
+class Selectable: ...
+
+class IOLoop:
+    @overload
+    def add_handler(self, fd: int, callback: Callable[[int, int], None]) -> None: ...
+    @overload
+    def add_handler(self, fd: SelectableT, callback: Callable[[SelectableT, int], None]) -> None: ...
+    def add_handler(self, fd: int | Selectable, callback: Callable[..., None]) -> None:
+        raise NotImplementedError
+
+class AsyncIOLoop(IOLoop):
+    def add_handler(self, fd: int | Selectable, callback: Callable[..., None]) -> None:
+        raise NotImplementedError
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class FrozenDict(dict[K, V]):
+    @classmethod
+    def fromkeys(cls, *args, **kwargs) -> "FrozenDict":
+        raise NotImplementedError
+    def __or__(self, other: Mapping) -> "FrozenDict":
+        raise NotImplementedError
+    def pop(self, key, default=None) -> NoReturn:
+        raise NotImplementedError
+
+class FrozenList(list):
+    def union(self, other: list | tuple) -> "FrozenList":
+        raise NotImplementedError
+    __add__ = union
+
+class Call(Generic[T]): ...
+
+class Portal:
+    def submit(self, call: Call[T]) -> Call[T]:
+        raise NotImplementedError
+
+class Waiter(Generic[T], Portal):
+    # error: [invalid-method-override]
+    def submit(self, call: Call[T]) -> Call[T]:
+        return call
+
+ConfigT = TypeVar("ConfigT", bound="DiffBase")
+
+class DiffBase:
+    @classmethod
+    def from_hierarchy(cls, configs: list[ConfigT]) -> ConfigT:
+        return configs[0]
+
+class Config(DiffBase):
+    @classmethod
+    # error: [invalid-method-override]
+    def from_hierarchy(cls, configs: list["Config"]) -> "Config":
+        return configs[0]
+
+class Counter(dict[K, int]):
+    @classmethod
+    # error: [invalid-method-override]
+    def fromkeys(cls, iterable: Any, value: int | None = None) -> NoReturn:
+        raise NotImplementedError
+
+class Morsel(dict[str, Any], Generic[V]):
+    # error: [invalid-method-override]
+    def setdefault(self, key: str, value: str | None = None) -> str:
+        raise NotImplementedError
+
+class MultiDict(dict[K, V]):
+    # error: [invalid-method-override]
+    def __or__(self, other: Mapping[K, V | list[V]]) -> "MultiDict[K, V]":
+        raise NotImplementedError
 ```

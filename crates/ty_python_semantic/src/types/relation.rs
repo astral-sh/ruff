@@ -14,7 +14,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1073,16 +1073,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
-            // `Any` and `Unknown` are assignable to every specialization of a universally
+            // Gradual types are assignable to every specialization of a rigid or universally
             // quantified target type variable. Ordinary inference still needs to record gradual
             // evidence as a constraint so that it can infer `Any` or `Unknown`.
             if self.relation.is_assignability()
-                && matches!(
-                    (source, target),
-                    (Type::TypeVar(typevar), Type::Dynamic(_))
-                        | (Type::Dynamic(_), Type::TypeVar(typevar))
-                        if typevar.is_inferable(db, self.universally_quantified)
-                )
+                && let (Type::TypeVar(typevar), gradual) | (gradual, Type::TypeVar(typevar)) =
+                    (source, target)
+                && (typevar.is_inferable(db, self.universally_quantified)
+                    || (self.universally_quantified != InferableTypeVars::None
+                        && !typevar.is_inferable(db, self.inferable)))
+                && (gradual.is_dynamic()
+                    || (typevar.is_typevartuple(db)
+                        && matches!(
+                            gradual.exact_tuple_instance_spec(db).as_deref(),
+                            Some(Tuple::Variable(tuple))
+                                if tuple.prefix_elements().is_empty()
+                                    && tuple.suffix_elements().is_empty()
+                                    && matches!(
+                                        tuple.variable(),
+                                        VariableSegment::Homogeneous(element)
+                                            if element.is_dynamic()
+                                    )
+                        )))
             {
                 return self.always();
             }

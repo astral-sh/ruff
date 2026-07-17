@@ -1701,6 +1701,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && !ty.is_union()
                 {
                     let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
+                    // A gradual invariant argument is consistent with every specialization of a
+                    // universally quantified type variable.
+                    if self.relation.is_assignability()
+                        && ty.is_dynamic()
+                        && typevar.is_inferable(db, self.universally_quantified)
+                    {
+                        return self.always();
+                    }
                     let (lower, upper) = if self.relation.is_subtyping() {
                         (ty.top_materialization(db), ty.bottom_materialization(db))
                     } else {
