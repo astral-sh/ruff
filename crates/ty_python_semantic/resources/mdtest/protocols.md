@@ -4161,6 +4161,48 @@ class InvalidBoundedClassImplementation:
 
 bounded_class_protocol: BoundedClassProtocol = BoundedClassImplementation()
 invalid_bounded_class_protocol: BoundedClassProtocol = InvalidBoundedClassImplementation()  # error: [invalid-assignment]
+
+class NonRecursiveProtocol(Protocol):
+    def method(self) -> None: ...
+
+class InvalidNestedBoundedImplementation(list[str]):
+    def method[T: int](self: list[T]) -> None: ...
+
+class InvalidUnionConstrainedImplementation:
+    def method[T: (int, str)](self: T | None) -> None: ...
+
+invalid_nested_bounded: NonRecursiveProtocol = InvalidNestedBoundedImplementation()  # error: [invalid-assignment]
+invalid_union_constrained: NonRecursiveProtocol = InvalidUnionConstrainedImplementation()  # error: [invalid-assignment]
+```
+
+A receiver TypeVar can be bounded by the protocol that declares the method. Binding it to the
+concrete receiver must not recursively check the same protocol while constructing its domain:
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+RecursiveT = TypeVar("RecursiveT", bound="RecursiveReceiver")
+
+class RecursiveReceiver(Protocol):
+    def copy(self: RecursiveT, other: RecursiveT) -> RecursiveT: ...
+
+class RecursiveImplementation:
+    def copy(self, other: "RecursiveImplementation") -> "RecursiveImplementation":
+        return self
+
+class InvalidRecursiveImplementation:
+    def copy(self, other: int) -> int:
+        return other
+
+recursive_receiver: RecursiveReceiver = RecursiveImplementation()
+invalid_recursive_receiver: RecursiveReceiver = InvalidRecursiveImplementation()  # error: [invalid-assignment]
+
+U = TypeVar("U", bound=RecursiveReceiver)
+
+class RecursiveBox(Generic[U]): ...
+
+recursive_box: RecursiveBox[RecursiveImplementation]
+invalid_recursive_box: RecursiveBox[InvalidRecursiveImplementation]  # error: [invalid-type-arguments]
 ```
 
 ## Module objects with static-method protocol members

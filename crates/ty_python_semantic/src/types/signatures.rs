@@ -1114,6 +1114,31 @@ impl<'db> Signature<'db> {
                 };
                 (Some(typevar), receiver)
             });
+            let receiver_generic_context = self.generic_context_for_receiver_annotation(
+                db,
+                parameter.annotated_type(),
+                bind_class_receiver,
+            );
+            if let Some(typevar) = receiver_typevar
+                && matches!(resolved_annotation, Type::TypeVar(_))
+                && self.receiver_typevar_has_enclosing_protocol_bound(db, typevar)
+            {
+                // Checking the declared bound here would recursively check the protocol that is
+                // already being compared. The concrete receiver is the valid specialization.
+                let constraints = ConstraintSetBuilder::new().into_owned(|builder| {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        builder,
+                        typevar,
+                        receiver_for_domain,
+                        receiver_for_domain,
+                    )
+                });
+                return Some(ReceiverBinding {
+                    constraints,
+                    generic_context: receiver_generic_context,
+                });
+            }
             if receiver_typevar.is_some_and(|typevar| {
                 Self::receiver_violates_typevar_domain(db, receiver_for_domain, typevar)
             }) {
@@ -1122,25 +1147,10 @@ impl<'db> Signature<'db> {
                     generic_context: None,
                 });
             }
-            let receiver_generic_context = self.generic_context_for_receiver_annotation(
-                db,
-                parameter.annotated_type(),
-                bind_class_receiver,
-            );
             let receiver_constraint =
                 receiver.when_constraint_set_assignable_to_owned(db, annotation);
-            let declared_domain = receiver_generic_context
-                .into_iter()
-                .flat_map(|generic_context| generic_context.variables(db))
-                .filter_map(|typevar| Self::receiver_typevar_domain(db, typevar))
-                .fold(None, |constraints, domain| {
-                    merge_receiver_constraints(db, constraints.as_ref(), Some(&domain))
-                });
-            let constraints = merge_receiver_constraints(
-                db,
-                Some(receiver_constraint.as_ref()),
-                declared_domain.as_ref(),
-            )?;
+            let constraints = (!receiver_constraint.is_trivially_always_satisfied())
+                .then(|| receiver_constraint.into_owned())?;
             Some(ReceiverBinding {
                 constraints,
                 generic_context: receiver_generic_context,
@@ -1209,37 +1219,48 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns the declared domain of a callable-local receiver `TypeVar` as a constraint set.
-    fn receiver_typevar_domain(
+    /// Returns whether a receiver `TypeVar` is bounded by the protocol that declares this method.
+    fn receiver_typevar_has_enclosing_protocol_bound(
+        &self,
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
-    ) -> Option<OwnedConstraintSet<'db>> {
-        let domain = typevar.typevar(db).bound_or_constraints(db)?;
-        let constraints = ConstraintSetBuilder::new();
-        Some(constraints.into_owned(|builder| {
-            match domain {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    ConstraintSet::constrain_typevar_upper_bound(
-                        db,
-                        builder,
-                        typevar,
-                        bound.top_materialization(db),
-                    )
-                }
-                TypeVarBoundOrConstraints::Constraints(typevar_constraints) => typevar_constraints
-                    .elements(db)
-                    .iter()
-                    .when_any(db, builder, |constraint| {
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            builder,
-                            typevar,
-                            constraint.bottom_materialization(db),
-                            constraint.top_materialization(db),
-                        )
-                    }),
-            }
-        }))
+    ) -> bool {
+        let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+            typevar.typevar(db).bound_or_constraints(db)
+        else {
+            return false;
+        };
+        self.references_enclosing_protocol(db, bound)
+    }
+
+    /// Returns whether `ty` references the protocol that declares this method.
+    fn references_enclosing_protocol(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let Some(definition) = self.definition else {
+            return false;
+        };
+        super::visitor::any_over_type(db, ty, false, |ty| {
+            let class = match ty {
+                Type::NominalInstance(instance) => Some(instance.class(db)),
+                Type::ProtocolInstance(protocol) => protocol
+                    .to_nominal_instance()
+                    .map(|instance| instance.class(db)),
+                _ => None,
+            };
+            class
+                .and_then(|class| class.static_class_literal(db))
+                .is_some_and(|(class, _)| {
+                    class.is_protocol(db) && class.body_scope(db) == definition.scope(db)
+                })
+        })
+    }
+
+    /// Returns whether this signature participates in a recursive protocol member relation.
+    fn is_recursive_protocol_member(&self, db: &'db dyn Db) -> bool {
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .any(|ty| self.references_enclosing_protocol(db, ty))
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1394,6 +1415,53 @@ impl<'db> Signature<'db> {
             return checker.always();
         };
         checker.constraints.load(db, &binding.constraints)
+    }
+
+    /// Returns the declared domain of the callable-local receiver `TypeVar`s.
+    fn receiver_declared_domain_when_satisfied<'c>(
+        &self,
+        checker: &TypeRelationChecker<'_, 'c, 'db>,
+        db: &'db dyn Db,
+    ) -> ConstraintSet<'db, 'c> {
+        self.receiver_binding
+            .as_ref()
+            .and_then(|binding| binding.generic_context)
+            .into_iter()
+            .flat_map(|generic_context| generic_context.variables(db))
+            .filter(|typevar| !self.receiver_typevar_has_enclosing_protocol_bound(db, *typevar))
+            .filter_map(|typevar| {
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map(|domain| (typevar, domain))
+            })
+            .fold(checker.always(), |constraints, (typevar, domain)| {
+                constraints.and(db, checker.constraints, || match domain {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        ConstraintSet::constrain_typevar_upper_bound(
+                            db,
+                            checker.constraints,
+                            typevar,
+                            bound.top_materialization(db),
+                        )
+                    }
+                    TypeVarBoundOrConstraints::Constraints(typevar_constraints) => {
+                        typevar_constraints.elements(db).iter().when_any(
+                            db,
+                            checker.constraints,
+                            |constraint| {
+                                ConstraintSet::constrain_typevar(
+                                    db,
+                                    checker.constraints,
+                                    typevar,
+                                    constraint.bottom_materialization(db),
+                                    constraint.top_materialization(db),
+                                )
+                            },
+                        )
+                    }
+                })
+            })
     }
 
     fn map_receiver_binding(
@@ -2250,6 +2318,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             source
                 .receiver_constraints_when_satisfied(&checker, db)
                 .and(db, self.constraints, || {
+                    // Recursive protocol members can revisit this same source signature while
+                    // checking a declared bound. Concrete receiver compatibility was already
+                    // checked when the signature was bound; keep the obligation for all other
+                    // comparisons, including coercion to `Callable`.
+                    if source
+                        .receiver_binding
+                        .as_ref()
+                        .and_then(|binding| binding.generic_context)
+                        .is_some()
+                        && !target.is_recursive_protocol_member(db)
+                    {
+                        source.receiver_declared_domain_when_satisfied(&checker, db)
+                    } else {
+                        checker.always()
+                    }
+                })
+                .and(db, self.constraints, || {
                     if matches!(target_receiver_inferable, InferableTypeVars::None) {
                         target
                             .receiver_constraints_when_satisfied(&checker, db)
@@ -2257,8 +2342,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 checker.check_signature_pair_inner(db, source, target)
                             })
                     } else {
-                        let target_domain =
-                            target.receiver_constraints_when_satisfied(&checker, db);
+                        let target_domain = target
+                            .receiver_constraints_when_satisfied(&checker, db)
+                            .and(db, self.constraints, || {
+                                target.receiver_declared_domain_when_satisfied(&checker, db)
+                            });
                         // A target receiver must admit at least one valid specialization. Without
                         // this check, an impossible declared bound makes the implication vacuous
                         // and an invalid implementation can satisfy the protocol.
