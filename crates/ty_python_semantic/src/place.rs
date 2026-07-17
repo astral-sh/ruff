@@ -14,8 +14,8 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
+    CycleQuery, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
@@ -1049,6 +1049,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1063,7 +1064,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, env, prev.ty, cycle),
+                ty: current.ty.cycle_normalized(db, env, query, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -1084,7 +1085,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, env, cycle),
+                ty: current.ty.recursive_type_normalized(db, env, query, cycle),
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -1097,12 +1098,12 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Defined(prev), Place::Undefined) => {
                 if cycle
                     .head_ids()
-                    .any(|id| prev.ty == Type::identity_recursive(db, env, id))
+                    .any(|id| prev.ty == Type::identity_recursive(db, env, query, id))
                 {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, env, cycle),
+                        ty: prev.ty.recursive_type_normalized(db, env, query, cycle),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -1124,11 +1125,11 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     returns(copy),
     cycle_initial=|db, id, scope, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
-        Place::bound(Type::identity_recursive(db, &env, id)).into()
+        Place::bound(Type::identity_recursive(db, &env, CycleQuery::Place, id)).into()
     },
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
-        place.cycle_normalized(db, &env, *previous, cycle)
+        place.cycle_normalized(db, &env, CycleQuery::Place, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]

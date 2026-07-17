@@ -5,8 +5,8 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypingModule, definition_expression_type,
+        CycleQuery, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
+        TypeContext, TypeMapping, TypeVarVariance, TypingModule, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -149,11 +149,11 @@ impl<'db> PEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|db, id, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
-            Type::identity_recursive(db, &env, id)
+            Type::identity_recursive(db, &env, CycleQuery::TypeAliasValue, id)
         },
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
-            value.cycle_normalized(db, &env, *previous, cycle)
+            value.cycle_normalized(db, &env, CycleQuery::TypeAliasValue, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -269,11 +269,17 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|db, id, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
-            Type::identity_recursive(db, &env, id)
+            Type::identity_recursive(db, &env, CycleQuery::ImplicitTypeAliasValue, id)
         },
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
-            value.cycle_normalized(db, &env, *previous, cycle)
+            value.cycle_normalized(
+                db,
+                &env,
+                CycleQuery::ImplicitTypeAliasValue,
+                *previous,
+                cycle,
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]

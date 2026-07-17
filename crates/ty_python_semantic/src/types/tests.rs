@@ -116,7 +116,7 @@ fn list_instance<'db>(
 }
 
 fn recursive_int_list<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> RecursiveType<'db> {
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let element_ty = UnionType::from_elements(
         db,
@@ -183,14 +183,14 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     program: Program<'db>,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
-    current.cycle_normalized(db, &env, *previous, cycle)
+    current.cycle_normalized(db, &env, CycleQuery::Test, *previous, cycle)
 }
 
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|db, id, program: Program<'db>| {
         let env = ProgramEnvironment::from_program(program);
-        Type::identity_recursive(db, &env, id)
+        Type::identity_recursive(db, &env, CycleQuery::Test, id)
     },
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
@@ -281,7 +281,7 @@ fn divergent_type() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
@@ -559,7 +559,7 @@ fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let list_of = |tuple| KnownClass::List.to_specialized_instance(db, &env, &[tuple]);
     let approximation = |element| list_of(Type::heterogeneous_tuple(db, &env, [element]));
     let top = list_of(Type::homogeneous_tuple(db, &env, Type::any())).top_materialization(db, &env);
@@ -585,7 +585,7 @@ fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
 fn recursive_type_constructor_simplifies_non_recursive_bodies() {
     let db = setup_db();
     let env = db.program_environment();
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let int = KnownClass::Int.to_instance(&db, &env);
 

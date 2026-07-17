@@ -8,7 +8,7 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
+use crate::types::{CycleQuery, InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
@@ -87,10 +87,16 @@ impl<'db> UnionType<'db> {
             returns(copy),
             cycle_initial=|db, id, types: TypePair<'db>| {
                 let env = ProgramEnvironment::from_program(types.program(db));
-                Type::identity_recursive(db, &env, id)
+                Type::identity_recursive(db, &env, CycleQuery::UnionTwoElements, id)
             },
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+                result.cycle_normalized(
+                    db,
+                    &ProgramEnvironment::from_program(types.program(db)),
+                    CycleQuery::UnionTwoElements,
+                    *previous,
+                    cycle,
+                )
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -964,10 +970,16 @@ impl<'db> IntersectionType<'db> {
             returns(copy),
             cycle_initial=|db, id, types: TypePair<'db>| {
                 let env = ProgramEnvironment::from_program(types.program(db));
-                Type::identity_recursive(db, &env, id)
+                Type::identity_recursive(db, &env, CycleQuery::IntersectionTwoElements, id)
             },
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+                result.cycle_normalized(
+                    db,
+                    &ProgramEnvironment::from_program(types.program(db)),
+                    CycleQuery::IntersectionTwoElements,
+                    *previous,
+                    cycle,
+                )
             },
             heap_size=ruff_memory_usage::heap_size
         )]

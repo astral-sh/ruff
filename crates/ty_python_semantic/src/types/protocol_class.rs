@@ -17,7 +17,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type_expanding_aliases;
-use crate::types::{TypeContext, UpcastPolicy};
+use crate::types::{CycleQuery, TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -792,6 +792,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -802,7 +803,7 @@ impl<'db> ProtocolInterface<'db> {
             .iter()
             .map(|(name, curr_data)| {
                 let normalized = if let Some(prev_data) = prev_inner.get(name) {
-                    curr_data.cycle_normalized(db, env, prev_data, cycle)
+                    curr_data.cycle_normalized(db, env, query, prev_data, cycle)
                 } else {
                     curr_data.clone()
                 };
@@ -1120,12 +1121,13 @@ impl<'db> ProtocolMemberWrite<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         match (self, previous) {
             (Self::Type(current), Self::Type(previous)) => {
-                Self::Type(current.cycle_normalized(db, env, previous, cycle))
+                Self::Type(current.cycle_normalized(db, env, query, previous, cycle))
             }
             (
                 Self::Descriptor {
@@ -1140,12 +1142,14 @@ impl<'db> ProtocolMemberWrite<'db> {
                 descriptor: current_descriptor.cycle_normalized(
                     db,
                     env,
+                    query,
                     previous_descriptor,
                     cycle,
                 ),
                 domain: cycle_normalized_optional_type(
                     db,
                     env,
+                    query,
                     current_domain,
                     previous_domain,
                     cycle,
@@ -1159,10 +1163,11 @@ impl<'db> ProtocolMemberWrite<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         cycle: &salsa::Cycle,
     ) -> Self {
         let normalize = |member: ProtocolMemberType<'db>| {
-            member.with_ty(member.ty().recursive_type_normalized(db, env, cycle))
+            member.with_ty(member.ty().recursive_type_normalized(db, env, query, cycle))
         };
         match self {
             Self::Type(member) => Self::Type(normalize(member)),
@@ -1352,10 +1357,13 @@ impl<'db> ProtocolMemberType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let ty = self.ty().cycle_normalized(db, env, previous.ty(), cycle);
+        let ty = self
+            .ty()
+            .cycle_normalized(db, env, query, previous.ty(), cycle);
         self.with_ty(ty)
     }
 
@@ -1488,15 +1496,22 @@ enum ProtocolMemberAccessMode {
 fn cycle_normalized_optional_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    query: CycleQuery,
     current: Option<ProtocolMemberType<'db>>,
     previous: Option<ProtocolMemberType<'db>>,
     cycle: &salsa::Cycle,
 ) -> Option<ProtocolMemberType<'db>> {
     match (current, previous) {
-        (Some(current), Some(previous)) => Some(current.cycle_normalized(db, env, previous, cycle)),
-        (Some(current), None) => {
-            Some(current.with_ty(current.ty().recursive_type_normalized(db, env, cycle)))
+        (Some(current), Some(previous)) => {
+            Some(current.cycle_normalized(db, env, query, previous, cycle))
         }
+        (Some(current), None) => Some(
+            current.with_ty(
+                current
+                    .ty()
+                    .recursive_type_normalized(db, env, query, cycle),
+            ),
+        ),
         (None, _) => None,
     }
 }
@@ -1614,11 +1629,14 @@ impl<'db> ProtocolMemberData<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         Self {
-            kind: self.kind.cycle_normalized(db, env, previous.kind, cycle),
+            kind: self
+                .kind
+                .cycle_normalized(db, env, query, previous.kind, cycle),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -1741,6 +1759,7 @@ impl<'db> ProtocolMemberKind<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1749,12 +1768,16 @@ impl<'db> ProtocolMemberKind<'db> {
                 let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
                     (current.ty(), previous.ty())
                 else {
-                    return Self::Method(current.cycle_normalized(db, env, previous, cycle), kind);
+                    return Self::Method(
+                        current.cycle_normalized(db, env, query, previous, cycle),
+                        kind,
+                    );
                 };
                 debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
                 let signatures = current_callable.signatures(db).cycle_normalized(
                     db,
                     env,
+                    query,
                     previous_callable.signatures(db),
                     cycle,
                 );
@@ -1777,19 +1800,26 @@ impl<'db> ProtocolMemberKind<'db> {
                     write: previous_write,
                 },
             ) => Self::Property {
-                read: cycle_normalized_optional_type(db, env, current_read, previous_read, cycle),
+                read: cycle_normalized_optional_type(
+                    db,
+                    env,
+                    query,
+                    current_read,
+                    previous_read,
+                    cycle,
+                ),
                 write: match (current_write, previous_write) {
                     (Some(current), Some(previous)) => {
-                        Some(current.cycle_normalized(db, env, previous, cycle))
+                        Some(current.cycle_normalized(db, env, query, previous, cycle))
                     }
                     (Some(current), None) => {
-                        Some(current.cycle_normalized_without_previous(db, env, cycle))
+                        Some(current.cycle_normalized_without_previous(db, env, query, cycle))
                     }
                     (None, _) => None,
                 },
             },
             (Self::Attribute(current), Self::Attribute(previous)) => {
-                Self::Attribute(current.cycle_normalized(db, env, previous, cycle))
+                Self::Attribute(current.cycle_normalized(db, env, query, previous, cycle))
             }
             (current, _) => current,
         }
@@ -3629,7 +3659,7 @@ fn proto_interface_cycle_recover<'db>(
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
-    value.cycle_normalized(db, &env, *previous, cycle)
+    value.cycle_normalized(db, &env, CycleQuery::ProtocolInterface, *previous, cycle)
 }
 
 /// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness

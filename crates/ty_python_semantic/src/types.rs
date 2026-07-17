@@ -996,6 +996,7 @@ fn member_lookup_or_fall_back_to<'db>(
 fn cycle_normalized_member_lookup<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    query: CycleQuery,
     result: MemberLookupResult<'db>,
     previous: MemberLookupResult<'db>,
     cycle: &salsa::Cycle,
@@ -1006,7 +1007,11 @@ fn cycle_normalized_member_lookup<'db>(
         .filter(|_| cycle.iteration() <= crate::TAINTED_CYCLES || previous.is_err());
     let member = result.unwrap_or_else(|error| error.fallback_member(db));
     let previous = previous.unwrap_or_else(|error| error.fallback_member(db));
-    member_lookup_result(db, member.cycle_normalized(db, env, previous, cycle), error)
+    member_lookup_result(
+        db,
+        member.cycle_normalized(db, env, query, previous, cycle),
+        error,
+    )
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
@@ -1935,16 +1940,17 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(id: salsa::Id) -> Self {
-        Self::Divergent(DivergentType::new(id))
+    pub(crate) fn divergent(query: CycleQuery, id: salsa::Id) -> Self {
+        Self::Divergent(DivergentType::new(query, id))
     }
 
     pub(crate) fn identity_recursive(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         id: salsa::Id,
     ) -> Self {
-        let binder = DivergentType::new(id);
+        let binder = DivergentType::new(query, id);
         Self::recursive(db, env, binder, Self::Divergent(binder))
     }
 
@@ -2118,16 +2124,20 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.cycle_normalized_with_semantic_view_and_origin(db, env, previous, None, None, cycle)
+        self.cycle_normalized_with_semantic_view_and_origin(
+            db, env, query, previous, None, None, cycle,
+        )
     }
 
     pub(crate) fn cycle_normalized_with_semantic_view(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         cycle: &salsa::Cycle,
@@ -2135,6 +2145,7 @@ impl<'db> Type<'db> {
         self.cycle_normalized_with_semantic_view_and_origin(
             db,
             env,
+            query,
             previous,
             previous_semantic_view,
             None,
@@ -2146,6 +2157,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -2198,6 +2210,7 @@ impl<'db> Type<'db> {
         stabilized.cycle_fold_recursive(
             db,
             env,
+            query,
             previous,
             previous_semantic_view,
             cycle.id(),
@@ -2368,13 +2381,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
     ) -> Self {
-        let binder = DivergentType::new(id);
+        let binder = DivergentType::new(query, id);
         let previous_root_recursive = match previous {
             Type::Recursive(recursive) if recursive.binder(db).same_marker(binder) => {
                 Some(recursive)
@@ -2681,10 +2695,19 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _, _, materialization_kind| {
-            Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
+            Type::Divergent(
+                DivergentType::new(CycleQuery::Materialization, id)
+                    .materialized(materialization_kind),
+            )
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program, _| {
-            value.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+            value.cycle_normalized(
+                db,
+                &ProgramEnvironment::from_program(program),
+                CycleQuery::Materialization,
+                *previous,
+                cycle,
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -3474,20 +3497,22 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.recursive_type_normalized_impl_with_cycle(db, env, cycle)
+        self.recursive_type_normalized_impl_with_cycle(db, env, query, cycle)
     }
 
     fn recursive_type_normalized_impl_with_cycle(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         cycle: &salsa::Cycle,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            ty.recursive_type_normalized_impl(db, env, Type::divergent(query, id), false)
+                .unwrap_or(Type::divergent(query, id))
         })
     }
 
@@ -4044,10 +4069,16 @@ impl<'db> Type<'db> {
         returns(copy),
         cycle_initial=|db, id, key: MemberLookupKey<'db>| {
             let env = ProgramEnvironment::from_program(key.program(db));
-            Place::bound(Type::identity_recursive(db, &env, id)).into()
+            Place::bound(Type::identity_recursive(db, &env, CycleQuery::ClassMember, id)).into()
         },
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
-            member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
+            member.cycle_normalized(
+                db,
+                &ProgramEnvironment::from_program(key.program(db)),
+                CycleQuery::ClassMember,
+                *previous,
+                cycle,
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -5435,10 +5466,22 @@ impl<'db> Type<'db> {
             returns(copy),
             cycle_initial=|db, id, key: MemberLookupKey<'db>| {
                 let env = ProgramEnvironment::from_program(key.program(db));
-                Ok(Place::bound(Type::identity_recursive(db, &env, id)).into())
+                Ok(Place::bound(Type::identity_recursive(
+                    db,
+                    &env,
+                    CycleQuery::MemberLookup,
+                    id,
+                )).into())
             },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
-                cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
+                cycle_normalized_member_lookup(
+                    db,
+                    &ProgramEnvironment::from_program(key.program(db)),
+                    CycleQuery::MemberLookup,
+                    member,
+                    *previous,
+                    cycle,
+                )
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -5453,10 +5496,22 @@ impl<'db> Type<'db> {
             returns(copy),
             cycle_initial=|db, id, key: MemberLookupKey<'db>, _| {
                 let env = ProgramEnvironment::from_program(key.program(db));
-                Ok(Place::bound(Type::identity_recursive(db, &env, id)).into())
+                Ok(Place::bound(Type::identity_recursive(
+                    db,
+                    &env,
+                    CycleQuery::MemberLookup,
+                    id,
+                )).into())
             },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
-                cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
+                cycle_normalized_member_lookup(
+                    db,
+                    &ProgramEnvironment::from_program(key.program(db)),
+                    CycleQuery::MemberLookup,
+                    member,
+                    *previous,
+                    cycle,
+                )
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -8704,13 +8759,19 @@ impl<'db> Type<'db> {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
-            Type::identity_recursive(db, &env, id)
+            Type::identity_recursive(db, &env, CycleQuery::ApplySpecialization, id)
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
-            value.cycle_normalized(db, &env, *previous, cycle)
+            value.cycle_normalized(
+                db,
+                &env,
+                CycleQuery::ApplySpecialization,
+                *previous,
+                cycle,
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -9712,10 +9773,16 @@ impl<'db> Type<'db> {
         returns(copy),
         cycle_initial=|db, id, _, program: Program<'db>| {
             let env = ProgramEnvironment::from_program(program);
-            Type::identity_recursive(db, &env, id)
+            Type::identity_recursive(db, &env, CycleQuery::EagerExpansion, id)
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program| {
-            value.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+            value.cycle_normalized(
+                db,
+                &ProgramEnvironment::from_program(program),
+                CycleQuery::EagerExpansion,
+                *previous,
+                cycle,
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -11063,6 +11130,48 @@ impl<'db> RecursiveType<'db> {
     }
 }
 
+/// The tracked query function that owns a recursion marker.
+///
+/// Salsa's [`salsa::Cycle::id`] identifies a query key, but not the tracked function using that
+/// key. Pairing it with the function kind prevents distinct queries over the same key from sharing
+/// a recursion marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(crate) enum CycleQuery {
+    ClassMember,
+    MemberLookup,
+    ApplySpecialization,
+    EagerExpansion,
+    Materialization,
+    UnionTwoElements,
+    IntersectionTwoElements,
+    TypeNarrowedByPreviousPatterns,
+    TypeNarrowedByPattern,
+    PatternSuccess,
+    ProtocolInterface,
+    FunctionSignature,
+    ParameterDefaultType,
+    TypeAliasValue,
+    ImplicitTypeAliasValue,
+    TypeVarBound,
+    TypeVarConstraints,
+    TypeVarDefault,
+    BoundTypeVarDefault,
+    DefinitionTypes,
+    DeferredTypes,
+    FunctionDefaultTypes,
+    ScopeTypes,
+    ExpressionTypes,
+    ExpressionType,
+    StatementTypes,
+    UnpackTypes,
+    ExplicitBases,
+    ImplicitAttribute,
+    Place,
+    TupleToClassType,
+    #[cfg(test)]
+    Test,
+}
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
@@ -11070,7 +11179,9 @@ impl<'db> RecursiveType<'db> {
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DivergentType {
-    /// The query ID that caused the cycle.
+    /// The tracked query function that caused the cycle.
+    query: CycleQuery,
+    /// The query key ID that caused the cycle.
     id: salsa::Id,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
@@ -11081,15 +11192,16 @@ pub struct DivergentType {
 impl get_size2::GetSize for DivergentType {}
 
 impl DivergentType {
-    pub(in crate::types) const fn new(id: salsa::Id) -> Self {
+    pub(in crate::types) const fn new(query: CycleQuery, id: salsa::Id) -> Self {
         Self {
+            query,
             id,
             materialization: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+        self.query == other.query && self.id == other.id
     }
 
     fn in_cycle_scc(self, binders: &[Self]) -> bool {
@@ -11098,6 +11210,7 @@ impl DivergentType {
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
+            query: self.query,
             id: self.id,
             materialization: Some(kind),
         }

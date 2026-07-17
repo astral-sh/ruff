@@ -13,7 +13,7 @@ use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
 use crate::types::unpacker::collected_list_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
+    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleQuery,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
@@ -239,15 +239,20 @@ impl<'db> PatternSuccessTypes<'db> {
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         for (place, ty) in &mut self.bindings {
-            *ty = ty.cycle_normalized(db, env, previous.binding_type(*place), cycle);
+            *ty = ty.cycle_normalized(db, env, query, previous.binding_type(*place), cycle);
         }
-        self.missing_binding_ty =
-            self.missing_binding_ty
-                .cycle_normalized(db, env, previous.missing_binding_ty, cycle);
+        self.missing_binding_ty = self.missing_binding_ty.cycle_normalized(
+            db,
+            env,
+            query,
+            previous.missing_binding_ty,
+            cycle,
+        );
         self
     }
 }
@@ -429,11 +434,16 @@ struct PatternSuccessAnalyzer<'db> {
     returns(ref),
     cycle_initial=|db: &'db dyn Db, id, pattern: PatternPredicate<'db>| {
         let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
-        PatternSuccessTypes::cycle_initial(Type::identity_recursive(db, &env, id))
+        PatternSuccessTypes::cycle_initial(Type::identity_recursive(
+            db,
+            &env,
+            CycleQuery::PatternSuccess,
+            id,
+        ))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>| {
         let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
-        result.cycle_normalized(db, &env, previous, cycle)
+        result.cycle_normalized(db, &env, CycleQuery::PatternSuccess, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]

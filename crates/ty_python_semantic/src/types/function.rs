@@ -94,8 +94,8 @@ use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, Foldable,
-    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
+    CallableType, ClassBase, ClassLiteral, ClassType, CycleQuery, FindLegacyTypeVarsVisitor,
+    Foldable, IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
@@ -1581,13 +1581,13 @@ impl<'db> FunctionType<'db> {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
-            CallableSignature::cycle_initial(db, &env, id)
+            CallableSignature::cycle_initial(db, &env, CycleQuery::FunctionSignature, id)
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
-            value.cycle_normalized(db, &env, previous, cycle)
+            value.cycle_normalized(db, &env, CycleQuery::FunctionSignature, previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]

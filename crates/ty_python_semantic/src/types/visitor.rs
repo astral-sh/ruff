@@ -874,7 +874,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{DynamicType, SpecialFormType, Type};
+    use crate::types::{CycleQuery, DynamicType, SpecialFormType, Type};
 
     use super::{CollectedTypes, materialization_is_noop};
 
@@ -926,7 +926,7 @@ mod tests {
     fn materialization_noop_rejects_divergent_markers() {
         let db = setup_db();
         let env = db.program_environment();
-        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        let divergent = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
 
         for ty in [
             divergent,

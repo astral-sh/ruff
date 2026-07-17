@@ -6,7 +6,8 @@ use crate::{
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
+        CycleQuery, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
@@ -85,7 +86,13 @@ impl<'db> StaticClassLiteral<'db> {
             let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
             ImplicitAttribute {
                 member: Member {
-                    inner: Place::bound(Type::identity_recursive(db, &env, id)).into(),
+                    inner: Place::bound(Type::identity_recursive(
+                        db,
+                        &env,
+                        CycleQuery::ImplicitAttribute,
+                        id,
+                    ))
+                    .into(),
                 },
                 augmented_bindings: None,
             }
@@ -491,11 +498,13 @@ fn implicit_attribute_cycle_recover<'db>(
     attribute: ImplicitAttributeName<'db>,
 ) -> ImplicitAttribute<'db> {
     let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
-    let inner =
-        attribute_member
-            .member
-            .inner
-            .cycle_normalized(db, &env, previous.member.inner, cycle);
+    let inner = attribute_member.member.inner.cycle_normalized(
+        db,
+        &env,
+        CycleQuery::ImplicitAttribute,
+        previous.member.inner,
+        cycle,
+    );
     ImplicitAttribute {
         member: Member { inner },
         ..attribute_member

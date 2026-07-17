@@ -201,7 +201,7 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        CallableTypes, ComparisonSoundnessPolicy, CycleQuery, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
@@ -243,11 +243,17 @@ use ty_python_core::{
     returns(copy),
     cycle_initial = |db: &'db dyn Db, id, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        Type::identity_recursive(db, &env, id)
+        Type::identity_recursive(db, &env, CycleQuery::TypeNarrowedByPreviousPatterns, id)
     },
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
+        result.cycle_normalized(
+            db,
+            &env,
+            CycleQuery::TypeNarrowedByPreviousPatterns,
+            *previous,
+            cycle,
+        )
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -277,11 +283,17 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     returns(copy),
     cycle_initial = |db: &'db dyn Db, id, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        Type::identity_recursive(db, &env, id)
+        Type::identity_recursive(db, &env, CycleQuery::TypeNarrowedByPattern, id)
     },
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
+        result.cycle_normalized(
+            db,
+            &env,
+            CycleQuery::TypeNarrowedByPattern,
+            *previous,
+            cycle,
+        )
     },
     heap_size = ruff_memory_usage::heap_size
 )]

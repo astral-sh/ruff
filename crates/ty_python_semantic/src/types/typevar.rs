@@ -15,10 +15,10 @@ use crate::{
         TypeOrigin,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, CycleQuery, DynamicType,
+        GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
+        MaterializationKind, Parameter, Parameters, Specialization, Type, TypeAliasType,
+        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
         any_over_type_including_alias_arguments, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
@@ -681,7 +681,7 @@ impl<'db> TypeVarInstance<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|db, id, typevar: TypeVarInstance<'db>| {
         typevar.definition(db).map(|definition| {
             let env = ProgramEnvironment::from_definition(definition);
-            Type::identity_recursive(db, &env, id)
+            Type::identity_recursive(db, &env, CycleQuery::TypeVarDefault, id)
         })
     }, cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -1622,8 +1622,8 @@ fn lazy_bound_cycle_recover<'db>(
         .program_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous {
-        Some(prev) => current.cycle_normalized(db, &env, *prev, cycle),
-        None => current.recursive_type_normalized(db, &env, cycle),
+        Some(prev) => current.cycle_normalized(db, &env, CycleQuery::TypeVarBound, *prev, cycle),
+        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarBound, cycle),
     })
 }
 
@@ -1644,8 +1644,10 @@ fn lazy_constraints_cycle_recover<'db>(
         .program_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous {
-        Some(prev) => current.cycle_normalized(db, &env, *prev, cycle),
-        None => current.recursive_type_normalized(db, &env, cycle),
+        Some(prev) => {
+            current.cycle_normalized(db, &env, CycleQuery::TypeVarConstraints, *prev, cycle)
+        }
+        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarConstraints, cycle),
     })
 }
 
@@ -1665,8 +1667,8 @@ fn lazy_default_cycle_recover<'db>(
         .program_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous_default {
-        Some(prev) => current.cycle_normalized(db, &env, *prev, cycle),
-        None => current.recursive_type_normalized(db, &env, cycle),
+        Some(prev) => current.cycle_normalized(db, &env, CycleQuery::TypeVarDefault, *prev, cycle),
+        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarDefault, cycle),
     })
 }
 
@@ -1880,7 +1882,12 @@ impl<'db> TypeVarSet<'db> {
     returns(copy),
     cycle_initial=|db, id, bound_typevar: BoundTypeVarInstance<'db>| {
         let env = ProgramEnvironment::from_program(bound_typevar.binding_context(db).program(db));
-        Some(Type::identity_recursive(db, &env, id))
+        Some(Type::identity_recursive(
+            db,
+            &env,
+            CycleQuery::BoundTypeVarDefault,
+            id,
+        ))
     },
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
@@ -1922,8 +1929,10 @@ fn bound_typevar_default_type_cycle_recover<'db>(
         .program_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous_default {
-        Some(previous) => default.cycle_normalized(db, &env, *previous, cycle),
-        None => default.recursive_type_normalized(db, &env, cycle),
+        Some(previous) => {
+            default.cycle_normalized(db, &env, CycleQuery::BoundTypeVarDefault, *previous, cycle)
+        }
+        None => default.recursive_type_normalized(db, &env, CycleQuery::BoundTypeVarDefault, cycle),
     })
 }
 
@@ -2109,6 +2118,7 @@ impl<'db> TypeVarConstraints<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -2119,7 +2129,7 @@ impl<'db> TypeVarConstraints<'db> {
             current_elements
                 .iter()
                 .zip(prev_elements.iter())
-                .map(|(ty, prev_ty)| ty.cycle_normalized(db, env, *prev_ty, cycle))
+                .map(|(ty, prev_ty)| ty.cycle_normalized(db, env, query, *prev_ty, cycle))
                 .collect::<Box<_>>(),
         )
     }
@@ -2131,9 +2141,10 @@ impl<'db> TypeVarConstraints<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.map(db, |ty| ty.recursive_type_normalized(db, env, cycle))
+        self.map(db, |ty| ty.recursive_type_normalized(db, env, query, cycle))
     }
 }
 

@@ -44,9 +44,9 @@ use crate::types::typevar::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
-    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    CallableType, CycleQuery, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
+    KnownClass, MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
     VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -184,11 +184,12 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn cycle_initial(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         id: salsa::Id,
     ) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::identity_recursive(db, env, id),
+            Type::identity_recursive(db, env, query, id),
         ))
     }
 
@@ -278,6 +279,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -287,7 +289,7 @@ impl<'db> CallableSignature<'db> {
                     .overloads
                     .iter()
                     .zip(previous.overloads.iter())
-                    .map(|(curr, prev)| curr.cycle_normalized(db, env, prev, cycle))
+                    .map(|(curr, prev)| curr.cycle_normalized(db, env, query, prev, cycle))
                     .collect(),
             }
         } else {
@@ -912,19 +914,20 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         let return_ty = self
             .return_ty
-            .cycle_normalized(db, env, previous.return_ty, cycle);
+            .cycle_normalized(db, env, query, previous.return_ty, cycle);
 
         let parameters = if self.parameters.len() == previous.parameters.len() {
             Parameters::new(
                 self.parameters
                     .iter()
                     .zip(previous.parameters.iter())
-                    .map(|(curr, prev)| curr.cycle_normalized(db, env, prev, cycle))
+                    .map(|(curr, prev)| curr.cycle_normalized(db, env, query, prev, cycle))
                     .collect::<Box<[_]>>(),
                 self.parameters.kind(),
             )
@@ -5512,14 +5515,17 @@ impl<'db> Parameter<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         let annotated_type =
             self.annotated_type
-                .cycle_normalized(db, env, previous.annotated_type, cycle);
+                .cycle_normalized(db, env, query, previous.annotated_type, cycle);
 
-        let kind = self.kind.cycle_normalized(db, env, &previous.kind, cycle);
+        let kind = self
+            .kind
+            .cycle_normalized(db, env, query, &previous.kind, cycle);
 
         Self {
             annotated_type,
@@ -5815,10 +5821,16 @@ impl<'db> ParameterDefault<'db> {
     returns(copy),
     cycle_initial=|db, id, parameter: Definition<'db>| {
         let env = ProgramEnvironment::from_definition(parameter);
-        Type::identity_recursive(db, &env, id)
+        Type::identity_recursive(db, &env, CycleQuery::ParameterDefaultType, id)
     },
     cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
-        ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
+        ty.cycle_normalized(
+            db,
+            &ProgramEnvironment::from_definition(parameter),
+            CycleQuery::ParameterDefaultType,
+            *previous,
+            cycle,
+        )
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -5888,14 +5900,15 @@ impl<'db> ParameterKind<'db> {
     fn cycle_normalized_default(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         current: &Option<ParameterDefault<'db>>,
         previous: &Option<ParameterDefault<'db>>,
         cycle: &salsa::Cycle,
     ) -> Option<ParameterDefault<'db>> {
         current.map(|current| {
             current.map_type(|ty| match previous.and_then(ParameterDefault::eager_type) {
-                Some(previous) => ty.cycle_normalized(db, env, previous, cycle),
-                None => ty.recursive_type_normalized(db, env, cycle),
+                Some(previous) => ty.cycle_normalized(db, env, query, previous, cycle),
+                None => ty.recursive_type_normalized(db, env, query, cycle),
             })
         })
     }
@@ -5904,6 +5917,7 @@ impl<'db> ParameterKind<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -5919,6 +5933,7 @@ impl<'db> ParameterKind<'db> {
                 default_type: Self::cycle_normalized_default(
                     db,
                     env,
+                    query,
                     default_type,
                     prev_default,
                     cycle,
@@ -5935,6 +5950,7 @@ impl<'db> ParameterKind<'db> {
                 default_type: Self::cycle_normalized_default(
                     db,
                     env,
+                    query,
                     default_type,
                     prev_default,
                     cycle,
@@ -5951,6 +5967,7 @@ impl<'db> ParameterKind<'db> {
                 default_type: Self::cycle_normalized_default(
                     db,
                     env,
+                    query,
                     default_type,
                     prev_default,
                     cycle,

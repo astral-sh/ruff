@@ -22,12 +22,12 @@ use crate::{
     reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
-        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
-        UnionBuilder, UnionType,
+        CallableType, ClassBase, ClassLiteral, ClassType, CycleQuery, DATACLASS_FLAGS,
+        DataclassFlags, DataclassParams, GenericAlias, GenericContext, KnownClass,
+        KnownInstanceType, MaterializationKind, MemberLookupPolicy, MetaclassCandidate,
+        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, Signature,
+        SpecialFormType, StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping,
+        TypeVarVariance, TypingModule, UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
@@ -3538,7 +3538,11 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::identity_recursive(db, &env, id); class_stmt.bases().len()].into_boxed_slice()
+    vec![
+        Type::identity_recursive(db, &env, CycleQuery::ExplicitBases, id);
+        class_stmt.bases().len()
+    ]
+    .into_boxed_slice()
 }
 
 fn explicit_bases_cycle_fn<'db>(
@@ -3555,7 +3559,9 @@ fn explicit_bases_cycle_fn<'db>(
         current
             .iter()
             .zip(previous.iter())
-            .map(|(curr, prev)| curr.cycle_normalized(db, &env, *prev, cycle))
+            .map(|(curr, prev)| {
+                curr.cycle_normalized(db, &env, CycleQuery::ExplicitBases, *prev, cycle)
+            })
             .collect()
     } else {
         // The length of bases has changed, presumably because we expanded a starred expression. We

@@ -59,8 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, GenericContext, KnownClass, RecursiveTypeOrigin, StaticClassLiteral, Type,
-    TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, CycleQuery, GenericContext, KnownClass, RecursiveTypeOrigin, StaticClassLiteral,
+    Type, TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -152,11 +152,11 @@ fn extend_collection_use_constraints<'db>(
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::identity_recursive(db, &env, id),
+            Type::identity_recursive(db, &env, CycleQuery::DefinitionTypes, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        inference.cycle_normalized(db, previous, cycle, definition)
+        inference.cycle_normalized(db, CycleQuery::DefinitionTypes, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -309,11 +309,11 @@ impl<'db> FunctionDecoratorInference<'db> {
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::identity_recursive(db, &env, id),
+            Type::identity_recursive(db, &env, CycleQuery::DeferredTypes, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        inference.cycle_normalized(db, previous, cycle, definition)
+        inference.cycle_normalized(db, CycleQuery::DeferredTypes, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -356,10 +356,14 @@ pub(crate) fn infer_deferred_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(
+            db,
+            definition,
+            Type::divergent(CycleQuery::FunctionDefaultTypes, id),
+        )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        inference.cycle_normalized(db, previous, cycle, definition)
+        inference.cycle_normalized(db, CycleQuery::FunctionDefaultTypes, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -432,7 +436,12 @@ pub(crate) fn infer_scope_types<'db>(
     cycle_initial=|db, id, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
-        ScopeInference::cycle_initial(Type::identity_recursive(db, &env, id))
+        ScopeInference::cycle_initial(Type::identity_recursive(
+            db,
+            &env,
+            CycleQuery::ScopeTypes,
+            id,
+        ))
     },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
@@ -533,7 +542,7 @@ fn expression_cycle_initial<'db>(
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
     let env = ProgramEnvironment::from_scope(expression.scope(db));
-    let cycle_recovery = Type::identity_recursive(db, &env, id);
+    let cycle_recovery = Type::identity_recursive(db, &env, CycleQuery::ExpressionTypes, id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -571,12 +580,12 @@ pub(crate) fn infer_expression_type<'db>(
     cycle_initial=|db, id, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        Type::identity_recursive(db, &env, id)
+        Type::identity_recursive(db, &env, CycleQuery::ExpressionType, id)
     },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
+        result.cycle_normalized(db, &env, CycleQuery::ExpressionType, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -616,7 +625,7 @@ pub(super) fn infer_statement_types<'db>(
         let env = ProgramEnvironment::from_file(statement.program_file(db));
         StatementInferenceInner::cycle_initial(
             statement.scope(db),
-            Type::identity_recursive(db, &env, id),
+            Type::identity_recursive(db, &env, CycleQuery::StatementTypes, id),
         )
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
@@ -814,7 +823,12 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
     returns(ref),
     cycle_initial=|db, id, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
-        UnpackResult::cycle_initial(Type::identity_recursive(db, &env, id))
+        UnpackResult::cycle_initial(Type::identity_recursive(
+            db,
+            &env,
+            CycleQuery::UnpackTypes,
+            id,
+        ))
     },
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
@@ -995,7 +1009,13 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized(
+                db,
+                env,
+                CycleQuery::ScopeTypes,
+                previous_inference.expression_type(expr),
+                cycle,
+            )
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1181,6 +1201,7 @@ impl<'db> DefinitionTypes<'db> {
     fn normalize_binding(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &DefinitionTypes<'db>,
         previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
@@ -1200,19 +1221,21 @@ impl<'db> DefinitionTypes<'db> {
             ty.cycle_normalized_with_semantic_view_and_origin(
                 db,
                 env,
+                query,
                 previous_ty,
                 cycle_recovery_semantic_view(previous_semantic_views, definition),
                 origin,
                 cycle,
             )
         } else {
-            ty.recursive_type_normalized(db, env, cycle)
+            ty.recursive_type_normalized(db, env, query, cycle)
         }
     }
 
     fn normalize_declaration(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &DefinitionTypes<'db>,
         previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         cycle: &salsa::Cycle,
@@ -1225,13 +1248,14 @@ impl<'db> DefinitionTypes<'db> {
                 inner.cycle_normalized_with_semantic_view(
                     db,
                     env,
+                    query,
                     previous_ty.inner_type(),
                     cycle_recovery_semantic_view(previous_semantic_views, definition),
                     cycle,
                 )
             })
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, env, cycle))
+            ty.map_type(|inner| inner.recursive_type_normalized(db, env, query, cycle))
         }
     }
 
@@ -1239,6 +1263,7 @@ impl<'db> DefinitionTypes<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
         previous: &DefinitionTypes<'db>,
         previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
@@ -1250,6 +1275,7 @@ impl<'db> DefinitionTypes<'db> {
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
                 db,
                 env,
+                query,
                 previous,
                 previous_semantic_views,
                 current_generic_contexts,
@@ -1261,6 +1287,7 @@ impl<'db> DefinitionTypes<'db> {
             Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
                 db,
                 env,
+                query,
                 previous,
                 previous_semantic_views,
                 cycle,
@@ -1272,6 +1299,7 @@ impl<'db> DefinitionTypes<'db> {
                 let binding_ty = Self::normalize_binding(
                     db,
                     env,
+                    query,
                     previous,
                     previous_semantic_views,
                     current_generic_contexts,
@@ -1283,6 +1311,7 @@ impl<'db> DefinitionTypes<'db> {
                 let declaration_ty = Self::normalize_declaration(
                     db,
                     env,
+                    query,
                     previous,
                     previous_semantic_views,
                     cycle,
@@ -1305,6 +1334,7 @@ impl<'db> DefinitionTypes<'db> {
                     *ty = Self::normalize_binding(
                         db,
                         env,
+                        query,
                         previous,
                         previous_semantic_views,
                         current_generic_contexts,
@@ -1318,6 +1348,7 @@ impl<'db> DefinitionTypes<'db> {
                     *ty = Self::normalize_declaration(
                         db,
                         env,
+                        query,
                         previous,
                         previous_semantic_views,
                         cycle,
@@ -1618,6 +1649,7 @@ impl<'db> DefinitionInference<'db> {
     fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
@@ -1655,6 +1687,7 @@ impl<'db> DefinitionInference<'db> {
             *ty = ty.cycle_normalized_with_semantic_view(
                 db,
                 &env,
+                query,
                 previous_ty,
                 semantic_view_for_previous_type(previous_ty),
                 cycle,
@@ -1663,6 +1696,7 @@ impl<'db> DefinitionInference<'db> {
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
             &env,
+            query,
             &previous_inference.types,
             previous_semantic_views,
             current_generic_contexts,
@@ -1694,12 +1728,13 @@ impl<'db> DefinitionInference<'db> {
                     semantic_view.cycle_normalized_with_semantic_view(
                         db,
                         &env,
+                        query,
                         previous_semantic_view.unwrap_or(previous_ty),
                         None,
                         cycle,
                     )
                 } else {
-                    semantic_view.recursive_type_normalized(db, &env, cycle)
+                    semantic_view.recursive_type_normalized(db, &env, query, cycle)
                 };
             }
         }
@@ -1974,9 +2009,20 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized(db, env, *previous_binding, cycle);
+                    *binding_ty = binding_ty.cycle_normalized(
+                        db,
+                        env,
+                        CycleQuery::ExpressionTypes,
+                        *previous_binding,
+                        cycle,
+                    );
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
+                    *binding_ty = binding_ty.recursive_type_normalized(
+                        db,
+                        env,
+                        CycleQuery::ExpressionTypes,
+                        cycle,
+                    );
                 }
             }
         }
@@ -1987,7 +2033,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, CycleQuery::ExpressionTypes, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2196,7 +2242,7 @@ impl<'db> StatementInferenceInner<'db> {
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, CycleQuery::StatementTypes, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
@@ -2204,9 +2250,20 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
             {
-                *binding_ty = binding_ty.cycle_normalized(db, env, *previous_binding, cycle);
+                *binding_ty = binding_ty.cycle_normalized(
+                    db,
+                    env,
+                    CycleQuery::StatementTypes,
+                    *previous_binding,
+                    cycle,
+                );
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
+                *binding_ty = binding_ty.recursive_type_normalized(
+                    db,
+                    env,
+                    CycleQuery::StatementTypes,
+                    cycle,
+                );
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -2216,11 +2273,18 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, env, previous_declaration.inner_type(), cycle)
+                    decl_ty.cycle_normalized(
+                        db,
+                        env,
+                        CycleQuery::StatementTypes,
+                        previous_declaration.inner_type(),
+                        cycle,
+                    )
                 });
             } else {
-                *declaration_ty = declaration_ty
-                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, env, cycle));
+                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                    decl_ty.recursive_type_normalized(db, env, CycleQuery::StatementTypes, cycle)
+                });
             }
         }
 

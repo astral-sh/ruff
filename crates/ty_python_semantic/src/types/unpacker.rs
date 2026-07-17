@@ -18,7 +18,7 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
+    CycleQuery, KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
     infer_expression_types,
 };
 use ty_python_core::ExpressionNodeKey;
@@ -411,7 +411,7 @@ impl<'db> UnpackResult<'db> {
     ) -> Self {
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, CycleQuery::UnpackTypes, previous_ty, cycle);
         }
 
         self
