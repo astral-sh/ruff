@@ -49,7 +49,7 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
   |
 4 |   @final
   |   ------
-5 |   # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `ccccccc…
+5 |   # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `ccccc…
 6 |   class Abstract(ABC):
   |         ^^^^^^^^ Abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk` are unimplemented
 7 | /     @abstractmethod
