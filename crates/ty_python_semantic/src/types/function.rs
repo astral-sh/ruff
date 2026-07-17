@@ -1890,6 +1890,38 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Return the type that is guaranteed to be accepted by an `isinstance` classinfo value.
+///
+/// Static unions represent alternative runtime values, so their guaranteed coverage is the
+/// intersection of each alternative's coverage. Only fixed tuple elements are guaranteed to be
+/// present; variadic elements and non-exact class objects cannot establish exhaustiveness.
+fn guaranteed_isinstance_constraint<'db>(db: &'db dyn Db, classinfo: Type<'db>) -> Type<'db> {
+    match classinfo {
+        Type::ClassLiteral(_)
+        | Type::KnownInstance(KnownInstanceType::UnionType(_))
+        | Type::SpecialForm(_) => ClassInfoConstraintFunction::IsInstance
+            .generate_constraint(db, classinfo, true)
+            .unwrap_or(Type::Never),
+        Type::TypeAlias(alias) => guaranteed_isinstance_constraint(db, alias.value_type(db)),
+        Type::NominalInstance(nominal) => nominal.tuple_spec(db).map_or(Type::Never, |tuple| {
+            UnionType::from_elements(
+                db,
+                tuple
+                    .fixed_elements()
+                    .map(|element| guaranteed_isinstance_constraint(db, *element)),
+            )
+        }),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .fold(IntersectionBuilder::new(db), |builder, element| {
+                builder.add_positive(guaranteed_isinstance_constraint(db, *element))
+            })
+            .build(),
+        _ => Type::Never,
+    }
+}
+
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
 pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
     let suite = ast::helpers::body_without_leading_docstring(&node.body);
@@ -2564,26 +2596,18 @@ impl KnownFunction {
 
                 if self == KnownFunction::IsInstance {
                     let truthiness = match second_argument {
-                        Type::ClassLiteral(class) => {
-                            Some(is_instance_truthiness(db, *first_arg, *class))
+                        Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
+                        _ => {
+                            let constraint = guaranteed_isinstance_constraint(db, *second_argument);
+                            if !constraint.is_never() && first_arg.is_subtype_of(db, constraint) {
+                                Truthiness::AlwaysTrue
+                            } else {
+                                Truthiness::Ambiguous
+                            }
                         }
-                        Type::NominalInstance(nominal) if nominal.tuple_spec(db).is_some() => {
-                            ClassInfoConstraintFunction::IsInstance
-                                .generate_constraint(db, *second_argument, true)
-                                .map(|constraint| {
-                                    if first_arg.is_subtype_of(db, constraint) {
-                                        Truthiness::AlwaysTrue
-                                    } else {
-                                        Truthiness::Ambiguous
-                                    }
-                                })
-                        }
-                        _ => None,
                     };
 
-                    if let Some(truthiness) = truthiness {
-                        overload.set_return_type(Type::from_truthiness(db, truthiness));
-                    }
+                    overload.set_return_type(Type::from_truthiness(db, truthiness));
                 }
             }
 

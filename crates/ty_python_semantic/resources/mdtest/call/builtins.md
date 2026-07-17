@@ -155,6 +155,46 @@ def returns_bool_union(x: A | B) -> bool:
     if isinstance(x, (A, B)):
         return True
 
+def returns_bool_union_of_tuples(x: A | B, condition: bool) -> bool:
+    targets = (A, B) if condition else (B, A)
+    if isinstance(x, targets):
+        return True
+
+def returns_bool_union_of_nested_tuples(x: A | B, condition: bool) -> bool:
+    targets = ((A, B) if condition else (B, A),)
+    if isinstance(x, targets):
+        return True
+
+def returns_bool_variadic_with_fixed_target(x: A, targets: tuple[type[B], ...]) -> bool:
+    if isinstance(x, (A, *targets)):
+        return True
+
+def returns_bool_with_subclass_target(x: A, target: type[A]) -> bool:
+    if isinstance(x, (target, A)):
+        return True
+
+def variadic_targets_are_not_exhaustive(x: A, targets: tuple[type[A], ...]) -> bool:
+    if isinstance(x, targets):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:
+    if isinstance(x, (target,)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def alternative_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
+    target = A if condition else B
+    if isinstance(x, (target,)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def alternative_nested_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
+    target = (A,) if condition else (B,)
+    if isinstance(x, (target,)):
+        return True
+    return ""  # error: [invalid-return-type]
+
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
