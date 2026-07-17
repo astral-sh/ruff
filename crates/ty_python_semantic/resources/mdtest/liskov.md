@@ -965,7 +965,7 @@ A mixin can annotate `self` with a protocol that the mixin itself does not imple
 can keep that annotation or omit it:
 
 ```pyi
-from typing import Protocol
+from typing import Protocol, overload
 
 class HasValue(Protocol):
     value: int
@@ -1030,6 +1030,26 @@ class UnionMixin:
 
 class SameUnionReceiver(UnionMixin):
     def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+```
+
+Overloaded mixin methods need the same treatment for every receiver-specific overload:
+
+```pyi
+# TODO: We should emit an `invalid-method-override` diagnostic on the second
+# `InvalidOverloadedReceiver.method` overload. Both overload sets need to be
+# compared within the `HasValue` receiver domain instead of being filtered
+# against the concrete mixin subclass.
+class OverloadedMixin:
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: str) -> None: ...
+
+class InvalidOverloadedReceiver(OverloadedMixin):
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: bytes) -> None: ...
 ```
 
 The protocol may include the overridden method itself. This must not cause a valid implementation to

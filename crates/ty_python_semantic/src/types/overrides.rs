@@ -705,6 +705,9 @@ fn method_override_types<'db>(
                     .get(0)
                     .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
                     .map(Parameter::annotated_type),
+                // TODO: Compare overloaded mixin methods within each overload's explicit receiver
+                // domain. Binding them directly to the concrete subclass can filter out applicable
+                // overloads when the subclass does not itself satisfy the receiver protocol.
                 _ => None,
             };
 
