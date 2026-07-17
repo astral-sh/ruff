@@ -6,9 +6,9 @@ use criterion::{
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
 use ruff_python_ast::token::TokenKind;
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
 use ruff_python_parser::Mode;
 use ruff_python_parser::lexer;
 
@@ -57,12 +57,12 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
     group.finish();
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 fn lex_module(source: &str) -> usize {
     lexer::lex_chunked(source).expect("benchmark input should be supported by the chunked lexer")
 }
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
 fn lex_module(source: &str) {
     let mut lexer = lexer::lex(source, Mode::Module);
     loop {

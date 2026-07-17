@@ -5,6 +5,16 @@ use std::arch::aarch64::{
     uint8x16_t, vandq_u8, vdupq_n_u8, vgetq_lane_u64, vld1q_u8, vmaxvq_u8, vorrq_u8, vpaddq_u8,
     vqtbl1q_u8, vreinterpretq_u64_u8, vshrq_n_u8, vtstq_u8,
 };
+#[cfg(target_arch = "x86")]
+use std::arch::x86::{
+    __m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_min_epu8, _mm_movemask_epi8, _mm_or_si128,
+    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
+};
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::{
+    __m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_min_epu8, _mm_movemask_epi8, _mm_or_si128,
+    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
+};
 
 /// Structural starts for one source batch. Each set bit begins a word run, whitespace run, or
 /// single structural byte; `ascii_source` lets the carver avoid per-identifier Unicode checks.
@@ -42,13 +52,24 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let mut previous_whitespace = 0;
 
     let mut chunks = source.chunks_exact(64);
+    #[cfg(target_arch = "aarch64")]
     let mut source_or = unsafe { vdupq_n_u8(0) };
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    let mut source_or = unsafe { _mm_setzero_si128() };
 
     for chunk in &mut chunks {
         // SAFETY: `chunks_exact(64)` guarantees that all four 16-byte loads are in bounds.
         let (word, whitespace, chunk_or) = unsafe { classify_chunk(chunk.as_ptr()) };
-        // SAFETY: All NEON operations are valid for arbitrary byte vectors.
-        source_or = unsafe { vorrq_u8(source_or, chunk_or) };
+        #[cfg(target_arch = "aarch64")]
+        {
+            // SAFETY: All NEON operations are valid for arbitrary byte vectors.
+            source_or = unsafe { vorrq_u8(source_or, chunk_or) };
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            // SAFETY: All SSE2 operations are valid for arbitrary byte vectors.
+            source_or = unsafe { _mm_or_si128(source_or, chunk_or) };
+        }
         push_block(
             classified,
             word,
@@ -59,8 +80,16 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
         );
     }
 
-    // SAFETY: All NEON operations are valid for arbitrary byte vectors.
-    classified.ascii_source = unsafe { vmaxvq_u8(source_or) < 0x80 };
+    #[cfg(target_arch = "aarch64")]
+    {
+        // SAFETY: All NEON operations are valid for arbitrary byte vectors.
+        classified.ascii_source = unsafe { vmaxvq_u8(source_or) < 0x80 };
+    }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        // SAFETY: Ruff's supported x86 targets guarantee SSE2 support.
+        classified.ascii_source = unsafe { _mm_movemask_epi8(source_or) == 0 };
+    }
 
     let tail = chunks.remainder();
     if !tail.is_empty() {
@@ -176,6 +205,73 @@ unsafe fn mask64(
         let second = vpaddq_u8(third, fourth);
         let result = vpaddq_u8(first, second);
         vgetq_lane_u64::<0>(vreinterpretq_u64_u8(vpaddq_u8(result, result)))
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+unsafe fn classify_chunk(source: *const u8) -> (u64, u64, __m128i) {
+    // SAFETY: The caller guarantees that `source..source + 64` is valid and Ruff's supported x86
+    // targets guarantee SSE2 support.
+    unsafe {
+        let first = _mm_loadu_si128(source.cast());
+        let second = _mm_loadu_si128(source.add(16).cast());
+        let third = _mm_loadu_si128(source.add(32).cast());
+        let fourth = _mm_loadu_si128(source.add(48).cast());
+
+        let word = mask64_x86(
+            word_predicate_x86(first),
+            word_predicate_x86(second),
+            word_predicate_x86(third),
+            word_predicate_x86(fourth),
+        );
+        let whitespace = mask64_x86(
+            whitespace_predicate_x86(first),
+            whitespace_predicate_x86(second),
+            whitespace_predicate_x86(third),
+            whitespace_predicate_x86(fourth),
+        );
+        let source_or = _mm_or_si128(_mm_or_si128(first, second), _mm_or_si128(third, fourth));
+        (word, whitespace, source_or)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+unsafe fn word_predicate_x86(bytes: __m128i) -> __m128i {
+    // SAFETY: All SSE2 operations are valid for arbitrary byte vectors.
+    unsafe {
+        let lower = _mm_or_si128(bytes, _mm_set1_epi8(0x20));
+        let alpha_delta = _mm_sub_epi8(lower, _mm_set1_epi8(b'a'.cast_signed()));
+        let alpha = _mm_cmpeq_epi8(_mm_min_epu8(alpha_delta, _mm_set1_epi8(25)), alpha_delta);
+        let digit_delta = _mm_sub_epi8(bytes, _mm_set1_epi8(b'0'.cast_signed()));
+        let digit = _mm_cmpeq_epi8(_mm_min_epu8(digit_delta, _mm_set1_epi8(9)), digit_delta);
+        let underscore = _mm_cmpeq_epi8(bytes, _mm_set1_epi8(b'_'.cast_signed()));
+        _mm_or_si128(_mm_or_si128(alpha, digit), _mm_or_si128(underscore, bytes))
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+unsafe fn whitespace_predicate_x86(bytes: __m128i) -> __m128i {
+    // SAFETY: All SSE2 operations are valid for arbitrary byte vectors.
+    unsafe {
+        let space = _mm_cmpeq_epi8(bytes, _mm_set1_epi8(b' '.cast_signed()));
+        let tab = _mm_cmpeq_epi8(bytes, _mm_set1_epi8(b'\t'.cast_signed()));
+        let form_feed = _mm_cmpeq_epi8(bytes, _mm_set1_epi8(b'\x0c'.cast_signed()));
+        _mm_or_si128(_mm_or_si128(space, tab), form_feed)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+unsafe fn mask64_x86(first: __m128i, second: __m128i, third: __m128i, fourth: __m128i) -> u64 {
+    // SAFETY: Ruff's supported x86 targets guarantee SSE2 support.
+    unsafe {
+        u64::from(_mm_movemask_epi8(first).cast_unsigned())
+            | (u64::from(_mm_movemask_epi8(second).cast_unsigned()) << 16)
+            | (u64::from(_mm_movemask_epi8(third).cast_unsigned()) << 32)
+            | (u64::from(_mm_movemask_epi8(fourth).cast_unsigned()) << 48)
     }
 }
 

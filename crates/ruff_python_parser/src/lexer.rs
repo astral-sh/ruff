@@ -25,12 +25,12 @@ use crate::lexer::interpolated_string::{
 };
 use crate::string::InterpolatedStringKind;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 pub(crate) mod chunked;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 mod classify;
 mod cursor;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 mod fast_token;
 mod indentation;
 mod interpolated_string;
@@ -1630,9 +1630,9 @@ pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 
-/// Lex a Python module with the experimental ARM chunked lexer, returning the number of tokens
+/// Lex a Python module with the experimental SIMD chunked lexer, returning the number of tokens
 /// (including EOF) on success. `None` indicates that the source requires the streaming lexer.
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 pub fn lex_chunked(source: &str) -> Option<usize> {
     chunked::lex(source).map(|tokens| tokens.tokens.len())
 }
