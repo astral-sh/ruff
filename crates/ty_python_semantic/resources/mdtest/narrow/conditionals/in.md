@@ -68,6 +68,84 @@ def _(x: Literal["a", "b", "c", 1]):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+## `in` for inline list and set literals
+
+Inline list and set literals are consumed immediately, so membership can use their precise element
+types without promoting them as mutable containers.
+
+```py
+from typing import Literal
+from typing_extensions import assert_never
+
+Choice = Literal["a", "b", "c"]
+
+def inline_list(value: Choice):
+    if value in ["a", "b"]:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value not in ["a", "b"]:
+        reveal_type(value)  # revealed: Literal["c"]
+    else:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+
+def inline_set(value: Choice):
+    if value in {"a", "b"}:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value not in {"a", "b"}:
+        reveal_type(value)  # revealed: Literal["c"]
+    else:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+
+def literal_locals(value: Choice):
+    a = "a"
+    b = "b"
+    if value in [a, b]:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value in {a, b}:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+def mixed_literals(value: Literal["a", "b", 1, 2, b"x"] | None):
+    if value in ["a", 1, b"x", None]:
+        reveal_type(value)  # revealed: Literal["a", 1, b"x"] | None
+    else:
+        reveal_type(value)  # revealed: Literal["b", 2]
+
+    if value in {"a", 1, b"x", None}:
+        reveal_type(value)  # revealed: Literal["a", 1, b"x"] | None
+    else:
+        reveal_type(value)  # revealed: Literal["b", 2]
+
+def union_valued_slots(value: Choice, a: Literal["a", "b"], b: Literal["a", "b"]):
+    if value not in [a, b]:
+        reveal_type(value)  # revealed: Literal["a", "b", "c"]
+    if value not in {a, b}:
+        reveal_type(value)  # revealed: Literal["a", "b", "c"]
+
+def exhaustive_list(value: Choice):
+    if value in ["a", "b"]:
+        return
+    if value == "c":
+        return
+    assert_never(value)
+
+def exhaustive_set(value: Choice):
+    if value in {"a", "b"}:
+        return
+    if value == "c":
+        return
+    assert_never(value)
+```
+
 ## `in` for PEP 695 aliases
 
 ```toml
@@ -144,6 +222,18 @@ type Foo = Literal["a", "b", "c"] | int
 def _(x: Foo):
     if x in ("a", "b"):
         reveal_type(x)  # revealed: Literal["a", "b"] | int
+
+def inline_list(x: str):
+    if x in ["a", "b"]:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def inline_set(x: str):
+    if x in {"a", "b"}:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
 ```
 
 ## `in` for `str` and literal strings
