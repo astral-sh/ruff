@@ -1921,6 +1921,30 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
                     .fixed_elements()
                     .any(|element| is_instance_tuple_exhaustive(db, ty, *element))
             }),
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                let Ok(elements) = instance.value_expression_types(db) else {
+                    return false;
+                };
+
+                let mut is_exhaustive = false;
+                for element in elements {
+                    let element = if element.is_none(db) {
+                        KnownClass::NoneType.to_class_literal(db)
+                    } else {
+                        element
+                    };
+                    let Type::ClassLiteral(class) = element else {
+                        return false;
+                    };
+                    if class.into_protocol_class(db).is_some()
+                        || class.metaclass(db) != KnownClass::Type.to_class_literal(db)
+                    {
+                        return false;
+                    }
+                    is_exhaustive |= is_instance_truthiness(db, ty, class).is_always_true();
+                }
+                is_exhaustive
+            }
             _ => false,
         },
     }

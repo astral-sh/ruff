@@ -155,6 +155,14 @@ def returns_bool_union(x: A | B) -> bool:
     if isinstance(x, (A, B)):
         return True
 
+def returns_bool_union_type(x: A | B) -> bool:
+    if isinstance(x, (A | B,)):
+        return True
+
+def returns_bool_optional_union_type(x: A | None) -> bool:
+    if isinstance(x, (A | None,)):
+        return True
+
 def returns_bool_stored_tuple(x: A | B) -> bool:
     targets = (A, B)
     if isinstance(x, targets):
@@ -215,6 +223,20 @@ class RejectingChild(RejectingBase): ...
 
 def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
     if isinstance(x, (RejectingBase, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+class UnionMeta(type):
+    def __or__(self, other: object, /) -> type[int]:
+        return int
+
+    def __ror__(self, other: object, /) -> type[int]:
+        return int
+
+class UnionBase(metaclass=UnionMeta): ...
+
+def custom_union_targets_are_not_exhaustive(x: B) -> bool:
+    if isinstance(x, (UnionBase | B,)):
         return True
     return ""  # error: [invalid-return-type]
 
