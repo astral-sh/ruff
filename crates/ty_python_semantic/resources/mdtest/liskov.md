@@ -959,19 +959,16 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
-## Mixin methods with protocol receiver annotations
+## Protocol annotations on mixin receivers
 
-A mixin can restrict a method to receivers that implement a protocol. An override that preserves or
-widens that receiver domain is valid even if the mixin itself does not implement the protocol.
+A mixin can annotate `self` with a protocol that the mixin itself does not implement. An override
+can keep that annotation or omit it:
 
 ```pyi
 from typing import Protocol
 
 class HasValue(Protocol):
     value: int
-
-class HasOtherValue(Protocol):
-    other_value: str
 
 class Mixin:
     def method(self: HasValue, argument: int) -> None: ...
@@ -981,10 +978,25 @@ class SameReceiver(Mixin):
 
 class ImplicitReceiver(Mixin):
     def method(self, argument: int) -> None: ...
+```
 
-class SatisfiesReceiver(Mixin):
+A subclass that provides the required protocol member can call the annotated method normally:
+
+```pyi
+class ImplementsProtocol(Mixin):
     value: int
     def method(self: HasValue, argument: int) -> None: ...
+
+receiver: HasValue = ImplementsProtocol()
+ImplementsProtocol().method(1)
+```
+
+An override cannot require an unrelated protocol or change the type of an argument accepted by the
+mixin:
+
+```pyi
+class HasOtherValue(Protocol):
+    other_value: str
 
 class InvalidReceiver(Mixin):
     def method(self: HasOtherValue, argument: int) -> None: ...  # error: [invalid-method-override]
@@ -992,19 +1004,22 @@ class InvalidReceiver(Mixin):
 class InvalidArgument(Mixin):
     value: int
     def method(self: HasValue, argument: str) -> None: ...  # error: [invalid-method-override]
+```
 
-receiver: HasValue = SatisfiesReceiver()
-SatisfiesReceiver().method(1)
+The receiver annotation can also accept more than one protocol:
 
+```pyi
 class UnionMixin:
     def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
 
 class SameUnionReceiver(UnionMixin):
     def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+```
 
-class ImplicitUnionReceiver(UnionMixin):
-    def method(self, argument: int) -> None: ...
+The protocol may include the overridden method itself. This must not cause a valid implementation to
+be rejected while checking the override:
 
+```pyi
 class Container(Protocol):
     def __contains__(self, key: str) -> bool: ...
     def method(self) -> None: ...
@@ -1012,18 +1027,12 @@ class Container(Protocol):
 class ContainerMixin:
     def method(self: Container) -> None: ...
 
-class SameContainerReceiver(ContainerMixin):
-    def method(self: Container) -> None: ...
-
-class ImplicitContainerReceiver(ContainerMixin):
-    def method(self) -> None: ...
-
-class SatisfiesContainerReceiver(ContainerMixin):
+class ImplementsContainer(ContainerMixin):
     def __contains__(self, key: str) -> bool: ...
     def method(self: Container) -> None: ...
 
-container: Container = SatisfiesContainerReceiver()
-SatisfiesContainerReceiver().method()
+container: Container = ImplementsContainer()
+ImplementsContainer().method()
 ```
 
 ## Generic methods on generic classes work as expected

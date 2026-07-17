@@ -559,13 +559,6 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
-            else {
-                continue;
-            };
-
-            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
-
             if is_assignable_method_override(db, class, type_on_subclass_instance, superclass_type)
             {
                 continue;
@@ -593,6 +586,12 @@ fn check_class_declaration<'db>(
                     }
                 }
             }
+
+            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+            else {
+                continue;
+            };
+            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
             report_invalid_method_override(
                 context,
@@ -678,6 +677,19 @@ fn check_class_declaration<'db>(
 ///
 /// An explicitly annotated superclass receiver can restrict a method to a subset of subclass
 /// instances. Bind both methods to that common receiver domain before comparing their signatures.
+///
+/// ```python
+/// from typing import Protocol
+///
+/// class HasValue(Protocol):
+///     value: int
+///
+/// class Mixin:
+///     def method(self: HasValue) -> None: ...
+///
+/// class Sub(Mixin):
+///     def method(self: HasValue) -> None: ...
+/// ```
 fn is_assignable_method_override<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
