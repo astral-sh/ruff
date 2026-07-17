@@ -857,40 +857,4 @@ def f():
     else:
         reveal_type(value)  # revealed: str
         reveal_type(result)  # revealed: Literal[False]
-
-def get_string() -> str:
-    return "s"
-
-def later_rebinding(value: int | str):
-    if result := (isinstance(value, int) and (value := get_string())):
-        reveal_type(value)  # revealed: int | str
-        reveal_type(result)  # revealed: str & ~AlwaysFalsy
-    else:
-        reveal_type(value)  # revealed: int | str
-        reveal_type(result)  # revealed: Literal[False] | (str & ~AlwaysTruthy)
-
-class Box:
-    value: int | str
-
-def later_base_rebinding(first: Box, second: Box):
-    if result := (isinstance(first.value, int) and (first := second)):
-        reveal_type(first.value)  # revealed: int | str
-        reveal_type(result)  # revealed: Box & ~AlwaysFalsy
-    else:
-        reveal_type(first.value)  # revealed: int | str
-        reveal_type(result)  # revealed: Literal[False] | (Box & ~AlwaysTruthy)
-
-def nested_scopes(value: int | str, items: list[int]):
-    if result := (isinstance(value, int) and (lambda: True)):
-        reveal_type(value)  # revealed: int | str
-    if result := (isinstance(value, int) and (lambda item=(value := get_string()): item)):
-        reveal_type(value)  # revealed: int | str
-    if result := (isinstance(value, int) and [item for item in items]):
-        reveal_type(value)  # revealed: int | str
-    if result := (isinstance(value, int) and {item for item in items}):
-        reveal_type(value)  # revealed: int | str
-    if result := (isinstance(value, int) and {item: item for item in items}):
-        reveal_type(value)  # revealed: int | str
-    if result := (isinstance(value, int) and (item for item in items)):
-        reveal_type(value)  # revealed: int | str
 ```

@@ -27,7 +27,7 @@ use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
     CallableAndCallExpr, ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
-    SubjectElementPatternPredicate, expr_may_have_nested_bindings,
+    SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
@@ -2915,13 +2915,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let target_constraints = self.evaluate_simple_expr(&expr_named.target, is_positive);
-        let mut value_constraints = if expr_may_have_nested_bindings(&expr_named.value) {
-            // Nested assignments and scopes can invalidate constraints before this predicate is
-            // applied to the final binding.
-            self.evaluate_simple_expr(&expr_named.value, is_positive)
-        } else {
-            self.evaluate_expression_node_predicate(&expr_named.value, expression, is_positive)
-        };
+        let mut value_constraints =
+            self.evaluate_expression_node_predicate(&expr_named.value, expression, is_positive);
 
         if let Some(value_constraints) = value_constraints.as_mut()
             && let Some(target) = PlaceExpr::try_from_expr(&expr_named.target)

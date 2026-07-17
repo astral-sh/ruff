@@ -47,7 +47,6 @@ use crate::predicate::{
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
     SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
-    expr_may_have_nested_bindings,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1154,7 +1153,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let Some(value) = value else { return };
         let target_name = &target_name_expr.id;
 
-        if !Self::can_register_narrowing_alias(value) || expr_may_have_nested_bindings(value) {
+        if !Self::can_register_narrowing_alias(value) {
             return;
         }
 

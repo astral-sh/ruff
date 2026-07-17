@@ -162,65 +162,6 @@ def _(x: int | None):
         reveal_type(x)  # revealed: int | None
 ```
 
-## Aliases containing named expressions or nested scopes
-
-A named expression or nested scope can invalidate a narrowed place before an aliased predicate is
-used, so the expression must not be registered as a narrowing alias. Rejecting all nested scopes is
-overly conservative, but we can remain conservative until motivated by real use cases.
-
-```py
-from typing_extensions import TypeGuard
-
-def get_string() -> str:
-    return "s"
-
-def guard_list(value: object) -> TypeGuard[list[int]]:
-    return isinstance(value, list)
-
-def _(value: int | str):
-    predicate = isinstance(value, int) and (value := get_string())
-    if result := predicate:
-        reveal_type(value)  # revealed: int | str
-        reveal_type(result)  # revealed: str & ~AlwaysFalsy
-    else:
-        reveal_type(value)  # revealed: int | str
-        reveal_type(result)  # revealed: Literal[False] | (str & ~AlwaysTruthy)
-
-    if result := bool(predicate):
-        reveal_type(value)  # revealed: int | str
-        reveal_type(result)  # revealed: Literal[True]
-
-def _(value: object):
-    predicate = guard_list(value) and (value := get_string())
-    if result := predicate:
-        reveal_type(value)  # revealed: object
-
-def _(value: int | str, items: list[int]):
-    lambda_predicate = isinstance(value, int) and (lambda: True)
-    if result := lambda_predicate:
-        reveal_type(value)  # revealed: int | str
-
-    lambda_default_predicate = isinstance(value, int) and (lambda item=(value := get_string()): item)
-    if result := lambda_default_predicate:
-        reveal_type(value)  # revealed: int | str
-
-    list_predicate = isinstance(value, int) and [item for item in items]
-    if result := list_predicate:
-        reveal_type(value)  # revealed: int | str
-
-    set_predicate = isinstance(value, int) and {item for item in items}
-    if result := set_predicate:
-        reveal_type(value)  # revealed: int | str
-
-    dict_predicate = isinstance(value, int) and {item: item for item in items}
-    if result := dict_predicate:
-        reveal_type(value)  # revealed: int | str
-
-    generator_predicate = isinstance(value, int) and (item for item in items)
-    if result := generator_predicate:
-        reveal_type(value)  # revealed: int | str
-```
-
 ## Attribute access alias
 
 ```py

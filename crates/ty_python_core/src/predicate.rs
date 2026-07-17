@@ -9,7 +9,7 @@
 
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
-use ruff_python_ast::{Expr, Singleton, helpers::any_over_expr, name::Name};
+use ruff_python_ast::{Singleton, name::Name};
 
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
@@ -17,21 +17,6 @@ use crate::expression::Expression;
 use crate::global_scope;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
-
-/// Returns `true` if `expr` contains a nested assignment or scope that may introduce bindings.
-pub fn expr_may_have_nested_bindings(expr: &Expr) -> bool {
-    any_over_expr(expr, |expression| {
-        matches!(
-            expression,
-            Expr::Named(_)
-                | Expr::Lambda(_)
-                | Expr::ListComp(_)
-                | Expr::SetComp(_)
-                | Expr::DictComp(_)
-                | Expr::Generator(_)
-        )
-    })
-}
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
