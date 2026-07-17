@@ -1907,9 +1907,8 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
                 .elements(db)
                 .iter()
                 .all(|element| is_instance_tuple_exhaustive(db, *element, classinfo)),
-            None => false,
+            None => is_instance_tuple_exhaustive(db, Type::object(), classinfo),
         },
-        ty if ty == Type::object() => false,
         ty => match classinfo {
             Type::ClassLiteral(class) => {
                 class.into_protocol_class(db).is_none()

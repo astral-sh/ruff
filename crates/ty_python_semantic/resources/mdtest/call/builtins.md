@@ -169,6 +169,10 @@ def returns_bool_annotated_local(condition: bool) -> bool:
     if isinstance(value, (A, B)):
         return True
 
+def returns_bool_object(x: object) -> bool:
+    if isinstance(x, (object,)):
+        return True
+
 def partial_targets_are_not_exhaustive(x: A | B) -> bool:  # error: [invalid-return-type]
     if isinstance(x, (A, bytes)):
         return True
@@ -218,12 +222,17 @@ T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
 
+def returns_bool_unconstrained_typevar(x: T) -> bool:
+    if isinstance(x, (object,)):
+        return True
+
 def _(
     x: T,
     x_bound_a: T_bound_A,
     x_constrained_sub_a: T_constrained,
 ):
     reveal_type(isinstance(x, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (object,)))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
 
     reveal_type(isinstance(x_bound_a, object))  # revealed: Literal[True]
