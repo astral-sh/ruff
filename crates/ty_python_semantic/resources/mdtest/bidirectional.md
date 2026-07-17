@@ -2464,21 +2464,21 @@ reveal_type(dict_result)  # revealed: dict[str, int | str]
 
 def make_list() -> list[str]:
     result = list()
-    result.append(1)
-    reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-type]
+    result.append(1)  # error: [invalid-argument-type]
+    reveal_type(result)  # revealed: list[str]
+    return result
 
 def make_set() -> set[str]:
     result = set()
-    result.add(1)
-    reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-type]
+    result.add(1)  # error: [invalid-argument-type]
+    reveal_type(result)  # revealed: set[str]
+    return result
 
 def make_dict() -> dict[str, str]:
     result = dict()
-    result["x"] = 1
-    reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-type]
+    result["x"] = 1  # error: [invalid-assignment]
+    reveal_type(result)  # revealed: dict[str, str]
+    return result
 
 set_alias = set
 aliased_result = set_alias()
@@ -2675,6 +2675,48 @@ _: list[int] = x21
 x21.append("a")
 
 reveal_type(x21)  # revealed: list[int]
+```
+
+Contextual constraints are checked in source order. The first applicable fully-static context fixes
+the collection type; a later incompatible context is an error rather than a reason to widen an
+invariant collection:
+
+```py
+conflicting_context = []
+_: list[int] = conflicting_context
+_: list[str] = conflicting_context  # error: [invalid-assignment]
+reveal_type(conflicting_context)  # revealed: list[int]
+```
+
+A context that cannot specialize the collection does not fix its type or prevent a later applicable
+context from doing so:
+
+```py
+structurally_incompatible_context = []
+_: set[int] = structurally_incompatible_context  # error: [invalid-assignment]
+_: list[str] = structurally_incompatible_context
+reveal_type(structurally_incompatible_context)  # revealed: list[str]
+
+unconstraining_context = []
+_: object = unconstraining_context
+unconstraining_context.append(1)
+reveal_type(unconstraining_context)  # revealed: list[int]
+
+union_context = []
+_: set[int] | list[str] = union_context
+reveal_type(union_context)  # revealed: list[str]
+```
+
+A gradual context does not prevent a later fully-static context from fixing the collection type:
+
+```py
+from typing import Any
+
+gradual_context = []
+_: list[Any] = gradual_context
+_: list[int] = gradual_context
+gradual_context.append(1)
+reveal_type(gradual_context)  # revealed: list[int]
 ```
 
 ```py

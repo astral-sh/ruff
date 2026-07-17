@@ -7516,6 +7516,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns whether the context constrains at least one of the collection's type variables.
+    fn collection_type_context_is_applicable(
+        &self,
+        identity_instance: Type<'db>,
+        context: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        if context.has_unspecialized_type_var(db, env) {
+            return false;
+        }
+
+        let constraints = ConstraintSetBuilder::new();
+        let solutions = identity_instance
+            .assignable_solutions_with_inferable(db, env, context, inferable)
+            .solve(db, env, &constraints);
+        matches!(
+            solutions,
+            Solutions::Constrained(solutions)
+                if solutions.as_slice().iter().any(|solution| !solution.is_empty())
+        )
+    }
+
+    /// Returns the preferred applicable type context from the uses of an unannotated collection
+    /// initializer.
+    ///
+    /// A fully-static context fixes the collection type. A gradual context is only used when no
+    /// fully-static context is available.
+    fn collection_type_context_from_uses(
+        &self,
+        collection_def: Definition<'db>,
+        collection_uses: &[(Statement<'db>, ExpressionNodeKey)],
+        identity_instance: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let mut gradual_context = None;
+
+        for (statement, _) in collection_uses {
+            if !self.is_contextual_collection_use_statement(*statement) {
+                continue;
+            }
+
+            let statement_use_types = infer_statement_types(self.db(), *statement);
+            let Some(constraints) = statement_use_types.collection_use_constraints(collection_def)
+            else {
+                continue;
+            };
+
+            for constraint in constraints {
+                let narrowed = TypeContext::new(Some(*constraint)).narrow_targets(db, env);
+                let fallback = [*constraint];
+                let Some(constraint) = narrowed
+                    .as_deref()
+                    .unwrap_or(&fallback)
+                    .iter()
+                    .copied()
+                    .find(|candidate| {
+                        self.collection_type_context_is_applicable(
+                            identity_instance,
+                            *candidate,
+                            inferable,
+                        )
+                    })
+                else {
+                    continue;
+                };
+
+                if !constraint.has_dynamic(db, env) {
+                    return Some(constraint);
+                }
+                gradual_context.get_or_insert(constraint);
+            }
+        }
+
+        gradual_context
+    }
+
     // Infer the type of a collection literal expression.
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
@@ -7560,6 +7640,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferable = generic_context.inferable_typevars(db);
         let identity_instance = Type::instance(db, env, ClassType::Generic(collection_alias));
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
+
+        let collection_def = if tcx.annotation.is_none()
+            && let Some(collection_expr) = collection_expr
+            && let InferenceRegion::Expression(current_expr, _) = self.region
+            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
+            && let Some(assignment) = current_expr.assigned_to(self.db())
+            && let Ok(collection_def) =
+                DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
+        {
+            self.index.try_definition(collection_def)
+        } else {
+            None
+        };
+        let collection_uses: Vec<_> = collection_def
+            .into_iter()
+            .flat_map(|collection_def| self.index.constraining_collection_uses(collection_def))
+            .collect();
+
+        let tcx = if tcx.annotation.is_none() {
+            TypeContext::new(collection_def.and_then(|collection_def| {
+                self.collection_type_context_from_uses(
+                    collection_def,
+                    &collection_uses,
+                    identity_instance,
+                    inferable,
+                )
+            }))
+        } else {
+            tcx
+        };
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7807,21 +7917,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if tcx.annotation.is_none()
-            && let Some(collection_expr) = collection_expr
-            && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
-            && let Some(assignment) = current_expr.assigned_to(self.db())
-            && let Ok(collection_def) =
-                DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
-            && let Some(collection_def) = self.index.try_definition(collection_def)
+            && let Some(collection_def) = collection_def
         {
             // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
-            let collection_uses: Vec<_> = self
-                .index
-                .constraining_collection_uses(collection_def)
-                .collect();
-
             let has_contextual_constraints = collection_uses.iter().any(|(statement, _)| {
                 self.is_contextual_collection_use_statement(*statement)
                     && infer_statement_types(self.db(), *statement)
