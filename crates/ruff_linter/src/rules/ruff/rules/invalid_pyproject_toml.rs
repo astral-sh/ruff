@@ -1,4 +1,4 @@
-use pyproject_toml::PyProjectToml;
+.use pyproject_toml::PyProjectToml;
 use serde::Deserialize;
 use toml::Spanned;
 use toml::de::DeTable;
@@ -12,7 +12,7 @@ use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 /// Checks for any pyproject.toml that does not conform to the schema from the relevant PEPs.
 ///
 /// ## Why is this bad?
-/// Your project may contain invalid metadata or configuration without you noticing
+/// Your project may contain invalid metadata or configuration without you noticing.
 ///
 /// ## Example
 /// ```toml
