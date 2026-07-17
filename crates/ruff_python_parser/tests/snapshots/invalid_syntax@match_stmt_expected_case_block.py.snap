@@ -126,8 +126,8 @@ Module(
   |
 1 | match x:
 2 |     x = 1
-  |          ^ Syntax Error: Expected a statement
 3 | match x:
+  | ^ Syntax Error: Expected a statement
 4 |     match y:
 5 |         case _: ...
   |

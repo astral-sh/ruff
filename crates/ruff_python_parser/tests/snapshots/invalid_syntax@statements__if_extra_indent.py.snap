@@ -111,5 +111,5 @@ Module(
   |
 6 |     pass
 7 |
-  | ^ Syntax Error: Expected a statement
 8 | a = 10
+  | ^ Syntax Error: Expected a statement

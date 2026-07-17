@@ -483,8 +483,8 @@ Module(
    |
  9 |         'format spec'}
 10 |
-   | ^ Syntax Error: Expected a statement
 11 | f'middle {'string':\\\
+   | ^ Syntax Error: Expected a statement
 12 |         'format spec'}
    |
 
