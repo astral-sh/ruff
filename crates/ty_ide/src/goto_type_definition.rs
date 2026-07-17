@@ -1832,9 +1832,10 @@ def function():
         4 | x = subpkg
           |     ^^^^^^ Clicking here
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -1866,9 +1867,10 @@ def function():
         2 | from .subpkg.submod import val
           |       ^^^^^^ Clicking here
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 

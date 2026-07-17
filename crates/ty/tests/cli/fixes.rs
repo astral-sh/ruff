@@ -221,7 +221,10 @@ fn fix_unfixable() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-syntax]: unexpected EOF while parsing
-    --> has_syntax_error.py:1:1
+     --> has_syntax_error.py:2:1
+      |
+    2 |
+      | ^
 
     Found 2 diagnostics (1 fixed, 1 remaining).
 

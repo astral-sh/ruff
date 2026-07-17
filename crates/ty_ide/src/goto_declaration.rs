@@ -380,7 +380,10 @@ FOO = 0
         1 | from lib import module
           |                 ^^^^^^ Clicking here
         info: Found 1 declaration
-        --> lib/module.py:1:1
+         --> lib/module.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -2550,7 +2553,10 @@ def ab(a: int, *, c: int): ...
         2 | from .subpkg.submod import val
           |       ^^^^^^ Clicking here
         info: Found 1 declaration
-        --> mypackage/subpkg/__init__.py:1:1
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
