@@ -160,6 +160,54 @@ mod tests {
     }
 
     #[test]
+    fn add_code_existing_empty_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 10  # ty:ignore[]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:5
+          |
+        2 | b = a / 10  # ty:ignore[]
+          |     ^
+          |
+          |
+        1 |
+          - b = a / 10  # ty:ignore[]
+        2 + b = a / 10  # ty:ignore[unresolved-reference]
+          |
+        ");
+    }
+
+    #[test]
+    fn add_ignore_does_not_update_preceding_own_line_suppression() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty:ignore[]
+            b = <START>a<END> / 10
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:5
+          |
+        4 | b = a / 10
+          |     ^
+          |
+          |
+        3 | # ty:ignore[]
+          - b = a / 10
+        4 + b = a / 10  # ty:ignore[unresolved-reference]
+          |
+        ");
+    }
+
+    #[test]
     fn add_code_existing_type_ignore() {
         let test = CodeActionTest::with_source(
             r#"

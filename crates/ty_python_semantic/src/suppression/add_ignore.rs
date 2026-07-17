@@ -8,6 +8,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 
@@ -271,30 +272,29 @@ fn add_to_existing_suppression(
     codes: &[LintName],
     offset: TextSize,
 ) -> Option<Fix> {
-    let mut existing_suppressions = suppressions
-        .inline_suppressions(TextRange::empty(offset))
-        .filter(|suppression| {
+    let existing = suppressions
+        .inline_suppressions_on_line(source.line_range(offset))
+        .find(|suppression| {
             matches!(
                 suppression.target,
                 SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
             )
-        });
-
-    // If there's an existing `ty: ignore[]` comment, append the code to it instead of creating a new suppression comment.
-    let existing = existing_suppressions.next()?;
+        })?;
     let comment_text = &source[existing.comment_range];
 
     // Only add to the existing ignore comment if it has no reason.
-    let before_closing_paren = comment_text.trim_end().strip_suffix(']')?;
-    let up_to_last_code = before_closing_paren.trim_end();
-
-    let insertion = if up_to_last_code.ends_with(',') {
-        format!(" {codes}", codes = Codes(existing.kind, codes))
+    let before_closing_bracket = comment_text.trim_end().strip_suffix(']')?;
+    let up_to_last_code = before_closing_bracket.trim_end();
+    let separator = if up_to_last_code.ends_with('[') {
+        ""
+    } else if up_to_last_code.ends_with(',') {
+        " "
     } else {
-        format!(", {codes}", codes = Codes(existing.kind, codes))
+        ", "
     };
-
     let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
+
+    let insertion = format!("{separator}{codes}", codes = Codes(existing.kind, codes));
 
     Some(Fix::safe_edit(Edit::insertion(
         insertion,
