@@ -88,6 +88,7 @@
 
 use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
@@ -6541,7 +6542,7 @@ pub(crate) struct PathAssignments {
     discovered: FxIndexMap<ConstraintId, bool>,
     /// Derived assignments that have been queued up to add because of the most recent BDD
     /// assignment
-    assignment_queue: FxIndexMap<ConstraintAssignment, AssignmentFuel>,
+    assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -6595,7 +6596,7 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
-            assignment_queue: FxIndexMap::default(),
+            assignment_queue: VecDeque::default(),
         }
     }
 
@@ -6705,7 +6706,7 @@ impl PathAssignments {
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
-    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
+    fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
         let max_fuel = self
             .additional_fuels
@@ -6750,7 +6751,7 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
-        while let Some((assignment, fuel)) = self.assignment_queue.shift_remove_index(0) {
+        while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, builder, assignment, source_order, fuel)?;
         }
         Ok(())
@@ -6831,18 +6832,38 @@ impl PathAssignments {
                 // there might be some consequents that were skipped previously due to a lack of
                 // fuel, that can be added now because of the replinished fuel budget.
 
-                // There is another derivation of this assignment that already provides at least as
-                // much fuel as this constraint. That means replenishing the fuel won't have any
-                // effect.
-                if existing_fuel.remaining >= fuel.remaining
-                    || self
-                        .additional_fuels
-                        .iter()
-                        .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && existing_fuel.remaining >= fuel.remaining
-                        })
+                // There is no need to replenish the fuel for this derivation if there is already
+                // an existing derivation whose fuel "dominates" (it both consumes as much fuel,
+                // and provides at least as much remaining fuel).
+                let existing_fuels = self
+                    .additional_fuels
+                    .iter()
+                    .filter(|(fuel_index, _)| *fuel_index == index);
+                let max_existing_remaining_fuel = existing_fuels
+                    .clone()
+                    .map(|(_, fuel)| fuel.remaining)
+                    .fold(existing_fuel.remaining, u16::max);
+                let max_existing_consumed_fuel = existing_fuels
+                    .clone()
+                    .filter_map(|(_, fuel)| fuel.consumed)
+                    .fold(existing_fuel.consumed.unwrap_or(0), u16::max);
+                if max_existing_remaining_fuel >= fuel.remaining
+                    && max_existing_consumed_fuel >= fuel.consumed.unwrap_or(0)
                 {
                     return Ok(());
+                }
+
+                // If this derivation of this assignment consumes more fuel than the other
+                // derivations that we've seen, we need to update the overall fuel consumed for
+                // this assignment.
+                if let Some(consumed) = fuel.consumed
+                    && let Some(delta) = consumed.checked_sub(max_existing_consumed_fuel)
+                {
+                    self.remaining_overall_fuel =
+                        match self.remaining_overall_fuel.checked_sub(delta) {
+                            Some(updated_fuel) => updated_fuel,
+                            None => return Ok(()),
+                        };
                 }
 
                 // Record the replenished fuel separately so that `walk_edge` can restore the
@@ -6889,14 +6910,7 @@ impl PathAssignments {
     }
 
     fn enqueue_assignment(&mut self, assignment: ConstraintAssignment, new_fuel: AssignmentFuel) {
-        self.assignment_queue
-            .entry(assignment)
-            .and_modify(|existing_fuel| {
-                *existing_fuel = std::cmp::max_by_key(*existing_fuel, new_fuel, |fuel| {
-                    (fuel.remaining, std::cmp::Reverse(fuel.consumed))
-                });
-            })
-            .or_insert(new_fuel);
+        self.assignment_queue.push_back((assignment, new_fuel));
     }
 
     fn check_single_tautology<'db>(
@@ -6960,10 +6974,10 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         sequent: PairImplication,
     ) {
-        let Some(ante1_fuel) = self.fuel_for(sequent.ante1.when_true()) else {
+        let Some(ante1_fuel) = self.max_remaining_fuel_for(sequent.ante1.when_true()) else {
             return;
         };
-        let Some(ante2_fuel) = self.fuel_for(sequent.ante2.when_true()) else {
+        let Some(ante2_fuel) = self.max_remaining_fuel_for(sequent.ante2.when_true()) else {
             return;
         };
         let available_fuel = ante1_fuel.min(ante2_fuel);
@@ -6985,7 +6999,7 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         sequent: SingleImplication,
     ) {
-        let Some(available_fuel) = self.fuel_for(sequent.ante.when_true()) else {
+        let Some(available_fuel) = self.max_remaining_fuel_for(sequent.ante.when_true()) else {
             return;
         };
         let ante_data = builder.constraint_data(sequent.ante);
