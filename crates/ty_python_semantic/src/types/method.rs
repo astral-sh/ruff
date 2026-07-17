@@ -85,11 +85,40 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Converts this bound method into a callable using separate runtime-receiver and `Self` types.
+    pub(crate) fn into_callable_type_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let function = self.function(db);
+
+        CallableType::new(
+            db,
+            self.bound_signatures_with_receiver(db, receiver_type, typing_self_type),
+            CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::from_function_return_annotation(
+                function.has_explicit_return_annotation(db),
+            ),
+        )
+    }
+
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        let function_signature = self.function(db).signature(db);
         let typing_self_type = self.typing_self_type(db);
         let receiver_type = self.self_instance(db);
+
+        self.bound_signatures_with_receiver(db, receiver_type, typing_self_type)
+    }
+
+    fn bound_signatures_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableSignature<'db> {
+        let function_signature = self.function(db).signature(db);
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature

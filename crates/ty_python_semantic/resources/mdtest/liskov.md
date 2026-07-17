@@ -1567,10 +1567,16 @@ class Item:
 class DynamicItem(Item):
     @classmethod
     def from_component(cls: type[Self], component: object) -> Self: ...
+```
 
+The override can also specialize a gradual parameter or accept additional keyword arguments:
+
+```pyi
 ModelT = TypeVar("ModelT", bound="BaseModel")
 
 class BaseModel:
+    @classmethod
+    def validate(cls: type[ModelT], value: Any) -> Any: ...
     @classmethod
     def strategy(cls: type[ModelT], *, size: int | None = None) -> Any: ...
     @classmethod
@@ -1578,14 +1584,22 @@ class BaseModel:
 
 class FrameModel(BaseModel):
     @classmethod
+    def validate(cls: type[Self], value: int) -> Self: ...
+    @classmethod
     def strategy(cls: type[Self], **kwargs: Any) -> Any: ...
     @classmethod
     def example(cls: type[Self], **kwargs: Any) -> Self: ...
 ```
 
-Narrowing an argument accepted by the superclass remains an invalid override:
+Narrowing a non-gradual argument accepted by the superclass remains an invalid override for both
+generic and concrete class receivers:
 
 ```pyi
+class InvalidDynamicItem(Item):
+    @classmethod
+    # error: [invalid-method-override]
+    def from_component(cls: type[Self], component: int) -> Self: ...
+
 class InvalidSwapEvent(Event):
     @classmethod
     # error: [invalid-method-override]

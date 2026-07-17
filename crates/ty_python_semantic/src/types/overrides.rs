@@ -702,15 +702,23 @@ fn is_assignable_method_override<'db>(
             };
 
             receiver.map_or((subclass_type, superclass_type), |receiver| {
-                let receiver =
-                    receiver.bind_self_typevars(db, subclass_method.typing_self_type(db));
+                let typing_self_type = subclass_method.typing_self_type(db);
+                let receiver = receiver.bind_self_typevars(db, typing_self_type);
                 let receiver = IntersectionType::from_elements(
                     db,
                     [subclass_method.self_instance(db), receiver],
                 );
                 (
-                    Type::BoundMethod(subclass_method.map_self_type(db, |_| receiver)),
-                    Type::BoundMethod(superclass_method.map_self_type(db, |_| receiver)),
+                    Type::Callable(subclass_method.into_callable_type_with_receiver(
+                        db,
+                        receiver,
+                        typing_self_type,
+                    )),
+                    Type::Callable(superclass_method.into_callable_type_with_receiver(
+                        db,
+                        receiver,
+                        typing_self_type,
+                    )),
                 )
             })
         }
