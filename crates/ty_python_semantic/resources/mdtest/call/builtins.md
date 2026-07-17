@@ -351,6 +351,15 @@ def accepts_alias_bound_typevar(x: T_bound_alias_a_b) -> bool:
     reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
     if isinstance(x, (A, B)):
         return True
+
+def accepts_truthy_constrained_typevar(x: T_constrained_a_b) -> bool:
+    if not x:
+        return False
+
+    reveal_type(x)  # revealed: T_constrained_a_b@accepts_truthy_constrained_typevar & ~AlwaysFalsy
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
 ```
 
 ## Generic builtins should not overfit upper-bound-only callback constraints

@@ -1920,6 +1920,10 @@ fn is_instance_tuple_covers<'db>(db: &'db dyn Db, tuple: &TupleSpec<'db>, ty: Ty
             .elements(db)
             .iter()
             .all(|element| is_instance_tuple_covers(db, tuple, *element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| is_instance_tuple_covers(db, tuple, *element)),
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 is_instance_tuple_covers(db, tuple, bound)
