@@ -341,11 +341,18 @@ impl DirectoryWalker for OsDirectoryWalker {
         &self,
         configuration: WalkDirectoryConfiguration,
     ) -> Box<dyn IgnoreIncremental> {
-        // N.B. The current work-around `IgnoreFiles` implementation doesn't
-        // support any configuration right now. This will be fixed once we
-        // switch to the `ignore` crate's implementation. --AG
-        let WalkDirectoryConfiguration { paths, .. } = configuration;
-        Box::new(IgnoreFiles::new(paths))
+        let WalkDirectoryConfiguration {
+            paths,
+            ignore_hidden: hidden,
+            standard_filters,
+        } = configuration;
+
+        let mut builder = ::ignore::WalkBuilder::from_iter(paths.iter().map(|p| p.as_std_path()));
+        builder.current_dir(self.cwd.as_std_path());
+        builder.standard_filters(standard_filters);
+        builder.hidden(hidden);
+        let root_matchers = builder.build_matchers();
+        Box::new(IgnoreFiles { root_matchers })
     }
 }
 
