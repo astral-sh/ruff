@@ -4,27 +4,10 @@ use std::path::PathBuf;
 
 use super::{FileType, SystemPath};
 
-/// Whether a path is known to be ignored by a directory walker.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Ignored {
-    /// An ignore file proves that the directory walker would skip this path.
-    Yes,
-
-    /// The path might be ignored, but a directory walk is required to know for sure.
-    Uncertain,
-}
-
-impl Ignored {
-    /// Returns `true` if a directory walk is required to determine whether the path is ignored.
-    pub const fn is_uncertain(self) -> bool {
-        matches!(self, Self::Uncertain)
-    }
-}
-
 /// A matcher for determining whether paths are ignored during incremental directory walking.
 pub trait IgnoreIncremental {
-    /// Returns whether the directory walker is known to ignore `path`.
-    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored;
+    /// Returns whether the directory walker ignores `path`.
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool;
 }
 
 /// A builder for constructing a directory recursive traversal.

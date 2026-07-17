@@ -1,30 +1,26 @@
 //! Checks whether paths are ignored during incremental project indexing.
 
 use crate::system::SystemPath;
-use crate::system::walk_directory::{IgnoreIncremental, Ignored};
+use crate::system::walk_directory::IgnoreIncremental;
 
 pub(super) struct IgnoreFiles {
     pub(super) root_matchers: Vec<ignore::IncrementalIgnore>,
 }
 
 impl IgnoreIncremental for IgnoreFiles {
-    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> Ignored {
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
         let Some(root) = self
             .root_matchers
             .iter_mut()
             .filter(|root| path.as_std_path().starts_with(root.root()))
             .max_by_key(|root| root.root().as_os_str().len())
         else {
-            return Ignored::Uncertain;
+            return false;
         };
         let Some(norm) = root.normalize(path.as_std_path()) else {
-            return Ignored::Uncertain;
+            return false;
         };
-        if root.matched(norm, is_directory).is_ignore() {
-            Ignored::Yes
-        } else {
-            Ignored::Uncertain
-        }
+        root.matched(norm, is_directory).is_ignore()
     }
 }
 
@@ -32,7 +28,6 @@ impl IgnoreIncremental for IgnoreFiles {
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::Ignored;
     use crate::system::{OsSystem, System, SystemPath, SystemPathBuf};
 
     struct TestProject {
@@ -75,11 +70,11 @@ mod tests {
             std::fs::create_dir_all(path.as_ref().as_std_path()).unwrap();
         }
 
-        fn is_ignored(&self, path: &SystemPath) -> Ignored {
+        fn is_ignored(&self, path: &SystemPath) -> bool {
             self.is_ignored_from(std::slice::from_ref(&self.root), path)
         }
 
-        fn is_ignored_from(&self, walk_roots: &[SystemPathBuf], path: &SystemPath) -> Ignored {
+        fn is_ignored_from(&self, walk_roots: &[SystemPathBuf], path: &SystemPath) -> bool {
             let (first, additional) = walk_roots.split_first().unwrap();
             let mut builder = self.system.walk_directory(first);
 
@@ -100,7 +95,7 @@ mod tests {
             (project.path("build/.ignore"), "!keep.py\n"),
         ]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Yes);
+        assert!(project.is_ignored(&path));
     }
 
     #[test]
@@ -110,7 +105,7 @@ mod tests {
         let path = project.path("build/keep.py");
         project.write_files([(project.path(".gitignore"), "build/\n")]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Uncertain);
+        assert!(!project.is_ignored(&path));
     }
 
     #[test]
@@ -119,7 +114,7 @@ mod tests {
         let path = project.path("build/keep.py");
         project.write_files([(project.path(".ignore"), "\u{feff}build/\n")]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Yes);
+        assert!(project.is_ignored(&path));
     }
 
     #[test]
@@ -132,7 +127,7 @@ mod tests {
             (project.path(".gitignore"), "build/\n"),
         ]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Uncertain);
+        assert!(!project.is_ignored(&path));
     }
 
     #[test]
@@ -148,7 +143,7 @@ mod tests {
             ),
         ]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Uncertain);
+        assert!(!project.is_ignored(&path));
     }
 
     #[test]
@@ -157,7 +152,7 @@ mod tests {
         let path = project.path("pkg/keep.py");
         project.write_files([(project.path(".ignore"), "pkg/keep.py\n")]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Yes);
+        assert!(project.is_ignored(&path));
     }
 
     #[test]
@@ -170,7 +165,7 @@ mod tests {
             (project.path(".gitignore"), "build/\n"),
         ]);
 
-        assert_eq!(project.is_ignored(&path), Ignored::Yes);
+        assert!(project.is_ignored(&path));
     }
 
     #[test]
@@ -179,10 +174,7 @@ mod tests {
         let path = project.path("build/keep.py");
         project.write_files([(project.path(".ignore"), "build/\n")]);
 
-        assert_eq!(
-            project.is_ignored_from(&[project.root.clone(), path.clone()], &path),
-            Ignored::Uncertain
-        );
+        assert!(!project.is_ignored_from(&[project.root.clone(), path.clone()], &path));
     }
 
     #[test]
@@ -195,9 +187,6 @@ mod tests {
             (project.path("pkg/.ignore"), "build/\n"),
         ]);
 
-        assert_eq!(
-            project.is_ignored_from(&[project.root.clone(), nested_root], &path),
-            Ignored::Yes
-        );
+        assert!(project.is_ignored_from(&[project.root.clone(), nested_root], &path));
     }
 }
