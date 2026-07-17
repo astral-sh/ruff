@@ -27,7 +27,7 @@ use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
     CallableAndCallExpr, ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
-    SubjectElementPatternPredicate,
+    SubjectElementPatternPredicate, expr_may_have_nested_bindings,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
@@ -1158,7 +1158,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
             ast::Expr::If(expr_if) => self.evaluate_expr_if(expr_if, expression, is_positive),
-            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
+            ast::Expr::Named(expr_named) => {
+                self.evaluate_expr_named(expr_named, expression, is_positive)
+            }
             _ => None,
         }
     }
@@ -2909,10 +2911,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_expr_named(
         &mut self,
         expr_named: &ast::ExprNamed,
+        expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let target_constraints = self.evaluate_simple_expr(&expr_named.target, is_positive);
-        let value_constraints = self.evaluate_simple_expr(&expr_named.value, is_positive);
+        let mut value_constraints = if expr_may_have_nested_bindings(&expr_named.value) {
+            // Nested assignments and scopes can invalidate constraints before this predicate is
+            // applied to the final binding.
+            self.evaluate_simple_expr(&expr_named.value, is_positive)
+        } else {
+            self.evaluate_expression_node_predicate(&expr_named.value, expression, is_positive)
+        };
+
+        if let Some(value_constraints) = value_constraints.as_mut()
+            && let Some(target) = PlaceExpr::try_from_expr(&expr_named.target)
+            && let Some(target_place) = self.places().place_id(&target)
+        {
+            let places = self.places();
+            // The target is rebound after the value is evaluated, invalidating constraints on the
+            // target and any member places rooted at it.
+            value_constraints.retain(|place, _| {
+                *place != target_place
+                    && !places
+                        .parents(places.place(*place))
+                        .any(|parent| parent == target_place)
+            });
+        }
+
         match (target_constraints, value_constraints) {
             (Some(mut target), Some(value)) => {
                 merge_constraints_and(&mut target, value);

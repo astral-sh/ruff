@@ -1299,6 +1299,27 @@ if (x := f()) != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 else:
     reveal_type(x)  # revealed: Literal[1]
+
+value = f()
+if result := (value == 1):
+    reveal_type(value)  # revealed: Literal[1]
+    reveal_type(result)  # revealed: Literal[True]
+else:
+    reveal_type(value)  # revealed: Literal[2, 3]
+    reveal_type(result)  # revealed: Literal[False]
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: Literal["b"]
+
+def overwritten_tagged_union(value: A | B | bool):
+    if isinstance(value, (A, B)):
+        if value := (value.tag == "a"):
+            reveal_type(value)  # revealed: Literal[True]
+        else:
+            reveal_type(value)  # revealed: Literal[False]
 ```
 
 ## Union with `Any`

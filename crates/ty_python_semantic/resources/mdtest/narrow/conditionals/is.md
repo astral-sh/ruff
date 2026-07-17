@@ -110,6 +110,20 @@ if (x := f()) is None:
     reveal_type(x)  # revealed: None
 else:
     reveal_type(x)  # revealed: Literal[1, 2]
+
+value = f()
+if result := (value is None):
+    reveal_type(value)  # revealed: None
+    reveal_type(result)  # revealed: Literal[True]
+else:
+    reveal_type(value)  # revealed: Literal[1, 2]
+    reveal_type(result)  # revealed: Literal[False]
+
+value = f()
+if value := (value is None):
+    reveal_type(value)  # revealed: Literal[True]
+else:
+    reveal_type(value)  # revealed: Literal[False]
 ```
 
 ## `is` with two narrowable operands
