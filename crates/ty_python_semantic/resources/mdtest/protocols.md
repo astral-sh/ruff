@@ -4120,6 +4120,27 @@ generic_apply: ReceiverAndMethodLocal = GenericApply()
 int_apply: ReceiverAndMethodLocal = IntApply()  # error: [invalid-assignment]
 ```
 
+A generic implementation must also cover every specialization of an unrelated generic target method.
+Merely making the implementation generic does not make a narrower domain valid:
+
+```py
+class GenericCallback(Protocol):
+    def __call__[T](self, value: T) -> T: ...
+
+def bounded_callback[T: int](value: T) -> T:
+    return value
+
+def narrow_callback[T](value: list[T]) -> T:
+    return value[0]
+
+def generic_callback[T](value: T) -> T:
+    return value
+
+bounded: GenericCallback = bounded_callback  # error: [invalid-assignment]
+narrow: GenericCallback = narrow_callback  # error: [invalid-assignment]
+generic: GenericCallback = generic_callback
+```
+
 The corresponding `cls` annotation on a class method can also use a TypeVar:
 
 ```py

@@ -22,6 +22,7 @@ use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -2483,10 +2484,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.universally_quantified =
                 checker.universally_quantified.merge(db, target_inferable);
         }
-        // A non-generic source cannot choose a specialization that satisfies a generic target;
-        // use lazy typevar evaluation so the target's obligations can be universally quantified.
+        // Keep this higher-rank source check to unary declared callables for now. More complex
+        // overload and multi-parameter constraints still require the ordinary inference path.
+        let check_generic_source = source.definition.is_some()
+            && target.definition.is_some()
+            && source_inferable != InferableTypeVars::None
+            && target_inferable != InferableTypeVars::None
+            && source.parameters.len() == 1
+            && target.parameters.len() == 1;
+        // A generic target must be compared lazily so its obligations survive until universal
+        // quantification, including when the source signature is generic too.
         // Keep recursive protocol members on the existing eager path to avoid expanding cycles.
-        if (source_inferable == InferableTypeVars::None
+        if ((source_inferable == InferableTypeVars::None || check_generic_source)
             && target_inferable != InferableTypeVars::None
             && !source.is_recursive_protocol_member(db)
             && !target.is_recursive_protocol_member(db))
@@ -2504,6 +2513,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let when = checker.with_signature_recursion_guard(source, target, || {
             source
                 .receiver_constraints_when_satisfied(&checker, db)
+                .and(db, self.constraints, || {
+                    if check_generic_source {
+                        Signature::declared_domain_when_satisfied(
+                            &checker,
+                            db,
+                            source
+                                .generic_context
+                                .into_iter()
+                                .flat_map(|generic_context| generic_context.variables(db))
+                                .filter(|typevar| typevar.is_inferable(db, source_inferable)),
+                        )
+                    } else {
+                        checker.always()
+                    }
+                })
                 .and(db, self.constraints, || {
                     // Recursive protocol members can revisit this same source signature while
                     // checking a declared bound. Concrete receiver compatibility was already
@@ -2564,6 +2588,42 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .flat_map(|generic_context| generic_context.variables(db))
                 .filter(|typevar| typevar.is_inferable(db, target_non_receiver_inferable)),
         );
+        let when = if check_generic_source
+            && source_inferable != InferableTypeVars::None
+            && target_inferable != InferableTypeVars::None
+            && let Some(source_generic_context) = source.generic_context
+        {
+            // Existential abstraction can discard a constraint that relates a target variable to
+            // a source variable nested in another type (for example, `T <= list[S]`). Recheck each
+            // inferred source specialization before abstraction so that such obligations remain
+            // attached to the universally quantified target variables.
+            let source_specialization_holds =
+                match when.solutions(db, self.constraints, source_inferable) {
+                    Solutions::Unsatisfiable => checker.never(),
+                    Solutions::Unconstrained => checker.always(),
+                    Solutions::Constrained(solutions) => {
+                        solutions.iter().when_any(db, self.constraints, |solution| {
+                            let specialization = source_generic_context.specialize_recursive(
+                                db,
+                                source_generic_context.variables(db).map(|typevar| {
+                                    solution
+                                        .iter()
+                                        .find(|binding| {
+                                            binding.bound_typevar.is_same_typevar_as(db, typevar)
+                                        })
+                                        .map(|binding| binding.solution)
+                                }),
+                            );
+                            let specialized_source =
+                                source.apply_specialization(db, specialization);
+                            checker.check_signature_pair_inner(db, &specialized_source, target)
+                        })
+                    }
+                };
+            when.and(db, self.constraints, || source_specialization_holds)
+        } else {
+            when
+        };
         target_declared_domain
             .implies(db, self.constraints, || {
                 when.reduce_inferable(db, self.constraints, source_inferable)

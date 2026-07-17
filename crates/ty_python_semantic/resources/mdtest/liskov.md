@@ -876,6 +876,17 @@ class A:
 class B(A):
     def method[T](self, x: T) -> T: ...  # fine
 
+class BoundedGeneric(A):
+    # `A.method` accepts values of every type, not only subtypes of `int`.
+    def method[T: int](self, x: T) -> T: ...  # error: [invalid-method-override]
+
+class NarrowGeneric(A):
+    # Adding a generic parameter does not make the narrower `list[T]` input valid.
+    def method[T](self, x: list[T]) -> T: ...  # error: [invalid-method-override]
+
+class WrongGenericReturn(A):
+    def method[T](self, x: T) -> int: ...  # error: [invalid-method-override]
+
 class C(A):
     def method(self, x: object) -> Never: ...  # fine
 
