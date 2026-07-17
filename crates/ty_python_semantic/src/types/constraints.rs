@@ -6846,85 +6846,24 @@ impl PathAssignments {
 
         self.discover_constraint(db, builder, assignment.constraint());
 
-        for sequent in &self.map.single_tautologies {
-            if self.assignment_holds(sequent.ante.when_false()) {
-                // The sequent map says (ante1) is always true, and the current path asserts that
-                // it's false.
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante = %sequent.ante.display(db, builder),
-                    facts = %format_args!(
-                        "[{}]",
-                        self.assignments.iter().map(|(assignment, _)| {
-                            assignment.display(db, builder)
-                        }).format(", "),
-                    ),
-                    "found contradiction",
-                );
-                return Err(PathAssignmentConflict);
-            }
+        for i in 0..self.map.single_tautologies.len() {
+            let sequent = self.map.single_tautologies[i];
+            self.check_single_tautology(db, builder, sequent)?;
         }
 
-        for sequent in &self.map.pair_impossibilities {
-            if self.assignment_holds(sequent.ante1.when_true())
-                && self.assignment_holds(sequent.ante2.when_true())
-            {
-                // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
-                // current path asserts that both are true.
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante1 = %sequent.ante1.display(db, builder),
-                    ante2 = %sequent.ante2.display(db, builder),
-                    facts = %format_args!(
-                        "[{}]",
-                        self.assignments.iter().map(|(assignment, _)| {
-                            assignment.display(db, builder)
-                        }).format(", "),
-                    ),
-                    "found contradiction",
-                );
-                return Err(PathAssignmentConflict);
-            }
+        for i in 0..self.map.pair_impossibilities.len() {
+            let sequent = self.map.pair_impossibilities[i];
+            self.check_pair_impossibility(db, builder, sequent)?;
         }
 
         for i in 0..self.map.pair_implications.len() {
             let sequent = self.map.pair_implications[i];
-            let Some(ante1_fuel) = self.fuel_for(sequent.ante1.when_true()) else {
-                continue;
-            };
-            let Some(ante2_fuel) = self.fuel_for(sequent.ante2.when_true()) else {
-                continue;
-            };
-            let available_fuel = ante1_fuel.min(ante2_fuel);
-            let (ante1_constructor_depth, _) =
-                builder.cached_constraint_bound_depth(db, sequent.ante1);
-            let (ante2_constructor_depth, _) =
-                builder.cached_constraint_bound_depth(db, sequent.ante2);
-            let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-            let fuel_cost =
-                builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth);
-            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-                self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
-            }
+            self.check_pair_implication(db, builder, sequent);
         }
 
         for i in 0..self.map.single_implications.len() {
             let sequent = self.map.single_implications[i];
-            let Some(available_fuel) = self.fuel_for(sequent.ante.when_true()) else {
-                continue;
-            };
-            let ante_data = builder.constraint_data(sequent.ante);
-            let (antecedent_constructor_depth, _) =
-                builder.cached_constraint_bound_depth(db, sequent.ante);
-            let post_data = builder.constraint_data(sequent.post);
-            let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-                1
-            } else {
-                builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth)
-            };
-            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-                self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
-            }
+            self.check_single_implication(db, builder, sequent);
         }
 
         Ok(())
@@ -6949,6 +6888,106 @@ impl PathAssignments {
                 );
             })
             .or_insert(new_fuel);
+    }
+
+    fn check_single_tautology<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        sequent: SingleTautology,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(sequent.ante.when_false()) {
+            // The sequent map says (ante1) is always true, and the current path asserts that
+            // it's false.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante = %sequent.ante.display(db, builder),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, builder)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
+    }
+
+    fn check_pair_impossibility<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        sequent: PairImpossibility,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(sequent.ante1.when_true())
+            && self.assignment_holds(sequent.ante2.when_true())
+        {
+            // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
+            // current path asserts that both are true.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante1 = %sequent.ante1.display(db, builder),
+                ante2 = %sequent.ante2.display(db, builder),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, builder)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
+    }
+
+    fn check_pair_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        sequent: PairImplication,
+    ) {
+        let Some(ante1_fuel) = self.fuel_for(sequent.ante1.when_true()) else {
+            return;
+        };
+        let Some(ante2_fuel) = self.fuel_for(sequent.ante2.when_true()) else {
+            return;
+        };
+        let available_fuel = ante1_fuel.min(ante2_fuel);
+        let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, sequent.ante1);
+        let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, sequent.ante2);
+        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
+        let fuel_cost = builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth);
+        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
+        }
+    }
+
+    fn check_single_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        sequent: SingleImplication,
+    ) {
+        let Some(available_fuel) = self.fuel_for(sequent.ante.when_true()) else {
+            return;
+        };
+        let ante_data = builder.constraint_data(sequent.ante);
+        let (antecedent_constructor_depth, _) =
+            builder.cached_constraint_bound_depth(db, sequent.ante);
+        let post_data = builder.constraint_data(sequent.post);
+        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+            1
+        } else {
+            builder.sequent_fuel_cost(db, sequent.post, antecedent_constructor_depth)
+        };
+        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            self.enqueue_assignment(sequent.post.when_true(), Some(fuel_cost), post_fuel);
+        }
     }
 }
 
