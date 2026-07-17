@@ -1430,6 +1430,68 @@ reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
 ```
 
+### Gradual return types
+
+Gradual return types must not widen a `ParamSpec` captured from a generic function into a union of
+parameter lists. The original generic signature should remain available to the decorated callable.
+
+```py
+from collections.abc import Callable, Generator
+import types
+from typing import Any, Generic, ParamSpec, TypeVar
+
+class Wrapped[**P]:
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def wrap[**P](func: Callable[P, Any]) -> Wrapped[P]:
+    return Wrapped()
+
+@wrap
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity)  # revealed: Wrapped[(value: T@identity)]
+identity.call("value")
+# error: [too-many-positional-arguments]
+identity.call(1, 2)
+
+def requires_int[**P](func: Callable[P, int]) -> Wrapped[P]:
+    return Wrapped()
+
+# error: [invalid-argument-type]
+@requires_int
+def returns_str(value: str) -> str:
+    return value
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class LegacyWrapped(Generic[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def legacy_wrap(func: Callable[P, Any]) -> LegacyWrapped[P]:
+    return LegacyWrapped()
+
+@legacy_wrap
+def legacy_identity(value: T) -> T:
+    return value
+
+reveal_type(legacy_identity)  # revealed: LegacyWrapped[(value: T@legacy_identity)]
+legacy_identity.call("value")
+# error: [too-many-positional-arguments]
+legacy_identity.call(1, 2)
+
+@types.coroutine
+def stdlib_yield(value: T) -> Generator[T, None, None]:
+    yield value
+
+reveal_type(stdlib_yield)  # revealed: [T](value: T) -> Awaitable[None]
+reveal_type(stdlib_yield(1))  # revealed: Awaitable[None]
+
+async def example() -> None:
+    await stdlib_yield(1)
+```
+
 ### Chained decorators with generic functions
 
 ```py

@@ -7,7 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -19,7 +19,9 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
+use crate::types::signatures::{
+    CallableSignature, Parameters, Signature, SignatureRelationVisitor,
+};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
@@ -2656,14 +2658,43 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal_signature: &CallableSignature<'db>,
         actual_callables: &CallableTypes<'db>,
     ) -> Result<(), ()> {
-        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+        let formal_paramspec = formal_signature.is_single_paramspec();
 
         for actual_callable in actual_callables.as_slice() {
-            if formal_is_single_paramspec {
-                let when = actual_callable
-                    .signatures(self.db)
-                    .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
+            if let Some((paramspec, _)) = formal_paramspec {
+                // Capture the actual parameter signature independently of return constraints. A
+                // gradual return can introduce relationships such as `T <= Any`, which must not
+                // widen the captured `ParamSpec` through transitivity. Overloaded callables still
+                // rely on the relation below to filter signatures by their return type.
+                let paramspec_identity = paramspec.identity(self.db);
+                let paramspec_was_inferred = self.types.contains_key(&paramspec_identity);
+                let actual_signatures = actual_callable.signatures(self.db);
+                let paramspec_value = match actual_signatures.overloads.as_slice() {
+                    [signature] if signature.generic_context.is_some() => {
+                        Some(Type::Callable(CallableType::new(
+                            self.db,
+                            CallableSignature::single(Signature::new_generic(
+                                signature.generic_context,
+                                signature.parameters().clone(),
+                                Type::unknown(),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                            CallableFunctionProvenance::None,
+                        )))
+                    }
+                    _ => None,
+                };
+
+                let when = actual_signatures.when_constraint_set_assignable_to(
+                    self.db,
+                    formal_signature,
+                    self.constraints,
+                );
                 self.add_type_mappings_from_constraint_set(when)?;
+                if !paramspec_was_inferred && let Some(paramspec_value) = paramspec_value {
+                    self.types
+                        .insert(paramspec_identity, UnionAccumulator::new(paramspec_value));
+                }
                 self.pending.intersect(self.db, self.constraints, when);
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
