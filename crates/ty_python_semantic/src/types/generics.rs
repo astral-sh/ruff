@@ -1354,40 +1354,6 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let types = if nested {
-            self.types(db)
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                .collect::<Option<Box<[_]>>>()?
-        } else {
-            self.types(db)
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Box<[_]>>()
-        };
-        let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
-            None => None,
-        };
-        let context = self.generic_context(db);
-        Some(Self::new(
-            db,
-            context,
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        ))
-    }
-
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,

@@ -44,25 +44,6 @@ impl<'db> EnumSpec<'db> {
 
         Self::new(db, members, self.has_known_members(db))
     }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let members = self
-            .members(db)
-            .iter()
-            .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
-                Some((name.clone(), ty))
-            })
-            .collect::<Option<Box<_>>>()?;
-
-        Some(Self::new(db, members, self.has_known_members(db)))
-    }
 }
 
 impl get_size2::GetSize for EnumSpec<'_> {}
@@ -135,29 +116,6 @@ impl<'db> DynamicEnumAnchor<'db> {
             },
         }
     }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Definition { definition, spec } => Some(Self::Definition {
-                definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
-            }),
-            Self::ScopeOffset {
-                scope,
-                offset,
-                spec,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
-            }),
-        }
-    }
 }
 
 /// A class created via the functional enum syntax, e.g. `Enum("Color", "RED GREEN BLUE")`.
@@ -193,30 +151,6 @@ impl<'db> DynamicEnumLiteral<'db> {
             self.base_class(db),
             mixin_type,
         )
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let mixin_type = match self.mixin_type(db) {
-            Some(mixin) => {
-                let mixin = mixin.recursive_type_normalized_impl(db, div, true);
-                Some(if nested { mixin? } else { mixin.unwrap_or(div) })
-            }
-            None => None,
-        };
-
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.base_class(db),
-            mixin_type,
-        ))
     }
 }
 

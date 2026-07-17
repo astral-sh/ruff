@@ -1060,7 +1060,7 @@ impl<'db> DefinitionTypes<'db> {
                 cycle,
             )
         } else {
-            ty.recursive_type_normalized(db, query, cycle)
+            ty
         }
     }
 
@@ -1086,7 +1086,7 @@ impl<'db> DefinitionTypes<'db> {
                 )
             })
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, query, cycle))
+            ty
         }
     }
 
@@ -1521,7 +1521,7 @@ impl<'db> DefinitionInference<'db> {
                         cycle,
                     )
                 } else {
-                    semantic_view.recursive_type_normalized(db, query, cycle)
+                    *semantic_view
                 };
             }
         }
@@ -1771,12 +1771,6 @@ impl<'db> ExpressionInference<'db> {
                         *previous_binding,
                         cycle,
                     );
-                } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(
-                        db,
-                        CycleQuery::ExpressionTypes,
-                        cycle,
-                    );
                 }
             }
         }
@@ -1961,9 +1955,6 @@ impl<'db> StatementInferenceInner<'db> {
                     *previous_binding,
                     cycle,
                 );
-            } else {
-                *binding_ty =
-                    binding_ty.recursive_type_normalized(db, CycleQuery::StatementTypes, cycle);
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -1979,10 +1970,6 @@ impl<'db> StatementInferenceInner<'db> {
                         previous_declaration.inner_type(),
                         cycle,
                     )
-                });
-            } else {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.recursive_type_normalized(db, CycleQuery::StatementTypes, cycle)
                 });
             }
         }

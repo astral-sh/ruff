@@ -156,17 +156,6 @@ impl<'db> ProtocolClass<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self(
-            self.0.recursive_type_normalized_impl(db, div, nested)?,
-        ))
-    }
 }
 
 impl<'db> Deref for ProtocolClass<'db> {
@@ -344,26 +333,6 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| {
-                    Some((
-                        name.clone(),
-                        data.recursive_type_normalized_impl(db, div, nested)?,
-                    ))
-                })
-                .collect::<Option<BTreeMap<_, _>>>()?,
-        ))
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -452,33 +421,6 @@ impl<'db> ProtocolMemberData<'db> {
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            kind: match &self.kind {
-                ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                    callable.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Other(ty) if nested => {
-                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, div, true)?)
-                }
-                ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div),
-                ),
-            },
-            qualifiers: self.qualifiers,
-            definition: self.definition,
-        })
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -582,17 +524,17 @@ impl<'db> ProtocolMemberKind<'db> {
             (Self::Property(curr), Self::Property(prev)) => {
                 let getter = match (curr.getter(db), prev.getter(db)) {
                     (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
+                    (Some(curr), None) => Some(curr),
                     (None, _) => None,
                 };
                 let setter = match (curr.setter(db), prev.setter(db)) {
                     (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
+                    (Some(curr), None) => Some(curr),
                     (None, _) => None,
                 };
                 let deleter = match (curr.deleter(db), prev.deleter(db)) {
                     (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
+                    (Some(curr), None) => Some(curr),
                     (None, _) => None,
                 };
                 Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))

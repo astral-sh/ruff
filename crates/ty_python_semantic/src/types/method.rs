@@ -111,21 +111,6 @@ impl<'db> BoundMethodType<'db> {
 
         CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
     }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.function(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.self_instance(db)
-                .recursive_type_normalized_impl(db, div, true)?,
-        ))
-    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -217,49 +202,6 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> KnownBoundMethodType<'db> {
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            KnownBoundMethodType::FunctionTypeDunderGet(function) => {
-                Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-                Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::PropertyDunderGet(property) => {
-                Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::PropertyDunderSet(property) => {
-                Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::PropertyDunderDelete(property) => {
-                Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::StrStartswith(_)
-            | KnownBoundMethodType::ConstraintSetRange
-            | KnownBoundMethodType::ConstraintSetAlways
-            | KnownBoundMethodType::ConstraintSetNever
-            | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
-            | KnownBoundMethodType::ConstraintSetSatisfies(_)
-            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
-            | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => Some(self),
-        }
-    }
-
     /// Return the [`KnownClass`] that inhabitants of this type are instances of at runtime
     pub(super) fn class(self) -> KnownClass {
         match self {
