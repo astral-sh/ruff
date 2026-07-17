@@ -8,12 +8,16 @@ use std::arch::aarch64::{
 #[cfg(target_arch = "x86")]
 use std::arch::x86::{
     __m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_min_epu8, _mm_movemask_epi8, _mm_or_si128,
-    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
+    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8, _mm256_and_si256, _mm256_broadcastsi128_si256,
+    _mm256_cmpeq_epi8, _mm256_loadu_si256, _mm256_movemask_epi8, _mm256_or_si256, _mm256_set1_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_srli_epi16,
 };
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::{
     __m128i, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_min_epu8, _mm_movemask_epi8, _mm_or_si128,
-    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8,
+    _mm_set1_epi8, _mm_setzero_si128, _mm_sub_epi8, _mm256_and_si256, _mm256_broadcastsi128_si256,
+    _mm256_cmpeq_epi8, _mm256_loadu_si256, _mm256_movemask_epi8, _mm256_or_si256, _mm256_set1_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_srli_epi16,
 };
 
 /// Structural starts for one source batch. Each set bit begins a word run, whitespace run, or
@@ -26,11 +30,11 @@ pub(super) struct Classified {
 
 /// Intersecting the low- and high-nibble entries classifies a byte. Bits 0..=4 are ASCII word
 /// ranges, bits 5..=6 are horizontal whitespace, and bit 7 marks non-ASCII word bytes.
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 const LOW_NIBBLE_CLASSES: [u8; 16] = [
     213, 159, 159, 159, 159, 159, 159, 159, 159, 191, 158, 138, 170, 138, 138, 142,
 ];
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64"))]
 const HIGH_NIBBLE_CLASSES: [u8; 16] = [
     32, 0, 64, 1, 2, 4, 8, 16, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
@@ -44,6 +48,19 @@ pub(super) fn classify(source: &[u8]) -> Classified {
 
 /// Reuses `classified` to identify token boundaries across the complete source batch.
 pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
+    classify_into_with(
+        source,
+        classified,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        std::is_x86_feature_detected!("avx2"),
+    );
+}
+
+fn classify_into_with(
+    source: &[u8],
+    classified: &mut Classified,
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] avx2: bool,
+) {
     let blocks = source.len().div_ceil(64);
     classified.starts.clear();
     classified.starts.reserve(blocks);
@@ -54,22 +71,13 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     let mut chunks = source.chunks_exact(64);
     #[cfg(target_arch = "aarch64")]
     let mut source_or = unsafe { vdupq_n_u8(0) };
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let mut source_or = unsafe { _mm_setzero_si128() };
 
+    #[cfg(target_arch = "aarch64")]
     for chunk in &mut chunks {
         // SAFETY: `chunks_exact(64)` guarantees that all four 16-byte loads are in bounds.
         let (word, whitespace, chunk_or) = unsafe { classify_chunk(chunk.as_ptr()) };
-        #[cfg(target_arch = "aarch64")]
-        {
-            // SAFETY: All NEON operations are valid for arbitrary byte vectors.
-            source_or = unsafe { vorrq_u8(source_or, chunk_or) };
-        }
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            // SAFETY: All SSE2 operations are valid for arbitrary byte vectors.
-            source_or = unsafe { _mm_or_si128(source_or, chunk_or) };
-        }
+        // SAFETY: All NEON operations are valid for arbitrary byte vectors.
+        source_or = unsafe { vorrq_u8(source_or, chunk_or) };
         push_block(
             classified,
             word,
@@ -87,8 +95,37 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // SAFETY: Ruff's supported x86 targets guarantee SSE2 support.
-        classified.ascii_source = unsafe { _mm_movemask_epi8(source_or) == 0 };
+        if avx2 {
+            // SAFETY: `avx2` was detected before entering this function and all loads are bounded
+            // by `chunks_exact(64)`.
+            classified.ascii_source = unsafe {
+                classify_blocks_avx2(
+                    &mut chunks,
+                    classified,
+                    &mut previous_word,
+                    &mut previous_whitespace,
+                )
+            };
+        } else {
+            let mut source_or = unsafe { _mm_setzero_si128() };
+            for chunk in &mut chunks {
+                // SAFETY: `chunks_exact(64)` guarantees that all four 16-byte loads are in
+                // bounds and Ruff's supported x86 targets guarantee SSE2 support.
+                let (word, whitespace, chunk_or) = unsafe { classify_chunk(chunk.as_ptr()) };
+                // SAFETY: All SSE2 operations are valid for arbitrary byte vectors.
+                source_or = unsafe { _mm_or_si128(source_or, chunk_or) };
+                push_block(
+                    classified,
+                    word,
+                    whitespace,
+                    &mut previous_word,
+                    &mut previous_whitespace,
+                    u64::MAX,
+                );
+            }
+            // SAFETY: Ruff's supported x86 targets guarantee SSE2 support.
+            classified.ascii_source = unsafe { _mm_movemask_epi8(source_or) == 0 };
+        }
     }
 
     let tail = chunks.remainder();
@@ -113,6 +150,70 @@ pub(super) fn classify_into(source: &[u8], classified: &mut Classified) {
             &mut previous_whitespace,
             valid,
         );
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+unsafe fn classify_blocks_avx2(
+    chunks: &mut std::slice::ChunksExact<'_, u8>,
+    classified: &mut Classified,
+    previous_word: &mut u64,
+    previous_whitespace: &mut u64,
+) -> bool {
+    // SAFETY: The caller guarantees AVX2 support and `chunks_exact(64)` bounds both 32-byte
+    // loads in every iteration. The broadcast duplicates each nibble table in both shuffle lanes.
+    unsafe {
+        let low = _mm256_broadcastsi128_si256(_mm_loadu_si128(LOW_NIBBLE_CLASSES.as_ptr().cast()));
+        let high =
+            _mm256_broadcastsi128_si256(_mm_loadu_si128(HIGH_NIBBLE_CLASSES.as_ptr().cast()));
+        let nibble = _mm256_set1_epi8(0x0f);
+        let word_bits = _mm256_set1_epi8(0x9f_u8.cast_signed());
+        let whitespace_bits = _mm256_set1_epi8(0x60);
+        let zero = _mm256_setzero_si256();
+        let mut source_or = zero;
+
+        for chunk in chunks {
+            let first = _mm256_loadu_si256(chunk.as_ptr().cast());
+            let second = _mm256_loadu_si256(chunk.as_ptr().add(32).cast());
+            let classes_first = _mm256_and_si256(
+                _mm256_shuffle_epi8(low, _mm256_and_si256(first, nibble)),
+                _mm256_shuffle_epi8(
+                    high,
+                    _mm256_and_si256(_mm256_srli_epi16::<4>(first), nibble),
+                ),
+            );
+            let classes_second = _mm256_and_si256(
+                _mm256_shuffle_epi8(low, _mm256_and_si256(second, nibble)),
+                _mm256_shuffle_epi8(
+                    high,
+                    _mm256_and_si256(_mm256_srli_epi16::<4>(second), nibble),
+                ),
+            );
+
+            let word_first = _mm256_cmpeq_epi8(_mm256_and_si256(classes_first, word_bits), zero);
+            let word_second = _mm256_cmpeq_epi8(_mm256_and_si256(classes_second, word_bits), zero);
+            let whitespace_first =
+                _mm256_cmpeq_epi8(_mm256_and_si256(classes_first, whitespace_bits), zero);
+            let whitespace_second =
+                _mm256_cmpeq_epi8(_mm256_and_si256(classes_second, whitespace_bits), zero);
+
+            let word = u64::from((!_mm256_movemask_epi8(word_first)).cast_unsigned())
+                | (u64::from((!_mm256_movemask_epi8(word_second)).cast_unsigned()) << 32);
+            let whitespace = u64::from((!_mm256_movemask_epi8(whitespace_first)).cast_unsigned())
+                | (u64::from((!_mm256_movemask_epi8(whitespace_second)).cast_unsigned()) << 32);
+            source_or = _mm256_or_si256(source_or, _mm256_or_si256(first, second));
+            push_block(
+                classified,
+                word,
+                whitespace,
+                previous_word,
+                previous_whitespace,
+                u64::MAX,
+            );
+        }
+
+        _mm256_movemask_epi8(source_or) == 0
     }
 }
 
@@ -304,6 +405,21 @@ mod tests {
 
         assert_eq!(classified.starts, expected_starts);
         assert_eq!(classified.ascii_source, source.is_ascii());
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            let mut sse2 = super::Classified::default();
+            super::classify_into_with(source, &mut sse2, false);
+            assert_eq!(sse2.starts, expected_starts);
+            assert_eq!(sse2.ascii_source, source.is_ascii());
+
+            if std::is_x86_feature_detected!("avx2") {
+                let mut avx2 = super::Classified::default();
+                super::classify_into_with(source, &mut avx2, true);
+                assert_eq!(avx2.starts, expected_starts);
+                assert_eq!(avx2.ascii_source, source.is_ascii());
+            }
+        }
     }
 
     #[test]
@@ -339,6 +455,15 @@ mod tests {
     #[test]
     fn punctuation_and_newlines_start_tokens() {
         assert_matches_scalar(b"a+-*/=()[]{},.:;@!<>\r\nb");
+    }
+
+    #[test]
+    fn empty_and_short_tails() {
+        for length in 0..64 {
+            assert_matches_scalar(&vec![b'a'; length]);
+            assert_matches_scalar(&vec![b' '; length]);
+            assert_matches_scalar(&vec![b'+'; length]);
+        }
     }
 
     #[test]
