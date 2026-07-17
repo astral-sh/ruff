@@ -1137,13 +1137,20 @@ impl Session {
 
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
+        let (project_contexts, projects) = self
+            .projects
+            .iter()
+            .map(|(root, project)| {
+                let disabled = self
+                    .workspaces
+                    .settings_for_path(root)
+                    .or_else(|| self.workspaces.settings_virtual_fallback())
+                    .is_some_and(|settings| settings.is_language_services_disabled());
+                ((root.clone(), disabled), project.db.clone())
+            })
+            .unzip();
         SessionSnapshot {
-            projects: self
-                .projects
-                .values()
-                .map(|project| &project.db)
-                .cloned()
-                .collect(),
+            projects,
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
@@ -1151,6 +1158,7 @@ impl Session {
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
             client_name: self.client_name,
+            project_contexts,
         }
     }
 
@@ -1429,6 +1437,8 @@ pub(crate) struct SessionSnapshot {
     in_test: bool,
     revision: u64,
     client_name: ClientName,
+    /// Workspace roots and disabled states, in the same order as `projects`.
+    project_contexts: Vec<(SystemPathBuf, bool)>,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1445,6 +1455,29 @@ pub(crate) struct SessionSnapshot {
 impl SessionSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects
+    }
+
+    /// Returns the closest enclosing workspace, without falling back to another project.
+    pub(crate) fn enclosing_project_index(&self, path: &SystemPath) -> Option<usize> {
+        self.project_contexts
+            .iter()
+            .enumerate()
+            .filter(|(_, (root, _))| path.starts_with(root))
+            .max_by_key(|(_, (root, _))| root.as_str().len())
+            .map(|(index, _)| index)
+    }
+
+    /// Returns whether language services are disabled for the selected workspace.
+    pub(crate) fn language_services_disabled(&self, project: usize) -> bool {
+        self.project_contexts[project].1
+    }
+
+    /// Returns whether `path` contains a workspace other than `project`.
+    pub(crate) fn contains_other_workspace(&self, project: usize, path: &SystemPath) -> bool {
+        self.project_contexts
+            .iter()
+            .enumerate()
+            .any(|(index, (root, _))| index != project && root.starts_with(path))
     }
 
     pub(crate) fn index(&self) -> &Index {
