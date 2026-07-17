@@ -7,7 +7,7 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{CycleQuery, Type, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
@@ -68,9 +68,9 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _, _| Type::identity_recursive(db, CycleQuery::UnionTwoElements, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result.cycle_normalized(db, CycleQuery::UnionTwoElements, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -847,9 +847,9 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _, _| Type::identity_recursive(db, CycleQuery::IntersectionTwoElements, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result.cycle_normalized(db, CycleQuery::IntersectionTwoElements, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]

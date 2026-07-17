@@ -57,7 +57,7 @@ fn list_instance<'db>(db: &'db dyn Db, argument: Type<'db>) -> Type<'db> {
 }
 
 fn recursive_int_list(db: &dyn Db) -> RecursiveType<'_> {
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let element_ty = UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_var]);
     let body = list_instance(db, element_ty);
@@ -116,11 +116,11 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
 ) -> Type<'db> {
-    current.cycle_normalized(db, *previous, cycle)
+    current.cycle_normalized(db, CycleQuery::Test, *previous, cycle)
 }
 
 #[salsa::tracked(
-    cycle_initial=Type::identity_recursive,
+    cycle_initial=|db, id| Type::identity_recursive(db, CycleQuery::Test, id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
@@ -203,7 +203,7 @@ fn todo_types() {
 #[test]
 fn divergent_type() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
     let visitor = ApplyTypeMappingVisitor::default();
@@ -403,7 +403,7 @@ fn divergent_type() {
 #[test]
 fn recursive_type_constructor_simplifies_non_recursive_bodies() {
     let db = setup_db();
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let int = KnownClass::Int.to_instance(&db);
 

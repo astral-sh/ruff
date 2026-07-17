@@ -89,10 +89,10 @@ use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, Foldable, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    definition_expression_type, walk_signature,
+    ClassLiteral, ClassType, CycleQuery, DynamicType, FindLegacyTypeVarsVisitor, Foldable,
+    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1390,8 +1390,8 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, _| CallableSignature::cycle_initial(db, id),
-        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| value.cycle_normalized(db, previous, cycle),
+        cycle_initial=|db, id, _| CallableSignature::cycle_initial(db, CycleQuery::FunctionSignature, id),
+        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| value.cycle_normalized(db, CycleQuery::FunctionSignature, previous, cycle),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {

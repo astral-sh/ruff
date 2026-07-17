@@ -3,8 +3,8 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleQuery, GenericContext, Type,
+        TypeContext, TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
@@ -58,9 +58,9 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _| Type::identity_recursive(db, CycleQuery::TypeAliasValue, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, CycleQuery::TypeAliasValue, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -176,9 +176,9 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _| Type::identity_recursive(db, CycleQuery::ImplicitTypeAliasValue, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, CycleQuery::ImplicitTypeAliasValue, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]

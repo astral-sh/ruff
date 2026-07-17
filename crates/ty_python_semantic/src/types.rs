@@ -1081,12 +1081,12 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(id: salsa::Id) -> Self {
-        Self::Divergent(DivergentType::new(id))
+    pub(crate) fn divergent(query: CycleQuery, id: salsa::Id) -> Self {
+        Self::Divergent(DivergentType::new(query, id))
     }
 
-    pub(crate) fn identity_recursive(db: &'db dyn Db, id: salsa::Id) -> Self {
-        let binder = DivergentType::new(id);
+    pub(crate) fn identity_recursive(db: &'db dyn Db, query: CycleQuery, id: salsa::Id) -> Self {
+        let binder = DivergentType::new(query, id);
         Self::recursive(db, binder, Self::Divergent(binder))
     }
 
@@ -1227,21 +1227,24 @@ impl<'db> Type<'db> {
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.cycle_normalized_with_semantic_view_and_origin(db, previous, None, None, cycle)
+        self.cycle_normalized_with_semantic_view_and_origin(db, query, previous, None, None, cycle)
     }
 
     pub(crate) fn cycle_normalized_with_semantic_view(
         self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         cycle: &salsa::Cycle,
     ) -> Self {
         self.cycle_normalized_with_semantic_view_and_origin(
             db,
+            query,
             previous,
             previous_semantic_view,
             None,
@@ -1252,6 +1255,7 @@ impl<'db> Type<'db> {
     fn cycle_normalized_with_semantic_view_and_origin(
         self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -1303,6 +1307,7 @@ impl<'db> Type<'db> {
 
         stabilized.cycle_fold_recursive(
             db,
+            query,
             previous,
             previous_semantic_view,
             cycle.id(),
@@ -1450,16 +1455,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn cycle_fold_recursive(
         self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous: Self,
         previous_semantic_view: Option<Self>,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
     ) -> Self {
-        let binder = DivergentType::new(id);
+        let binder = DivergentType::new(query, id);
         let previous_root_recursive = match previous {
             Type::Recursive(recursive) if recursive.binder(db).same_marker(binder) => {
                 Some(recursive)
@@ -2457,10 +2464,15 @@ impl<'db> Type<'db> {
     /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
-    pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+    pub(crate) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            ty.recursive_type_normalized_impl(db, Type::divergent(query, id), false)
+                .unwrap_or(Type::divergent(query, id))
         })
     }
 
@@ -3060,9 +3072,9 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::identity_recursive(db, CycleQuery::ClassMember, id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
+            member.cycle_normalized(db, CycleQuery::ClassMember, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -3881,10 +3893,10 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
             cycle_initial=|db, id, _, _, _, _| {
-                Place::bound(Type::identity_recursive(db, id)).into()
+                Place::bound(Type::identity_recursive(db, CycleQuery::MemberLookup, id)).into()
             },
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
-                member.cycle_normalized(db, *previous, cycle)
+                member.cycle_normalized(db, CycleQuery::MemberLookup, *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -6533,9 +6545,9 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _, _| Type::identity_recursive(db, CycleQuery::ApplySpecialization, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, CycleQuery::ApplySpecialization, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -7368,9 +7380,9 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|db, id, _, ()| Type::identity_recursive(db, id),
+        cycle_initial=|db, id, _, ()| Type::identity_recursive(db, CycleQuery::EagerExpansion, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, CycleQuery::EagerExpansion, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -8510,6 +8522,45 @@ impl<'db> RecursiveType<'db> {
     }
 }
 
+/// The tracked query function that owns a recursion marker.
+///
+/// Salsa's [`salsa::Cycle::id`] identifies a query key, but not the tracked function using that
+/// key. Pairing it with the function kind prevents distinct queries over the same key from sharing
+/// a recursion marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum CycleQuery {
+    ClassMember,
+    MemberLookup,
+    ApplySpecialization,
+    EagerExpansion,
+    UnionTwoElements,
+    IntersectionTwoElements,
+    TypeNarrowedByPreviousPatterns,
+    TypeNarrowedByPattern,
+    PatternSuccess,
+    ProtocolInterface,
+    FunctionSignature,
+    TypeAliasValue,
+    ImplicitTypeAliasValue,
+    TypeVarBound,
+    TypeVarConstraints,
+    TypeVarDefault,
+    BoundTypeVarDefault,
+    DefinitionTypes,
+    DeferredTypes,
+    ScopeTypes,
+    ExpressionTypes,
+    ExpressionType,
+    StatementTypes,
+    UnpackTypes,
+    ExplicitBases,
+    ImplicitAttribute,
+    Place,
+    TupleToClassType,
+    #[cfg(test)]
+    Test,
+}
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
@@ -8517,7 +8568,9 @@ impl<'db> RecursiveType<'db> {
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct DivergentType {
-    /// The query ID that caused the cycle.
+    /// The tracked query function that caused the cycle.
+    query: CycleQuery,
+    /// The query key ID that caused the cycle.
     id: salsa::Id,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
@@ -8528,15 +8581,16 @@ pub struct DivergentType {
 impl get_size2::GetSize for DivergentType {}
 
 impl DivergentType {
-    pub(in crate::types) const fn new(id: salsa::Id) -> Self {
+    pub(in crate::types) const fn new(query: CycleQuery, id: salsa::Id) -> Self {
         Self {
+            query,
             id,
             materialization: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+        self.query == other.query && self.id == other.id
     }
 
     fn in_cycle_scc(self, binders: &[Self]) -> bool {
@@ -8545,6 +8599,7 @@ impl DivergentType {
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
+            query: self.query,
             id: self.id,
             materialization: Some(kind),
         }

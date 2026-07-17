@@ -13,9 +13,9 @@ use crate::{
         TypeOrigin,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, CycleQuery, DynamicType,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
@@ -560,7 +560,7 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    #[salsa::tracked(cycle_initial=|db, id, _| Some(Type::identity_recursive(db, id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=|db, id, _| Some(Type::identity_recursive(db, CycleQuery::TypeVarDefault, id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -1349,8 +1349,12 @@ fn lazy_bound_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
-        (Some(prev), Some(current)) => Some(current.cycle_normalized(db, *prev, cycle)),
-        (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
+        (Some(prev), Some(current)) => {
+            Some(current.cycle_normalized(db, CycleQuery::TypeVarBound, *prev, cycle))
+        }
+        (None, Some(current)) => {
+            Some(current.recursive_type_normalized(db, CycleQuery::TypeVarBound, cycle))
+        }
         (_, None) => None,
     }
 }
@@ -1366,8 +1370,12 @@ fn lazy_constraints_cycle_recover<'db>(
 ) -> Option<TypeVarConstraints<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
-        (Some(prev), Some(constraints)) => Some(constraints.cycle_normalized(db, *prev, cycle)),
-        (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
+        (Some(prev), Some(constraints)) => {
+            Some(constraints.cycle_normalized(db, CycleQuery::TypeVarConstraints, *prev, cycle))
+        }
+        (None, Some(current)) => {
+            Some(current.recursive_type_normalized(db, CycleQuery::TypeVarConstraints, cycle))
+        }
         (_, None) => None,
     }
 }
@@ -1382,8 +1390,12 @@ fn lazy_default_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the default to ensure cycle convergence.
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (Some(prev), Some(default)) => {
+            Some(default.cycle_normalized(db, CycleQuery::TypeVarDefault, *prev, cycle))
+        }
+        (None, Some(default)) => {
+            Some(default.recursive_type_normalized(db, CycleQuery::TypeVarDefault, cycle))
+        }
         (_, None) => None,
     }
 }
@@ -1472,7 +1484,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _| Some(Type::identity_recursive(db, id)),
+    cycle_initial=|db, id, _| Some(Type::identity_recursive(db, CycleQuery::BoundTypeVarDefault, id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1499,8 +1511,12 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     match (previous_default, default) {
-        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (Some(previous), Some(default)) => {
+            Some(default.cycle_normalized(db, CycleQuery::BoundTypeVarDefault, *previous, cycle))
+        }
+        (None, Some(default)) => {
+            Some(default.recursive_type_normalized(db, CycleQuery::BoundTypeVarDefault, cycle))
+        }
         (_, None) => None,
     }
 }
@@ -1675,7 +1691,13 @@ impl<'db> TypeVarConstraints<'db> {
     /// removing divergent types introduced by the cycle.
     ///
     /// See [`Type::cycle_normalized`] for more details on how this works.
-    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let current_elements = self.elements(db);
         let prev_elements = previous.elements(db);
         TypeVarConstraints::new(
@@ -1683,7 +1705,7 @@ impl<'db> TypeVarConstraints<'db> {
             current_elements
                 .iter()
                 .zip(prev_elements.iter())
-                .map(|(ty, prev_ty)| ty.cycle_normalized(db, *prev_ty, cycle))
+                .map(|(ty, prev_ty)| ty.cycle_normalized(db, query, *prev_ty, cycle))
                 .collect::<Box<_>>(),
         )
     }
@@ -1691,8 +1713,13 @@ impl<'db> TypeVarConstraints<'db> {
     /// Normalize recursive types for cycle recovery when there's no previous value.
     ///
     /// See [`Type::recursive_type_normalized`] for more details.
-    fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        self.map(db, |ty| ty.recursive_type_normalized(db, cycle))
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        self.map(db, |ty| ty.recursive_type_normalized(db, query, cycle))
     }
 }
 

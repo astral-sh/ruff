@@ -200,7 +200,7 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, KnownInstanceType,
+        ActiveRecursionDetector, CallableTypes, CycleQuery, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
@@ -236,9 +236,9 @@ use ty_python_core::{
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
 #[salsa::tracked(
-    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, CycleQuery::TypeNarrowedByPreviousPatterns, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, CycleQuery::TypeNarrowedByPreviousPatterns, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -265,9 +265,9 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
-    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, CycleQuery::TypeNarrowedByPattern, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, CycleQuery::TypeNarrowedByPattern, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]

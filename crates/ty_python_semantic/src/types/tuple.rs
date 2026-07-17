@@ -31,7 +31,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, ErrorContext,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleQuery, DivergentType, ErrorContext,
     FindLegacyTypeVarsVisitor, Foldable, IntersectionType, RecursiveType, StructuralTypeMapping,
     Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
@@ -612,7 +612,11 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::identity_recursive(db, id), self_)
+            generic_context.specialize_tuple(
+                db,
+                Type::identity_recursive(db, CycleQuery::TupleToClassType, id),
+                self_,
+            )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }
