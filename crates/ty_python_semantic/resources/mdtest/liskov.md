@@ -959,6 +959,136 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
+## Protocol annotations on mixin receivers
+
+A mixin can annotate `self` with a protocol that the mixin itself does not implement. An override
+can keep that annotation or omit it:
+
+```pyi
+from typing import Protocol, overload
+
+class HasValue(Protocol):
+    value: int
+
+class Mixin:
+    def method(self: HasValue, argument: int) -> None: ...
+
+class SameReceiver(Mixin):
+    def method(self: HasValue, argument: int) -> None: ...
+
+class ImplicitReceiver(Mixin):
+    def method(self, argument: int) -> None: ...
+```
+
+A subclass that provides the required protocol member can call the annotated method normally:
+
+```pyi
+class ImplementsProtocol(Mixin):
+    value: int
+    def method(self: HasValue, argument: int) -> None: ...
+
+receiver: HasValue = ImplementsProtocol()
+ImplementsProtocol().method(1)
+```
+
+An override cannot require an unrelated protocol or change the type of an argument accepted by the
+mixin:
+
+```pyi
+class HasOtherValue(Protocol):
+    other_value: str
+
+class InvalidReceiver(Mixin):
+    def method(self: HasOtherValue, argument: int) -> None: ...  # error: [invalid-method-override]
+
+class InvalidArgument(Mixin):
+    value: int
+    def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:28:9
+   |
+28 |     def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Mixin.method`
+   |
+  ::: src/mdtest_snippet.pyi:7:9
+   |
+ 7 |     def method(self: HasValue, argument: int) -> None: ...
+   |         --------------------------------------------- `Mixin.method` defined here
+   |
+info: parameter `argument` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
+The receiver annotation can also accept more than one protocol:
+
+```pyi
+class UnionMixin:
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+
+class SameUnionReceiver(UnionMixin):
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+```
+
+Overloaded mixin methods need the same treatment for every receiver-specific overload:
+
+```pyi
+# TODO: We should emit an `invalid-method-override` diagnostic on the second
+# `InvalidOverloadedReceiver.method` overload. Both overload sets need to be
+# compared within the `HasValue` receiver domain instead of being filtered
+# against the concrete mixin subclass.
+class OverloadedMixin:
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: str) -> None: ...
+
+class InvalidOverloadedReceiver(OverloadedMixin):
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: bytes) -> None: ...
+```
+
+The protocol may include the overridden method itself. This must not cause a valid implementation to
+be rejected while checking the override:
+
+```pyi
+class Container(Protocol):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self) -> None: ...
+
+class ContainerMixin:
+    def method(self: Container) -> None: ...
+
+class ImplementsContainer(ContainerMixin):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self: Container) -> None: ...
+
+container: Container = ImplementsContainer()
+ImplementsContainer().method()
+```
+
+## Generic instance-method receivers
+
+An instance method can relate its receiver and return type using a bounded type variable. An
+override can express the same relationship with `Self`:
+
+```pyi
+from typing import TypeVar
+from typing_extensions import Self
+
+InstanceT = TypeVar("InstanceT", bound="InstanceBase")
+
+class InstanceBase:
+    def clone(self: InstanceT) -> InstanceT: ...
+
+class InstanceChild(InstanceBase):
+    def clone(self: Self) -> Self: ...
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
@@ -1436,6 +1566,80 @@ error[invalid-method-override]: Invalid override of method `static_method`
    |
 info: `BadChild3B.static_method` is a classmethod but `Parent.static_method` is a staticmethod
 info: This violates the Liskov Substitution Principle
+```
+
+## Explicitly annotated classmethod receivers
+
+An explicitly annotated `cls` can specialize the class receiver and return type. A subclass can also
+replace a bounded type variable on the class receiver with `Self` while preserving compatible
+arguments:
+
+```pyi
+from typing import Any, TypeVar
+from typing_extensions import Self
+
+class Event:
+    @classmethod
+    def deserialize(cls: type[Event], data: dict[str, object]) -> Event: ...
+
+class SwapEvent(Event):
+    @classmethod
+    def deserialize(cls: type[SwapEvent], data: dict[str, object]) -> SwapEvent: ...
+
+class Context:
+    @classmethod
+    def get(cls: type[Self]) -> Self | None: ...
+
+class SettingsContext(Context):
+    @classmethod
+    def get(cls) -> SettingsContext | None: ...
+
+ItemT = TypeVar("ItemT", bound="Item")
+
+class Item:
+    @classmethod
+    def from_component(cls: type[ItemT], component: object) -> ItemT: ...
+
+class DynamicItem(Item):
+    @classmethod
+    def from_component(cls: type[Self], component: object) -> Self: ...
+```
+
+The override can also specialize a gradual parameter or accept additional keyword arguments:
+
+```pyi
+ModelT = TypeVar("ModelT", bound="BaseModel")
+
+class BaseModel:
+    @classmethod
+    def validate(cls: type[ModelT], value: Any) -> Any: ...
+    @classmethod
+    def strategy(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+    @classmethod
+    def example(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+
+class FrameModel(BaseModel):
+    @classmethod
+    def validate(cls: type[Self], value: int) -> Self: ...
+    @classmethod
+    def strategy(cls: type[Self], **kwargs: Any) -> Any: ...
+    @classmethod
+    def example(cls: type[Self], **kwargs: Any) -> Self: ...
+```
+
+Narrowing a non-gradual argument accepted by the superclass remains an invalid override for both
+generic and concrete class receivers:
+
+```pyi
+class InvalidDynamicItem(Item):
+    @classmethod
+    # error: [invalid-method-override]
+    def from_component(cls: type[Self], component: int) -> Self: ...
+
+class InvalidSwapEvent(Event):
+    @classmethod
+    # error: [invalid-method-override]
+    def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
 ```
 
 ## Overloaded methods with positional-only parameters with defaults
