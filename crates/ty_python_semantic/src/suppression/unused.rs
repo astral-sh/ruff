@@ -40,16 +40,15 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         // `unused-ignore-comment` diagnostics can only be suppressed by specifying a
         // code. This is necessary because every `type: ignore` would implicitly also
         // suppress its own unused-ignore-comment diagnostic.
-        if let Some(unused_suppression) = all
-            .lint_suppressions(suppression.range, LintId::of(&UNUSED_IGNORE_COMMENT))
-            .find(|unused_ignore_suppression| unused_ignore_suppression.target.is_lint())
-        {
-            // A `unused-ignore-comment` suppression can't ignore itself.
-            // It can only ignore other suppressions.
-            if unused_suppression.id() != suppression.id() {
-                diagnostics.mark_used(unused_suppression.id());
-                continue;
-            }
+        // An `unused-ignore-comment` suppression can't ignore itself. It can only ignore other
+        // suppressions, so exclude the suppression whose diagnostic we're checking.
+        if let Some(unused_suppression) = all.find_code_suppression(
+            suppression.range,
+            LintId::of(&UNUSED_IGNORE_COMMENT),
+            Some(suppression.id()),
+        ) {
+            diagnostics.mark_used(unused_suppression);
+            continue;
         }
 
         unused.push(suppression);

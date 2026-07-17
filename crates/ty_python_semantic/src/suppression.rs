@@ -2,6 +2,7 @@ mod add_ignore;
 mod parser;
 mod unused;
 
+use itertools::Itertools;
 use smallvec::{SmallVec, smallvec};
 use std::fmt;
 
@@ -12,6 +13,7 @@ use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
@@ -157,15 +159,12 @@ fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
     }) {
         // A blanket suppression cannot suppress its own diagnostic, but a code-specific
         // suppression can.
-        if let Some(code_suppression) = context
-            .suppressions
-            .lint_suppressions(suppression.range, LintId::of(&BLANKET_IGNORE_COMMENT))
-            .find(|candidate| candidate.target.is_lint())
-        {
-            context
-                .diagnostics
-                .borrow_mut()
-                .mark_used(code_suppression.id());
+        if let Some(code_suppression) = context.suppressions.find_code_suppression(
+            suppression.range,
+            LintId::of(&BLANKET_IGNORE_COMMENT),
+            None,
+        ) {
+            context.diagnostics.borrow_mut().mark_used(code_suppression);
         } else if let Some(diag) =
             context.report_unchecked(&BLANKET_IGNORE_COMMENT, suppression.range)
         {
@@ -329,6 +328,12 @@ pub(crate) struct Suppressions {
     /// The outer suppression starts before the inner suppression but ends after it.
     inline: IntervalIndex<Suppression>,
 
+    /// Inline suppressions indexed by their target, excluding empty suppressions.
+    ///
+    /// This avoids scanning unrelated nested suppressions for every diagnostic. Blanket and
+    /// code-specific candidates are queried separately and merged in source order.
+    inline_by_target: FxHashMap<SuppressionTarget, IntervalIndex<usize>>,
+
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
 
@@ -337,34 +342,71 @@ pub(crate) struct Suppressions {
 }
 
 impl Suppressions {
+    /// Returns the suppression that takes precedence for the diagnostic `range` and lint `id`.
+    ///
+    /// Nested suppression ranges prefer the innermost candidate. If a diagnostic spans multiple
+    /// physical lines and separate suppressions cover its opening and closing lines, the
+    /// opening-line suppression retains precedence.
     pub(crate) fn find_suppression(&self, range: TextRange, id: LintId) -> Option<&Suppression> {
-        self.lint_suppressions(range, id).next()
+        self.file
+            .iter()
+            .find(|suppression| suppression.matches(id))
+            .or_else(|| {
+                let code_suppressions =
+                    self.inline_suppressions_for_target_rev(range, SuppressionTarget::Lint(id));
+                let blanket_suppressions =
+                    self.inline_suppressions_for_target_rev(range, SuppressionTarget::All);
+
+                select_preferred_suppression(
+                    code_suppressions.merge_by(blanket_suppressions, |left, right| {
+                        left.range.start() > right.range.start()
+                    }),
+                    range,
+                )
+            })
     }
 
-    /// Returns all suppressions for the given lint
-    fn lint_suppressions(
+    /// Returns the first code-specific suppression for `id` other than `excluded`, using the same
+    /// precedence as [`Self::find_suppression`].
+    fn find_code_suppression(
         &self,
         range: TextRange,
         id: LintId,
-    ) -> impl Iterator<Item = &Suppression> + '_ {
+        excluded: Option<FileSuppressionId>,
+    ) -> Option<FileSuppressionId> {
+        let target = SuppressionTarget::Lint(id);
         self.file
             .iter()
-            .chain(self.inline_suppressions(range))
-            .filter(move |suppression| suppression.matches(id))
+            .find(|suppression| suppression.target == target && Some(suppression.id()) != excluded)
+            .map(Suppression::id)
+            .or_else(|| {
+                select_preferred_suppression(
+                    self.inline_suppressions_for_target_rev(range, target)
+                        .filter(|suppression| Some(suppression.id()) != excluded),
+                    range,
+                )
+                .map(Suppression::id)
+            })
     }
 
-    /// Returns the inline suppressions that apply for `range`.
+    /// Returns applicable inline suppressions for `target` in reverse source order.
     ///
-    /// A suppression applies for the given range if it contains the range's start or end offset.
-    /// End-of-line suppressions cover the diagnostic's start or end line, while own-line
-    /// suppressions cover the following logical line.
-    fn inline_suppressions(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        self.inline.intersecting(range).filter(move |suppression| {
-            // Don't use intersect to avoid that suppressions on inner-expression
-            // ignore errors for outer expressions
-            suppression.suppressed_range.contains(range.start())
-                || suppression.suppressed_range.contains_inclusive(range.end())
-        })
+    /// Querying the target-specific index avoids visiting nested suppressions for unrelated lints.
+    fn inline_suppressions_for_target_rev(
+        &self,
+        range: TextRange,
+        target: SuppressionTarget,
+    ) -> impl Iterator<Item = &Suppression> + '_ {
+        self.inline_by_target
+            .get(&target)
+            .into_iter()
+            .flat_map(move |index| {
+                index.intersecting_rev_by(range, |inline_index| {
+                    self.inline.get(*inline_index).interval()
+                })
+            })
+            .map(|inline_index| self.inline.get(*inline_index))
+            .filter(move |suppression| suppression.applies_to(range))
     }
 
     /// Returns the inline suppressions whose comments are on `line_range`.
@@ -386,6 +428,40 @@ impl Suppressions {
 
     fn iter(&self) -> impl Iterator<Item = &Suppression> {
         self.file.iter().chain(self.inline.iter())
+    }
+}
+
+/// Selects between applicable suppressions yielded in reverse source order.
+///
+/// Candidates covering the same endpoint are nested, so the first (innermost) candidate wins. For
+/// a diagnostic spanning multiple physical lines, however, a later candidate may cover only its
+/// closing line while a separate earlier candidate covers its opening line. The closing-line
+/// candidate wins only when its suppression range is nested within the opening-line candidate's
+/// range; otherwise the opening-line candidate retains precedence.
+fn select_preferred_suppression<'a>(
+    mut candidates: impl Iterator<Item = &'a Suppression>,
+    diagnostic_range: TextRange,
+) -> Option<&'a Suppression> {
+    let end_candidate = candidates.next()?;
+    let diagnostic_start = diagnostic_range.start();
+
+    if end_candidate.suppressed_range.contains(diagnostic_start) {
+        return Some(end_candidate);
+    }
+
+    let start_candidate =
+        candidates.find(|candidate| candidate.suppressed_range.contains(diagnostic_start));
+
+    match start_candidate {
+        Some(start_candidate)
+            if start_candidate
+                .suppressed_range
+                .contains_range(end_candidate.suppressed_range) =>
+        {
+            Some(end_candidate)
+        }
+        Some(start_candidate) => Some(start_candidate),
+        None => Some(end_candidate),
     }
 }
 
@@ -428,6 +504,15 @@ pub(crate) struct Suppression {
 }
 
 impl Suppression {
+    /// Returns whether this suppression covers either endpoint of `range`.
+    ///
+    /// Requiring endpoint containment, rather than any intersection, prevents a suppression on an
+    /// inner expression from suppressing a diagnostic for an enclosing expression.
+    fn applies_to(&self, range: TextRange) -> bool {
+        self.suppressed_range.contains(range.start())
+            || self.suppressed_range.contains_inclusive(range.end())
+    }
+
     fn matches(&self, tested_id: LintId) -> bool {
         match self.target {
             SuppressionTarget::All => true,
@@ -484,7 +569,7 @@ impl fmt::Display for SuppressionKind {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) struct FileSuppressionId(TextRange);
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 enum SuppressionTarget {
     /// Suppress all lints
     All,
@@ -496,12 +581,6 @@ enum SuppressionTarget {
     Empty,
 }
 
-impl SuppressionTarget {
-    const fn is_lint(self) -> bool {
-        matches!(self, SuppressionTarget::Lint(_))
-    }
-}
-
 struct SuppressionsBuilder<'a> {
     lint_registry: &'a LintRegistry,
     source: &'a str,
@@ -511,6 +590,7 @@ struct SuppressionsBuilder<'a> {
     seen_non_trivia_token: bool,
 
     inline: Vec<Suppression>,
+    inline_by_target: FxHashMap<SuppressionTarget, Vec<usize>>,
     file: SmallVec<[Suppression; 1]>,
     unknown: Vec<UnknownSuppression>,
     invalid: Vec<InvalidSuppression>,
@@ -523,6 +603,7 @@ impl<'a> SuppressionsBuilder<'a> {
             lint_registry,
             seen_non_trivia_token: false,
             inline: Vec::new(),
+            inline_by_target: FxHashMap::default(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
             invalid: Vec::new(),
@@ -538,9 +619,25 @@ impl<'a> SuppressionsBuilder<'a> {
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
 
+        let inline = IntervalIndex::from_sorted(self.inline);
+        let mut inline_by_target: FxHashMap<_, _> = self
+            .inline_by_target
+            .into_iter()
+            .map(|(target, suppressions)| {
+                (
+                    target,
+                    IntervalIndex::from_sorted_by(suppressions, |inline_index| {
+                        inline.get(*inline_index).interval()
+                    }),
+                )
+            })
+            .collect();
+        inline_by_target.shrink_to_fit();
+
         Suppressions {
             file: self.file,
-            inline: IntervalIndex::from_sorted(self.inline),
+            inline,
+            inline_by_target,
             unknown: self.unknown,
             invalid: self.invalid,
         }
@@ -571,6 +668,12 @@ impl<'a> SuppressionsBuilder<'a> {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
+                if suppression.target != SuppressionTarget::Empty {
+                    self.inline_by_target
+                        .entry(suppression.target)
+                        .or_default()
+                        .push(self.inline.len());
+                }
                 self.inline.push(suppression);
             }
         };
@@ -732,7 +835,7 @@ trait Interval {
 ///
 /// The entries form an implicit balanced binary tree. Each entry stores the maximum interval end
 /// in its subtree, which allows intersection queries to skip subtrees that end before the query.
-/// Intervals may overlap or nest, and queries return them in their original order.
+/// Intervals may overlap or nest, and queries traverse them in reverse input order.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 struct IntervalIndex<T> {
     entries: Box<[IntervalEntry<T>]>,
@@ -745,59 +848,65 @@ struct IntervalEntry<T> {
     subtree_max_end: TextSize,
 }
 
-impl<T: Interval> IntervalIndex<T> {
-    /// Builds an index from values sorted by interval start, retaining their input order.
+impl<T> IntervalIndex<T> {
+    /// Builds an index from values sorted by the start returned by `interval`, retaining their
+    /// input order.
     ///
-    /// The caller must ensure that `values` is sorted by [`Interval::interval`] start.
-    fn from_sorted(values: Vec<T>) -> Self {
-        debug_assert!(values.is_sorted_by_key(|value| value.interval().start()));
+    /// Queries must use the same interval projection so that subtree bounds remain valid.
+    fn from_sorted_by(values: Vec<T>, interval: impl Fn(&T) -> TextRange + Copy) -> Self {
+        debug_assert!(values.is_sorted_by_key(|value| interval(value).start()));
 
         let mut entries = values
             .into_iter()
             .map(|value| IntervalEntry {
-                subtree_max_end: value.interval().end(),
+                subtree_max_end: interval(&value).end(),
                 value,
             })
             .collect::<Box<[_]>>();
 
-        Self::set_subtree_max_ends(&mut entries);
+        Self::set_subtree_max_ends(&mut entries, interval);
 
         Self { entries }
     }
 
     /// Populates each entry's subtree maximum and returns the maximum end in `entries`.
-    fn set_subtree_max_ends(entries: &mut [IntervalEntry<T>]) -> TextSize {
+    fn set_subtree_max_ends(
+        entries: &mut [IntervalEntry<T>],
+        interval: impl Fn(&T) -> TextRange + Copy,
+    ) -> TextSize {
         let mid = entries.len() / 2;
         let (left, root_and_right) = entries.split_at_mut(mid);
         let Some((root, right)) = root_and_right.split_first_mut() else {
             return TextSize::default();
         };
 
-        let left_max_end = Self::set_subtree_max_ends(left);
-        let right_max_end = Self::set_subtree_max_ends(right);
-        root.subtree_max_end = root
-            .value
-            .interval()
+        let left_max_end = Self::set_subtree_max_ends(left, interval);
+        let right_max_end = Self::set_subtree_max_ends(right, interval);
+        root.subtree_max_end = interval(&root.value)
             .end()
             .max(left_max_end)
             .max(right_max_end);
         root.subtree_max_end
     }
 
-    /// Returns the indexed values that intersect `query`, in input order.
+    /// Returns the indexed values that intersect `query`, in reverse input order.
     ///
     /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
     /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
-    /// returned values.
-    fn intersecting(&self, query: TextRange) -> impl Iterator<Item = &T> {
+    /// returned values. `interval` must return the same ranges used to build the index.
+    fn intersecting_rev_by(
+        &self,
+        query: TextRange,
+        interval: impl Fn(&T) -> TextRange + Copy,
+    ) -> impl Iterator<Item = &T> {
         let mut pending: SmallVec<[&[IntervalEntry<T>]; 16]> = smallvec![self.entries.as_ref()];
 
         std::iter::from_fn(move || {
             while let Some(entries) = pending.pop() {
                 match entries {
                     [entry] => {
-                        if entry.value.interval().start() <= query.end()
-                            && entry.value.interval().end() >= query.start()
+                        if interval(&entry.value).start() <= query.end()
+                            && interval(&entry.value).end() >= query.start()
                         {
                             return Some(&entry.value);
                         }
@@ -813,15 +922,16 @@ impl<T: Interval> IntervalIndex<T> {
                             continue;
                         }
 
-                        if root.value.interval().start() > query.end() {
+                        if interval(&root.value).start() > query.end() {
                             pending.push(left);
                             continue;
                         }
 
-                        // Push in reverse source order so the left subtree is visited first.
-                        pending.push(right);
-                        pending.push(std::slice::from_ref(root));
+                        // The stack is last-in, first-out, so push in source order to visit the
+                        // right subtree first.
                         pending.push(left);
+                        pending.push(std::slice::from_ref(root));
+                        pending.push(right);
                     }
                 }
             }
@@ -834,7 +944,61 @@ impl<T: Interval> IntervalIndex<T> {
         self.entries.iter().map(|entry| &entry.value)
     }
 
+    fn get(&self, index: usize) -> &T {
+        &self.entries[index].value
+    }
+
     fn len(&self) -> usize {
         self.entries.len()
+    }
+}
+
+impl<T: Interval> IntervalIndex<T> {
+    /// Builds an index from values sorted by interval start, retaining their input order.
+    ///
+    /// The caller must ensure that `values` is sorted by [`Interval::interval`] start.
+    fn from_sorted(values: Vec<T>) -> Self {
+        Self::from_sorted_by(values, Interval::interval)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_text_size::{TextLen as _, TextRange};
+
+    use super::{SuppressionTarget, suppressions};
+    use crate::Db as _;
+    use crate::db::tests::TestDbBuilder;
+
+    #[test]
+    fn target_index_skips_nested_suppressions_for_other_lints() {
+        let source = r#"seen_code = True
+# ty: ignore[unresolved-reference]
+# ty: ignore[division-by-zero]
+# ty: ignore[division-by-zero]
+# ty: ignore[division-by-zero]
+value = missing
+"#;
+        let db = TestDbBuilder::new()
+            .with_file("test.py", source)
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let unresolved_reference = db.lint_registry().get("unresolved-reference").unwrap();
+        let missing_start = source.find("missing").unwrap().try_into().unwrap();
+        let missing_range = TextRange::at(missing_start, "missing".text_len());
+
+        let suppressions = suppressions(&db, file);
+        assert_eq!(suppressions.inline.len(), 4);
+        assert_eq!(
+            suppressions
+                .inline_suppressions_for_target_rev(
+                    missing_range,
+                    SuppressionTarget::Lint(unresolved_reference),
+                )
+                .count(),
+            1
+        );
     }
 }
