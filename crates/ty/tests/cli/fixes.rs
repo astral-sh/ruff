@@ -47,6 +47,61 @@ fn add_ignore() -> anyhow::Result<()> {
 }
 
 #[test]
+fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "nested.py",
+        r#"
+            def f(value: int) -> int:
+                return value
+
+            seen_code = True
+            # ty: ignore[]
+            values = [
+                # ty: ignore[blanket-ignore-comment]
+                # ty: ignore
+                f("bad"),
+                # ty: ignore
+                missing,
+            ]
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--add-ignore")
+            .arg("--warn")
+            .arg("blanket-ignore-comment"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 1 ignore comment
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("nested.py"))?, @r#"
+
+    def f(value: int) -> int:
+        return value
+
+    seen_code = True
+    # ty: ignore[blanket-ignore-comment]
+    values = [
+        # ty: ignore[blanket-ignore-comment]
+        # ty: ignore
+        f("bad"),
+        # ty: ignore
+        missing,
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", r"print(x  # [unresolved-reference]"),

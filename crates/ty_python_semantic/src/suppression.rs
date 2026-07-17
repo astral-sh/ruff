@@ -358,25 +358,24 @@ impl Suppressions {
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.file
             .iter()
-            .chain(self.inline.intersecting_rev(range, id))
+            .chain(self.inline.intersecting_rev(
+                range,
+                SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask(),
+            ))
             .filter(move |suppression| suppression.matches(id) && suppression.applies_to(range))
     }
 
-    /// Returns the inline suppressions whose comments are on `line_range`.
-    fn inline_suppressions_on_line(
+    /// Returns applicable comments that `--add-ignore` can extend, in reverse source order.
+    ///
+    /// The interval index marks one editable entry per comment, excluding comments with trailing
+    /// reasons and duplicate entries for a multi-code suppression.
+    fn editable_inline_suppressions_rev(
         &self,
-        line_range: TextRange,
+        range: TextRange,
     ) -> impl Iterator<Item = &Suppression> + '_ {
-        // The interval index retains source order, so comment ranges are also ordered by start.
-        let start = self
-            .inline
-            .entries
-            .partition_point(|entry| entry.suppression.comment_range.start() < line_range.start());
-
-        self.inline.entries[start..]
-            .iter()
-            .map(|entry| &entry.suppression)
-            .take_while(move |suppression| suppression.comment_range.start() < line_range.end())
+        self.inline
+            .intersecting_rev(range, IntervalIndex::EDITABLE_MASK)
+            .filter(move |suppression| suppression.editable && suppression.applies_to(range))
     }
 
     fn iter(&self) -> impl Iterator<Item = &Suppression> {
@@ -427,6 +426,7 @@ fn select_preferred_suppression<'a>(
 pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
+    editable: bool,
 
     /// The range of the code in this suppression.
     ///
@@ -507,6 +507,23 @@ impl fmt::Display for SuppressionKind {
     }
 }
 
+/// Returns the portion of an ignore comment before its closing bracket if another code can be
+/// appended to it.
+///
+/// ```python
+/// # ty: ignore[]         # Editable
+/// # ty: ignore[] reason  # Not editable
+/// ```
+fn editable_suppression_prefix(comment_text: &str) -> Option<&str> {
+    // The parser accepts a reason after the code list, but rule codes can't contain `]`, so the
+    // first `]` is the code list's closing bracket. Don't edit comments with trailing reasons.
+    let (before_closing_bracket, after_closing_bracket) = comment_text.split_once(']')?;
+    after_closing_bracket
+        .trim()
+        .is_empty()
+        .then(|| before_closing_bracket.trim_end())
+}
+
 /// Unique ID for a suppression in a file.
 ///
 /// ## Implementation
@@ -545,7 +562,8 @@ impl SuppressionTarget {
             SuppressionTarget::Lint(id) => {
                 let mut hasher = FxHasher::default();
                 id.hash(&mut hasher);
-                1 << (1 + hasher.finish() % 63)
+                // The top bit is reserved for editable suppressions.
+                1 << (1 + hasher.finish() % 62)
             }
         }
     }
@@ -616,10 +634,24 @@ impl<'a> SuppressionsBuilder<'a> {
             line_range
         };
 
-        let mut push_ignore_suppression = |suppression: Suppression| {
+        let is_editable = comment.codes().is_some()
+            && editable_suppression_prefix(&self.source[comment.range()]).is_some();
+        let mut indexed_editable_comment = false;
+
+        let mut push_ignore_suppression = |mut suppression: Suppression| {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
+                if is_editable
+                    && !indexed_editable_comment
+                    && matches!(
+                        suppression.target,
+                        SuppressionTarget::Lint(_) | SuppressionTarget::Empty
+                    )
+                {
+                    suppression.editable = true;
+                    indexed_editable_comment = true;
+                }
                 self.inline.push(suppression);
             }
         };
@@ -630,6 +662,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 push_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind(),
+                    editable: false,
                     comment_range: comment.range(),
                     range: comment.range(),
                     suppressed_range,
@@ -641,6 +674,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 push_ignore_suppression(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind(),
+                    editable: false,
                     range: comment.range(),
                     comment_range: comment.range(),
                     suppressed_range,
@@ -668,6 +702,7 @@ impl<'a> SuppressionsBuilder<'a> {
                             push_ignore_suppression(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind(),
+                                editable: false,
                                 range: code_range,
                                 comment_range: comment.range(),
                                 suppressed_range,
@@ -790,6 +825,9 @@ struct IntervalEntry {
 }
 
 impl IntervalIndex {
+    /// Marks the single editable entry for an inline suppression comment.
+    const EDITABLE_MASK: u64 = 1 << 63;
+
     /// Builds an index from values sorted by interval start, retaining their input order.
     fn from_sorted(suppressions: Vec<Suppression>) -> Self {
         debug_assert!(
@@ -800,7 +838,12 @@ impl IntervalIndex {
             .into_iter()
             .map(|suppression| IntervalEntry {
                 subtree_max_end: suppression.suppressed_range.end(),
-                subtree_target_mask: suppression.target.target_mask(),
+                subtree_target_mask: suppression.target.target_mask()
+                    | if suppression.editable {
+                        Self::EDITABLE_MASK
+                    } else {
+                        0
+                    },
                 suppression,
             })
             .collect::<Box<[_]>>();
@@ -835,10 +878,12 @@ impl IntervalIndex {
     /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
     /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
     /// returned values.
-    fn intersecting_rev(&self, query: TextRange, id: LintId) -> impl Iterator<Item = &Suppression> {
+    fn intersecting_rev(
+        &self,
+        query: TextRange,
+        wanted: u64,
+    ) -> impl Iterator<Item = &Suppression> {
         let mut pending: SmallVec<[&[IntervalEntry]; 16]> = smallvec![self.entries.as_ref()];
-        let wanted =
-            SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask();
 
         std::iter::from_fn(move || {
             while let Some(entries) = pending.pop() {
@@ -924,6 +969,33 @@ value = missing
         assert_eq!(
             suppressions
                 .lint_suppressions(missing_range, unresolved_reference)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn editable_index_skips_nested_suppressions_with_reasons() {
+        let source = r#"seen_code = True
+# ty: ignore[] reason
+# ty: ignore[] reason
+# ty: ignore[] reason
+# ty: ignore[]
+value = missing
+"#;
+        let db = TestDbBuilder::new()
+            .with_file("test.py", source)
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let missing_start = source.find("missing").unwrap().try_into().unwrap();
+        let missing_range = TextRange::at(missing_start, "missing".text_len());
+
+        let suppressions = suppressions(&db, file);
+        assert_eq!(suppressions.inline.len(), 4);
+        assert_eq!(
+            suppressions
+                .editable_inline_suppressions_rev(missing_range)
                 .count(),
             1
         );

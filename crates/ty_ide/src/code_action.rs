@@ -88,6 +88,7 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
+        default_lint_registry,
         lint::LintMetadata,
         types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE},
     };
@@ -183,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn add_ignore_does_not_update_preceding_own_line_suppression() {
+    fn add_ignore_updates_preceding_own_line_suppression() {
         let test = CodeActionTest::with_source(
             r#"
             seen_code = True
@@ -200,9 +201,129 @@ mod tests {
           |     ^
           |
           |
-        3 | # ty:ignore[]
-          - b = a / 10
-        4 + b = a / 10  # ty:ignore[unresolved-reference]
+        2 | seen_code = True
+          - # ty:ignore[]
+        3 + # ty:ignore[unresolved-reference]
+        4 | b = a / 10
+          |
+        ");
+    }
+
+    #[test]
+    fn add_ignore_does_not_append_to_reason_ending_in_bracket() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty:ignore[] tracked by [123]
+            values = [
+                <START>missing<END>,
+            ]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:5:5
+          |
+        5 |     missing,
+          |     ^^^^^^^
+          |
+          |
+        4 | values = [
+          -     missing,
+        5 +     missing,  # ty:ignore[unresolved-reference]
+        6 | ]
+          |
+        ");
+    }
+
+    #[test]
+    fn add_ignore_matches_existing_suppression_against_diagnostic_range() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty:ignore[] # ty:ignore[<START>not-a-rule<END>] # ty:ignore[division-by-zero]
+            value = 1 / 0
+        "#,
+        );
+
+        let lint = default_lint_registry()
+            .get("ignore-comment-unknown-rule")
+            .unwrap();
+        assert_snapshot!(test.code_actions(&lint), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:3:27
+          |
+        3 | # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
+          |                           ^^^^^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
+        3 + # ty:ignore[ignore-comment-unknown-rule] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
+        4 | value = 1 / 0
+          |
+        ");
+    }
+
+    #[test]
+    fn add_ignore_does_not_make_nested_suppression_unused() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty:ignore[]
+            values = [
+                # ty:ignore[unresolved-reference]
+                missing,
+                <START>absent<END>,
+            ]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:7:5
+          |
+        7 |     absent,
+          |     ^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty:ignore[]
+        3 + # ty:ignore[unresolved-reference]
+        4 | values = [
+          |
+        ");
+    }
+
+    #[test]
+    fn add_ignore_reuses_outer_suppression_with_nested_blanket() {
+        let test = CodeActionTest::with_source(
+            r#"
+            def f(value: int) -> int: return value
+
+            seen_code = True
+            # ty:ignore[invalid-assignment]
+            values: tuple[int] = [
+                # ty:ignore
+                f("bad"),
+                <START>absent<END>,
+            ]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:9:5
+          |
+        9 |     absent,
+          |     ^^^^^^
+          |
+          |
+        4 | seen_code = True
+          - # ty:ignore[invalid-assignment]
+        5 + # ty:ignore[invalid-assignment, unresolved-reference]
+        6 | values: tuple[int] = [
           |
         ");
     }
@@ -863,7 +984,7 @@ mod tests {
             }
         }
 
-        pub(super) fn code_actions(&self, lint: &'static LintMetadata) -> String {
+        pub(super) fn code_actions(&self, lint: &LintMetadata) -> String {
             use std::fmt::Write;
 
             let mut buf = String::new();
