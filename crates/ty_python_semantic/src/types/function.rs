@@ -1890,56 +1890,6 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-/// Return the type that is guaranteed to be accepted by an `isinstance` classinfo value.
-///
-/// Static unions represent alternative runtime values, so their guaranteed coverage is the
-/// intersection of each alternative's coverage. Only fixed tuple elements are guaranteed to be
-/// present. Variadic elements, non-exact class objects, protocols, and classes with custom
-/// metaclasses cannot establish exhaustiveness.
-fn guaranteed_isinstance_constraint<'db>(db: &'db dyn Db, classinfo: Type<'db>) -> Type<'db> {
-    match classinfo {
-        Type::ClassLiteral(class)
-            if class.into_protocol_class(db).is_none()
-                && class.metaclass(db) == KnownClass::Type.to_class_literal(db) =>
-        {
-            Type::instance(db, class.top_materialization(db))
-        }
-        Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-            let Ok(elements) = instance.value_expression_types(db) else {
-                return Type::Never;
-            };
-            UnionType::from_elements(
-                db,
-                elements.map(|element| {
-                    let element = if element.is_none(db) {
-                        KnownClass::NoneType.to_class_literal(db)
-                    } else {
-                        element
-                    };
-                    guaranteed_isinstance_constraint(db, element)
-                }),
-            )
-        }
-        Type::TypeAlias(alias) => guaranteed_isinstance_constraint(db, alias.value_type(db)),
-        Type::NominalInstance(nominal) => nominal.tuple_spec(db).map_or(Type::Never, |tuple| {
-            UnionType::from_elements(
-                db,
-                tuple
-                    .fixed_elements()
-                    .map(|element| guaranteed_isinstance_constraint(db, *element)),
-            )
-        }),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .fold(IntersectionBuilder::new(db), |builder, element| {
-                builder.add_positive(guaranteed_isinstance_constraint(db, *element))
-            })
-            .build(),
-        _ => Type::Never,
-    }
-}
-
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
 pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
     let suite = ast::helpers::body_without_leading_docstring(&node.body);
@@ -2612,20 +2562,13 @@ impl KnownFunction {
                     call_expression.arguments.args.get(1),
                 );
 
-                if self == KnownFunction::IsInstance {
-                    let truthiness = match second_argument {
-                        Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
-                        _ => {
-                            let constraint = guaranteed_isinstance_constraint(db, *second_argument);
-                            if !constraint.is_never() && first_arg.is_subtype_of(db, constraint) {
-                                Truthiness::AlwaysTrue
-                            } else {
-                                Truthiness::Ambiguous
-                            }
-                        }
-                    };
-
-                    overload.set_return_type(Type::from_truthiness(db, truthiness));
+                if let Type::ClassLiteral(class) = second_argument
+                    && self == KnownFunction::IsInstance
+                {
+                    overload.set_return_type(Type::from_truthiness(
+                        db,
+                        is_instance_truthiness(db, *first_arg, *class),
+                    ));
                 }
             }
 

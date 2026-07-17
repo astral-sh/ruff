@@ -1,5 +1,6 @@
 use crate::{
     Db,
+    place::place_from_bindings,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
@@ -35,6 +36,7 @@ use crate::{
 use ty_python_core::{
     UseDefMap,
     definition::{Definition, DefinitionKind},
+    place::PlaceTable,
     scope::NodeWithScopeRef,
 };
 
@@ -116,15 +118,33 @@ impl<'db> ExpectedReturnType<'db> {
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
-        fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
+        fn can_implicitly_return_none<'db>(
+            db: &'db dyn Db,
+            use_def: &UseDefMap<'db>,
+            place_table: &PlaceTable,
+        ) -> bool {
+            let reachability = use_def.reachability_constraints().evaluate(
+                db,
+                use_def.predicates(),
+                use_def.end_of_scope_reachability(),
+            );
+
+            if !reachability.is_ambiguous() {
+                return reachability.is_always_true();
+            }
+
             !use_def
-                .reachability_constraints()
-                .evaluate(
-                    db,
-                    use_def.predicates(),
-                    use_def.end_of_scope_reachability(),
-                )
-                .is_always_false()
+                .all_end_of_scope_symbol_bindings()
+                .filter(|(symbol_id, _)| {
+                    let symbol = place_table.symbol(*symbol_id);
+                    symbol.is_parameter() || symbol.is_declared()
+                })
+                .any(|(_, bindings)| {
+                    place_from_bindings(db, bindings)
+                        .place
+                        .raw_type()
+                        .is_some_and(|ty| ty.is_never())
+                })
         }
 
         let db = self.db();
@@ -228,8 +248,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let use_def = self.index.use_def_map(scope_id);
 
-                    if can_implicitly_return_none(db, use_def)
-                        && !Type::none(db).is_assignable_to(db, expected_return_ty)
+                    if !Type::none(db).is_assignable_to(db, expected_return_ty)
+                        && can_implicitly_return_none(db, use_def, self.index.place_table(scope_id))
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
                         report_implicit_return_type(
@@ -271,8 +291,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             let use_def = self.index.use_def_map(scope_id);
-            if can_implicitly_return_none(db, use_def)
-                && !Type::none(db).is_assignable_to(db, expected_ty)
+            if !Type::none(db).is_assignable_to(db, expected_ty)
+                && can_implicitly_return_none(db, use_def, self.index.place_table(scope_id))
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(

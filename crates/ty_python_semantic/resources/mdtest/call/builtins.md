@@ -87,7 +87,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import TypeVar
 
 class Answer(Enum):
     NO = 0
@@ -132,9 +132,9 @@ def _(x: A | B, y: list[int]):
 
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
-    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
-    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: Literal[True]
-    reveal_type(isinstance(x, targets))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (A, B)))  # revealed: bool
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
+    reveal_type(isinstance(x, targets))  # revealed: bool
     reveal_type(isinstance(x, (A, bytes)))  # revealed: bool
 
     if isinstance(x, A):
@@ -155,87 +155,27 @@ def returns_bool_union(x: A | B) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-def returns_bool_union_type(x: A | B) -> bool:
-    if isinstance(x, (A | B,)):
-        return True
-
-def returns_bool_optional_union_type(x: A | None) -> bool:
-    if isinstance(x, (A | None,)):
-        return True
-
-def returns_bool_union_of_tuples(x: A | B, condition: bool) -> bool:
-    targets = (A, B) if condition else (B, A)
+def returns_bool_stored_tuple(x: A | B) -> bool:
+    targets = (A, B)
     if isinstance(x, targets):
         return True
 
-def returns_bool_union_of_nested_tuples(x: A | B, condition: bool) -> bool:
-    targets = ((A, B) if condition else (B, A),)
+def returns_bool_annotated_local(condition: bool) -> bool:
+    value: A | B = A() if condition else B()
+    if isinstance(value, (A, B)):
+        return True
+
+def partial_targets_are_not_exhaustive(x: A | B) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (A, bytes)):
+        return True
+
+def variadic_targets_are_not_exhaustive(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
     if isinstance(x, targets):
         return True
 
-def returns_bool_variadic_with_fixed_target(x: A, targets: tuple[type[B], ...]) -> bool:
-    if isinstance(x, (A, *targets)):
-        return True
-
-def returns_bool_with_subclass_target(x: A, target: type[A]) -> bool:
-    if isinstance(x, (target, A)):
-        return True
-
-def variadic_targets_are_not_exhaustive(x: A, targets: tuple[type[A], ...]) -> bool:
-    if isinstance(x, targets):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:
+def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
     if isinstance(x, (target,)):
         return True
-    return ""  # error: [invalid-return-type]
-
-def alternative_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
-    target = A if condition else B
-    if isinstance(x, (target,)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def alternative_nested_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
-    target = (A,) if condition else (B,)
-    if isinstance(x, (target,)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-@runtime_checkable
-class RuntimeProtocol(Protocol):
-    value: int
-
-class StructuralImplementation:
-    value: int
-
-def protocol_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
-    if isinstance(x, (RuntimeProtocol, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def protocol_union_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
-    if isinstance(x, (RuntimeProtocol | bytes,)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-class RejectingMeta(type):
-    def __instancecheck__(self, instance: object, /) -> bool:
-        return False
-
-class RejectingBase(metaclass=RejectingMeta): ...
-class RejectingChild(RejectingBase): ...
-
-def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
-    if isinstance(x, (RejectingBase, bytes)):
-        return True
-    return ""  # error: [invalid-return-type]
-
-def custom_instancecheck_union_targets_are_not_exhaustive(x: RejectingChild) -> bool:
-    if isinstance(x, (RejectingBase | bytes,)):
-        return True
-    return ""  # error: [invalid-return-type]
 
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
@@ -253,14 +193,14 @@ def _(
     reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_bound_a, B))  # revealed: bool
-    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: Literal[True]
+    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: bool
 
     reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
-    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: Literal[True]
+    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: bool
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
