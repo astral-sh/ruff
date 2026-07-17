@@ -8,3 +8,22 @@ RUF065 Unnecessary `str()` conversion when formatting with `%s`
 17 | logging.warning("%s", str(object="!"))
    |                       ^^^^^^^^^^^^^^^
    |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065_1.py:41:26
+   |
+39 | values = [2]
+40 | logging.warning("%s%s%s%s %r", *"1234", str(5))
+41 | logging.warning("%s %r", str(1), *values, str(2))
+   |                          ^^^^^^
+42 | logging.log(logging.WARNING, "%s %r", str(1), *values, str(2))
+   |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065_1.py:42:39
+   |
+40 | logging.warning("%s%s%s%s %r", *"1234", str(5))
+41 | logging.warning("%s %r", str(1), *values, str(2))
+42 | logging.log(logging.WARNING, "%s %r", str(1), *values, str(2))
+   |                                       ^^^^^^
+   |

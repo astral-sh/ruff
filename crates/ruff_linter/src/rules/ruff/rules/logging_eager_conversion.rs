@@ -137,7 +137,13 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 None
             }
         })
-        .zip(call.arguments.args.iter().skip(msg_pos + 1))
+        .zip(
+            call.arguments
+                .args
+                .iter()
+                .skip(msg_pos + 1)
+                .take_while(|arg| !arg.is_starred_expr()),
+        )
     {
         // Check if the argument is a call to eagerly format a value
         if let Expr::Call(ast::ExprCall {

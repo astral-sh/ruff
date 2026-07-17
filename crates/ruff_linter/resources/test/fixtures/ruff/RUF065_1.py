@@ -32,3 +32,11 @@ logging.warning("%+s", oct(123))
 
 # %.3s with hex() - precision (should NOT be flagged)
 logging.warning("%.3s", hex(123))
+
+
+# Arguments after an unpack cannot be paired with a specific conversion specifier
+# https://github.com/astral-sh/ruff/issues/26912
+values = [2]
+logging.warning("%s%s%s%s %r", *"1234", str(5))
+logging.warning("%s %r", str(1), *values, str(2))
+logging.log(logging.WARNING, "%s %r", str(1), *values, str(2))
