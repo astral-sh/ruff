@@ -1,4 +1,4 @@
-.use pyproject_toml::PyProjectToml;
+use pyproject_toml::PyProjectToml;
 use serde::Deserialize;
 use toml::Spanned;
 use toml::de::DeTable;
