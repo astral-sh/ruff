@@ -87,7 +87,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import TypeVar
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 class Answer(Enum):
     NO = 0
@@ -132,9 +132,9 @@ def _(x: A | B, y: list[int]):
 
     reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
-    reveal_type(isinstance(x, (A, B)))  # revealed: bool
-    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
-    reveal_type(isinstance(x, targets))  # revealed: bool
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: Literal[True]
+    reveal_type(isinstance(x, targets))  # revealed: Literal[True]
     reveal_type(isinstance(x, (A, bytes)))  # revealed: bool
 
     if isinstance(x, A):
@@ -160,6 +160,10 @@ def returns_bool_stored_tuple(x: A | B) -> bool:
     if isinstance(x, targets):
         return True
 
+def returns_bool_variadic_with_fixed_target(x: A, targets: tuple[type[B], ...]) -> bool:
+    if isinstance(x, (A, *targets)):
+        return True
+
 def returns_bool_annotated_local(condition: bool) -> bool:
     value: A | B = A() if condition else B()
     if isinstance(value, (A, B)):
@@ -177,6 +181,39 @@ def subclass_targets_are_not_exhaustive(x: A, target: type[A]) -> bool:  # error
     if isinstance(x, (target,)):
         return True
 
+def alternative_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:  # error: [invalid-return-type]
+    target = A if condition else B
+    if isinstance(x, (target,)):
+        return True
+
+def object_and_any_are_not_exhaustive(x: object, y: Any):
+    reveal_type(isinstance(x, (A, B)))  # revealed: bool
+    reveal_type(isinstance(y, (A, B)))  # revealed: bool
+
+@runtime_checkable
+class RuntimeProtocol(Protocol):
+    value: int
+
+class StructuralImplementation:
+    value: int
+
+def protocol_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
+    if isinstance(x, (RuntimeProtocol, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+class RejectingMeta(type):
+    def __instancecheck__(self, instance: object, /) -> bool:
+        return False
+
+class RejectingBase(metaclass=RejectingMeta): ...
+class RejectingChild(RejectingBase): ...
+
+def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
+    if isinstance(x, (RejectingBase, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
 T = TypeVar("T")
 T_bound_A = TypeVar("T_bound_A", bound=A)
 T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
@@ -193,14 +230,14 @@ def _(
     reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_bound_a, B))  # revealed: bool
-    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: bool
+    reveal_type(isinstance(x_bound_a, (B, A)))  # revealed: Literal[True]
 
     reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
     reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
-    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, (SubclassOfA, OtherSubclassOfA)))  # revealed: Literal[True]
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking

@@ -1890,6 +1890,43 @@ fn is_instance_truthiness<'db>(
     }
 }
 
+/// Return whether every possible value of `ty` is accepted by a fixed `isinstance` tuple member.
+fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: Type<'db>) -> bool {
+    match ty {
+        Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_instance_tuple_exhaustive(db, *element, classinfo)),
+        Type::TypeAlias(alias) => is_instance_tuple_exhaustive(db, alias.value_type(db), classinfo),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_instance_tuple_exhaustive(db, bound, classinfo)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|element| is_instance_tuple_exhaustive(db, *element, classinfo)),
+            None => false,
+        },
+        ty if ty == Type::object() => false,
+        ty => match classinfo {
+            Type::ClassLiteral(class) => {
+                class.into_protocol_class(db).is_none()
+                    && class.metaclass(db) == KnownClass::Type.to_class_literal(db)
+                    && is_instance_truthiness(db, ty, class).is_always_true()
+            }
+            Type::TypeAlias(alias) => is_instance_tuple_exhaustive(db, ty, alias.value_type(db)),
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|tuple| {
+                tuple
+                    .fixed_elements()
+                    .any(|element| is_instance_tuple_exhaustive(db, ty, *element))
+            }),
+            _ => false,
+        },
+    }
+}
+
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
 pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
     let suite = ast::helpers::body_without_leading_docstring(&node.body);
@@ -2562,13 +2599,19 @@ impl KnownFunction {
                     call_expression.arguments.args.get(1),
                 );
 
-                if let Type::ClassLiteral(class) = second_argument
-                    && self == KnownFunction::IsInstance
-                {
-                    overload.set_return_type(Type::from_truthiness(
-                        db,
-                        is_instance_truthiness(db, *first_arg, *class),
-                    ));
+                if self == KnownFunction::IsInstance {
+                    let truthiness = match second_argument {
+                        Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
+                        Type::NominalInstance(nominal) if nominal.tuple_spec(db).is_some() => {
+                            if is_instance_tuple_exhaustive(db, *first_arg, *second_argument) {
+                                Truthiness::AlwaysTrue
+                            } else {
+                                Truthiness::Ambiguous
+                            }
+                        }
+                        _ => Truthiness::Ambiguous,
+                    };
+                    overload.set_return_type(Type::from_truthiness(db, truthiness));
                 }
             }
 
