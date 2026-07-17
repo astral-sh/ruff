@@ -1945,6 +1945,15 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
                 }
                 is_exhaustive
             }
+            Type::SpecialForm(SpecialFormType::LegacyStdlibAlias(alias)) => {
+                is_instance_tuple_exhaustive(db, ty, alias.aliased_class().to_class_literal(db))
+            }
+            Type::SpecialForm(SpecialFormType::Tuple) => {
+                is_instance_tuple_exhaustive(db, ty, KnownClass::Tuple.to_class_literal(db))
+            }
+            Type::SpecialForm(SpecialFormType::Type) => {
+                matches!(ty, Type::ClassLiteral(_) | Type::SubclassOf(_))
+            }
             _ => false,
         },
     }

@@ -87,7 +87,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Dict, List, Protocol, Tuple, Type, TypeVar, runtime_checkable
 
 class Answer(Enum):
     NO = 0
@@ -161,6 +161,22 @@ def returns_bool_union_type(x: A | B) -> bool:
 
 def returns_bool_optional_union_type(x: A | None) -> bool:
     if isinstance(x, (A | None,)):
+        return True
+
+def returns_bool_typing_list(x: list[int]) -> bool:
+    if isinstance(x, (List,)):
+        return True
+
+def returns_bool_typing_dict(x: dict[str, int]) -> bool:
+    if isinstance(x, (Dict,)):
+        return True
+
+def returns_bool_typing_tuple(x: tuple[int, ...]) -> bool:
+    if isinstance(x, (Tuple,)):
+        return True
+
+def returns_bool_typing_type(x: type[A]) -> bool:
+    if isinstance(x, (Type,)):
         return True
 
 def returns_bool_stored_tuple(x: A | B) -> bool:
