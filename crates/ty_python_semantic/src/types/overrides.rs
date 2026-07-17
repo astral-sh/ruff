@@ -19,8 +19,8 @@ use crate::{
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
+        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -566,7 +566,8 @@ fn check_class_declaration<'db>(
 
             let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+            if is_assignable_method_override(db, class, type_on_subclass_instance, superclass_type)
+            {
                 continue;
             }
 
@@ -580,7 +581,12 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                    if !is_assignable_method_override(
+                        db,
+                        immediate_parent,
+                        immediate_parent_type,
+                        superclass_type,
+                    ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;
@@ -666,6 +672,46 @@ fn check_class_declaration<'db>(
             superclass_definition,
         );
     }
+}
+
+/// Checks whether a method override preserves its superclass method's callable domain.
+///
+/// An explicitly annotated superclass receiver can restrict a method to a subset of subclass
+/// instances. Bind both methods to that common receiver domain before comparing their signatures.
+fn is_assignable_method_override<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    subclass_type: Type<'db>,
+    superclass_type: Type<'db>,
+) -> bool {
+    let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
+        (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
+            let superclass_signature = superclass_method.function(db).signature(db);
+            let receiver = match superclass_signature.overloads.as_slice() {
+                [signature] => signature
+                    .parameters()
+                    .get(0)
+                    .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+                    .map(Parameter::annotated_type),
+                _ => None,
+            };
+
+            receiver.map_or((subclass_type, superclass_type), |receiver| {
+                let receiver =
+                    IntersectionType::from_elements(db, [Type::instance(db, class), receiver]);
+                (
+                    Type::BoundMethod(subclass_method.map_self_type(db, |_| receiver)),
+                    Type::BoundMethod(superclass_method.map_self_type(db, |_| receiver)),
+                )
+            })
+        }
+        _ => (subclass_type, superclass_type),
+    };
+    let Some(superclass_callable) = superclass_type.try_upcast_to_callable(db) else {
+        return false;
+    };
+
+    subclass_type.is_assignable_to(db, superclass_callable.into_type(db))
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.

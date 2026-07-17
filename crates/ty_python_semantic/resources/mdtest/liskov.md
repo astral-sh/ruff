@@ -959,6 +959,73 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
+## Mixin methods with protocol receiver annotations
+
+A mixin can restrict a method to receivers that implement a protocol. An override that preserves or
+widens that receiver domain is valid even if the mixin itself does not implement the protocol.
+
+```pyi
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+class HasOtherValue(Protocol):
+    other_value: str
+
+class Mixin:
+    def method(self: HasValue, argument: int) -> None: ...
+
+class SameReceiver(Mixin):
+    def method(self: HasValue, argument: int) -> None: ...
+
+class ImplicitReceiver(Mixin):
+    def method(self, argument: int) -> None: ...
+
+class SatisfiesReceiver(Mixin):
+    value: int
+    def method(self: HasValue, argument: int) -> None: ...
+
+class InvalidReceiver(Mixin):
+    def method(self: HasOtherValue, argument: int) -> None: ...  # error: [invalid-method-override]
+
+class InvalidArgument(Mixin):
+    value: int
+    def method(self: HasValue, argument: str) -> None: ...  # error: [invalid-method-override]
+
+receiver: HasValue = SatisfiesReceiver()
+SatisfiesReceiver().method(1)
+
+class UnionMixin:
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+
+class SameUnionReceiver(UnionMixin):
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+
+class ImplicitUnionReceiver(UnionMixin):
+    def method(self, argument: int) -> None: ...
+
+class Container(Protocol):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self) -> None: ...
+
+class ContainerMixin:
+    def method(self: Container) -> None: ...
+
+class SameContainerReceiver(ContainerMixin):
+    def method(self: Container) -> None: ...
+
+class ImplicitContainerReceiver(ContainerMixin):
+    def method(self) -> None: ...
+
+class SatisfiesContainerReceiver(ContainerMixin):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self: Container) -> None: ...
+
+container: Container = SatisfiesContainerReceiver()
+SatisfiesContainerReceiver().method()
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
