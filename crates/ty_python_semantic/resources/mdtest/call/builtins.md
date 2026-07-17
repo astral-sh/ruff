@@ -320,6 +320,7 @@ python-version = "3.12"
 
 ```py
 from typing import TypeVar
+from typing_extensions import TypeAliasType, Union
 
 class A: ...
 class B: ...
@@ -358,6 +359,21 @@ def accepts_truthy_constrained_typevar(x: T_constrained_a_b) -> bool:
 
     reveal_type(x)  # revealed: T_constrained_a_b@accepts_truthy_constrained_typevar & ~AlwaysFalsy
     reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])
+RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])
+RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])
+RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])
+
+def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [invalid-return-type]
+    reveal_type(isinstance(x, (A, B)))  # revealed: bool
     if isinstance(x, (A, B)):
         return True
 ```

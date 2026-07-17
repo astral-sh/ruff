@@ -1911,28 +1911,39 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
         return false;
     }
 
-    is_instance_tuple_covers(db, &tuple, ty)
+    is_instance_tuple_covers(db, &tuple, ty, &ActiveRecursionDetector::default())
 }
 
-fn is_instance_tuple_covers<'db>(db: &'db dyn Db, tuple: &TupleSpec<'db>, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
+fn is_instance_tuple_covers<'db>(
+    db: &'db dyn Db,
+    tuple: &TupleSpec<'db>,
+    ty: Type<'db>,
+    recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+) -> bool {
+    match ty {
+        Type::TypeAlias(alias) => recursion_guard.visit(
+            &ty,
+            || true,
+            || is_instance_tuple_covers(db, tuple, alias.value_type(db), recursion_guard),
+        ),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_instance_tuple_covers(db, tuple, *element)),
+            .all(|element| is_instance_tuple_covers(db, tuple, *element, recursion_guard)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| is_instance_tuple_covers(db, tuple, *element)),
+            .any(|element| is_instance_tuple_covers(db, tuple, *element, recursion_guard)),
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_instance_tuple_covers(db, tuple, bound)
+                is_instance_tuple_covers(db, tuple, bound, recursion_guard)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .all(|constraint| is_instance_tuple_covers(db, tuple, *constraint)),
-            None => is_instance_tuple_covers(db, tuple, Type::object()),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().all(|constraint| {
+                    is_instance_tuple_covers(db, tuple, *constraint, recursion_guard)
+                })
+            }
+            None => is_instance_tuple_covers(db, tuple, Type::object(), recursion_guard),
         },
         ty => tuple.fixed_elements().any(|element| {
             let Type::ClassLiteral(class) = element else {
