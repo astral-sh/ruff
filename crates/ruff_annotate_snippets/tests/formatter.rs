@@ -2828,7 +2828,7 @@ error[E0308]: mismatched types
    |  |__________________________________^ expected `Atype<Btype<Ctype<..., i32>, i32>, i32>`, found `Result<Result<Result<..., _>, _>, _>`
    |
    = note: expected struct `Atype<Btype<..., i32>, i32>`
-                found enum `Result<Result<..., _>, _>`
+     found enum `Result<Result<..., _>, _>`
    = note: the full name for the type has been written to '$TEST_BUILD_DIR/$FILE.long-type-hash.txt'
    = note: consider using `--verbose` to print the full type name to the console
 "#]];
@@ -2930,7 +2930,7 @@ error[E0308]: mismatched types
    |     arguments to this function are incorrect
    |
    = note: expected fn pointer `for<'a> fn(Box<(dyn Any + Send + 'a)>) -> Pin<_>`
-                 found fn item `fn(Box<(dyn Any + Send + 'static)>) -> Pin<_> {wrapped_fn}`
+      found fn item `fn(Box<(dyn Any + Send + 'static)>) -> Pin<_> {wrapped_fn}`
 note: function defined here
   --> $DIR/unicode-output.rs:12:10
    |
@@ -2953,7 +2953,7 @@ error[E0308]: mismatched types
    │     arguments to this function are incorrect
    │
    ╰ note: expected fn pointer `for<'a> fn(Box<(dyn Any + Send + 'a)>) -> Pin<_>`
-                 found fn item `fn(Box<(dyn Any + Send + 'static)>) -> Pin<_> {wrapped_fn}`
+      found fn item `fn(Box<(dyn Any + Send + 'static)>) -> Pin<_> {wrapped_fn}`
 note: function defined here
    ╭▸ $DIR/unicode-output.rs:12:10
    │
@@ -3459,7 +3459,7 @@ error[E0308]: mismatched types
   |            expected due to this
   |
   = expected reference `&str`
-    found reference `&'static [u8; 0]`
+found reference `&'static [u8; 0]`
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -3474,7 +3474,7 @@ error[E0308]: mismatched types
   │            expected due to this
   │
   ╰ expected reference `&str`
-    found reference `&'static [u8; 0]`
+found reference `&'static [u8; 0]`
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -3520,7 +3520,7 @@ error[E0308]: mismatched types
   |            expected due to this
   |
   = custom: expected reference `&str`
-            found reference `&'static [u8; 0]`
+found reference `&'static [u8; 0]`
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -3535,7 +3535,7 @@ error[E0308]: mismatched types
   │            expected due to this
   │
   ╰ custom: expected reference `&str`
-            found reference `&'static [u8; 0]`
+found reference `&'static [u8; 0]`
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
