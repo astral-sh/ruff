@@ -87,7 +87,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
-from typing import TypeVar
+from typing import Protocol, TypeVar, runtime_checkable
 
 class Answer(Enum):
     NO = 0
@@ -155,6 +155,14 @@ def returns_bool_union(x: A | B) -> bool:
     if isinstance(x, (A, B)):
         return True
 
+def returns_bool_union_type(x: A | B) -> bool:
+    if isinstance(x, (A | B,)):
+        return True
+
+def returns_bool_optional_union_type(x: A | None) -> bool:
+    if isinstance(x, (A | None,)):
+        return True
+
 def returns_bool_union_of_tuples(x: A | B, condition: bool) -> bool:
     targets = (A, B) if condition else (B, A)
     if isinstance(x, targets):
@@ -192,6 +200,40 @@ def alternative_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
 def alternative_nested_targets_are_not_exhaustive(x: A | B, condition: bool) -> bool:
     target = (A,) if condition else (B,)
     if isinstance(x, (target,)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+@runtime_checkable
+class RuntimeProtocol(Protocol):
+    value: int
+
+class StructuralImplementation:
+    value: int
+
+def protocol_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
+    if isinstance(x, (RuntimeProtocol, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def protocol_union_targets_are_not_exhaustive(x: StructuralImplementation) -> bool:
+    if isinstance(x, (RuntimeProtocol | bytes,)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+class RejectingMeta(type):
+    def __instancecheck__(self, instance: object, /) -> bool:
+        return False
+
+class RejectingBase(metaclass=RejectingMeta): ...
+class RejectingChild(RejectingBase): ...
+
+def custom_instancecheck_targets_are_not_exhaustive(x: RejectingChild) -> bool:
+    if isinstance(x, (RejectingBase, bytes)):
+        return True
+    return ""  # error: [invalid-return-type]
+
+def custom_instancecheck_union_targets_are_not_exhaustive(x: RejectingChild) -> bool:
+    if isinstance(x, (RejectingBase | bytes,)):
         return True
     return ""  # error: [invalid-return-type]
 

@@ -428,7 +428,7 @@ impl ClassInfoConstraintFunction {
     ///
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
-    pub(super) fn generate_constraint<'db>(
+    fn generate_constraint<'db>(
         self,
         db: &'db dyn Db,
         classinfo: Type<'db>,

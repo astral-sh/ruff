@@ -1894,14 +1894,32 @@ fn is_instance_truthiness<'db>(
 ///
 /// Static unions represent alternative runtime values, so their guaranteed coverage is the
 /// intersection of each alternative's coverage. Only fixed tuple elements are guaranteed to be
-/// present; variadic elements and non-exact class objects cannot establish exhaustiveness.
+/// present. Variadic elements, non-exact class objects, protocols, and classes with custom
+/// metaclasses cannot establish exhaustiveness.
 fn guaranteed_isinstance_constraint<'db>(db: &'db dyn Db, classinfo: Type<'db>) -> Type<'db> {
     match classinfo {
-        Type::ClassLiteral(_)
-        | Type::KnownInstance(KnownInstanceType::UnionType(_))
-        | Type::SpecialForm(_) => ClassInfoConstraintFunction::IsInstance
-            .generate_constraint(db, classinfo, true)
-            .unwrap_or(Type::Never),
+        Type::ClassLiteral(class)
+            if class.into_protocol_class(db).is_none()
+                && class.metaclass(db) == KnownClass::Type.to_class_literal(db) =>
+        {
+            Type::instance(db, class.top_materialization(db))
+        }
+        Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+            let Ok(elements) = instance.value_expression_types(db) else {
+                return Type::Never;
+            };
+            UnionType::from_elements(
+                db,
+                elements.map(|element| {
+                    let element = if element.is_none(db) {
+                        KnownClass::NoneType.to_class_literal(db)
+                    } else {
+                        element
+                    };
+                    guaranteed_isinstance_constraint(db, element)
+                }),
+            )
+        }
         Type::TypeAlias(alias) => guaranteed_isinstance_constraint(db, alias.value_type(db)),
         Type::NominalInstance(nominal) => nominal.tuple_spec(db).map_or(Type::Never, |tuple| {
             UnionType::from_elements(
