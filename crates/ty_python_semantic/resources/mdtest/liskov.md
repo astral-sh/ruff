@@ -1035,6 +1035,24 @@ container: Container = ImplementsContainer()
 ImplementsContainer().method()
 ```
 
+## Generic instance-method receivers
+
+An instance method can relate its receiver and return type using a bounded type variable. An
+override can express the same relationship with `Self`:
+
+```pyi
+from typing import TypeVar
+from typing_extensions import Self
+
+InstanceT = TypeVar("InstanceT", bound="InstanceBase")
+
+class InstanceBase:
+    def clone(self: InstanceT) -> InstanceT: ...
+
+class InstanceChild(InstanceBase):
+    def clone(self: Self) -> Self: ...
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
@@ -1516,10 +1534,12 @@ info: This violates the Liskov Substitution Principle
 
 ## Explicitly annotated classmethod receivers
 
-An explicitly annotated `cls` can specialize the class receiver and return type without changing the
-method's arguments:
+An explicitly annotated `cls` can specialize the class receiver and return type. A subclass can also
+replace a bounded type variable on the class receiver with `Self` while preserving compatible
+arguments:
 
 ```pyi
+from typing import Any, TypeVar
 from typing_extensions import Self
 
 class Event:
@@ -1537,6 +1557,30 @@ class Context:
 class SettingsContext(Context):
     @classmethod
     def get(cls) -> SettingsContext | None: ...
+
+ItemT = TypeVar("ItemT", bound="Item")
+
+class Item:
+    @classmethod
+    def from_component(cls: type[ItemT], component: object) -> ItemT: ...
+
+class DynamicItem(Item):
+    @classmethod
+    def from_component(cls: type[Self], component: object) -> Self: ...
+
+ModelT = TypeVar("ModelT", bound="BaseModel")
+
+class BaseModel:
+    @classmethod
+    def strategy(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+    @classmethod
+    def example(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+
+class FrameModel(BaseModel):
+    @classmethod
+    def strategy(cls: type[Self], **kwargs: Any) -> Any: ...
+    @classmethod
+    def example(cls: type[Self], **kwargs: Any) -> Self: ...
 ```
 
 Narrowing an argument accepted by the superclass remains an invalid override:

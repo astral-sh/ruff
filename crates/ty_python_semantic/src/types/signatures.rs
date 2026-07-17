@@ -2029,6 +2029,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = target.generic_context
+            // A target-local type variable can occur in the source receiver constraint after both
+            // methods are bound to a common receiver. That occurrence represents the same receiver
+            // domain, rather than a collision between independent signatures, so keep it shared.
+            && max_typevar_freshness_matching_generic_context(
+                db,
+                source.receiver_constraint_types(),
+                generic_context,
+            )
+            .is_none()
             && let Some(delta) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
