@@ -159,6 +159,73 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Inheriting from an unresolved generic base
+
+Type variables used to specialize an unresolved base still belong to the class. They must not be
+mistaken for method-local type variables when a concrete subclass overrides a method. The unresolved
+base must also remain gradual when the subclass is used in an annotation.
+
+```toml
+[rules]
+missing-type-argument = "ignore"
+```
+
+```py
+import collections.abc
+from collections.abc import Hashable
+from typing import Any, Generic, TypeVar
+from typing_extensions import dataclass_transform, reveal_type
+from unresolved import Dataset  # error: [unresolved-import]
+
+T_co = TypeVar("T_co", covariant=True)
+
+class VisionDataset(Dataset[T_co]):
+    item: T_co
+
+    def __getitem__(self, index: int) -> T_co:
+        raise NotImplementedError
+
+reveal_type(VisionDataset.__getitem__)  # revealed: def __getitem__(self, index: int) -> Unknown
+
+class ImageDataset(VisionDataset):
+    def __getitem__(self, index: int) -> tuple[Any, Any]:
+        raise NotImplementedError
+
+def read_item(dataset: ImageDataset) -> None:
+    reveal_type(dataset.item)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class MethodGeneric(Dataset[Any]):
+    def method(self, value: T) -> T:
+        return value
+
+class InvalidMethodOverride(MethodGeneric):
+    # error: [invalid-method-override]
+    def method(self, value: int) -> int:
+        return value
+
+K = TypeVar("K", bound=Hashable)
+V = TypeVar("V")
+
+@collections.abc.Mapping.register  # error: [unresolved-attribute]
+class Mapping(Generic[K, V]):
+    def __getitem__(self, key: K, /) -> V:
+        raise NotImplementedError
+
+class FrozenDict(dict, Mapping[K, V]): ...
+class FrozenOrderedDict(FrozenDict[K, V]): ...
+
+@dataclass_transform()
+class Concrete:
+    def __init__(self, **kwargs: object) -> None: ...
+
+class Schema(Concrete):
+    fields: FrozenOrderedDict[str, int]
+
+Schema(fields={"value": 1})
+```
+
 ## Errors for inconsistent type arguments
 
 <!-- snapshot-diagnostics -->

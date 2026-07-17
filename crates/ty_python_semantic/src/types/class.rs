@@ -1676,7 +1676,14 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 return enum_lit.own_class_member(db, name);
             }
-            Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
+            // Type variables owned by an unresolved base remain gradual when the non-generic
+            // class is used from outside its body.
+            Self::NonGeneric(ClassLiteral::Static(class)) => (
+                class,
+                class
+                    .unresolved_legacy_generic_context(db)
+                    .map(|generic_context| generic_context.unknown_specialization(db)),
+            ),
             Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
         };
 
@@ -2028,8 +2035,15 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 enum_lit.own_instance_member(db, name)
             }
+            // Type variables owned by an unresolved base remain gradual when the non-generic
+            // class is used from outside its body.
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
-                class_literal.own_instance_member(db, name)
+                let specialization = class_literal
+                    .unresolved_legacy_generic_context(db)
+                    .map(|generic_context| generic_context.unknown_specialization(db));
+                class_literal
+                    .own_instance_member(db, name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);

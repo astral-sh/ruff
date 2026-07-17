@@ -20,7 +20,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
+        DataclassParams, DynamicType, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
         SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
@@ -356,6 +356,37 @@ impl<'db> StaticClassLiteral<'db> {
             return None;
         }
         inherited_legacy_generic_context_inner(db, self)
+    }
+
+    /// Returns the legacy type variables owned by unresolved generic bases.
+    pub(crate) fn unresolved_legacy_generic_context(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<GenericContext<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn unresolved_legacy_generic_context_inner<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> Option<GenericContext<'db>> {
+            GenericContext::from_base_classes(
+                db,
+                class.definition(db),
+                class
+                    .explicit_bases(db)
+                    .iter()
+                    .copied()
+                    .filter(|ty| matches!(ty, Type::Dynamic(DynamicType::UnknownGeneric(_)))),
+            )
+        }
+
+        if !self.has_explicit_bases(db) {
+            return None;
+        }
+        unresolved_legacy_generic_context_inner(db, self)
     }
 
     /// Returns all of the typevars that are referenced in this class's base class list.
