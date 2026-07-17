@@ -134,9 +134,12 @@ fn merge_receiver_constraints<'db>(
     }
 }
 
+/// Distinguishes an inferred receiver constraint from an already-specialized receiver variable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ReceiverBindingKind {
+    /// The receiver `TypeVar` still participates in constraint solving.
     Constrained,
+    /// The receiver `TypeVar` was substituted, but its declared domain may still need checking.
     Specialized,
 }
 
@@ -149,6 +152,7 @@ struct ReceiverBinding<'db> {
 }
 
 impl<'db> ReceiverBinding<'db> {
+    /// Combines receiver domains while retaining a specialization whose constraints are trivial.
     fn merge(db: &'db dyn Db, first: Option<&Self>, second: Option<&Self>) -> Option<Self> {
         let kind = if first
             .into_iter()
