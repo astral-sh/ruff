@@ -380,9 +380,13 @@ impl<'db> GenericContext<'db> {
                 let class = original_class_type(db, definition)?;
                 // An unresolved generic base can still own legacy type variables referenced by
                 // methods, even though the class itself cannot be reliably specialized.
-                class
-                    .generic_context(db)
-                    .or_else(|| class.as_static()?.unresolved_legacy_generic_context(db))
+                Self::merge_optional(
+                    db,
+                    class.generic_context(db),
+                    class
+                        .as_static()
+                        .and_then(|class| class.unresolved_legacy_generic_context(db)),
+                )
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);

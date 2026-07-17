@@ -1690,9 +1690,19 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             let specialization = specialization
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
+            let unresolved_specialization = match self {
+                Self::Generic(generic) => generic
+                    .origin(db)
+                    .unresolved_legacy_generic_context(db)
+                    .map(|generic_context| generic_context.unknown_specialization(db)),
+                Self::NonGeneric(_) => None,
+            };
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(|ty| {
+                    ty.apply_optional_specialization(db, specialization)
+                        .apply_optional_specialization(db, unresolved_specialization)
+                })
         };
 
         match name {
@@ -2047,10 +2057,17 @@ impl<'db> ClassType<'db> {
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
+                let unresolved_specialization = generic
+                    .origin(db)
+                    .unresolved_legacy_generic_context(db)
+                    .map(|generic_context| generic_context.unknown_specialization(db));
                 generic
                     .origin(db)
                     .own_instance_member(db, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .map_type(|ty| {
+                        ty.apply_optional_specialization(db, Some(specialization))
+                            .apply_optional_specialization(db, unresolved_specialization)
+                    })
             }
         }
     }

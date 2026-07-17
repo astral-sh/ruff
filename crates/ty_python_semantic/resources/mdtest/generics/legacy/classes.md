@@ -194,6 +194,27 @@ class ImageDataset(VisionDataset):
 def read_item(dataset: ImageDataset) -> None:
     reveal_type(dataset.item)  # revealed: Unknown
 
+KnownT = TypeVar("KnownT")
+MissingT = TypeVar("MissingT")
+
+class Known(Generic[KnownT]): ...
+
+class Mixed(Known[KnownT], Dataset[MissingT]):
+    known: KnownT
+    item: MissingT
+
+    def read(self) -> MissingT:
+        raise NotImplementedError
+
+class MixedChild(Mixed[int]):
+    def read(self) -> str:
+        raise NotImplementedError
+
+reveal_type(Mixed[int].read)  # revealed: def read(self) -> Unknown
+reveal_type(MixedChild.read)  # revealed: def read(self) -> str
+reveal_type(MixedChild().known)  # revealed: int
+reveal_type(MixedChild().item)  # revealed: Unknown
+
 T = TypeVar("T")
 
 class MethodGeneric(Dataset[Any]):
