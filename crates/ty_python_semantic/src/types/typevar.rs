@@ -1623,7 +1623,7 @@ fn lazy_bound_cycle_recover<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous {
         Some(prev) => current.cycle_normalized(db, &env, CycleQuery::TypeVarBound, *prev, cycle),
-        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarBound, cycle),
+        None => current,
     })
 }
 
@@ -1647,7 +1647,7 @@ fn lazy_constraints_cycle_recover<'db>(
         Some(prev) => {
             current.cycle_normalized(db, &env, CycleQuery::TypeVarConstraints, *prev, cycle)
         }
-        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarConstraints, cycle),
+        None => current,
     })
 }
 
@@ -1668,7 +1668,7 @@ fn lazy_default_cycle_recover<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     Some(match previous_default {
         Some(prev) => current.cycle_normalized(db, &env, CycleQuery::TypeVarDefault, *prev, cycle),
-        None => current.recursive_type_normalized(db, &env, CycleQuery::TypeVarDefault, cycle),
+        None => current,
     })
 }
 
@@ -1932,7 +1932,7 @@ fn bound_typevar_default_type_cycle_recover<'db>(
         Some(previous) => {
             default.cycle_normalized(db, &env, CycleQuery::BoundTypeVarDefault, *previous, cycle)
         }
-        None => default.recursive_type_normalized(db, &env, CycleQuery::BoundTypeVarDefault, cycle),
+        None => default,
     })
 }
 
@@ -2132,19 +2132,6 @@ impl<'db> TypeVarConstraints<'db> {
                 .map(|(ty, prev_ty)| ty.cycle_normalized(db, env, query, *prev_ty, cycle))
                 .collect::<Box<_>>(),
         )
-    }
-
-    /// Normalize recursive types for cycle recovery when there's no previous value.
-    ///
-    /// See [`Type::recursive_type_normalized`] for more details.
-    fn recursive_type_normalized(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        query: CycleQuery,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.map(db, |ty| ty.recursive_type_normalized(db, env, query, cycle))
     }
 }
 

@@ -588,21 +588,6 @@ impl<'db> CallableType<'db> {
         Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.kind(db),
-        ))
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,

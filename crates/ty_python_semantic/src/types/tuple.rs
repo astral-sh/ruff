@@ -283,21 +283,6 @@ impl<'db> TupleType<'db> {
         })
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new_internal(
-            db,
-            env.program(db),
-            self.tuple(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -991,33 +976,6 @@ impl<T> FixedLengthTuple<T> {
 }
 
 impl<'db> FixedLengthTuple<Type<'db>> {
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        if nested {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
-                    .collect::<Option<Box<[_]>>>()?,
-            ))
-        } else {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div)
-                    })
-                    .collect::<Box<[_]>>(),
-            ))
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -1130,37 +1088,6 @@ impl<T, V> VariableLengthTuple<T, V> {
         suffix: impl IntoIterator<Item = T>,
     ) -> Tuple<T, V> {
         Tuple::Variable(Self::new(prefix, variable, suffix))
-    }
-
-    fn try_new<P, S>(prefix: P, variable: V, suffix: S) -> Option<Self>
-    where
-        P: IntoIterator<Item = Option<T>>,
-        P::IntoIter: ExactSizeIterator,
-        S: IntoIterator<Item = Option<T>>,
-        S::IntoIter: ExactSizeIterator,
-    {
-        let prefix = prefix.into_iter();
-        let suffix = suffix.into_iter();
-
-        let mut fixed_elements = SmallVec::with_capacity(prefix.len().saturating_add(suffix.len()));
-
-        for element in prefix {
-            fixed_elements.push(element?);
-        }
-
-        let prefix_len = fixed_elements.len();
-
-        for element in suffix {
-            fixed_elements.push(element?);
-        }
-
-        fixed_elements.shrink_to_fit();
-
-        Some(Self {
-            fixed_elements,
-            prefix_len,
-            variable_segment: variable,
-        })
     }
 
     fn new(
@@ -2148,80 +2075,6 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             .skip_while(move |element| element.is_equivalent_to(db, env, variable))
     }
 
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        if nested {
-            let prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
-
-            let variable_segment = match self.variable() {
-                VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable.recursive_type_normalized_impl(db, env, div, true)?,
-                ),
-                VariableSegment::TypeVarTuple(typevartuple) => {
-                    VariableSegment::TypeVarTuple(typevartuple)
-                }
-            };
-
-            let suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
-
-            Self::try_new(prefix, variable_segment, suffix)
-        } else {
-            let mut prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Vec<_>>();
-
-            let variable_segment = match self.variable() {
-                VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable
-                        .recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div),
-                ),
-                VariableSegment::TypeVarTuple(typevartuple) => {
-                    VariableSegment::TypeVarTuple(typevartuple)
-                }
-            };
-
-            let mut suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Vec<_>>();
-
-            // `tuple[a, ..., a]` still grows under tuple-star recursion such as
-            // `x = (*x, x)`. The current tuple representation cannot express that
-            // sequence-recursive shape, so absorb redundant binder slots into the
-            // variable portion during cycle recovery.
-            if matches!(
-                variable_segment,
-                VariableSegment::Homogeneous(variable) if variable == div
-            ) {
-                prefix.retain(|ty| *ty != div);
-                suffix.retain(|ty| *ty != div);
-            }
-
-            Some(Self::new(prefix, variable_segment, suffix))
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -2794,23 +2647,6 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
                     db, env, elements,
                 ))
             }))
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-        }
     }
 
     fn apply_type_mapping_impl<'a>(

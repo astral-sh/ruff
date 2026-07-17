@@ -896,29 +896,6 @@ impl<'db> DynamicTypedDictAnchor<'db> {
             },
         }
     }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Definition(definition) => Some(Self::Definition(*definition)),
-            Self::ScopeOffset {
-                scope,
-                offset,
-                schema,
-                openness,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                schema: schema.recursive_type_normalized_impl(db, env, div, nested)?,
-                openness: openness.recursive_type_normalized_impl(db, env, div, nested)?,
-            }),
-        }
-    }
 }
 
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
@@ -957,22 +934,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.typed_dict_module(db),
         )
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.anchor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.typed_dict_module(db),
-        ))
     }
 }
 

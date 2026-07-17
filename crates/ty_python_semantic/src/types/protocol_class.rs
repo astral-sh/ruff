@@ -374,19 +374,6 @@ impl<'db> ProtocolClass<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self(
-            self.0
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
-    }
 }
 
 impl<'db> Deref for ProtocolClass<'db> {
@@ -917,28 +904,6 @@ impl<'db> ProtocolInterface<'db> {
         ProtocolInterfaceView::new(self, None).instance_member(db, env, name)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            env.program(db),
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| {
-                    Some((
-                        name.clone(),
-                        data.recursive_type_normalized_impl(db, env, div, nested)?,
-                    ))
-                })
-                .collect::<Option<BTreeMap<_, _>>>()?,
-        ))
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -1159,48 +1124,6 @@ impl<'db> ProtocolMemberWrite<'db> {
         }
     }
 
-    fn cycle_normalized_without_previous(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        query: CycleQuery,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        let normalize = |member: ProtocolMemberType<'db>| {
-            member.with_ty(member.ty().recursive_type_normalized(db, env, query, cycle))
-        };
-        match self {
-            Self::Type(member) => Self::Type(normalize(member)),
-            Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: normalize(descriptor),
-                domain: domain.map(normalize),
-            },
-        }
-    }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(match self {
-            Self::Type(member) => {
-                Self::Type(member.recursive_type_normalized_impl(db, env, div, nested)?)
-            }
-            Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: descriptor.recursive_type_normalized_impl(db, env, div, nested)?,
-                domain: match domain {
-                    Some(domain) => {
-                        Some(domain.recursive_type_normalized_impl(db, env, div, nested)?)
-                    }
-                    None => None,
-                },
-            },
-        })
-    }
-
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -1367,24 +1290,6 @@ impl<'db> ProtocolMemberType<'db> {
         self.with_ty(ty)
     }
 
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let ty = if nested {
-            self.ty()
-                .recursive_type_normalized_impl(db, env, div, true)?
-        } else {
-            self.ty()
-                .recursive_type_normalized_impl(db, env, div, true)
-                .unwrap_or(div)
-        };
-        Some(self.with_ty(ty))
-    }
-
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -1505,13 +1410,7 @@ fn cycle_normalized_optional_type<'db>(
         (Some(current), Some(previous)) => {
             Some(current.cycle_normalized(db, env, query, previous, cycle))
         }
-        (Some(current), None) => Some(
-            current.with_ty(
-                current
-                    .ty()
-                    .recursive_type_normalized(db, env, query, cycle),
-            ),
-        ),
+        (Some(current), None) => Some(current),
         (None, _) => None,
     }
 }
@@ -1640,22 +1539,6 @@ impl<'db> ProtocolMemberData<'db> {
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            kind: self
-                .kind
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            qualifiers: self.qualifiers,
-            definition: self.definition,
-        })
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -1812,9 +1695,7 @@ impl<'db> ProtocolMemberKind<'db> {
                     (Some(current), Some(previous)) => {
                         Some(current.cycle_normalized(db, env, query, previous, cycle))
                     }
-                    (Some(current), None) => {
-                        Some(current.cycle_normalized_without_previous(db, env, query, cycle))
-                    }
+                    (Some(current), None) => Some(current),
                     (None, _) => None,
                 },
             },
@@ -1823,36 +1704,6 @@ impl<'db> ProtocolMemberKind<'db> {
             }
             (current, _) => current,
         }
-    }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(match self {
-            Self::Method(member, kind) => Self::Method(
-                member.recursive_type_normalized_impl(db, env, div, nested)?,
-                kind,
-            ),
-            Self::Property { read, write } => Self::Property {
-                read: match read {
-                    Some(read) => Some(read.recursive_type_normalized_impl(db, env, div, nested)?),
-                    None => None,
-                },
-                write: match write {
-                    Some(write) => {
-                        Some(write.recursive_type_normalized_impl(db, env, div, nested)?)
-                    }
-                    None => None,
-                },
-            },
-            Self::Attribute(attribute) => {
-                Self::Attribute(attribute.recursive_type_normalized_impl(db, env, div, nested)?)
-            }
-        })
     }
 
     fn apply_type_mapping_impl<'a>(

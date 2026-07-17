@@ -64,7 +64,6 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
-use salsa::plumbing::AsId;
 use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
@@ -104,45 +103,6 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecursiveTypeNormalizationKey {
-    function_literal: salsa::Id,
-    nested: bool,
-}
-
-// Keep this detector thread-local rather than threading it through every recursive
-// normalization helper. Passing an explicit visitor would model the recursion state more
-// directly, but it would touch a wide slice of the type-normalization plumbing for no current
-// behavioral benefit. This works because recursive normalization currently stays on a single
-// thread/query stack; if that ever changes, revisit this and prefer explicit visitor propagation.
-std::thread_local! {
-    static ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS: ActiveRecursionDetector<RecursiveTypeNormalizationKey> =
-        ActiveRecursionDetector::default();
-}
-
-/// Runs recursive type normalization under a scoped guard keyed by function literal identity.
-///
-/// `TypeOf` can make a function signature refer back to the same function through many different
-/// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
-fn visit_recursive_type_normalization<R>(
-    function_literal: FunctionLiteral<'_>,
-    nested: bool,
-    on_cycle: impl FnOnce() -> R,
-    func: impl FnOnce() -> R,
-) -> R {
-    ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
-        detector.visit(
-            &RecursiveTypeNormalizationKey {
-                function_literal: function_literal.last_definition.as_id(),
-                nested,
-            },
-            on_cycle,
-            func,
-        )
-    })
-}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -1696,49 +1656,6 @@ impl<'db> FunctionType<'db> {
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
-    }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        visit_recursive_type_normalization(
-            self.literal(db),
-            nested,
-            || None,
-            || {
-                let literal = self.literal(db);
-                let updated_signature = match self.updated_signature(db) {
-                    Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, env, div, nested)?)
-                    }
-                    None => None,
-                };
-                let updated_implementation_callables =
-                    match self.updated_implementation_callables(db) {
-                        Some(callables) => Some(
-                            callables
-                                .iter()
-                                .map(|callable| {
-                                    callable.recursive_type_normalized_impl(db, env, div, nested)
-                                })
-                                .collect::<Option<Box<_>>>()?,
-                        ),
-                        None => None,
-                    };
-                Some(Self::new(
-                    db,
-                    literal,
-                    UpdatedFunctionSignatures::new(
-                        updated_signature,
-                        updated_implementation_callables,
-                    ),
-                ))
-            },
-        )
     }
 
     pub(super) fn as_abstract_method(

@@ -345,15 +345,6 @@ fn divergent_type() {
             .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load,)
             .is_err()
     );
-    assert_eq!(
-        top_div.recursive_type_normalized_impl(db, &env, div, true),
-        None
-    );
-    assert_eq!(
-        bottom_div.recursive_type_normalized_impl(db, &env, div, true),
-        None
-    );
-
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
     let union = UnionType::from_elements(db, &env, [Type::unknown(), div]);
@@ -435,88 +426,6 @@ fn divergent_type() {
             .to_string(),
         "list[list[Divergent] | None]"
     );
-    let normalized = nested_rec
-        .recursive_type_normalized_impl(db, &env, div, false)
-        .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "list[Divergent]"
-    );
-
-    let recursive_tuple = Type::heterogeneous_tuple(
-        db,
-        &env,
-        [
-            UnionType::from_elements(
-                db,
-                &env,
-                [
-                    KnownClass::Int.to_instance(db, &env),
-                    Type::heterogeneous_tuple(
-                        db,
-                        &env,
-                        [
-                            UnionType::from_elements(
-                                db,
-                                &env,
-                                [KnownClass::Int.to_instance(db, &env), div],
-                            ),
-                            KnownClass::Str.to_instance(db, &env),
-                        ],
-                    ),
-                ],
-            ),
-            KnownClass::Str.to_instance(db, &env),
-        ],
-    );
-    let normalized = recursive_tuple
-        .recursive_type_normalized_impl(db, &env, div, false)
-        .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "tuple[Divergent, str]"
-    );
-
-    let recursive_dict = KnownClass::Dict.to_specialized_instance(
-        db,
-        &env,
-        &[
-            KnownClass::Str.to_instance(db, &env),
-            UnionType::from_elements(
-                db,
-                &env,
-                [
-                    KnownClass::Int.to_instance(db, &env),
-                    KnownClass::Dict.to_specialized_instance(
-                        db,
-                        &env,
-                        &[
-                            KnownClass::Str.to_instance(db, &env),
-                            UnionType::from_elements(
-                                db,
-                                &env,
-                                [KnownClass::Int.to_instance(db, &env), div],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    );
-    let normalized = recursive_dict
-        .recursive_type_normalized_impl(db, &env, div, false)
-        .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "dict[str, Divergent]"
-    );
-
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
     assert_eq!(
         union.display(db, &db.program_environment()).to_string(),
@@ -526,16 +435,6 @@ fn divergent_type() {
         let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
         assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
     }
-    let normalized = union
-        .recursive_type_normalized_impl(db, &env, div, false)
-        .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "int"
-    );
-
     // The same can be said about intersections for the `Never` type.
     let intersection = IntersectionType::from_elements(db, &env, [Type::Never, div]);
     assert_eq!(

@@ -298,22 +298,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            overloads: self
-                .overloads
-                .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, env, div, nested))
-                .collect::<Option<SmallVec<_>>>()?,
-        })
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -944,38 +928,6 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let return_ty = if nested {
-            self.return_ty
-                .recursive_type_normalized_impl(db, env, div, true)?
-        } else {
-            self.return_ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .unwrap_or(div)
-        };
-        let parameters = {
-            let mut parameters = Vec::with_capacity(self.parameters.len());
-            for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, env, div, nested)?);
-            }
-            Parameters::new(parameters, self.parameters.kind())
-        };
-        Some(Self {
-            generic_context: self.generic_context,
-            definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.receiver_constraints.clone(),
-            parameters,
-            return_ty,
-        })
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -5537,54 +5489,6 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let Parameter {
-            annotated_type,
-            definition,
-            annotation_kind,
-            inferred_annotation,
-            source_parameter_index,
-            kind,
-        } = self;
-
-        let normalize_type = |ty: Type<'db>| {
-            let normalized = ty.recursive_type_normalized_impl(db, env, div, true);
-            if nested {
-                normalized
-            } else {
-                Some(normalized.unwrap_or(div))
-            }
-        };
-        let annotated_type = normalize_type(*annotated_type)?;
-
-        let mut kind = kind.clone();
-        match &mut kind {
-            ParameterKind::PositionalOnly { default_type, .. }
-            | ParameterKind::PositionalOrKeyword { default_type, .. }
-            | ParameterKind::KeywordOnly { default_type, .. } => {
-                if let Some(ParameterDefault::Inferred(ty)) = default_type {
-                    *ty = normalize_type(*ty)?;
-                }
-            }
-            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
-        }
-
-        Some(Self {
-            annotated_type,
-            definition: *definition,
-            inferred_annotation: *inferred_annotation,
-            annotation_kind: *annotation_kind,
-            source_parameter_index: *source_parameter_index,
-            kind,
-        })
-    }
-
     fn from_node_and_kind(
         db: &'db dyn Db,
         function_definition: Definition<'db>,
@@ -5906,10 +5810,11 @@ impl<'db> ParameterKind<'db> {
         cycle: &salsa::Cycle,
     ) -> Option<ParameterDefault<'db>> {
         current.map(|current| {
-            current.map_type(|ty| match previous.and_then(ParameterDefault::eager_type) {
-                Some(previous) => ty.cycle_normalized(db, env, query, previous, cycle),
-                None => ty.recursive_type_normalized(db, env, query, cycle),
-            })
+            previous
+                .and_then(ParameterDefault::eager_type)
+                .map_or(current, |previous| {
+                    current.map_type(|ty| ty.cycle_normalized(db, env, query, previous, cycle))
+                })
         })
     }
 

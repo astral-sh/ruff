@@ -54,23 +54,6 @@ impl<'db> ClassBase<'db> {
             .then_some(Self::IdentityRecursive(recursive))
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
-            Self::IdentityRecursive(_) => Some(self),
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
-        }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             ClassBase::Any => "Any",

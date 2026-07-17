@@ -156,29 +156,6 @@ impl<'db> TypedDictOpenness<'db> {
             }
         }
     }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::ImplicitlyOpen | Self::Closed => Some(self),
-            Self::Extra(extra_items) => {
-                let declared_ty = extra_items
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, env, div, true);
-                let declared_ty = if nested {
-                    declared_ty?
-                } else {
-                    declared_ty.unwrap_or(div)
-                };
-                Some(Self::extra(db, declared_ty, extra_items.is_read_only))
-            }
-        }
-    }
 }
 
 /// The value type and mutability of a `TypedDict`'s extra items.
@@ -3159,30 +3136,6 @@ impl<'db> SynthesizedTypedDictType<'db> {
 pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
 
 impl<'db> TypedDictSchema<'db> {
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        self.iter()
-            .map(|(name, field)| {
-                let declared_ty = field
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, env, div, true);
-                let declared_ty = if nested {
-                    declared_ty?
-                } else {
-                    declared_ty.unwrap_or(div)
-                };
-                let mut field = field.clone();
-                field.declared_ty = declared_ty;
-                Some((name.clone(), field))
-            })
-            .collect()
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,

@@ -185,21 +185,6 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.anchor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
-    }
 }
 
 #[salsa::tracked]
@@ -605,31 +590,6 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
             },
         }
     }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
-                definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
-            }),
-            Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
-            Self::ScopeOffset {
-                scope,
-                offset,
-                spec,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
-            }),
-        }
-    }
 }
 
 /// A specification describing the fields of a dynamic `namedtuple`
@@ -652,43 +612,6 @@ impl<'db> NamedTupleSpec<'db> {
     /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false)
-    }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let fields = self
-            .fields(db)
-            .iter()
-            .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
-                let default = match f.default {
-                    Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, env, div, true);
-                        Some(if nested {
-                            default?
-                        } else {
-                            default.unwrap_or(div)
-                        })
-                    }
-                    None => None,
-                };
-
-                Some(NamedTupleField {
-                    name: f.name.clone(),
-                    ty,
-                    default,
-                    definition: f.definition,
-                })
-            })
-            .collect::<Option<Box<_>>>()?;
-
-        Some(Self::new(db, fields, self.has_known_fields(db)))
     }
 
     fn apply_type_mapping_impl<'a>(

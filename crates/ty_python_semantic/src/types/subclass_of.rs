@@ -285,20 +285,6 @@ impl<'db> SubclassOfType<'db> {
         class_like.find_name_in_mro_with_policy(db, env, name, policy)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            subclass_of: self
-                .subclass_of
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        })
-    }
-
     pub(crate) fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, env, class),
@@ -619,25 +605,6 @@ impl<'db> SubclassOfInner<'db> {
         });
 
         Self::TypeVar(bound_typevar)
-    }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
-            Self::Protocol(protocol) => Some(Self::Protocol(
-                protocol.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Self::TypeVar(_) => Some(self),
-        }
     }
 }
 

@@ -444,47 +444,6 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db, env)
-            .unpack_aliases(false)
-            .cycle_recovery(true)
-            .recursively_defined(self.recursively_defined(db));
-        let mut empty = true;
-        for ty in self.elements(db) {
-            if nested {
-                // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(div) {
-                    return Some(ty);
-                }
-                builder.add_in_place(ty);
-                empty = false;
-            } else {
-                // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
-                // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
-                    builder = builder.recursively_defined(RecursivelyDefined::Yes);
-                    continue;
-                }
-                builder.add_in_place(
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div),
-                );
-                empty = false;
-            }
-        }
-        if empty {
-            builder.add_in_place(div);
-        }
-        Some(builder.build())
-    }
-
     /// Identify some specific unions of known classes, currently the ones that `float` and
     /// `complex` expand into in type position.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownUnion> {
@@ -699,38 +658,6 @@ impl<'db> NegativeIntersectionElements<'db> {
             // See struct-level comment: we don't try to maintain the invariant that collections
             // with size 0 or 1 are represented as `Empty` or `Single`.
             Self::Multiple(set) => set.swap_remove_index(index),
-        }
-    }
-
-    /// Apply a transformation to all elements in this collection,
-    /// and return a new collection of the transformed elements.
-    fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
-        match self {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                NegativeIntersectionElements::Single(map_fn(ty))
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                NegativeIntersectionElements::Multiple(set.iter().map(map_fn).collect())
-            }
-        }
-    }
-
-    /// Apply a fallible transformation to all elements in this collection,
-    /// and return a new collection of the transformed elements.
-    ///
-    /// Returns `None` if `map_fn` fails for any element in the collection.
-    fn try_map(&self, map_fn: impl Fn(&Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
-        match self {
-            NegativeIntersectionElements::Empty => Some(NegativeIntersectionElements::Empty),
-            NegativeIntersectionElements::Single(ty) => {
-                map_fn(ty).map(NegativeIntersectionElements::Single)
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                Some(NegativeIntersectionElements::Multiple(
-                    set.iter().map(map_fn).collect::<Option<_>>()?,
-                ))
-            }
         }
     }
 }
@@ -991,41 +918,6 @@ impl<'db> IntersectionType<'db> {
         }
 
         intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
-    }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let positive = if nested {
-            self.positive(db)
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, nested))
-                .collect::<Option<FxOrderSet<Type<'db>>>>()?
-        } else {
-            self.positive(db)
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div)
-                })
-                .collect()
-        };
-
-        let negative = if nested {
-            self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, env, div, nested))?
-        } else {
-            self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, nested)
-                    .unwrap_or(div)
-            })
-        };
-
-        Some(IntersectionType::new(db, positive, negative))
     }
 
     /// Returns an iterator over the positive elements of the intersection. If

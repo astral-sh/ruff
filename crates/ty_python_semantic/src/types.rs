@@ -1441,52 +1441,6 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new_internal(db, getter, setter, deleter, instance_class)
     }
 
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let getter = match self.getter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, env, div, true)?),
-            Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
-            ),
-            None => None,
-        };
-        let setter = match self.setter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, env, div, true)?),
-            Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
-            ),
-            None => None,
-        };
-        let deleter = match self.deleter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, env, div, true)?),
-            Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
-            ),
-            None => None,
-        };
-        let instance_class = match self.instance_class(db) {
-            PropertyInstanceClass::Subclass(class) => PropertyInstanceClass::Subclass(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            ),
-            class => class,
-        };
-        Some(Self::new_internal(
-            db,
-            getter,
-            setter,
-            deleter,
-            instance_class,
-        ))
-    }
-
     fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1610,25 +1564,6 @@ impl<'db> DataclassParams<'db> {
             DataclassFlags::from(params.flags(db)),
             params.field_specifiers(db),
         )
-    }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let field_specifiers = self
-            .field_specifiers(db)
-            .iter()
-            .map(|ty| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                if nested { ty } else { Some(ty.unwrap_or(div)) }
-            })
-            .collect::<Option<Box<_>>>()?;
-
-        Some(Self::new(db, self.flags(db), field_specifiers))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -1854,27 +1789,6 @@ struct TypePair<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TypePair<'_> {}
 
-/// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
-fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    guard: T,
-    div: Type<'db>,
-    nested: bool,
-) -> Option<Type<'db>> {
-    let ty = if nested {
-        guard
-            .type_argument(db)
-            .recursive_type_normalized_impl(db, env, div, true)?
-    } else {
-        guard
-            .type_argument(db)
-            .recursive_type_normalized_impl(db, env, div, true)
-            .unwrap_or(div)
-    };
-    Some(guard.with_type(db, ty))
-}
-
 /// Whether generator-type extraction supplies defaults for iterator annotations.
 ///
 /// `Iterator[T]` and `AsyncIterator[T]` constrain yielded values but do not declare
@@ -1981,15 +1895,6 @@ impl<'db> Type<'db> {
         match self {
             Type::Recursive(recursive) => Some(recursive),
             _ => None,
-        }
-    }
-
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
-    fn same_divergent_marker(self, other: Type<'db>) -> bool {
-        match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
-            _ => false,
         }
     }
 
@@ -3484,163 +3389,6 @@ impl<'db> Type<'db> {
                 UnionType::from_two_elements(db, env, self, Type::unknown())
             }
             _ => self,
-        }
-    }
-
-    /// Performs nest reduction for recursive types (types that contain `Divergent` types).
-    /// For example, consider the following implicit attribute inference:
-    /// ```python
-    /// class C:
-    ///     def f(self, other: "C"):
-    ///         self.x = (other.x, 1)
-    ///
-    /// reveal_type(C().x) # revealed: Unknown | tuple[Divergent, Literal[1]]
-    /// ```
-    ///
-    /// A query that performs implicit attribute type inference enters a cycle because the attribute is recursively defined, and the cycle initial value is set to `Divergent`.
-    /// In the next (1st) cycle it is inferred to be `tuple[Divergent, Literal[1]]`, and in the 2nd cycle it becomes `tuple[tuple[Divergent, Literal[1]], Literal[1]]`.
-    /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
-    /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
-    #[must_use]
-    pub(crate) fn recursive_type_normalized(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        query: CycleQuery,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.recursive_type_normalized_impl_with_cycle(db, env, query, cycle)
-    }
-
-    fn recursive_type_normalized_impl_with_cycle(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        query: CycleQuery,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(query, id), false)
-                .unwrap_or(Type::divergent(query, id))
-        })
-    }
-
-    /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
-    /// When `nested` is true, propagate `None`. That is, if the type contains a `Divergent` type, the return value of this method is `None` (so we can use the `?` operator).
-    /// When `nested` is false, create a type containing `Divergent` types instead of propagating `None` (we should use `unwrap_or(Divergent)`).
-    /// This is to preserve the structure of the non-divergent parts of the type instead of completely collapsing the type containing a `Divergent` type into a `Divergent` type.
-    /// ```python
-    /// tuple[tuple[Divergent, Literal[1]], Literal[1]].recursive_type_normalized(nested: false)
-    /// => tuple[
-    ///     tuple[Divergent, Literal[1]].recursive_type_normalized_impl(nested: true).unwrap_or(Divergent),
-    ///     Literal[1].recursive_type_normalized_impl(nested: true).unwrap_or(Divergent)
-    /// ]
-    /// => tuple[Divergent, Literal[1]]
-    /// ```
-    /// Generic nominal types such as `list[T]` and `tuple[T]` should send `nested=true` for `T`. This is necessary for normalization.
-    /// Structural types such as union and intersection do not need to send `nested=true` for element types; that is, types that are "flat" from the perspective of recursive types. `T | U` should send `nested` as is for `T`, `U`.
-    /// For other types, the decision depends on whether they are interpreted as nominal or structural.
-    /// For example, `KnownInstanceType::UnionType` should simply send `nested` as is.
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
-            return None;
-        }
-        match self {
-            Type::Union(union) => union.recursive_type_normalized_impl(db, env, div, nested),
-            Type::Intersection(intersection) => intersection
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::Intersection),
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db, env)
-                .recursive_type_normalized_impl(db, env, div, nested),
-            Type::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::Callable),
-            Type::ProtocolInstance(protocol) => protocol
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::ProtocolInstance),
-            Type::NominalInstance(instance) => instance
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::NominalInstance),
-            Type::FunctionLiteral(function) => function
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::FunctionLiteral),
-            Type::PropertyInstance(property) => property
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::PropertyInstance),
-            Type::SlotDescriptor(descriptor) => descriptor
-                .value_type(db)
-                .recursive_type_normalized_impl(db, env, div, true)
-                .map(|value_type| Type::SlotDescriptor(SlotDescriptorType::new(db, value_type))),
-            Type::KnownBoundMethod(method_kind) => method_kind
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::KnownBoundMethod),
-            Type::BoundMethod(method) => method
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::BoundMethod),
-            Type::BoundSuper(bound_super) => bound_super
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::BoundSuper),
-            Type::GenericAlias(generic) => generic
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::GenericAlias),
-            Type::Recursive(recursive) => recursive
-                .body(db)
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(|body| {
-                    RecursiveType::build(
-                        db,
-                        env,
-                        *recursive.binder(db),
-                        *recursive.origin(db),
-                        body,
-                    )
-                }),
-            Type::ClassLiteral(class) => class
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::ClassLiteral),
-            Type::SubclassOf(subclass_of) => subclass_of
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::SubclassOf),
-            Type::TypeVar(_) => Some(self),
-            Type::KnownInstance(known_instance) => known_instance
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::KnownInstance),
-            Type::TypeIs(type_is) => {
-                recursive_type_normalize_type_guard_like(db, env, type_is, div, nested)
-            }
-            Type::TypeGuard(type_guard) => {
-                recursive_type_normalize_type_guard_like(db, env, type_guard, div, nested)
-            }
-            Type::TypeForm(typeform) => typeform
-                .type_argument(db)
-                .recursive_type_normalized_impl(db, env, div, true)
-                .map(|ty| TypeFormType::from_type_expression(db, ty)),
-            Type::Divergent(_) => Some(self),
-            Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                Some(self)
-            }
-            Type::TypeAlias(_) => Some(self),
-            Type::NewTypeInstance(newtype) => newtype
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Type::NewTypeInstance),
-            Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::Never
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::LiteralValue(_) => Some(self),
         }
     }
 
@@ -11271,10 +11019,6 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
-    fn recursive_type_normalized(self) -> Self {
-        self
-    }
-
     fn is_todo(&self) -> bool {
         matches!(self, Self::Todo(_))
     }
@@ -12322,9 +12066,6 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
     /// Get the human-readable place name if bound
     fn place_name(self, db: &'db dyn Db) -> Option<String>;
 
-    /// Create a new instance with a different type argument, wrapped in Type.
-    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
-
     /// The `SpecialFormType` for display purposes
     fn special_form() -> SpecialFormType;
 }
@@ -12338,10 +12079,6 @@ impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
         TypeIsType::place_name(self, db)
-    }
-
-    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        TypeIsType::with_type(self, db, ty)
     }
 
     fn special_form() -> SpecialFormType {
@@ -12358,10 +12095,6 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
         TypeGuardType::place_name(self, db)
-    }
-
-    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        TypeGuardType::with_type(self, db, ty)
     }
 
     fn special_form() -> SpecialFormType {
