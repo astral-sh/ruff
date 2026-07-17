@@ -391,14 +391,10 @@ def _(
     # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
     reveal_type(invariant_correlated(x, y))  # revealed: A | B
 
-def invariant_paramspec[T, **P](
-    x: Box[T], y: Box[T], callback: Callable[P, None]
-) -> T:
+def invariant_paramspec[T, **P](x: Box[T], y: Box[T], callback: Callable[P, None]) -> T:
     raise NotImplementedError
 
-def invariant_typevartuple[T, *Ts](
-    x: Box[T], y: Box[T], values: tuple[*Ts]
-) -> T:
+def invariant_typevartuple[T, *Ts](x: Box[T], y: Box[T], values: tuple[*Ts]) -> T:
     raise NotImplementedError
 
 def _(
