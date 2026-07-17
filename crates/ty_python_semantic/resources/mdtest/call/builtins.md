@@ -311,6 +311,48 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
+## Calls to `isinstance` with tuple-covered aliases and type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+class A: ...
+class B: ...
+
+type AliasA = A
+type AliasB = B
+type AliasAB = AliasA | AliasB
+
+T_constrained_a_b = TypeVar("T_constrained_a_b", A, B)
+T_bound_a_b = TypeVar("T_bound_a_b", bound=A | B)
+T_bound_alias_a_b = TypeVar("T_bound_alias_a_b", bound=AliasAB)
+
+def accepts_alias(x: AliasAB) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_constrained_typevar(x: T_constrained_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_union_bound_typevar(x: T_bound_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_alias_bound_typevar(x: T_bound_alias_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+```
+
 ## Generic builtins should not overfit upper-bound-only callback constraints
 
 These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and

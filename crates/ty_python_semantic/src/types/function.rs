@@ -85,6 +85,7 @@ use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
+use crate::types::tuple::TupleSpec;
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
@@ -1890,7 +1891,7 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-/// Return whether a fixed `isinstance` tuple covers every member of an input union.
+/// Return whether a fixed `isinstance` tuple covers every possible type of an input.
 ///
 /// Each class in the tuple uses the same truthiness inference as a single-class `isinstance` check.
 ///
@@ -1910,18 +1911,31 @@ fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: 
         return false;
     }
 
-    let is_covered = |ty: Type<'db>| {
-        tuple.fixed_elements().any(|element| {
+    is_instance_tuple_covers(db, &tuple, ty)
+}
+
+fn is_instance_tuple_covers<'db>(db: &'db dyn Db, tuple: &TupleSpec<'db>, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_instance_tuple_covers(db, tuple, *element)),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_instance_tuple_covers(db, tuple, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| is_instance_tuple_covers(db, tuple, *constraint)),
+            None => is_instance_tuple_covers(db, tuple, Type::object()),
+        },
+        ty => tuple.fixed_elements().any(|element| {
             let Type::ClassLiteral(class) = element else {
                 return false;
             };
             is_instance_truthiness(db, ty, *class).is_always_true()
-        })
-    };
-
-    match ty {
-        Type::Union(union) => union.elements(db).iter().copied().all(is_covered),
-        ty => is_covered(ty),
+        }),
     }
 }
 
