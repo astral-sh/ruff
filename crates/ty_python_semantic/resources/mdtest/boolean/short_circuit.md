@@ -122,6 +122,52 @@ def _(flag1: bool, flag2: bool):
         reveal_type(z)  # revealed: Literal[1]
 ```
 
+## Nested short-circuit assignments
+
+Assignments in mutually exclusive short-circuit paths can still leave a name definitely bound.
+
+```py
+def _(flag: bool):
+    if (flag and (x := 54)) or (x := 32):
+        reveal_type(x)  # revealed: Literal[54, 32]
+
+def _(flag: bool):
+    (flag and (x := 1)) or (x := 2)
+    reveal_type(x)  # revealed: Literal[1, 2]
+
+def _(flag: bool, first: int, second: str):
+    (flag and (x := first)) or (x := second)
+    reveal_type(x)  # revealed: int | str
+
+def _(flag: bool):
+    (flag or (x := 0)) and (x := 2)
+    reveal_type(x)  # revealed: Literal[0, 2]
+
+def _(flag1: bool, flag2: bool):
+    if (flag1 and (x := 1)) or (flag2 and (x := 2)):
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+    if (flag1 or (y := 0)) and (flag2 or (y := 0)):
+        pass
+    else:
+        reveal_type(y)  # revealed: Literal[0]
+
+def _(flag1: bool, flag2: bool):
+    (flag1 and (x := 1)) or (flag2 and (x := 2)) or (x := 3)
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
+
+def _(flag1: bool, flag2: bool):
+    if (flag1 and (x := 1)) or flag2:
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
+
+    if (flag1 and (y := 1)) or (z := 2):
+        # error: [possibly-unresolved-reference]
+        reveal_type(y)  # revealed: Literal[1]
+        # error: [possibly-unresolved-reference]
+        reveal_type(z)  # revealed: Literal[2]
+```
+
 ## Negated expressions
 
 ```py
