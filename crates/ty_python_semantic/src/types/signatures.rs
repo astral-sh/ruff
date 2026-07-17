@@ -1280,6 +1280,65 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Specializes a type that refers to callable-local variables in this signature's receiver.
+    ///
+    /// This uses the same receiver constraints as ordinary descriptor binding, including nested
+    /// receiver annotations such as `Box[T]`. Returns `None` if the receiver cannot satisfy the
+    /// annotation or a declared `TypeVar` domain.
+    pub(super) fn specialize_type_for_receiver(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        receiver: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if !self.has_explicit_positional_receiver_annotation() {
+            return Some(ty);
+        }
+
+        let bound = self.bind_self_with_receiver(db, Some(receiver), Some(receiver));
+        let Some(binding) = bound.receiver_binding.as_ref() else {
+            return Some(ty);
+        };
+        let inferable = InferableTypeVars::from_typevars(
+            db,
+            binding
+                .generic_context
+                .into_iter()
+                .flat_map(|generic_context| generic_context.variables(db))
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        );
+
+        binding.constraints.query(|builder, constraints| {
+            match constraints.solutions(db, builder, inferable) {
+                Solutions::Unsatisfiable => None,
+                Solutions::Unconstrained => Some(ty),
+                Solutions::Constrained(solutions) => {
+                    let Some(generic_context) = binding.generic_context else {
+                        return Some(ty);
+                    };
+                    Some(UnionType::from_elements(
+                        db,
+                        solutions.into_iter().map(|solution| {
+                            let specialization = generic_context.specialize_recursive(
+                                db,
+                                generic_context.variables(db).map(|typevar| {
+                                    solution
+                                        .iter()
+                                        .find(|binding| {
+                                            binding.bound_typevar.is_same_typevar_as(db, typevar)
+                                        })
+                                        .map(|binding| binding.solution)
+                                }),
+                            );
+                            ty.apply_specialization(db, specialization)
+                        }),
+                    ))
+                }
+            }
+        })
+    }
+
     /// Returns the declared-domain obligation that remains after specializing a receiver `TypeVar`.
     fn specialized_receiver_domain(
         db: &'db dyn Db,

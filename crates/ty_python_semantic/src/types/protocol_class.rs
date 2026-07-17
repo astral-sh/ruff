@@ -1484,8 +1484,9 @@ fn property_get_member_type<'db>(
     let mut definition = None;
     for callable in &getter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
-            let return_ty =
-                bind_property_accessor_type(db, signature, signature.return_ty, receiver_ty)?;
+            let return_ty = receiver_ty.map_or(Some(signature.return_ty), |receiver_ty| {
+                signature.specialize_type_for_receiver(db, signature.return_ty, receiver_ty)
+            })?;
             get_types.push(return_ty);
             definition = definition.or(signature.definition());
         }
@@ -1506,8 +1507,9 @@ fn property_set_member_type<'db>(
     for callable in &setter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
             let parameter_ty = signature.parameters().get_positional(1)?.annotated_type();
-            let parameter_ty =
-                bind_property_accessor_type(db, signature, parameter_ty, receiver_ty)?;
+            let parameter_ty = receiver_ty.map_or(Some(parameter_ty), |receiver_ty| {
+                signature.specialize_type_for_receiver(db, parameter_ty, receiver_ty)
+            })?;
             set_types.push(parameter_ty);
             definition = definition.or(signature.definition());
         }
@@ -1516,45 +1518,6 @@ fn property_set_member_type<'db>(
         UnionType::from_elements(db, set_types),
         definition,
     ))
-}
-
-/// Specializes a property getter or setter type for its callable-local receiver `TypeVar`.
-///
-/// ```python
-/// @property
-/// def value[T](self: T) -> T: ...
-/// ```
-///
-/// Returns `None` when the concrete receiver violates the accessor's declared `TypeVar` domain.
-fn bind_property_accessor_type<'db>(
-    db: &'db dyn Db,
-    signature: &Signature<'db>,
-    ty: Type<'db>,
-    receiver_ty: Option<Type<'db>>,
-) -> Option<Type<'db>> {
-    let Some(receiver_ty) = receiver_ty else {
-        return Some(ty);
-    };
-    if !signature.has_explicit_positional_receiver_annotation() {
-        return Some(ty);
-    }
-    let Some(typevar) = signature
-        .parameters()
-        .get_positional(0)
-        .and_then(|parameter| {
-            parameter
-                .annotated_type()
-                .resolve_type_alias(db)
-                .as_typevar()
-        })
-    else {
-        return Some(ty);
-    };
-    if typevar.binding_context(db).definition() != signature.definition() {
-        return Some(ty);
-    }
-    (!Signature::receiver_violates_typevar_domain(db, receiver_ty, typevar))
-        .then(|| ty.substitute_one_typevar(db, typevar, receiver_ty))
 }
 
 /// Derive the observable instance capabilities of a descriptor-decorated protocol member.

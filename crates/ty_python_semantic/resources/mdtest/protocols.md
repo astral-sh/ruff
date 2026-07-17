@@ -2638,6 +2638,57 @@ bounded_property: HasBoundedSelfProperty = BoundedSelfProperty()
 invalid_bounded_property: HasBoundedSelfProperty = InvalidBoundedSelfProperty()  # error: [invalid-assignment]
 ```
 
+Receiver TypeVars can also be nested in a generic receiver annotation. The accessor type must use
+the concrete receiver's corresponding type argument:
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+BoxT = TypeVar("BoxT")
+
+class PropertyBox(Generic[BoxT]): ...
+
+class HasBoxProperty(Protocol):
+    @property
+    def value(self: PropertyBox[BoxT]) -> BoxT: ...
+
+class IntBoxProperty(PropertyBox[int]):
+    @property
+    def value(self) -> int:
+        return 1
+
+class StringBoxProperty(PropertyBox[int]):
+    @property
+    def value(self) -> str:
+        return ""
+
+box_property: HasBoxProperty = IntBoxProperty()
+invalid_box_property: HasBoxProperty = StringBoxProperty()  # error: [invalid-assignment]
+
+class HasMutableBoxProperty(Protocol):
+    @property
+    def value(self) -> object: ...
+    @value.setter
+    def value(self: PropertyBox[BoxT], value: BoxT) -> None: ...
+
+class MutableIntBoxProperty(PropertyBox[int]):
+    @property
+    def value(self) -> object:
+        return 1
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class MutableStringBoxProperty(PropertyBox[int]):
+    @property
+    def value(self) -> object:
+        return ""
+    @value.setter
+    def value(self, value: str) -> None: ...
+
+mutable_box_property: HasMutableBoxProperty = MutableIntBoxProperty()
+invalid_mutable_box_property: HasMutableBoxProperty = MutableStringBoxProperty()  # error: [invalid-assignment]
+```
+
 ## Independent generic protocol methods
 
 A TypeVar used by a property receiver does not make another protocol method non-generic. An
