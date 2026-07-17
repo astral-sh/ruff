@@ -376,7 +376,7 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
     }
 
     // If any type variables have defaults, skip the rule unless targeting Python 3.13+.
-    if vars.iter().any(|tv| tv.default.is_some()) && checker.target_version() < PythonVersion::PY313
+    if checker.target_version() < PythonVersion::PY313 && vars.iter().any(|tv| tv.default.is_some())
     {
         return None;
     }
