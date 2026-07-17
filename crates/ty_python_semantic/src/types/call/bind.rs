@@ -1807,7 +1807,8 @@ impl<'db> Bindings<'db> {
                         if bound_method.function(db).name(db) == "__iter__"
                             && is_enum_class(db, bound_method.self_instance(db)) =>
                     {
-                        if let Some(enum_instance) = bound_method.self_instance(db).to_instance(db)
+                        if let Some(enum_instance) =
+                            bound_method.self_instance(db).to_instance_approximation(db)
                         {
                             overload.set_return_type(
                                 KnownClass::Iterator.to_specialized_instance(db, &[enum_instance]),

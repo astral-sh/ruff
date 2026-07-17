@@ -2236,7 +2236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (index, element) in tuple_spec.iter_element_types(self.db()).enumerate() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db()).expect(
+                        element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         )
@@ -2317,7 +2317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 tuple_spec.iter_element_types(self.db()).map(|element| {
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        Some(element.to_instance(self.db()).expect(
+                        Some(element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         ))
@@ -2328,7 +2328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if ty.is_assignable_to(self.db(), type_base_exception) {
             // `except ValueError as e:`
-            Some(ty.to_instance(self.db()).expect(
+            Some(ty.to_instance_approximation(self.db()).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             ))
@@ -2343,7 +2343,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .and_then(|spec| {
                         let specialization = spec
                             .homogeneous_element_type(self.db())
-                            .to_instance(self.db());
+                            .to_instance_approximation(self.db());
 
                         debug_assert!(specialization.is_some_and(|specialization_type| {
                             specialization_type.is_assignable_to(
@@ -7024,7 +7024,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .specialize_recursive(self.db(), specialization.into_iter().map(Some))
                     },
                 );
-                return Type::from(class_type).to_instance(self.db());
+                return Type::from(class_type).to_instance_approximation(self.db());
             }
 
             pre_inferred_elt_tys = Some(inferred_elts);
@@ -7263,7 +7263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        Type::from(class_type).to_instance(self.db())
+        Type::from(class_type).to_instance_approximation(self.db())
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.

@@ -693,7 +693,7 @@ impl<'db> ClassLiteral<'db> {
     /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(crate) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self.metaclass(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -1592,10 +1592,10 @@ impl<'db> ClassType<'db> {
         if other_metaclass == type_class {
             return true;
         }
-        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
+        let Some(self_metaclass_instance) = self_metaclass.to_instance_approximation(db) else {
             return true;
         };
-        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
+        let Some(other_metaclass_instance) = other_metaclass.to_instance_approximation(db) else {
             return true;
         };
         if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
@@ -1609,7 +1609,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self
             .metaclass(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -2106,7 +2106,7 @@ impl<'db> ClassType<'db> {
                 !signature.return_ty.is_assignable_to(
                     db,
                     self_ty
-                        .to_instance(db)
+                        .to_instance_approximation(db)
                         .expect("ClassType should be instantiable"),
                 )
             });
@@ -2136,7 +2136,9 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
+        let correct_return_type = self_ty
+            .to_instance_approximation(db)
+            .unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of

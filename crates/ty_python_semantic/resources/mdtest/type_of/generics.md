@@ -146,6 +146,21 @@ def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
     return x
 ```
 
+Narrowing a union of `type[T]` and a callable factory must preserve the `type[T]` alternative:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Holder(Generic[T]):
+    value: type[T] | Callable[[], type[T]]
+
+    def narrow(self) -> None:
+        if isinstance(self.value, type):
+            reveal_type(self.value)  # revealed: type[T@Holder] | ((() -> type[T@Holder]) & type)
+```
+
 ## `__class__`
 
 ```py
@@ -180,9 +195,9 @@ class B:
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
 
 ```py
-from typing import Any, Callable, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of, is_disjoint_from
+from typing import Any, Callable, NewType, Protocol, TypeVar
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Callback[T](Protocol):
     def __call__(self, *args, **kwargs) -> T: ...
@@ -201,6 +216,9 @@ def _[T](_: T):
 
     static_assert(is_assignable_to(type[T], Callable[..., T] | Callable[..., Any]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T] | Callable[..., Any]))
+
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type]))
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int]))
 
     static_assert(not is_assignable_to(type[T], Callback[int]))
     static_assert(not is_disjoint_from(type[T], Callback[int]))
@@ -277,12 +295,35 @@ def _[T: (int, str)](_: T):
 
     static_assert(is_subtype_of(type[T], type[int] | type[str]))
     static_assert(is_subtype_of(type[T], type[int | str]))
+    static_assert(is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int] | type[str]))
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
 def _[T: (int | str, int)](_: T):
     static_assert(is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
+
+def _[T, U: (Intersection[Callable[[], type], type], type)](_: T):
+    static_assert(not is_subtype_of(type[T], U))
+    static_assert(not is_subtype_of(type[T], U | type[int]))
+
+class Base: ...
+class Other: ...
+class OtherMeta(type): ...
+
+UserId = NewType("UserId", int)
+
+BoundBase = TypeVar("BoundBase", bound=Base)
+BoundList = TypeVar("BoundList", bound=list[int])
+BoundUserId = TypeVar("BoundUserId", bound=UserId)
+
+def lossy_class_object_projections(base: BoundBase, items: BoundList, user_id: BoundUserId) -> None:
+    static_assert(not is_subtype_of(type[BoundBase], TypeOf[Base]))
+    static_assert(not is_subtype_of(type[BoundList], TypeOf[list[int]]))
+    static_assert(not is_subtype_of(type[BoundBase], TypeOf[Base] | type[Other]))
+    static_assert(not is_subtype_of(type[BoundList], TypeOf[list[int]] | type[Other]))
+    static_assert(not is_subtype_of(type[BoundBase], OtherMeta | type[Other]))
+    static_assert(not is_subtype_of(type[BoundUserId], TypeOf[UserId] | type[Other]))
 ```
 
 ## Type aliases in final upper bounds
@@ -296,7 +337,8 @@ python-version = "3.12"
 
 ```py
 from typing import final
-from ty_extensions._internal import TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 @final
 class FinalClass: ...
@@ -306,6 +348,7 @@ type Alias = FinalClass
 def accepts_exact(cls: TypeOf[FinalClass]) -> None: ...
 def bounded[T: Alias](cls: type[T]) -> None:
     accepts_exact(cls)
+    static_assert(is_subtype_of(type[T], TypeOf[FinalClass] | type[int]))
 ```
 
 ## Metaclass instances

@@ -14,9 +14,9 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        any_over_type, binding_type, definition_expression_type,
+        InstanceProjection, KnownClass, KnownInstanceType, MaterializationKind, Parameter,
+        Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        UnionType, any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -333,14 +333,14 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
+    fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Self>> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
-            TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
-                TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?)
-            }
+            TypeVarBoundOrConstraints::UpperBound(upper_bound) => upper_bound
+                .to_instance(db)?
+                .map(TypeVarBoundOrConstraints::UpperBound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .to_instance(db)?
+                .map(TypeVarBoundOrConstraints::Constraints),
         };
         let identity = TypeVarIdentity::new(
             db,
@@ -348,13 +348,15 @@ impl<'db> TypeVarInstance<'db> {
             None, // definition
             self.kind(db),
         );
-        Some(Self::new(
-            db,
-            identity,
-            Some(bound_or_constraints.into()),
-            self.explicit_variance(db),
-            None, // _default
-        ))
+        Some(bound_or_constraints.map(|bound_or_constraints| {
+            Self::new(
+                db,
+                identity,
+                Some(bound_or_constraints.into()),
+                self.explicit_variance(db),
+                None, // _default
+            )
+        }))
     }
 
     fn type_is_self_referential(
@@ -1299,14 +1301,16 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    pub(super) fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.typevar(db).to_instance(db)?,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        ))
+    pub(super) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Self>> {
+        Some(self.typevar(db).to_instance(db)?.map(|typevar| {
+            Self::new(
+                db,
+                typevar,
+                self.binding_context(db),
+                self.paramspec_attr(db),
+                self.freshness(db),
+            )
+        }))
     }
 }
 
@@ -1595,14 +1599,17 @@ impl<'db> TypeVarConstraints<'db> {
         UnionType::from_elements(db, self.elements(db))
     }
 
-    fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+    fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<TypeVarConstraints<'db>>> {
         let mut instance_elements = Vec::new();
+        let mut is_exact = true;
         for ty in self.elements(db) {
-            instance_elements.push(ty.to_instance(db)?);
+            let projection = ty.to_instance(db)?;
+            is_exact &= projection.is_exact();
+            instance_elements.push(projection.into_inner());
         }
-        Some(TypeVarConstraints::new(
-            db,
-            instance_elements.into_boxed_slice(),
+        Some(InstanceProjection::new(
+            TypeVarConstraints::new(db, instance_elements.into_boxed_slice()),
+            is_exact,
         ))
     }
 

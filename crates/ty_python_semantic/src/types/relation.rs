@@ -965,28 +965,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    /// Can we check `target`s relation to a `type[T]` in either the metaclass-instance domain (it
-    /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
-    /// `.to_instance()`)?
-    ///
-    /// Do not use instance subtyping for an exact class object. For `T: (Y, Z)` where `Z` extends
-    /// `Y`, doing so would incorrectly simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and
-    /// `Z` instances are subtypes of `Y`, but only the class object `Y` satisfies `klass is Y`.
-    ///
-    /// The exception is a type variable whose upper bound normalizes to this exact class object.
-    /// That can only happen for a final class, so the exact object is the only valid
-    /// specialization of the type variable.
-    fn can_check_typevar_subclass_relation_to_target(
-        db: &'db dyn Db,
-        source_subclass: SubclassOfType<'db>,
-        target: Type<'db>,
-    ) -> bool {
-        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
-
-        (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_)) || is_exact_upper_bound)
-            && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
-    }
-
     /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
     /// projected into the ordinary instance/object domain via `.to_instance()`, or is a plain
     /// metaclass object type.
@@ -1003,28 +981,51 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// the metaclass of the upper bound of `T`, and compare in the metaclass-instance domain
     /// directly.
     ///
-    /// Exact class objects, and types that have no `.to_instance()` projection and are not
-    /// metaclass instances, do not pass the `can_check_typevar_subclass_relation_to_target` guard.
-    /// This helper does not decide their relation; they fall through to other type-pair branches.
+    /// When `.to_instance()` is an over-approximation, compare the original target in the
+    /// class-object domain instead. This preserves constraints that the projection discards, as
+    /// well as source constraints so that `T: (Y, Z)` can still be related to
+    /// `type[Y] | type[Z]`.
+    ///
+    /// Exact class objects also have an over-approximated instance projection. For `T: (Y, Z)`
+    /// where `Z` extends `Y`, instance subtyping would incorrectly simplify
+    /// `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are subtypes of `Y`, but
+    /// only the class object `Y` satisfies `klass is Y`. The exception is a type variable whose
+    /// upper bound normalizes to this exact class object. That can only happen for a final class,
+    /// so the exact object is the only valid specialization of the type variable.
+    ///
+    /// Return `None` for targets without a `.to_instance()` projection, allowing other type-pair
+    /// branches to decide their relation.
     fn check_typevar_subclass_relation_to_target(
         &self,
         db: &'db dyn Db,
         source_subclass: SubclassOfType<'db>,
         target: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        source_subclass
-            .into_type_var()
-            .when_some_and(db, self.constraints, |source_i| {
-                if Self::is_metaclass_instance(db, target) {
-                    self.check_type_pair(db, source_subclass.to_metaclass_instance(db), target)
-                } else {
-                    target
-                        .to_instance(db)
-                        .when_some_and(db, self.constraints, |target_i| {
-                            self.check_type_pair(db, Type::TypeVar(source_i), target_i)
-                        })
-                }
-            })
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let source_i = source_subclass.into_type_var()?;
+        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
+
+        if Self::is_metaclass_instance(db, target) {
+            return Some(self.check_type_pair(
+                db,
+                source_subclass.to_metaclass_instance(db),
+                target,
+            ));
+        }
+
+        let projection = target.to_instance(db)?;
+        if projection.is_exact() || is_exact_upper_bound {
+            return Some(self.check_type_pair(
+                db,
+                Type::TypeVar(source_i),
+                projection.into_inner(),
+            ));
+        }
+
+        let source = source_subclass
+            .subclass_of()
+            .with_transposed_type_var(db)
+            .into_type_var()?;
+        Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
 
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
@@ -1380,21 +1381,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // collapsing `A` through `to_instance()` would erase it to `object` (we have no
             // precise representation for "all instances of any classes with a given metaclass").
             (Type::SubclassOf(subclass_of), _)
-                if subclass_of.is_type_var()
-                    && Self::can_check_typevar_subclass_relation_to_target(
-                        db,
-                        subclass_of,
-                        target,
-                    ) =>
+                if let Some(constraint_set) =
+                    self.check_typevar_subclass_relation_to_target(db, subclass_of, target) =>
             {
-                self.check_typevar_subclass_relation_to_target(db, subclass_of, target)
+                constraint_set
             }
 
             // And vice versa. (No special metaclass handling is needed in this direction, since
             // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(instance) = source.to_instance(db) =>
+                    && let Some(instance) = source.to_instance_approximation(db) =>
             {
                 self.check_type_pair(db, instance, Type::TypeVar(type_var))
             }
@@ -2641,7 +2638,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(instance) = other.to_instance(db) =>
+                    && let Some(instance) = other.to_instance_approximation(db) =>
             {
                 self.check_type_pair(db, Type::TypeVar(type_var), instance)
             }

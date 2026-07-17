@@ -402,7 +402,7 @@ fn class_attribute_write_requirement<'db>(
     let Some(members) = assignment_attribute_members(db, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
-    let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
+    let Some(class_attr_self_ty) = object_ty.to_instance_approximation(db) else {
         return AttributeWriteRequirement::Unconstrained;
     };
     let (type_member, receiver_fallback) = match members {

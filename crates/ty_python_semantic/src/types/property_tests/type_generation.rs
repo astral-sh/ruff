@@ -142,7 +142,7 @@ fn create_bound_method<'db>(
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance_approximation(db).unwrap(),
     ))
 }
 
@@ -182,12 +182,12 @@ impl Ty {
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
@@ -197,7 +197,7 @@ impl Ty {
                 .expect_type(),
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),

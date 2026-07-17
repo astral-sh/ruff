@@ -52,7 +52,9 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
         let mut self_instance = self.self_instance(db);
         if self.function(db).is_classmethod(db) {
-            self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
+            self_instance = self_instance
+                .to_instance_approximation(db)
+                .unwrap_or_else(Type::unknown);
         }
         self_instance
     }

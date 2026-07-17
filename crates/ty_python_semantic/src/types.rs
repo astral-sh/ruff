@@ -1019,6 +1019,59 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// The result of projecting class-object types into the corresponding instance types.
+///
+/// An exact projection preserves all class-object constraints relevant to a `type[T]` relation;
+/// where `to_meta_type` is a faithful inverse, it round-trips semantically. An over-approximation
+/// may discard class-object constraints and cannot establish a subtype relation in target
+/// position.
+///
+/// For example, given these Python classes:
+///
+/// ```py
+/// class Base: ...
+/// class Child(Base): ...
+/// ```
+///
+/// `type[Base]` projects to `Base` exactly: both admit `Child`. In contrast,
+/// `TypeOf[Base]` (the type of the expression `Base`) admits only the `Base` class object, but
+/// also projects to `Base`, which admits `Child` instances. That projection is an
+/// over-approximation.
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum InstanceProjection<T> {
+    Exact(T),
+    OverApproximation(T),
+}
+
+impl<T> InstanceProjection<T> {
+    pub(crate) const fn is_exact(&self) -> bool {
+        matches!(self, Self::Exact(_))
+    }
+
+    pub(crate) fn into_inner(self) -> T {
+        match self {
+            Self::Exact(value) | Self::OverApproximation(value) => value,
+        }
+    }
+
+    pub(crate) fn map<U>(self, transform: impl FnOnce(T) -> U) -> InstanceProjection<U> {
+        match self {
+            Self::Exact(value) => InstanceProjection::Exact(transform(value)),
+            Self::OverApproximation(value) => {
+                InstanceProjection::OverApproximation(transform(value))
+            }
+        }
+    }
+
+    pub(crate) const fn new(value: T, is_exact: bool) -> Self {
+        if is_exact {
+            Self::Exact(value)
+        } else {
+            Self::OverApproximation(value)
+        }
+    }
+}
+
 /// An ordered pair of types shared by type-relation and set-theoretic queries.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct TypePair<'db> {
@@ -2916,7 +2969,7 @@ impl<'db> Type<'db> {
             return class_attr;
         }
 
-        let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) else {
+        let Some(metaclass_instance) = self.to_meta_type(db).to_instance_approximation(db) else {
             return class_attr;
         };
         let metaclass_attr = metaclass_instance.instance_member(db, name);
@@ -2976,7 +3029,7 @@ impl<'db> Type<'db> {
             .expect("The meta-type of an instance-like type should always have an MRO");
         let Some(metaclass) = class
             .metaclass(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .and_then(|metaclass| metaclass.nominal_class(db))
         else {
             return class_attr;
@@ -3290,7 +3343,7 @@ impl<'db> Type<'db> {
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
                             // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance(db).unwrap_or(owner)
+                            owner.to_instance_approximation(db).unwrap_or(owner)
                         });
 
                         Some((
@@ -4365,7 +4418,7 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = receiver.to_instance(db).expect(
+                    let self_instance = receiver.to_instance_approximation(db).expect(
                         "The receiver for a class-object lookup should always be instantiable",
                     );
                     let class_attr_plain =
@@ -5308,7 +5361,9 @@ impl<'db> Type<'db> {
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
-            let return_type = self.to_instance(db).unwrap_or(Type::unknown());
+            let return_type = self
+                .to_instance_approximation(db)
+                .unwrap_or(Type::unknown());
             Binding::single(
                 self,
                 Signature::new_generic(
@@ -5386,7 +5441,7 @@ impl<'db> Type<'db> {
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         );
 
-        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
+        let Some(constructor_instance_ty) = self_type.to_instance_approximation(db) else {
             return fallback_bindings();
         };
 
@@ -5964,23 +6019,43 @@ impl<'db> Type<'db> {
             .and_then(|generator_types| generator_types.send_ty)
     }
 
+    /// Return the instance approximation, discarding whether the projection is exact.
+    ///
+    /// Use this only when an over-approximation is sound, such as constructor inference or a
+    /// source-side relation. Target-side subtype checks must use [`Self::to_instance`].
     #[must_use]
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn to_instance_approximation(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_instance(db).map(InstanceProjection::into_inner)
+    }
+
+    /// Project this class-object type into its instance type while preserving projection quality.
+    #[must_use]
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
-            Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
-            Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
-            Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
-                Some(Type::NewTypeInstance(newtype))
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+                Some(InstanceProjection::Exact(self))
             }
+            Type::ClassLiteral(class) => Some(InstanceProjection::OverApproximation(
+                Type::instance(db, class.default_specialization(db)),
+            )),
+            Type::GenericAlias(alias) => Some(InstanceProjection::OverApproximation(
+                Type::instance(db, ClassType::from(alias)),
+            )),
+            Type::SubclassOf(subclass_of_ty) => {
+                Some(InstanceProjection::Exact(subclass_of_ty.to_instance(db)))
+            }
+            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Some(
+                InstanceProjection::OverApproximation(Type::NewTypeInstance(newtype)),
+            ),
             Type::Union(union) => union.to_instance(db),
             // If there is no bound or constraints on a typevar `T`, `T: object` implicitly, which
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
-            Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
+            Type::TypeVar(bound_typevar) => bound_typevar
+                .to_instance(db)
+                .map(|projection| projection.map(Type::TypeVar)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            Type::Intersection(intersection) => intersection.to_instance(db),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
                 if KnownClass::Type
@@ -5990,7 +6065,7 @@ impl<'db> Type<'db> {
                         instance.class(db).is_subclass_of(db, type_class)
                     }) =>
             {
-                Some(Type::object())
+                Some(InstanceProjection::OverApproximation(Type::object()))
             }
             Type::FunctionLiteral(_)
             | Type::Callable(..)

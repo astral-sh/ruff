@@ -1032,7 +1032,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         return;
     }
 
-    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+    let Some(metaclass_instance) = metaclass.to_instance_approximation(db) else {
         return;
     };
 
