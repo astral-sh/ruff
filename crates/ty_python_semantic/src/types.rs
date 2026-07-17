@@ -2133,6 +2133,15 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Whether `TY_CYCLE_DEBUG` recursive-type display is enabled.
+    #[expect(clippy::disallowed_methods)]
+    fn cycle_debug_enabled() -> bool {
+        static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *ENABLED.get_or_init(|| {
+            std::env::var("TY_CYCLE_DEBUG").is_ok_and(|value| !value.is_empty() && value != "0")
+        })
+    }
+
     pub(crate) fn cycle_normalized_with_semantic_view(
         self,
         db: &'db dyn Db,

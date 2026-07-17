@@ -1041,11 +1041,36 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            Type::Recursive(recursive) => recursive
-                .body(self.db)
-                .display_with(self.db, self.env, self.settings.clone())
-                .fmt_detailed(f),
+            Type::Divergent(divergent) => {
+                if Type::cycle_debug_enabled() {
+                    write!(
+                        f.with_type(self.ty),
+                        "Divergent({:?}@{:?})",
+                        divergent.query,
+                        divergent.id
+                    )
+                } else {
+                    f.with_type(self.ty).write_str("Divergent")
+                }
+            }
+            Type::Recursive(recursive) => {
+                if Type::cycle_debug_enabled() {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    let binder = recursive.binder(self.db);
+                    write!(f, "<Recursive({:?}@{:?}) ", binder.query, binder.id)?;
+                    recursive
+                        .body(self.db)
+                        .display_with(self.db, self.env, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str(">")
+                } else {
+                    recursive
+                        .body(self.db)
+                        .display_with(self.db, self.env, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(db, self.env);
