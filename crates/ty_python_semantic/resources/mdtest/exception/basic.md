@@ -65,11 +65,11 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
-## Intersected exception types
+## Exception-class expressions
 
-An intersected exception class projects its positive class-object constraints into the caught
-instance type. Unmappable positive constraints and exact-class negatives do not exclude valid
-subclass instances.
+Exception-class expressions can produce intersections, gradual refinements, or unions. Positive
+class-object constraints project into the caught instance type; unmappable positive constraints and
+exact-class negatives do not exclude valid subclass instances.
 
 ```py
 from typing import Any
