@@ -559,8 +559,7 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if is_assignable_method_override(db, class, type_on_subclass_instance, superclass_type)
-            {
+            if is_assignable_method_override(db, type_on_subclass_instance, superclass_type) {
                 continue;
             }
 
@@ -574,12 +573,7 @@ fn check_class_declaration<'db>(
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method
                     // is also incompatible with this ancestor.
-                    if !is_assignable_method_override(
-                        db,
-                        immediate_parent,
-                        immediate_parent_type,
-                        superclass_type,
-                    ) {
+                    if !is_assignable_method_override(db, immediate_parent_type, superclass_type) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
                         continue;
@@ -676,7 +670,7 @@ fn check_class_declaration<'db>(
 /// Checks whether a method override preserves its superclass method's callable domain.
 ///
 /// An explicitly annotated superclass receiver can restrict a method to a subset of subclass
-/// instances. Bind both methods to that common receiver domain before comparing their signatures.
+/// receivers. Bind both methods to that common receiver domain before comparing their signatures.
 ///
 /// ```python
 /// from typing import Protocol
@@ -692,7 +686,6 @@ fn check_class_declaration<'db>(
 /// ```
 fn is_assignable_method_override<'db>(
     db: &'db dyn Db,
-    class: ClassType<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
 ) -> bool {
@@ -710,7 +703,11 @@ fn is_assignable_method_override<'db>(
 
             receiver.map_or((subclass_type, superclass_type), |receiver| {
                 let receiver =
-                    IntersectionType::from_elements(db, [Type::instance(db, class), receiver]);
+                    receiver.bind_self_typevars(db, subclass_method.typing_self_type(db));
+                let receiver = IntersectionType::from_elements(
+                    db,
+                    [subclass_method.self_instance(db), receiver],
+                );
                 (
                     Type::BoundMethod(subclass_method.map_self_type(db, |_| receiver)),
                     Type::BoundMethod(superclass_method.map_self_type(db, |_| receiver)),

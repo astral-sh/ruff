@@ -1514,6 +1514,40 @@ info: `BadChild3B.static_method` is a classmethod but `Parent.static_method` is 
 info: This violates the Liskov Substitution Principle
 ```
 
+## Explicitly annotated classmethod receivers
+
+An explicitly annotated `cls` can specialize the class receiver and return type without changing the
+method's arguments:
+
+```pyi
+from typing_extensions import Self
+
+class Event:
+    @classmethod
+    def deserialize(cls: type[Event], data: dict[str, object]) -> Event: ...
+
+class SwapEvent(Event):
+    @classmethod
+    def deserialize(cls: type[SwapEvent], data: dict[str, object]) -> SwapEvent: ...
+
+class Context:
+    @classmethod
+    def get(cls: type[Self]) -> Self | None: ...
+
+class SettingsContext(Context):
+    @classmethod
+    def get(cls) -> SettingsContext | None: ...
+```
+
+Narrowing an argument accepted by the superclass remains an invalid override:
+
+```pyi
+class InvalidSwapEvent(Event):
+    @classmethod
+    # error: [invalid-method-override]
+    def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
+```
+
 ## Overloaded methods with positional-only parameters with defaults
 
 When a base class has an overloaded method where one overload accepts only keyword arguments
