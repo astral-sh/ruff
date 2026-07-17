@@ -1116,8 +1116,9 @@ impl<'db> IntersectionType<'db> {
     ///     return Base()
     /// ```
     ///
-    /// Projecting the negative `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child`
-    /// instances too, so only the positive `type[Base]` is projected.
+    /// Projecting only the positive `type[Base]` is an over-approximation, since we have no
+    /// representation of an exact instance type excluding subclasses, and projecting the negative
+    /// `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child` instances too.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
         let mut builder = IntersectionBuilder::new(db);
         let mut has_projected_positive = false;
