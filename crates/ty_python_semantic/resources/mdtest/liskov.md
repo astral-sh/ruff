@@ -1741,12 +1741,12 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:
-help
+help: 
 help:     def __eq__(self, other: object) -> bool:
 help:         if not isinstance(other, Bad):
 help:             return False
 help:         return <logic to compare two `Bad` instances>
-help
+help: 
 ```
 
 ## Class-private names do not override

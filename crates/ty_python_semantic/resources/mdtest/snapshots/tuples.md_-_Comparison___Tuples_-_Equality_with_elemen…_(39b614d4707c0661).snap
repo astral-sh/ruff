@@ -41,12 +41,12 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 info: incompatible return types: `NotBoolable` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 help: It is recommended for `__eq__` to work with arbitrary objects, for example:
-help
+help: 
 help:     def __eq__(self, other: object) -> bool:
 help:         if not isinstance(other, A):
 help:             return False
 help:         return <logic to compare two `A` instances>
-help
+help: 
 
 ```
 
