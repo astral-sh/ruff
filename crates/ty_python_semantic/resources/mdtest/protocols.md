@@ -24,7 +24,7 @@ A protocol is defined by inheriting from the `Protocol` class, which is annotate
 `_SpecialForm` in typeshed's stubs.
 
 ```py
-from typing import Any, Protocol
+from typing import Protocol
 from ty_extensions._internal import reveal_mro
 
 class MyProtocol(Protocol): ...
@@ -2552,6 +2552,83 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
+Property accessors can use a callable-local receiver TypeVar instead of `Self`. The receiver must be
+specialized before the getter return or setter value type is compared:
+
+```py
+from typing import Protocol, TypeAlias, TypeVar
+
+PropertySelfT = TypeVar("PropertySelfT")
+PropertyReceiver: TypeAlias = PropertySelfT
+
+class HasGenericSelfProperty(Protocol):
+    @property
+    def value(self: PropertySelfT) -> PropertySelfT: ...
+
+class HasAliasedSelfProperty(Protocol):
+    @property
+    def value(self: PropertyReceiver) -> PropertyReceiver: ...
+
+class GenericSelfProperty:
+    @property
+    def value(self) -> "GenericSelfProperty":
+        return self
+
+class IntProperty:
+    @property
+    def value(self) -> int:
+        return 1
+
+generic_property: HasGenericSelfProperty = GenericSelfProperty()
+invalid_property: HasGenericSelfProperty = IntProperty()  # error: [invalid-assignment]
+aliased_property: HasAliasedSelfProperty = GenericSelfProperty()
+invalid_aliased_property: HasAliasedSelfProperty = IntProperty()  # error: [invalid-assignment]
+
+class HasMutableSelfProperty(Protocol):
+    @property
+    def value(self) -> object: ...
+    @value.setter
+    def value(self: PropertySelfT, value: PropertySelfT) -> None: ...
+
+class MutableSelfProperty:
+    @property
+    def value(self) -> object:
+        return self
+    @value.setter
+    def value(self, value: "MutableSelfProperty") -> None: ...
+
+class InvalidMutableSelfProperty:
+    @property
+    def value(self) -> object:
+        return self
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+mutable_property: HasMutableSelfProperty = MutableSelfProperty()
+invalid_mutable_property: HasMutableSelfProperty = InvalidMutableSelfProperty()  # error: [invalid-assignment]
+
+class PropertyBase: ...
+
+BoundedPropertyT = TypeVar("BoundedPropertyT", bound=PropertyBase)
+
+class HasBoundedSelfProperty(Protocol):
+    @property
+    def value(self: BoundedPropertyT) -> BoundedPropertyT: ...
+
+class BoundedSelfProperty(PropertyBase):
+    @property
+    def value(self) -> "BoundedSelfProperty":
+        return self
+
+class InvalidBoundedSelfProperty:
+    @property
+    def value(self) -> "InvalidBoundedSelfProperty":
+        return self
+
+bounded_property: HasBoundedSelfProperty = BoundedSelfProperty()
+invalid_bounded_property: HasBoundedSelfProperty = InvalidBoundedSelfProperty()  # error: [invalid-assignment]
+```
+
 ## Protocol members defined using descriptor decorators
 
 ### Descriptor reads and writes
@@ -2611,7 +2688,7 @@ type instead of reducing it to a bare `Unknown`, which would allow an incompatib
 
 ```py
 from functools import cached_property
-from typing import Any, Protocol, TypeVar
+from typing import Protocol, TypeVar
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, reveal_protocol_interface
 
@@ -3861,7 +3938,7 @@ A receiver TypeVar's bound limits the specializations for which a protocol metho
 compatible. It is not an additional constraint that must hold for every possible specialization:
 
 ```py
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 from typing_extensions import Self, assert_type
 
 T = TypeVar("T")
@@ -3960,6 +4037,130 @@ class InvalidClassFactory:
 
 class_factory: GenericClassReceiver = ClassFactory()
 invalid_class_factory: GenericClassReceiver = InvalidClassFactory()  # error: [invalid-assignment]
+```
+
+Receiver TypeVars can also occur inside type arguments (including deferred `type[Box[T]]`
+receivers). Discover those variables without traversing the members of a protocol-valued receiver
+annotation or the bounds of a TypeVar:
+
+```py
+from typing import Protocol
+
+class ProtocolReceiver(Protocol):
+    def apply[T](self: "ProtocolReceiver", value: T) -> T: ...
+
+class BadProtocolReceiver:
+    def apply(self, value: int) -> int:
+        return value
+
+bad_protocol_receiver: ProtocolReceiver = BadProtocolReceiver()  # error: [invalid-assignment]
+
+class Box[T]:
+    value: T
+
+class NestedNominalReceiver(Protocol):
+    def apply[T](self: Box[T], value: T) -> T: ...
+
+class GoodIntBox(Box[int]):
+    def apply(self, value: int) -> int:
+        return value
+
+class BadIntBox(Box[int]):
+    def apply(self, value: str) -> str:
+        return value
+
+good_int_box: NestedNominalReceiver = GoodIntBox()
+bad_int_box: NestedNominalReceiver = BadIntBox()  # error: [invalid-assignment]
+
+class NestedClassReceiver(Protocol):
+    @classmethod
+    def make[T](cls: type[Box[T]], value: T) -> T: ...
+
+class GoodClassBox(Box[int]):
+    @classmethod
+    def make(cls, value: int) -> int:
+        return value
+
+class BadClassBox(Box[int]):
+    @classmethod
+    def make(cls, value: str) -> str:
+        return value
+
+good_class_box: NestedClassReceiver = GoodClassBox()
+bad_class_box: NestedClassReceiver = BadClassBox()  # error: [invalid-assignment]
+
+class NestedReceiver[T](Protocol):
+    def apply[U](self: "NestedReceiver[U]", value: U) -> U: ...
+
+class GenericNestedReceiver:
+    def apply[T](self, value: T) -> T:
+        return value
+
+class BadNestedReceiver:
+    def apply(self, value: int) -> int:
+        return value
+
+generic_nested_receiver: NestedReceiver[str] = GenericNestedReceiver()
+bad_nested_receiver: NestedReceiver[str] = BadNestedReceiver()  # error: [invalid-assignment]
+```
+
+A receiver domain includes the TypeVar's declared bound. This both permits valid bounded overrides
+and prevents a protocol method with an impossible receiver bound from being satisfied vacuously:
+
+```py
+from typing import Protocol, TypeVar
+
+class Base:
+    def method[T: "Base"](self: T, other: T) -> None: ...
+
+class Child(Base):
+    def method(self, other: Base) -> None: ...
+
+LegacyT = TypeVar("LegacyT", bound="LegacyBase")
+
+class LegacyBase:
+    def method(self: LegacyT, other: LegacyT) -> None: ...
+
+class LegacyChild(LegacyBase):
+    def method(self, other: LegacyBase) -> None: ...
+
+class ClassBase:
+    @classmethod
+    def method[T: "ClassBase"](cls: type[T], other: T) -> T:
+        return other
+
+class ClassChild(ClassBase):
+    @classmethod
+    def method(cls, other: ClassBase) -> "ClassChild":
+        return cls()
+
+class InvalidClassChild(ClassBase):
+    @classmethod
+    def method(cls, other: "InvalidClassChild") -> ClassBase:  # error: [invalid-method-override]
+        return other
+
+class BoundedProtocol(Protocol):
+    def method[T: int](self: T) -> None: ...
+
+class InvalidBoundedProtocolImplementation:
+    def method(self) -> None: ...
+
+bounded_protocol: BoundedProtocol = InvalidBoundedProtocolImplementation()  # error: [invalid-assignment]
+
+class BoundedClassProtocol(Protocol):
+    @classmethod
+    def method[T: int](cls: type[T]) -> None: ...
+
+class BoundedClassImplementation(int):
+    @classmethod
+    def method(cls) -> None: ...
+
+class InvalidBoundedClassImplementation:
+    @classmethod
+    def method(cls) -> None: ...
+
+bounded_class_protocol: BoundedClassProtocol = BoundedClassImplementation()
+invalid_bounded_class_protocol: BoundedClassProtocol = InvalidBoundedClassImplementation()  # error: [invalid-assignment]
 ```
 
 ## Module objects with static-method protocol members

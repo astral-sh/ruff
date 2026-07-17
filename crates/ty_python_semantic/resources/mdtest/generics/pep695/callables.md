@@ -104,9 +104,8 @@ valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
 
 invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
 
-# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
-invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
-invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:

@@ -786,17 +786,22 @@ impl<'db> ProtocolMemberType<'db> {
     fn resolve(self, db: &'db dyn Db) -> Option<Self> {
         match self {
             Self::Value { .. } => Some(self),
-            Self::PropertyGetter(getter) => property_get_member_type(db, getter),
-            Self::PropertySetter(setter) => property_set_member_type(db, setter),
+            Self::PropertyGetter(getter) => property_get_member_type(db, getter, None),
+            Self::PropertySetter(setter) => property_set_member_type(db, setter, None),
         }
     }
 
     /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
+        let resolved = match self {
+            Self::Value { .. } => Some(self),
+            Self::PropertyGetter(getter) => property_get_member_type(db, getter, Some(self_type)),
+            Self::PropertySetter(setter) => property_set_member_type(db, setter, Some(self_type)),
+        }?;
         let Self::Value {
             ty,
             self_binding_context,
-        } = self.resolve(db)?
+        } = resolved
         else {
             return None;
         };
@@ -1473,12 +1478,27 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 fn property_get_member_type<'db>(
     db: &'db dyn Db,
     getter: Type<'db>,
+    receiver_ty: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
     let mut get_types = Vec::new();
     let mut definition = None;
     for callable in &getter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
-            get_types.push(signature.return_ty);
+            let receiver_typevar = property_accessor_receiver_typevar(db, signature);
+            let return_ty = match receiver_typevar.zip(receiver_ty) {
+                Some((typevar, receiver_ty))
+                    if Signature::receiver_violates_typevar_domain(db, receiver_ty, typevar) =>
+                {
+                    return None;
+                }
+                Some((typevar, receiver_ty)) => {
+                    signature
+                        .return_ty
+                        .substitute_one_typevar(db, typevar, receiver_ty)
+                }
+                None => signature.return_ty,
+            };
+            get_types.push(return_ty);
             definition = definition.or(signature.definition());
         }
     }
@@ -1491,12 +1511,26 @@ fn property_get_member_type<'db>(
 fn property_set_member_type<'db>(
     db: &'db dyn Db,
     setter: Type<'db>,
+    receiver_ty: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
     let mut set_types = Vec::new();
     let mut definition = None;
     for callable in &setter.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
-            set_types.push(signature.parameters().get_positional(1)?.annotated_type());
+            let parameter_ty = signature.parameters().get_positional(1)?.annotated_type();
+            let receiver_typevar = property_accessor_receiver_typevar(db, signature);
+            let parameter_ty = match receiver_typevar.zip(receiver_ty) {
+                Some((typevar, receiver_ty))
+                    if Signature::receiver_violates_typevar_domain(db, receiver_ty, typevar) =>
+                {
+                    return None;
+                }
+                Some((typevar, receiver_ty)) => {
+                    parameter_ty.substitute_one_typevar(db, typevar, receiver_ty)
+                }
+                None => parameter_ty,
+            };
+            set_types.push(parameter_ty);
             definition = definition.or(signature.definition());
         }
     }
@@ -1504,6 +1538,23 @@ fn property_set_member_type<'db>(
         UnionType::from_elements(db, set_types),
         definition,
     ))
+}
+
+/// Returns the direct, callable-local receiver `TypeVar` of a property accessor.
+fn property_accessor_receiver_typevar<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    if !signature.has_explicit_positional_receiver_annotation() {
+        return None;
+    }
+    let typevar = signature
+        .parameters()
+        .get_positional(0)?
+        .annotated_type()
+        .resolve_type_alias(db)
+        .as_typevar()?;
+    (typevar.binding_context(db).definition() == signature.definition()).then_some(typevar)
 }
 
 /// Derive the observable instance capabilities of a descriptor-decorated protocol member.
@@ -1729,7 +1780,8 @@ fn property_set_type<'db>(
     property: PropertyInstanceType<'db>,
     receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    property_set_member_type(db, property.setter(db)?)?.bind_self(db, receiver_ty)
+    property_set_member_type(db, property.setter(db)?, Some(receiver_ty))?
+        .bind_self(db, receiver_ty)
 }
 
 fn is_class_object_type(ty: Type<'_>) -> bool {
@@ -2474,9 +2526,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (Some(source), Some(target)) => {
                 let bind_read = |member_type: ProtocolMemberType<'db>,
                                  member: &ProtocolMember<'_, 'db>| {
-                    let member_type = member_type.resolve(db)?;
                     if member.is_method()
-                        && let Type::Callable(callable) = member_type.ty()
+                        && let Type::Callable(callable) = member_type.resolve(db)?.ty()
                     {
                         Some(Type::Callable(callable.apply_self(db, source_type)))
                     } else {
