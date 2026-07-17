@@ -20,7 +20,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
+        DataclassParams, DynamicType, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
         SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
@@ -344,11 +344,12 @@ impl<'db> StaticClassLiteral<'db> {
             GenericContext::from_base_classes(
                 db,
                 class.definition(db),
-                class
-                    .explicit_bases(db)
-                    .iter()
-                    .copied()
-                    .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+                class.explicit_bases(db).iter().copied().filter(|ty| {
+                    matches!(
+                        ty,
+                        Type::GenericAlias(_) | Type::Dynamic(DynamicType::UnknownGeneric(_))
+                    )
+                }),
             )
         }
 
