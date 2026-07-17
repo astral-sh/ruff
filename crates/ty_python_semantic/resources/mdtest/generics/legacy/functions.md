@@ -1536,14 +1536,10 @@ def _(
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 
-def invariant_paramspec(
-    x: Box[ElementT], y: Box[ElementT], callback: Callable[P, None]
-) -> ElementT:
+def invariant_paramspec(x: Box[ElementT], y: Box[ElementT], callback: Callable[P, None]) -> ElementT:
     raise NotImplementedError
 
-def invariant_typevartuple(
-    x: Box[ElementT], y: Box[ElementT], values: tuple[Unpack[Ts]]
-) -> ElementT:
+def invariant_typevartuple(x: Box[ElementT], y: Box[ElementT], values: tuple[Unpack[Ts]]) -> ElementT:
     raise NotImplementedError
 
 def _(
@@ -1697,8 +1693,8 @@ def _(x: Intersection[Source[A], Source[B]], other) -> None:
 When a gradual argument does contribute to `ElementT`, it can hide a constraint from an otherwise
 complete solution. Checking `Unknown & Source[D]` against `Source[ElementT]` reduces to
 `Always | (D <= ElementT)`, and therefore loses the `D` constraint. The fallback both widens the
-static `A & B` contribution to `A | B`, causing false positives, and incorrectly drops the known
-`D` contribution entirely:
+static `A & B` contribution to `A | B`, causing false positives, and incorrectly drops the known `D`
+contribution entirely:
 
 ```py
 from typing import Any
