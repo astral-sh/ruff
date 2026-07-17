@@ -178,6 +178,29 @@ reveal_type(generic_context(decorator_factory()))
 reveal_type(decorator_factory()(1))
 ```
 
+The returned callable can also be inferred from a lambda expression:
+
+```py
+from typing import Any
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def lambda_decorator_factory() -> Callable[[T], T]:
+    return lambda value: value
+
+def bounded_lambda_decorator_factory() -> Callable[[F], F]:
+    return lambda value: value
+
+# revealed: [T'return](T'return, /) -> T'return
+reveal_type(lambda_decorator_factory())
+# revealed: [F'return](F'return, /) -> F'return
+reveal_type(bounded_lambda_decorator_factory())
+
+def invalid_lambda_decorator_factory() -> Callable[[T], T]:
+    # error: [invalid-return-type]
+    return lambda value: 1
+```
+
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
 `Callable` is not:
 

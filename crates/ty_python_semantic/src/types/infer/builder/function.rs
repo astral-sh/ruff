@@ -60,17 +60,13 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
 struct ExpectedReturnType<'db> {
     /// The externally-visible return type.
     public: Type<'db>,
-    /// The lexical return type, if it differs for a generic PEP 695 function.
+    /// The lexical return type, if the public return type contains a type variable.
     lexical: Option<Type<'db>>,
 }
 
 impl<'db> ExpectedReturnType<'db> {
-    /// Creates the expected return type policy for `function_node`.
-    fn from_function(
-        db: &'db dyn Db,
-        function: FunctionType<'db>,
-        function_node: &ast::StmtFunctionDef,
-    ) -> Self {
+    /// Creates the expected return type policy for `function`.
+    fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
         fn normalize<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             match ty {
@@ -84,7 +80,7 @@ impl<'db> ExpectedReturnType<'db> {
             same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
-        let lexical = function_node.type_params.is_some().then(|| {
+        let lexical = public.has_typevar(db).then(|| {
             normalize(
                 db,
                 same_module_uncached_raw_signature(
@@ -176,8 +172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
-            let expected_return =
-                ExpectedReturnType::from_function(db, enclosing_function, function);
+            let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
