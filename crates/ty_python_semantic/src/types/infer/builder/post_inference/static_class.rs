@@ -4,18 +4,18 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, TypeQualifiers,
+    Db, Program, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
         KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -639,7 +639,20 @@ pub(crate) fn check_static_class_definitions<'db>(
     // base class `__init_subclass__` method.
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
+            let supports_pep_728 = context.in_stub()
+                || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                || Program::get(db).python_version(db) >= PythonVersion::PY315;
+
             for keyword in &args.keywords {
+                if !supports_pep_728
+                    && let Some(arg_name @ ("closed" | "extra_items")) = keyword.arg.as_deref()
+                    && let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, keyword)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "The `{arg_name}` parameter of `typing.TypedDict` was added in Python 3.15"
+                    ));
+                }
+
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
                         let passed_type = file_expression_type(&keyword.value);

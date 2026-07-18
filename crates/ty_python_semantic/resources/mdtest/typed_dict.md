@@ -185,7 +185,9 @@ reveal_type(bob | carol_update)  # revealed: Person
 Compatible `TypedDict` subset updates are also accepted for `|=`:
 
 ```py
-class NameOnly(TypedDict, closed=True):
+from typing_extensions import TypedDict as ExtensionsTypedDict
+
+class NameOnly(ExtensionsTypedDict, closed=True):
     name: str
 
 name_update: NameOnly = {"name": "Bobby"}
@@ -5836,6 +5838,11 @@ reveal_type(Decorated)  # revealed: ReplacesClass
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.15"
+```
+
 A `TypedDict` may not inherit from a non-`TypedDict`:
 
 ```py
@@ -5896,6 +5903,74 @@ class Quux(TypedDict, closed=1 == 1): ...  # error: [invalid-argument-type]
 ```
 
 ## PEP 728 (`closed` and `extra_items`)
+
+### Python-version support for `closed` and `extra_items`
+
+The PEP 728 keyword arguments are only available on the standard-library `TypedDict` starting in
+Python 3.15. On older Python versions, they can be used with `typing_extensions.TypedDict` or in
+stub files.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+`runtime.py`:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypedDict as ExtensionsTypedDict
+
+# error: [unknown-argument] "The `closed` parameter of `typing.TypedDict` was added in Python 3.15"
+class Closed(TypedDict, closed=True): ...
+
+# error: [unknown-argument] "The `closed` parameter of `typing.TypedDict` was added in Python 3.15"
+class Open(TypedDict, closed=False): ...
+
+# error: [unknown-argument] "The `extra_items` parameter of `typing.TypedDict` was added in Python 3.15"
+class Extra(TypedDict, extra_items=int): ...
+
+# error: [unknown-argument] "The `closed` parameter of `typing.TypedDict` was added in Python 3.15"
+FunctionalClosed = TypedDict("FunctionalClosed", {}, closed=True)
+
+# error: [unknown-argument] "The `extra_items` parameter of `typing.TypedDict` was added in Python 3.15"
+FunctionalExtra = TypedDict("FunctionalExtra", {}, extra_items=int)
+
+class ExtensionsClosed(ExtensionsTypedDict, closed=True): ...
+class ExtensionsExtra(ExtensionsTypedDict, extra_items=int): ...
+
+FunctionalExtensionsClosed = ExtensionsTypedDict("FunctionalExtensionsClosed", {}, closed=True)
+FunctionalExtensionsExtra = ExtensionsTypedDict("FunctionalExtensionsExtra", {}, extra_items=int)
+```
+
+`stub.pyi`:
+
+```pyi
+from typing import TypedDict
+
+class StubClosed(TypedDict, closed=True): ...
+class StubExtra(TypedDict, extra_items=int): ...
+
+FunctionalStubClosed = TypedDict("FunctionalStubClosed", {}, closed=True)
+FunctionalStubExtra = TypedDict("FunctionalStubExtra", {}, extra_items=int)
+```
+
+### Python 3.15 support for `closed` and `extra_items`
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypedDict
+
+class Closed(TypedDict, closed=True): ...
+class Extra(TypedDict, extra_items=int): ...
+
+FunctionalClosed = TypedDict("FunctionalClosed", {}, closed=True)
+FunctionalExtra = TypedDict("FunctionalExtra", {}, extra_items=int)
+```
 
 ### Iterating keys, values and items of a `closed=True` `TypedDict`
 
@@ -6336,7 +6411,7 @@ Stringified forward references are understood:
 `a.py`:
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 class F(TypedDict, extra_items="F | None"): ...
 ```
@@ -6346,7 +6421,7 @@ While invalid syntax in forward annotations is rejected:
 `b.py`:
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 # error: [invalid-syntax-in-forward-annotation]
 class G(TypedDict, extra_items="not a type expression"): ...
@@ -6357,7 +6432,7 @@ In non-stub files, forward references in `extra_items` must be stringified:
 `c.py`:
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 # error: [unresolved-reference] "Name `H` used when not defined"
 class H(TypedDict, extra_items=H | None): ...
