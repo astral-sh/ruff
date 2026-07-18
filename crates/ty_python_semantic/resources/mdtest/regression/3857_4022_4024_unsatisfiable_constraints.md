@@ -62,3 +62,24 @@ min([None, 2])  # error: [invalid-argument-type]
 max([2, None])  # error: [invalid-argument-type]
 sorted([None, 2])  # error: [invalid-argument-type]
 ```
+
+## Inferred path-bound conflicts are not declared-bound failures
+
+An inferred lower bound can satisfy the type variable's declared bound while conflicting with an
+upper bound inferred from a contravariant occurrence.
+
+```py
+from collections.abc import Callable
+
+class A: ...
+class B: ...
+
+def call[T: A](callback: Callable[[T], T], fallback: T) -> None:
+    raise NotImplementedError
+
+def callback(value: B) -> A:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(A, /) -> A`, found `def callback(value: B) -> A`"
+call(callback, A())
+```

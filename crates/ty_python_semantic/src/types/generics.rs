@@ -2572,8 +2572,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let solution = PathBounds::default_solve(self.db, self.constraints, path_bound);
                 if solution.is_err() && first_error.is_none() {
-                    first_error =
-                        Self::specialization_error_from_failed_bounds(self.db, path_bound);
+                    first_error = self.specialization_error_from_failed_bounds(path_bound);
                 }
                 solution
             },
@@ -2600,18 +2599,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     fn specialization_error_from_failed_bounds(
-        db: &'db dyn Db,
+        &self,
         path_bound: &PathBound<'db>,
     ) -> Option<SpecializationError<'db>> {
         let bound_typevar = path_bound.bound_typevar;
         let argument = path_bound.lower?;
-        match bound_typevar.typevar(db).bound_or_constraints(db)? {
-            TypeVarBoundOrConstraints::UpperBound(_) => {
+        match bound_typevar
+            .typevar(self.db)
+            .bound_or_constraints(self.db)?
+        {
+            TypeVarBoundOrConstraints::UpperBound(bound)
+                if !argument
+                    .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                    .is_always_satisfied(self.db) =>
+            {
                 Some(SpecializationError::MismatchedBound {
                     bound_typevar,
                     argument,
                 })
             }
+            TypeVarBoundOrConstraints::UpperBound(_) => None,
             TypeVarBoundOrConstraints::Constraints(_) if !path_bound.has_upper() => {
                 Some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
