@@ -547,6 +547,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ImplicitClassVarInDataclass) {
                 ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
             }
+            if checker.is_rule_enabled(Rule::UnittestMissingSuperCall) {
+                ruff::rules::unittest_missing_super_call(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport {
             names,

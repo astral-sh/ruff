@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 829
+---
+RUF077 `setUp` override should call `super().setUp()`
+  --> RUF077.py:35:9
+   |
+34 | class BadChild(DatabaseTestCase):
+35 |     def setUp(self):
+   |         ^^^^^
+36 |         # RUF077
+37 |         self.fixture = 1
+   |
+
+RUF077 `tearDown` override should call `super().tearDown()`
+  --> RUF077.py:39:9
+   |
+37 |         self.fixture = 1
+38 |
+39 |     def tearDown(self):
+   |         ^^^^^^^^
+40 |         # RUF077
+41 |         del self.fixture
+   |
+
+RUF077 `setUpClass` override should call `super().setUpClass()`
+  --> RUF077.py:44:9
+   |
+43 |     @classmethod
+44 |     def setUpClass(cls):
+   |         ^^^^^^^^^^
+45 |         # RUF077
+46 |         cls.shared = True
+   |
+
+RUF077 `tearDownClass` override should call `super().tearDownClass()`
+  --> RUF077.py:49:9
+   |
+48 |     @classmethod
+49 |     def tearDownClass(cls):
+   |         ^^^^^^^^^^^^^
+50 |         # RUF077
+51 |         del cls.shared
+   |
+
+RUF077 `setUp` override should call `super().setUp()`
+  --> RUF077.py:68:9
+   |
+67 | class GrandChild(Mid):
+68 |     def setUp(self):
+   |         ^^^^^
+69 |         # RUF077 — Mid is a custom TestCase subclass in this file
+70 |         self.leaf = True
+   |
