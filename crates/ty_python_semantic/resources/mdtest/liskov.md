@@ -1064,6 +1064,45 @@ error[invalid-method-override]: Invalid override of method `method`
 info: This violates the Liskov Substitution Principle
 ```
 
+An overloaded override cannot replace the shared receiver with an unrelated protocol:
+
+```pyi
+class InvalidOverloadedReceiverAnnotation(OverloadedMixin):
+    @overload
+    def method(self: HasOtherValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasOtherValue, argument: str) -> None: ...  # error: [invalid-method-override]
+```
+
+The superclass method does not impose an override requirement on subclasses outside its receiver
+domain:
+
+```pyi
+class ExcludedOverloadedReceiver(OverloadedMixin):
+    def method(self, argument: bytes) -> bytes: ...
+```
+
+This also applies when a generic specialization excludes the subclass from the receiver domain:
+
+```pyi
+from typing import Generic, Literal, TypeVar, overload
+
+T = TypeVar("T")
+FlagT = TypeVar("FlagT", bound=bool)
+
+class Series: ...
+class DataFrame: ...
+
+class GroupBy(Generic[T]):
+    def size(self: GroupBy[Series]) -> Series: ...
+
+class DataFrameGroupBy(GroupBy[DataFrame], Generic[FlagT]):
+    @overload
+    def size(self: DataFrameGroupBy[Literal[True]]) -> Series: ...
+    @overload
+    def size(self: DataFrameGroupBy[Literal[False]]) -> DataFrame: ...
+```
+
 The protocol may include the overridden method itself. This must not cause a valid implementation to
 be rejected while checking the override:
 

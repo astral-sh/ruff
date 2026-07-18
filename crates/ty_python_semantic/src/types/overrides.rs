@@ -718,13 +718,25 @@ fn method_override_types<'db>(
             receiver.map_or((subclass_type, superclass_type), |receiver| {
                 let typing_self_type = subclass_method.typing_self_type(db);
                 let receiver = receiver.bind_self_typevars(db, typing_self_type);
+                // An implicit receiver does not opt into a superclass receiver domain that
+                // excludes the subclass. Preserve normal overload filtering in that case.
+                if superclass_signature.overloads.len() > 1
+                    && !subclass_method
+                        .self_instance(db)
+                        .is_assignable_to(db, receiver)
+                    && subclass_method
+                        .function(db)
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .all(Signature::has_implicit_positional_receiver_annotation)
+                {
+                    return (subclass_type, superclass_type);
+                }
                 let receiver = IntersectionType::from_elements(
                     db,
                     [subclass_method.self_instance(db), receiver],
                 );
-                if receiver.is_never() {
-                    return (subclass_type, superclass_type);
-                }
                 (
                     Type::Callable(subclass_method.into_callable_type_with_receiver(
                         db,
