@@ -142,6 +142,26 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+An overload is not a match if it requires a type-variable solution that violates the declared bound.
+Here, the first overload would require `T_str` to be `int`, which does not satisfy the bound `str`,
+so the second overload is selected.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar, overload
+
+T_str = TypeVar("T_str", bound=str)
+
+@overload
+def pick(x: Iterable[T_str]) -> T_str: ...
+@overload
+def pick(x: Iterable[int]) -> bool: ...
+def pick(x: object) -> str | bool:
+    raise NotImplementedError
+
+reveal_type(pick([1]))  # revealed: bool
+```
+
 ## Inferring tuple parameter types
 
 ```toml
@@ -216,6 +236,27 @@ info: Type variable defined here
 3 | T = TypeVar("T", bound=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+```
+
+A bound can also be a union of protocols. If inference produces a union for the type variable, each
+member must satisfy at least one protocol in the bound. `int` supports ordering, but `None` does
+not, so `None | int` is invalid.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Protocol, TypeVar
+
+class SupportsLT(Protocol):
+    def __lt__(self, other: Any, /) -> object: ...
+
+class SupportsGT(Protocol):
+    def __gt__(self, other: Any, /) -> object: ...
+
+ComparableT = TypeVar("ComparableT", bound=SupportsLT | SupportsGT)
+
+def consume_comparable(values: Iterable[ComparableT]) -> None: ...
+
+consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
 ## Inferring a constrained typevar

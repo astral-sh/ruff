@@ -602,6 +602,26 @@ def consume_b(value: B) -> None: ...
 infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
 ```
 
+A callable argument can make a call invalid even when another argument satisfies the declared
+type-variable bound. The diagnostic should describe the incompatible callable rather than claim that
+`Base` violates its own bound.
+
+```py
+from typing import Callable
+
+class Base: ...
+class Input: ...
+
+def call[T: Base](callback: Callable[[T], T], value: T) -> None:
+    raise NotImplementedError
+
+def callback(value: Input) -> Base:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(Base, /) -> Base`, found `def callback(value: Input) -> Base`"
+call(callback, Base())
+```
+
 ## Combined upper bounds uses redundancy
 
 When solving an upper bound involving a union, we should use the same typing relation to look for

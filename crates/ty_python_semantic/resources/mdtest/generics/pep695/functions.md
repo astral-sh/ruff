@@ -186,6 +186,35 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Bound violations inferred through protocols
+
+If matching a protocol argument infers a type that violates a type variable's bound, the call should
+report that violation once. Another argument may independently infer a valid type for the same type
+variable, but should not cause a second error for the protocol argument.
+
+```py
+from typing import Protocol
+
+class A: ...
+class B(A): ...
+class C: ...
+
+class P[T, U](Protocol):
+    def put(self, value: T) -> None: ...
+    def get(self) -> U: ...
+
+class Bad:
+    def put(self, value: B) -> None: ...
+    def get(self) -> C:
+        return C()
+
+def f[T: A](x: P[T, T], value: T) -> None:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+f(Bad(), B())
+```
+
 ## Inferring tuple parameter types
 
 ```py
