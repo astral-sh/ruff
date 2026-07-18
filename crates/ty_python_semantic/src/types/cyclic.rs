@@ -123,7 +123,7 @@ pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY
 
     fallback: R,
 
-    _tag: PhantomData<fn(&'db ()) -> Tag>,
+    _tag: PhantomData<fn() -> &'db Tag>,
 }
 
 impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
