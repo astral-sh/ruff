@@ -2648,9 +2648,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If this type is a `Type::TypeAlias`, recursively resolves it to its
-    /// underlying value type. Otherwise, returns `self` unchanged.
-    fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
+    /// Resolves a chain of `Type::TypeAlias` values to its underlying value type.
+    pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         let mut ty = self;
         while let Type::TypeAlias(alias) = ty {
             ty = alias.value_type(db);
