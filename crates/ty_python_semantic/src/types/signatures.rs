@@ -1341,7 +1341,7 @@ impl<'db> Signature<'db> {
         })
     }
 
-    fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+    pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.receiver_constraints
             .iter()
             .flat_map(OwnedConstraintSet::types)

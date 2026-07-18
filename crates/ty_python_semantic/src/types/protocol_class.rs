@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -228,39 +229,49 @@ pub(super) fn walk_protocol_instance_interface<
     visitor: &V,
 ) {
     for member in interface.members(db) {
-        match member.data.kind {
-            ProtocolMemberKind::Method(method, _) => {
-                let Type::Callable(callable) = method.ty() else {
-                    visitor.visit_type(db, method.ty());
-                    continue;
-                };
-                for signature in callable.signatures(db) {
-                    if signature.has_implicit_positional_receiver_annotation() {
-                        let signature = signature.bind_self(db, Some(receiver_ty));
-                        walk_signature(db, &signature, visitor);
-                    } else {
-                        walk_signature(db, signature, visitor);
-                    }
+        walk_protocol_instance_member(db, &member, receiver_ty, visitor);
+    }
+}
+
+/// Walks the types of a protocol member after binding any implicit receiver to `receiver_ty`.
+pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    member: &ProtocolMember<'_, 'db>,
+    receiver_ty: Type<'db>,
+    visitor: &V,
+) {
+    match member.data.kind {
+        ProtocolMemberKind::Method(method, _) => {
+            let Type::Callable(callable) = method.ty() else {
+                visitor.visit_type(db, method.ty());
+                return;
+            };
+            for signature in callable.signatures(db) {
+                if signature.has_implicit_positional_receiver_annotation() {
+                    let signature = signature.bind_self(db, Some(receiver_ty));
+                    walk_signature(db, &signature, visitor);
+                } else {
+                    walk_signature(db, signature, visitor);
                 }
             }
-            ProtocolMemberKind::Property { read, write } => {
-                for member_type in [
-                    read,
-                    write.and_then(ProtocolMemberWrite::domain),
-                    write.and_then(ProtocolMemberWrite::descriptor_type),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    if let Some(ty) = member_type.bind_self(db, receiver_ty) {
-                        visitor.visit_type(db, ty);
-                    }
-                }
-            }
-            ProtocolMemberKind::Attribute(attribute) => {
-                if let Some(ty) = attribute.bind_self(db, receiver_ty) {
+        }
+        ProtocolMemberKind::Property { read, write } => {
+            for member_type in [
+                read,
+                write.and_then(ProtocolMemberWrite::domain),
+                write.and_then(ProtocolMemberWrite::descriptor_type),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if let Some(ty) = member_type.bind_self(db, receiver_ty) {
                     visitor.visit_type(db, ty);
                 }
+            }
+        }
+        ProtocolMemberKind::Attribute(attribute) => {
+            if let Some(ty) = attribute.bind_self(db, receiver_ty) {
+                visitor.visit_type(db, ty);
             }
         }
     }
@@ -336,6 +347,21 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db)
             .iter()
             .map(|(name, data)| ProtocolMember { name, data })
+    }
+
+    pub(super) fn filter_members(
+        self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(&ProtocolMember<'_, 'db>) -> bool,
+    ) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .filter(|&(name, data)| predicate(&ProtocolMember { name, data }))
+                .map(|(name, data)| (name.clone(), data.clone()))
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     fn member_count(self, db: &'db dyn Db) -> usize {
@@ -1259,6 +1285,20 @@ pub(super) struct ProtocolMember<'a, 'db> {
     data: &'a ProtocolMemberData<'db>,
 }
 
+/// Orders protocol members so that finite constraints are established before recursive relations.
+///
+/// The declaration order is significant because the derived ordering is used when comparing
+/// protocol interfaces.
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+enum StructuralMemberPriority {
+    /// A non-recursive member with at most one callable signature.
+    Simple,
+    /// A non-recursive callable member with multiple overloads.
+    FiniteOverload,
+    /// A member that may recurse through a protocol or type alias, or whose finiteness is unknown.
+    Recursive,
+}
+
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
@@ -1280,6 +1320,61 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     pub(super) fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    /// Returns the priority for structurally comparing this member.
+    ///
+    /// Simple finite members are cheapest, followed by finite overloads. Recursive and
+    /// alias-containing members are compared last because they can expand the same interface again.
+    fn structural_member_priority(&self, db: &'db dyn Db) -> StructuralMemberPriority {
+        let is_recursive_type = |ty| {
+            any_over_type(db, ty, false, |nested| {
+                matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
+            })
+        };
+
+        let ProtocolMemberKind::Method(member, _) = self.data.kind else {
+            let is_finite = self.data.kind.member_types().all(|member| {
+                member
+                    .resolve(db)
+                    .is_some_and(|member| !is_recursive_type(member.ty()))
+            });
+            return if is_finite {
+                StructuralMemberPriority::Simple
+            } else {
+                StructuralMemberPriority::Recursive
+            };
+        };
+        let Type::Callable(callable) = member.ty() else {
+            return StructuralMemberPriority::Recursive;
+        };
+        let signatures = callable.signatures(db);
+        let finite_priority = match signatures.iter().len() {
+            0 => return StructuralMemberPriority::Recursive,
+            1 => StructuralMemberPriority::Simple,
+            _ => StructuralMemberPriority::FiniteOverload,
+        };
+
+        let is_recursive = signatures.iter().any(|signature| {
+            signature
+                .receiver_constraint_types()
+                .chain(
+                    signature
+                        .parameters()
+                        .iter()
+                        .skip(usize::from(
+                            signature.has_implicit_positional_receiver_annotation(),
+                        ))
+                        .map(Parameter::annotated_type),
+                )
+                .chain(std::iter::once(signature.return_ty))
+                .any(is_recursive_type)
+        });
+        if is_recursive {
+            return StructuralMemberPriority::Recursive;
+        }
+
+        finite_priority
     }
 
     fn is_instance_method(&self) -> bool {
@@ -2544,6 +2639,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         target
             .members(db)
+            .sorted_by_cached_key(|member| member.structural_member_priority(db))
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
