@@ -83,10 +83,10 @@ pub(super) fn function_signature_expression_type<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(db, definition).expression_type(expression)
+        infer_deferred_types(db, definition).expression_type(db, expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -5756,7 +5756,7 @@ fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> T
     // Use the function's default inference so the default retains its annotation context.
     // Nested callable defaults still need the existing cycle-breaking normalization.
     infer_function_default_types(db, function)
-        .expression_type(default)
+        .expression_type(db, default)
         .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
 }
 

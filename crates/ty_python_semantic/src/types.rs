@@ -23,6 +23,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, file_to_module, resolve_module,
 };
+use ty_python_core::ExpressionNodeKey;
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
@@ -52,11 +53,12 @@ pub(crate) use self::match_pattern::{
     typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
+pub(crate) use self::set_theoretic::RecursivelyDefined;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-use self::set_theoretic::{KnownUnion, NegativeIntersectionElements, RecursivelyDefined};
+use self::set_theoretic::{KnownUnion, NegativeIntersectionElements};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -235,7 +237,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.binding_type(definition)
+    inference.binding_type(db, definition)
 }
 
 /// Returns whether a definition represents a value that exists at runtime.
@@ -254,7 +256,7 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let file = definition.program_file(db);
     let inference = infer_definition_types(db, definition);
-    let ty = inference.binding_type(definition);
+    let ty = inference.binding_type(db, definition);
 
     // A class or function decorated with `@type_check_only` never exists at runtime.
     if ty.is_type_check_only(db)
@@ -338,7 +340,7 @@ pub(crate) fn inferred_declaration<'db>(
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.inferred_declaration(definition)
+    inference.inferred_declaration(db, definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -359,20 +361,20 @@ fn definition_expression_type<'db>(
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if let Some(ty) = inference.try_expression_type(expression) {
+        if let Some(ty) = inference.try_expression_type(db, expression) {
             ty
         } else if let Some(ty) =
-            infer_deferred_types(db, definition).try_expression_type(expression)
+            infer_deferred_types(db, definition).try_expression_type(db, expression)
         {
             ty
         } else if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            infer_function_default_types(db, definition).expression_type(expression)
+            infer_function_default_types(db, definition).expression_type(db, expression)
         } else {
             Type::unknown()
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -392,14 +394,14 @@ fn definition_expression_annotation<'db>(
     if scope == definition.scope(db) {
         let inference = infer_deferred_types(db, definition);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.expression_type(db, expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )
     } else {
         let inference = infer_complete_scope_types(db, scope);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.expression_type(db, expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )
@@ -1854,6 +1856,7 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    #[cfg(test)]
     pub(crate) fn divergent(query: CycleQuery, id: salsa::Id) -> Self {
         Self::Divergent(DivergentType::new(query, id))
     }
@@ -1866,6 +1869,22 @@ impl<'db> Type<'db> {
     ) -> Self {
         let binder = DivergentType::new(query, id);
         Self::recursive(db, env, binder, Self::Divergent(binder))
+    }
+
+    /// Creates the initial recursive type for one result of an aggregate inference query.
+    pub(crate) fn type_inference_cycle_initial(
+        db: &'db dyn Db,
+        query: CycleQuery,
+        id: salsa::Id,
+        slot: TypeInferenceSlot,
+    ) -> Self {
+        let binder = DivergentType::new(query, id).with_type_inference_slot(slot);
+        Self::Recursive(RecursiveType::new(
+            db,
+            binder,
+            RecursiveTypeOrigin::Structural,
+            Self::Divergent(binder),
+        ))
     }
 
     pub(crate) fn recursive(
@@ -2033,7 +2052,20 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.cycle_normalized_with_origin(db, env, query, previous, None, cycle)
+        self.cycle_normalized_with_origin(db, env, query, previous, None, None, cycle)
+    }
+
+    /// Normalizes one result of an aggregate inference query using its own recursive marker.
+    pub(crate) fn cycle_normalized_for_type_inference_slot(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        query: CycleQuery,
+        previous: Self,
+        slot: TypeInferenceSlot,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        self.cycle_normalized_with_origin(db, env, query, previous, None, Some(slot), cycle)
     }
 
     /// Whether `TY_CYCLE_DEBUG` recursive-type display is enabled.
@@ -2045,6 +2077,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn cycle_normalized_with_origin(
         self,
         db: &'db dyn Db,
@@ -2052,6 +2085,7 @@ impl<'db> Type<'db> {
         query: CycleQuery,
         previous: Self,
         origin: Option<RecursiveTypeOrigin<'db>>,
+        type_inference_slot: Option<TypeInferenceSlot>,
         cycle: &salsa::Cycle,
     ) -> Self {
         let self_degraded_by_overload =
@@ -2098,15 +2132,9 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
         };
 
-        stabilized.cycle_fold_recursive(
-            db,
-            env,
-            query,
-            previous,
-            cycle.id(),
-            include_previous,
-            origin,
-        )
+        let binder = DivergentType::new(query, cycle.id())
+            .with_optional_type_inference_slot(type_inference_slot);
+        stabilized.cycle_fold_recursive(db, env, previous, binder, include_previous, origin)
     }
 
     fn replace_recursive_with_binder(
@@ -2204,13 +2232,11 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        query: CycleQuery,
         previous: Self,
-        id: salsa::Id,
+        binder: DivergentType,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
     ) -> Self {
-        let binder = DivergentType::new(query, id);
         let previous_root_recursive = match previous {
             Type::Recursive(recursive) if recursive.binder(db).same_marker(binder) => {
                 Some(recursive)
@@ -10807,6 +10833,16 @@ pub(crate) enum CycleQuery {
     Test,
 }
 
+/// Identifies one result slot of an aggregate type-inference query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum TypeInferenceSlot {
+    Expression(ExpressionNodeKey),
+    Binding(salsa::Id),
+    Declaration(salsa::Id),
+}
+
+impl get_size2::GetSize for TypeInferenceSlot {}
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
@@ -10818,6 +10854,8 @@ pub struct DivergentType {
     query: CycleQuery,
     /// The query key ID that caused the cycle.
     id: salsa::Id,
+    /// The aggregate type-inference result slot represented by this marker.
+    type_inference_slot: Option<TypeInferenceSlot>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
@@ -10831,12 +10869,15 @@ impl DivergentType {
         Self {
             query,
             id,
+            type_inference_slot: None,
             materialization: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
-        self.query == other.query && self.id == other.id
+        self.query == other.query
+            && self.id == other.id
+            && self.type_inference_slot == other.type_inference_slot
     }
 
     fn in_cycle_scc(self, binders: &[Self]) -> bool {
@@ -10847,7 +10888,21 @@ impl DivergentType {
         Self {
             query: self.query,
             id: self.id,
+            type_inference_slot: self.type_inference_slot,
             materialization: Some(kind),
+        }
+    }
+
+    const fn with_type_inference_slot(self, slot: TypeInferenceSlot) -> Self {
+        self.with_optional_type_inference_slot(Some(slot))
+    }
+
+    const fn with_optional_type_inference_slot(self, slot: Option<TypeInferenceSlot>) -> Self {
+        Self {
+            query: self.query,
+            id: self.id,
+            type_inference_slot: slot,
+            materialization: self.materialization,
         }
     }
 

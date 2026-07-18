@@ -320,6 +320,58 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 }
 
 #[test]
+fn cycle_initial_types_are_distinct_per_result_slot() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/definitions.py",
+        r#"
+        first = 1
+        second = 2
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
+    let program_file = program_file(&db, file);
+    let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
+    let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+    let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
+    let index = semantic_index(&db, program_file);
+    let first = index.expect_single_definition(first_assignment.targets[0].as_name_expr().unwrap());
+    let second =
+        index.expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
+
+    let cycle_initial = TypeInferenceCycleInitial::new(
+        CycleQuery::DefinitionTypes,
+        salsa::plumbing::Id::from_bits(1),
+    );
+    let inference = DefinitionInference::cycle_initial(&db, first, cycle_initial);
+
+    let first_binding = inference.binding_type(&db, first);
+    let second_binding = inference.binding_type(&db, second);
+    let first_expression = inference.expression_type(&db, &first_assignment.value);
+    let second_expression = inference.expression_type(&db, &second_assignment.value);
+
+    assert_ne!(first_binding, second_binding);
+    assert_ne!(first_expression, second_expression);
+    assert_ne!(first_binding, first_expression);
+    assert_eq!(first_binding, inference.binding_type(&db, first));
+
+    let Type::Recursive(first_binding) = first_binding else {
+        panic!("cycle initial should be recursive");
+    };
+    let Type::Recursive(second_binding) = second_binding else {
+        panic!("cycle initial should be recursive");
+    };
+    assert!(
+        !first_binding
+            .binder(&db)
+            .same_marker(*second_binding.binder(&db))
+    );
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
@@ -941,14 +993,14 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     };
 
     let annotations = infer_deferred_types(&db, definition);
-    assert!(annotations.try_expression_type(annotation).is_some());
-    assert!(annotations.try_expression_type(default).is_none());
+    assert!(annotations.try_expression_type(&db, annotation).is_some());
+    assert!(annotations.try_expression_type(&db, default).is_none());
     let defaults = infer_function_default_types(&db, definition);
-    assert!(defaults.try_expression_type(default).is_some());
-    assert!(defaults.try_expression_type(annotation).is_none());
+    assert!(defaults.try_expression_type(&db, default).is_some());
+    assert!(defaults.try_expression_type(&db, annotation).is_none());
     assert_eq!(
         crate::types::definition_expression_type(&db, definition, default),
-        defaults.expression_type(default)
+        defaults.expression_type(&db, default)
     );
     Ok(())
 }

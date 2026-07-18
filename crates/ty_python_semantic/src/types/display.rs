@@ -1043,12 +1043,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::Divergent(divergent) => {
                 if Type::cycle_debug_enabled() {
-                    write!(
-                        f.with_type(self.ty),
-                        "Divergent({:?}@{:?})",
-                        divergent.query,
-                        divergent.id
-                    )
+                    let mut f = f.with_type(self.ty);
+                    write!(f, "Divergent({:?}@{:?}", divergent.query, divergent.id)?;
+                    if let Some(slot) = divergent.type_inference_slot {
+                        write!(f, "/{slot:?}")?;
+                    }
+                    f.write_str(")")
                 } else {
                     f.with_type(self.ty).write_str("Divergent")
                 }
@@ -1058,7 +1058,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.set_invalid_type_annotation();
                     let mut f = f.with_type(self.ty);
                     let binder = recursive.binder(self.db);
-                    write!(f, "<Recursive({:?}@{:?}) ", binder.query, binder.id)?;
+                    write!(f, "<Recursive({:?}@{:?}", binder.query, binder.id)?;
+                    if let Some(slot) = binder.type_inference_slot {
+                        write!(f, "/{slot:?}")?;
+                    }
+                    f.write_str(") ")?;
                     recursive
                         .body(self.db)
                         .display_with(self.db, self.env, self.settings.clone())

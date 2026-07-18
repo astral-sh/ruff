@@ -1601,7 +1601,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let inference = infer_expression_types(db, expression, TypeContext::default());
                 let nominal_constraints = self
                     .narrow_nominal_attribute_by_truthiness(
-                        inference.expression_type(&*attribute.value),
+                        inference.expression_type(self.db, &*attribute.value),
                         &attribute.value,
                         attribute.attr.id(),
                         is_positive,
@@ -1617,9 +1617,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let inference = infer_expression_types(db, expression, TypeContext::default());
                 let typeddict_constraints = self
                     .narrow_typeddict_subscript_by_truthiness(
-                        inference.expression_type(&*subscript.value),
+                        inference.expression_type(self.db, &*subscript.value),
                         &subscript.value,
-                        inference.expression_type(&*subscript.slice),
+                        inference.expression_type(self.db, &*subscript.slice),
                         is_positive,
                     )
                     .map(|(place, constraint)| {
@@ -1756,7 +1756,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
         let test_truthiness = infer_expression_types(db, expression, TypeContext::default())
-            .expression_type(&expr_if.test)
+            .expression_type(self.db, &expr_if.test)
             .bool(db, &self.env);
 
         match test_truthiness {
@@ -3661,7 +3661,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             &self.env,
             elements
                 .iter()
-                .map(|element| inference.expression_type(element)),
+                .map(|element| inference.expression_type(self.db, element)),
         ))
     }
 
@@ -3857,7 +3857,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }) => {
                     if keywords.is_empty()
                         && let [single_argument] = &**args
-                        && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                        && let Type::ClassLiteral(called_class) =
+                            inference.expression_type(db, func)
                         && called_class.is_known(db, KnownClass::Type)
                     {
                         Some(single_argument)
@@ -3916,14 +3917,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             && let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is)
             && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
-                .expression_type(&*subscript.value)
+                .expression_type(self.db, &*subscript.value)
                 .resolve_type_alias(db)
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Some(index) = inference
-                .expression_type(&*subscript.slice)
+                .expression_type(self.db, &*subscript.slice)
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
-            && let rhs_ty = inference.expression_type(&comparators[0])
+            && let rhs_ty = inference.expression_type(self.db, &comparators[0])
         {
             let filtered = union.filter(db, |elem| {
                 elem.tuple_instance_spec(db, &self.env)
@@ -3959,7 +3960,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             let is_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
 
             let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
-                let Type::FunctionLiteral(function_type) = inference.expression_type(&*call.func)
+                let Type::FunctionLiteral(function_type) =
+                    inference.expression_type(self.db, &*call.func)
                 else {
                     return;
                 };
@@ -3982,7 +3984,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     return;
                 };
 
-                let arg_type = inference.expression_type(arg);
+                let arg_type = inference.expression_type(self.db, arg);
                 let narrowed =
                     Self::narrow_type_by_exact_len(db, &self.env, arg_type, length, is_equality);
                 if narrowed != arg_type {
@@ -3996,17 +3998,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
             // E.g., `len(items) == 2`
             if let ast::Expr::Call(call) = left.expression_value() {
-                narrow_len_call(call, inference.expression_type(&comparators[0]));
+                narrow_len_call(call, inference.expression_type(self.db, &comparators[0]));
             }
 
             // E.g., `2 == len(items)`
             if let ast::Expr::Call(call) = comparators[0].expression_value() {
-                narrow_len_call(call, inference.expression_type(&**left));
+                narrow_len_call(call, inference.expression_type(self.db, &**left));
             }
 
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
-                let value_type = inference.expression_type(&*subscript.value);
-                let slice_type = inference.expression_type(&*subscript.slice);
+                let value_type = inference.expression_type(self.db, &*subscript.value);
+                let slice_type = inference.expression_type(self.db, &*subscript.slice);
 
                 if let Some((place, constraint)) = self.narrow_typeddict_subscript(
                     value_type,
@@ -4028,11 +4030,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             };
 
             if let ast::Expr::Subscript(subscript) = left.expression_value() {
-                narrow_subscript(subscript, inference.expression_type(&comparators[0]));
+                narrow_subscript(
+                    subscript,
+                    inference.expression_type(self.db, &comparators[0]),
+                );
             }
 
             if let ast::Expr::Subscript(subscript) = comparators[0].expression_value() {
-                narrow_subscript(subscript, inference.expression_type(&**left));
+                narrow_subscript(subscript, inference.expression_type(self.db, &**left));
             }
         }
 
@@ -4049,7 +4054,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 is_positive == matches!(operator, ast::CmpOp::Eq | ast::CmpOp::Is);
 
             let mut narrow_attribute = |attribute: &ast::ExprAttribute, other_type: Type<'db>| {
-                let value_type = inference.expression_type(&*attribute.value);
+                let value_type = inference.expression_type(self.db, &*attribute.value);
 
                 if let Some((place, constraint)) = self.narrow_nominal_attribute(
                     value_type,
@@ -4069,11 +4074,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         != PlaceExpr::try_from_expr(&attribute.value)
                 })
             {
-                narrow_attribute(attribute, inference.expression_type(&comparators[0]));
+                narrow_attribute(
+                    attribute,
+                    inference.expression_type(self.db, &comparators[0]),
+                );
             }
 
             if let ast::Expr::Attribute(attribute) = &comparators[0] {
-                narrow_attribute(attribute, inference.expression_type(&**left));
+                narrow_attribute(attribute, inference.expression_type(self.db, &**left));
             }
         }
 
@@ -4090,9 +4098,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
-            && let Some(key) = inference.expression_type(&**left).as_string_literal()
+            && let Some(key) = inference
+                .expression_type(self.db, &**left)
+                .as_string_literal()
             && let rhs_expr = comparators[0].expression_value()
-            && let rhs_type = inference.expression_type(&comparators[0])
+            && let rhs_type = inference.expression_type(self.db, &comparators[0])
             && is_or_contains_typeddict(db, rhs_type)
         {
             let key = key.value(db);
@@ -4178,7 +4188,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if expr.is_none_literal_expr() {
                 Type::none(db, env)
             } else {
-                inference.expression_type(expr)
+                inference.expression_type(self.db, expr)
             }
         };
         let mut last_rhs_ty: Option<Type> = None;
@@ -4316,7 +4326,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return Some(type_guard_call_constraints);
         }
 
-        let callable_ty = inference.expression_type(&*expr_call.func);
+        let callable_ty = inference.expression_type(self.db, &*expr_call.func);
 
         match callable_ty {
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
@@ -4329,7 +4339,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     && function_type.known(db) == Some(KnownFunction::Len) =>
             {
                 let arg = &expr_call.arguments.args[0];
-                let arg_ty = inference.expression_type(arg);
+                let arg_ty = inference.expression_type(self.db, arg);
 
                 // Narrow only the parts of the type that are safe to narrow based on len().
                 if let Some(narrowed_ty) =
@@ -4355,7 +4365,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
-                        .expression_type(second_arg)
+                        .expression_type(self.db, second_arg)
                         .as_string_literal()?
                         .value(db);
 
@@ -4383,7 +4393,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
+                let class_info_ty = inference.expression_type(self.db, second_arg);
 
                 let use_generic_filtering = is_positive
                     && !self
@@ -4438,7 +4448,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
-        let return_ty = inference.expression_type(expr_call);
+        let return_ty = inference.expression_type(self.db, expr_call);
 
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
@@ -4649,7 +4659,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return PatternNarrowingResult::Possible(None);
         };
         let subject_ty = infer_expression_types(db, subject_expression, TypeContext::default())
-            .expression_type(subject_expr);
+            .expression_type(self.db, subject_expr);
         let Some(constraint) = self.positive_subject_constraint(pattern, subject_ty) else {
             return PatternNarrowingResult::Possible(None);
         };
@@ -4708,9 +4718,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if let ast::Expr::Subscript(subscript) = subject_node {
             let inference = infer_expression_types(db, subject, TypeContext::default());
             if let Some((place, constraint)) = self.narrow_typeddict_subscript(
-                inference.expression_type(&*subscript.value),
+                inference.expression_type(self.db, &*subscript.value),
                 &subscript.value,
-                inference.expression_type(&*subscript.slice),
+                inference.expression_type(self.db, &*subscript.slice),
                 value_ty,
                 is_positive,
             ) {
@@ -4718,9 +4728,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             // Narrow tagged unions of tuples with `Literal` elements, just like `if` statements.
             else if let Some((place, constraint)) = self.narrow_tuple_subscript(
-                inference.expression_type(&*subscript.value),
+                inference.expression_type(self.db, &*subscript.value),
                 &subscript.value,
-                inference.expression_type(&*subscript.slice),
+                inference.expression_type(self.db, &*subscript.slice),
                 value_ty,
                 is_positive,
             ) {
@@ -4729,7 +4739,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         } else if let ast::Expr::Attribute(attribute) = subject_node {
             let inference = infer_expression_types(db, subject, TypeContext::default());
             if let Some((place, constraint)) = self.narrow_nominal_attribute(
-                inference.expression_type(&*attribute.value),
+                inference.expression_type(self.db, &*attribute.value),
                 &attribute.value,
                 attribute.attr.id(),
                 value_ty,
@@ -4757,7 +4767,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             .iter()
             // filter our arms with statically known truthiness
             .filter(|expr| {
-                inference.expression_type(*expr).bool(db, &env)
+                inference.expression_type(self.db, *expr).bool(db, &env)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,
                         BoolOp::Or => Truthiness::AlwaysFalse,
