@@ -485,4 +485,23 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(2)]
+    #[test_case(4)]
+    #[test_case(8)]
+    fn indent_width(indent_width: u8) -> Result<()> {
+        let snapshot = format!("indent_width_{indent_width}");
+        let diagnostics = test_path(
+            Path::new("pycodestyle/E11_indent_width.py"),
+            &settings::LinterSettings {
+                tab_size: NonZeroU8::new(indent_width).unwrap().into(),
+                ..settings::LinterSettings::for_rules([
+                    Rule::IndentationWithInvalidMultiple,
+                    Rule::IndentationWithInvalidMultipleComment,
+                ])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
 }
