@@ -2609,7 +2609,7 @@ x14.append(x15)
 x15.append(x14)
 
 reveal_type(x14)  # revealed: list[Divergent]
-reveal_type(x15)  # revealed: list[Divergent]
+reveal_type(x15)  # revealed: list[list[Divergent]]
 ```
 
 Collection-use constraints must converge when multiple collection literals are used in a container
