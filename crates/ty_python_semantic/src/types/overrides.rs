@@ -699,17 +699,21 @@ fn method_override_types<'db>(
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
             let superclass_signature = superclass_method.function(db).signature(db);
-            let receiver = match superclass_signature.overloads.as_slice() {
-                [signature] => signature
+            let explicit_receiver_annotation = |signature: &Signature<'db>| {
+                signature
                     .parameters()
                     .get(0)
                     .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
-                    .map(Parameter::annotated_type),
-                // TODO: Compare overloaded mixin methods within each overload's explicit receiver
-                // domain. Binding them directly to the concrete subclass can filter out applicable
-                // overloads when the subclass does not itself satisfy the receiver protocol.
-                _ => None,
+                    .map(Parameter::annotated_type)
             };
+            let mut overloads = superclass_signature.overloads.iter();
+            let receiver = overloads
+                .next()
+                .and_then(&explicit_receiver_annotation)
+                .filter(|receiver| {
+                    overloads
+                        .all(|signature| explicit_receiver_annotation(signature) == Some(*receiver))
+                });
 
             receiver.map_or((subclass_type, superclass_type), |receiver| {
                 let typing_self_type = subclass_method.typing_self_type(db);
@@ -718,6 +722,9 @@ fn method_override_types<'db>(
                     db,
                     [subclass_method.self_instance(db), receiver],
                 );
+                if receiver.is_never() {
+                    return (subclass_type, superclass_type);
+                }
                 (
                     Type::Callable(subclass_method.into_callable_type_with_receiver(
                         db,
@@ -734,6 +741,7 @@ fn method_override_types<'db>(
         }
         _ => (subclass_type, superclass_type),
     };
+
     let superclass_callable = superclass_type.try_upcast_to_callable(db)?;
 
     Some((subclass_type, superclass_callable.into_type(db)))

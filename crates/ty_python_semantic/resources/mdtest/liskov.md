@@ -1032,13 +1032,10 @@ class SameUnionReceiver(UnionMixin):
     def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
 ```
 
-Overloaded mixin methods need the same treatment for every receiver-specific overload:
+When all overloads on a mixin method share the same explicit receiver annotation, the overload sets
+are compared within that common receiver domain:
 
 ```pyi
-# TODO: We should emit an `invalid-method-override` diagnostic on the second
-# `InvalidOverloadedReceiver.method` overload. Both overload sets need to be
-# compared within the `HasValue` receiver domain instead of being filtered
-# against the concrete mixin subclass.
 class OverloadedMixin:
     @overload
     def method(self: HasValue, argument: int) -> None: ...
@@ -1049,7 +1046,22 @@ class InvalidOverloadedReceiver(OverloadedMixin):
     @overload
     def method(self: HasValue, argument: int) -> None: ...
     @overload
-    def method(self: HasValue, argument: bytes) -> None: ...
+    def method(self: HasValue, argument: bytes) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:44:9
+   |
+44 |     def method(self: HasValue, argument: bytes) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `OverloadedMixin.method`
+   |
+  ::: src/mdtest_snippet.pyi:38:9
+   |
+38 |     def method(self: HasValue, argument: str) -> None: ...
+   |         --------------------------------------------- `OverloadedMixin.method` defined here
+   |
+info: This violates the Liskov Substitution Principle
 ```
 
 The protocol may include the overridden method itself. This must not cause a valid implementation to
