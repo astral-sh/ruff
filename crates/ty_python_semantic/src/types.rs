@@ -1152,7 +1152,7 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.cycle_normalized_with_semantic_view_and_origin(db, query, previous, None, None, cycle)
+        self.cycle_normalized_with_origin(db, query, previous, None, cycle)
     }
 
     /// Whether `TY_CYCLE_DEBUG` recursive-type display is enabled.
@@ -1164,30 +1164,11 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn cycle_normalized_with_semantic_view(
+    fn cycle_normalized_with_origin(
         self,
         db: &'db dyn Db,
         query: CycleQuery,
         previous: Self,
-        previous_semantic_view: Option<Self>,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.cycle_normalized_with_semantic_view_and_origin(
-            db,
-            query,
-            previous,
-            previous_semantic_view,
-            None,
-            cycle,
-        )
-    }
-
-    fn cycle_normalized_with_semantic_view_and_origin(
-        self,
-        db: &'db dyn Db,
-        query: CycleQuery,
-        previous: Self,
-        previous_semantic_view: Option<Self>,
         origin: Option<RecursiveTypeOrigin<'db>>,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1235,15 +1216,7 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         };
 
-        stabilized.cycle_fold_recursive(
-            db,
-            query,
-            previous,
-            previous_semantic_view,
-            cycle.id(),
-            include_previous,
-            origin,
-        )
+        stabilized.cycle_fold_recursive(db, query, previous, cycle.id(), include_previous, origin)
     }
 
     fn replace_recursive_with_binder(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
@@ -1360,38 +1333,11 @@ impl<'db> Type<'db> {
         )
     }
 
-    fn semantic_view_in_inference(self, db: &'db dyn Db) -> Self {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::SemanticViewInInference,
-            TypeContext::default(),
-        )
-    }
-
-    /// Returns a type-expression view while the owning inference query is still running.
-    ///
-    /// This may use normal inference-time conversions such as `Type::instance`; do not call it
-    /// from salsa cycle recovery functions.
-    pub(crate) fn infer_type_expression_semantic_view(self, db: &'db dyn Db) -> Option<Self> {
-        match self {
-            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                let union_type = instance.union_type(db).as_ref().ok().copied()?;
-                Some(union_type.semantic_view_in_inference(db))
-            }
-            _ => {
-                let semantic_view = self.semantic_view_in_inference(db);
-                (semantic_view != self).then_some(semantic_view)
-            }
-        }
-    }
-
-    #[expect(clippy::too_many_arguments)]
     fn cycle_fold_recursive(
         self,
         db: &'db dyn Db,
         query: CycleQuery,
         previous: Self,
-        previous_semantic_view: Option<Self>,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -1403,12 +1349,8 @@ impl<'db> Type<'db> {
             }
             _ => None,
         };
-        let previous_recursive = previous_root_recursive
-            .or_else(|| previous.find_recursive_with_binder(db, binder))
-            .or_else(|| {
-                previous_semantic_view
-                    .and_then(|semantic_view| semantic_view.find_recursive_with_binder(db, binder))
-            });
+        let previous_recursive =
+            previous_root_recursive.or_else(|| previous.find_recursive_with_binder(db, binder));
 
         let recursive = previous_recursive.unwrap_or_else(|| {
             RecursiveType::new(
@@ -1420,22 +1362,6 @@ impl<'db> Type<'db> {
         });
 
         let mut current_body = self.replace_recursive_boundary_to_fixpoint(db, recursive);
-
-        if let Some(Type::Recursive(semantic_recursive)) = previous_semantic_view
-            && semantic_recursive.binder(db).same_marker(binder)
-            && semantic_recursive != recursive
-        {
-            // The semantic view is not necessarily a runtime substructure of `current_body`;
-            // use it as an additional boundary for binder replacement.
-            loop {
-                let replaced =
-                    current_body.replace_recursive_boundary_with_binder(db, semantic_recursive);
-                if replaced == current_body {
-                    break;
-                }
-                current_body = replaced;
-            }
-        }
 
         let mut recursives = Vec::new();
         current_body.collect_recursive_boundaries(db, &mut recursives);
@@ -6570,14 +6496,6 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_type_mapping_impl(db, child_type_mapping, tcx, visitor))
             }),
 
-            Type::GenericAlias(generic)
-                if matches!(type_mapping, TypeMapping::SemanticViewInInference) =>
-            {
-                let generic =
-                    generic.apply_type_mapping_impl(db, child_type_mapping, TypeContext::default(), visitor);
-                Type::instance(db, ClassType::from(generic))
-            }
-
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, child_type_mapping, tcx, visitor))
             }
@@ -6784,7 +6702,6 @@ impl<'db> Type<'db> {
                     TypeMapping::ApplySpecialization(_) |
                     TypeMapping::ApplySpecializationWithMaterialization { .. } |
                     TypeMapping::Structural(_) |
-                    TypeMapping::SemanticViewInInference |
                     TypeMapping::BindLegacyTypevars(_) |
                     TypeMapping::FreshenBoundTypeVars { .. } |
                     TypeMapping::BindSelf { .. } |
@@ -6802,13 +6719,12 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::Structural(_) |
-                TypeMapping::SemanticViewInInference |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::FreshenBoundTypeVars { .. } |
-                TypeMapping::BindSelf(..) |
+                    TypeMapping::ApplySpecialization(_) |
+                    TypeMapping::ApplySpecializationWithMaterialization { .. } |
+                    TypeMapping::Structural(_) |
+                    TypeMapping::BindLegacyTypevars(_) |
+                    TypeMapping::FreshenBoundTypeVars { .. } |
+                    TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -7884,8 +7800,6 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// Applies a query-free structural transformation.
     Structural(StructuralTypeMapping<'db>),
-    /// Converts retained runtime type-expression values to their type-expression meaning.
-    SemanticViewInInference,
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -7983,7 +7897,6 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::Structural(_)
-            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -8029,7 +7942,6 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::Structural(_)
-            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
