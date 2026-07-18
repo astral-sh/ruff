@@ -2188,19 +2188,32 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a union (or a type alias that resolves to a union), filters union elements
-    /// based on the provided predicate.
+    /// If the type is a union (or a type alias or recursive type with a transparent union body),
+    /// filters union elements based on the provided predicate.
     ///
     /// Otherwise, returns the type unchanged.
     pub(crate) fn filter_union(
         self,
         db: &'db dyn Db,
-        f: impl FnMut(&Type<'db>) -> bool,
+        mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        if let Type::Union(union) = self.resolve_type_alias(db) {
-            union.filter(db, f)
-        } else {
-            self
+        self.try_filter_union(db, &mut f).unwrap_or(self)
+    }
+
+    /// Resolve just enough aliases and recursive types to find a union, while closing an
+    /// unchanged recursive unfolding before returning it to the caller.
+    fn try_filter_union(
+        self,
+        db: &'db dyn Db,
+        f: &mut impl FnMut(&Type<'db>) -> bool,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::Recursive(recursive) => {
+                recursive.map_or(db, None, |unfolded| unfolded.try_filter_union(db, f))
+            }
+            Type::TypeAlias(alias) => alias.value_type(db).try_filter_union(db, f),
+            Type::Union(union) => Some(union.filter(db, f)),
+            _ => None,
         }
     }
 
