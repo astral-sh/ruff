@@ -282,9 +282,7 @@ fn add_to_existing_suppression(
         })?;
     let comment_text = &source[existing.comment_range];
 
-    // Only add to the existing ignore comment if it has no reason.
-    let before_closing_bracket = comment_text.trim_end().strip_suffix(']')?;
-    let up_to_last_code = before_closing_bracket.trim_end();
+    let up_to_last_code = editable_suppression_prefix(comment_text)?;
     let separator = if up_to_last_code.ends_with('[') {
         ""
     } else if up_to_last_code.ends_with(',') {
@@ -300,6 +298,23 @@ fn add_to_existing_suppression(
         insertion,
         existing.comment_range.end() - relative_offset_from_end,
     )))
+}
+
+/// Returns the portion of an ignore comment before its closing bracket if another code can be
+/// appended to it.
+///
+/// ```python
+/// # ty: ignore[]         # Editable
+/// # ty: ignore[] reason  # Not editable
+/// ```
+fn editable_suppression_prefix(comment_text: &str) -> Option<&str> {
+    // The parser accepts a reason after the code list, but rule codes can't contain `]`, so the
+    // first `]` is the code list's closing bracket. Don't edit comments with trailing reasons.
+    let (before_closing_bracket, after_closing_bracket) = comment_text.split_once(']')?;
+    after_closing_bracket
+        .trim()
+        .is_empty()
+        .then(|| before_closing_bracket.trim_end())
 }
 
 struct Codes<'a>(SuppressionKind, &'a [LintName]);
