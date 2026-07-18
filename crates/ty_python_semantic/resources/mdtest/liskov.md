@@ -1074,6 +1074,28 @@ class InvalidOverloadedReceiverAnnotation(OverloadedMixin):
     def method(self: HasOtherValue, argument: str) -> None: ...  # error: [invalid-method-override]
 ```
 
+Explicit receiver annotations can also be disjoint from the superclass receiver domain:
+
+```pyi
+from typing import final
+
+@final
+class InDomain: ...
+
+class FinalReceiverMixin:
+    @overload
+    def method(self: InDomain, argument: int) -> None: ...
+    @overload
+    def method(self: InDomain, argument: str) -> None: ...
+
+@final
+class ExplicitlyExcludedReceiver(FinalReceiverMixin):
+    @overload
+    def method(self: ExplicitlyExcludedReceiver, argument: int) -> None: ...
+    @overload
+    def method(self: ExplicitlyExcludedReceiver, argument: bytes) -> None: ...
+```
+
 The superclass method does not impose an override requirement on subclasses outside its receiver
 domain:
 

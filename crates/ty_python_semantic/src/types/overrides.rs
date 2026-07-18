@@ -737,6 +737,10 @@ fn method_override_types<'db>(
                     db,
                     [subclass_method.self_instance(db), receiver],
                 );
+                // Normal binding filters out overloads when the shared receiver domain is empty.
+                if superclass_signature.overloads.len() > 1 && receiver.is_never() {
+                    return (subclass_type, superclass_type);
+                }
                 (
                     Type::Callable(subclass_method.into_callable_type_with_receiver(
                         db,
