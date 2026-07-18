@@ -373,28 +373,23 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     return t1 + t2
 ```
 
-## Gradual constrained typevars
+## Constraints containing `Any`
 
-A heterogeneous collection can infer a union whose members all promote to the same gradual
-constraint.
+A heterogeneous collection can infer a union of tuple types. If every member of that union is
+compatible with `tuple[Any, ...]`, a constrained type variable can use that constraint.
 
 ```py
 from collections.abc import Iterable
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar
 
 Row = TypeVar("Row", list[Any], tuple[Any, ...])
 
 class Dense: ...
 class Sparse: ...
 
-@overload
-def create(data: Iterable[Row], schema: list[str] | tuple[str, ...]) -> None: ...
-@overload
-def create(data: int, schema: None = None) -> None: ...
-def create(data: object, schema: object = None) -> None:
-    raise NotImplementedError
+def consume(rows: Iterable[Row]) -> None: ...
 
-create([(1.0, Dense()), (0.0, Sparse())], ["label", "features"])
+consume([(1.0, Dense()), (0.0, Sparse())])
 ```
 
 ## Typevar inference is a unification problem
