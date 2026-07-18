@@ -3140,8 +3140,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a union (or a type alias that resolves to a union), filters union elements
-    /// based on the provided predicate.
+    /// If the type is a union (or a type alias or recursive type with a transparent union body),
+    /// filters union elements based on the provided predicate.
     ///
     /// Aliases among the elements are expanded first. An element may itself be an alias for a
     /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
@@ -3154,20 +3154,37 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        let Type::Union(union) = self.resolve_type_alias(db) else {
-            return self;
-        };
-        let union = if union.has_aliases(db) {
-            match union.expand_aliases(db, env) {
-                Type::Union(expanded) => expanded,
-                // Expanding collapsed the union to a single type, leaving nothing to filter
-                // between, so apply the predicate to it directly.
-                expanded => return if f(&expanded) { expanded } else { Type::Never },
+        self.try_filter_union(db, env, &mut f).unwrap_or(self)
+    }
+
+    /// Resolve just enough aliases and recursive types to find a union, while closing an
+    /// unchanged recursive unfolding before returning it to the caller.
+    fn try_filter_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        f: &mut impl FnMut(&Type<'db>) -> bool,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                unfolded.try_filter_union(db, env, f)
+            }),
+            Type::TypeAlias(alias) => alias.value_type(db).try_filter_union(db, env, f),
+            Type::Union(union) => {
+                let union = if union.has_aliases(db) {
+                    match union.expand_aliases(db, env) {
+                        Type::Union(expanded) => expanded,
+                        // Expanding collapsed the union to a single type, leaving nothing to filter
+                        // between, so apply the predicate to it directly.
+                        expanded => return Some(if f(&expanded) { expanded } else { Type::Never }),
+                    }
+                } else {
+                    union
+                };
+                Some(union.filter(db, f))
             }
-        } else {
-            union
-        };
-        union.filter(db, f)
+            _ => None,
+        }
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
