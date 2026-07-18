@@ -1286,41 +1286,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn collect_recursive_boundaries(
-        self,
-        db: &'db dyn Db,
-        recursives: &mut Vec<RecursiveType<'db>>,
-    ) {
-        while let Some(recursive) = find_over_type(db, self, false, |ty| {
-            let Type::Recursive(recursive) = ty else {
-                return None;
-            };
-            recursives
-                .iter()
-                .all(|seen| !seen.binder(db).same_marker(recursive.binder(db)))
-                .then_some(recursive)
-        }) {
-            recursives.push(recursive);
-        }
-    }
-
-    fn fold_recursive_boundaries_to_fixpoint(
-        mut self,
-        db: &'db dyn Db,
-        recursives: &[RecursiveType<'db>],
-    ) -> Self {
-        loop {
-            let mut folded = self;
-            for recursive in recursives {
-                folded = folded.fold(db, *recursive);
-            }
-            if folded == self {
-                return folded;
-            }
-            self = folded;
-        }
-    }
-
     pub(in crate::types) fn widen_recursive_tuples(
         self,
         db: &'db dyn Db,
@@ -1361,11 +1326,7 @@ impl<'db> Type<'db> {
             )
         });
 
-        let mut current_body = self.replace_recursive_boundary_to_fixpoint(db, recursive);
-
-        let mut recursives = Vec::new();
-        current_body.collect_recursive_boundaries(db, &mut recursives);
-        current_body = current_body.fold_recursive_boundaries_to_fixpoint(db, &recursives);
+        let current_body = self.replace_recursive_boundary_to_fixpoint(db, recursive);
 
         let body = if include_previous {
             let previous_body =
