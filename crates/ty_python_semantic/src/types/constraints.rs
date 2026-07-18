@@ -4067,12 +4067,16 @@ impl<'db> PathBounds<'db> {
                 for constraint in constraints.elements(db).iter().copied() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
+                    // A gradual constraint can choose any materialization that satisfies this
+                    // path. Its top materialization is the most permissive target for lower-bound
+                    // evidence, while its bottom materialization is the most permissive source
+                    // for upper-bound evidence.
                     let when_lower =
-                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                        lower.when_constraint_set_assignable_to_owned(db, constraint_upper);
                     let when_upper =
                         path_bound
                             .upper
-                            .when_satisfied_by(db, builder, constraint_upper);
+                            .when_satisfied_by(db, builder, constraint_lower);
                     let when = builder
                         .load(db, &when_lower)
                         .and(db, builder, || when_upper);

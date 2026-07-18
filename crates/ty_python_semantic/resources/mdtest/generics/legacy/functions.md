@@ -373,6 +373,30 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     return t1 + t2
 ```
 
+## Gradual constrained typevars
+
+A heterogeneous collection can infer a union whose members all promote to the same gradual
+constraint.
+
+```py
+from collections.abc import Iterable
+from typing import Any, TypeVar, overload
+
+Row = TypeVar("Row", list[Any], tuple[Any, ...])
+
+class Dense: ...
+class Sparse: ...
+
+@overload
+def create(data: Iterable[Row], schema: list[str] | tuple[str, ...]) -> None: ...
+@overload
+def create(data: int, schema: None = None) -> None: ...
+def create(data: object, schema: object = None) -> None:
+    raise NotImplementedError
+
+create([(1.0, Dense()), (0.0, Sparse())], ["label", "features"])
+```
+
 ## Typevar inference is a unification problem
 
 When inferring typevar assignments in a generic function call, we cannot simply solve constraints
