@@ -2097,6 +2097,11 @@ impl<'db> TypeVarInference<'db> {
     }
 }
 
+enum ConstraintSetInferenceError<'db> {
+    InvalidTypeVar(SpecializationError<'db>),
+    Unsatisfiable,
+}
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -2128,7 +2133,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
-        let types = self.solve_pending_with(generic_context, &mut choose);
+        let types = self
+            .solve_pending_with(generic_context, &mut choose)
+            .unwrap_or_else(|()| self.solve_hash_map_with(generic_context, &mut choose));
         let specialization =
             generic_context
                 .variables_inner(self.db)
@@ -2144,12 +2151,42 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Build raw type-variable inference, preserving which type variables were left unsolved.
+    ///
+    /// Returns an error if the call-wide pending constraints are unsatisfiable.
     pub(crate) fn build_inference_with(
         &mut self,
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
+    ) -> Result<TypeVarInference<'db>, ()> {
+        let types = self.solve_pending_with(generic_context, &mut choose)?;
+        Ok(self.typevar_inference(generic_context, &types))
+    }
+
+    /// Build a diagnostic specialization after the call-wide constraints were unsatisfiable.
+    ///
+    /// Each argument relation is solved independently, then its solutions are merged into the
+    /// legacy type map. This preserves enough information to report the conflicting arguments
+    /// even when a migrated inference path only populated `pending`.
+    pub(crate) fn build_diagnostic_inference_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        argument_relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> TypeVarInference<'db> {
-        let types = self.solve_pending_with(generic_context, &mut choose);
+        for (formal, actual) in argument_relations {
+            let when = actual.when_constraint_set_assignable_to(self.db, formal, self.constraints);
+            let _ = self.add_type_mappings_from_constraint_set(when);
+        }
+
+        let types = self.solve_hash_map_with(generic_context, &mut choose);
+        self.typevar_inference(generic_context, &types)
+    }
+
+    fn typevar_inference(
+        &self,
+        generic_context: GenericContext<'db>,
+        types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    ) -> TypeVarInference<'db> {
         let inferred: Box<[_]> = generic_context
             .variables_inner(self.db)
             .keys()
@@ -2163,14 +2200,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
-    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+    ) -> Result<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>, ()> {
         // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
         if generic_context
             .variables_inner(self.db)
             .values()
             .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
-            return self.solve_hash_map_with(generic_context, choose);
+            return Ok(self.solve_hash_map_with(generic_context, choose));
         }
 
         // TODO: This projection / solve can be expensive for large-union collection-literal type
@@ -2190,16 +2227,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.constraints,
             self.inferable,
             |_variance, path_bound| {
+                // A projection choice must not turn an invalid path into a satisfiable one.
+                let solution = PathBounds::default_solve(self.db, self.constraints, path_bound)?;
                 let typevar = path_bound.bound_typevar;
-                if let Some(ty) = choose(typevar, Some(path_bound)) {
-                    return Ok(Some(ty));
-                }
-
-                PathBounds::default_solve(self.db, self.constraints, path_bound)
+                Ok(choose(typevar, Some(path_bound)).or(solution))
             },
         ) {
-            Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                return self.solve_hash_map_with(generic_context, choose);
+            Solutions::Unsatisfiable => return Err(()),
+            Solutions::Unconstrained => {
+                return Ok(self.solve_hash_map_with(generic_context, choose));
             }
             Solutions::Constrained(solutions) => solutions,
         };
@@ -2240,9 +2276,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         {
             // Recursive specialization cannot reach a fixed point when a cycle grows through an
             // embedded generic type, such as `SupportsAdd[T, S]`.
-            self.solve_hash_map_with(generic_context, choose)
+            Ok(self.solve_hash_map_with(generic_context, choose))
         } else {
-            types
+            Ok(types)
         }
     }
 
@@ -2527,9 +2563,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn add_type_mappings_from_constraint_set(
         &mut self,
         set: ConstraintSet<'db, 'c>,
-    ) -> Result<(), ()> {
-        let solutions = match set.solutions(self.db, self.constraints, self.inferable) {
-            Solutions::Unsatisfiable => return Err(()),
+    ) -> Result<(), ConstraintSetInferenceError<'db>> {
+        let mut first_error = None;
+        let solutions = match set.solutions_with(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |_variance, path_bound| {
+                let solution = PathBounds::default_solve(self.db, self.constraints, path_bound);
+                if solution.is_err() && first_error.is_none() {
+                    first_error =
+                        Self::specialization_error_from_failed_bounds(self.db, path_bound);
+                }
+                solution
+            },
+        ) {
+            Solutions::Unsatisfiable => {
+                return Err(first_error.map_or(
+                    ConstraintSetInferenceError::Unsatisfiable,
+                    ConstraintSetInferenceError::InvalidTypeVar,
+                ));
+            }
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
         };
@@ -2545,15 +2599,40 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
+    fn specialization_error_from_failed_bounds(
+        db: &'db dyn Db,
+        path_bound: &PathBound<'db>,
+    ) -> Option<SpecializationError<'db>> {
+        let bound_typevar = path_bound.bound_typevar;
+        let argument = path_bound.lower?;
+        match bound_typevar.typevar(db).bound_or_constraints(db)? {
+            TypeVarBoundOrConstraints::UpperBound(_) => {
+                Some(SpecializationError::MismatchedBound {
+                    bound_typevar,
+                    argument,
+                })
+            }
+            TypeVarBoundOrConstraints::Constraints(_) if !path_bound.has_upper() => {
+                Some(SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    argument,
+                })
+            }
+            // If both bounds are present, the upper bound might be what invalidated the path.
+            TypeVarBoundOrConstraints::Constraints(_) => None,
+        }
+    }
+
     /// Infer type mappings from protocol constraints.
-    ///
-    /// Unsatisfiable results are treated as "no inference" instead of an immediate specialization
-    /// error. This matches the previous behavior, where unsatisfied comparisons simply produced no
-    /// type mappings, and avoids false positives while this path is still a hybrid of the old and
-    /// new solver logic.
-    fn infer_from_protocol_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
-        if self.add_type_mappings_from_constraint_set(when).is_ok() {
-            self.pending.intersect(self.db, self.constraints, when);
+    fn infer_from_protocol_constraint_set(
+        &mut self,
+        when: ConstraintSet<'db, 'c>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let result = self.add_type_mappings_from_constraint_set(when);
+        self.pending.intersect(self.db, self.constraints, when);
+        match result {
+            Ok(()) | Err(ConstraintSetInferenceError::Unsatisfiable) => Ok(()),
+            Err(ConstraintSetInferenceError::InvalidTypeVar(error)) => Err(error),
         }
     }
 
@@ -2649,7 +2728,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         formal_signature: &CallableSignature<'db>,
         actual_callables: &CallableTypes<'db>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), ConstraintSetInferenceError<'db>> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
 
         for actual_callable in actual_callables.as_slice() {
@@ -2657,14 +2736,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let when = actual_callable
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
-                self.add_type_mappings_from_constraint_set(when)?;
+                let result = self.add_type_mappings_from_constraint_set(when);
                 self.pending.intersect(self.db, self.constraints, when);
+                result?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
                 // overloads, and only report an error if none of them are satisfiable.
                 let db = self.db;
                 let constraints = self.constraints;
+                let mut first_error = None;
                 let combined = actual_callable
                     .signatures(db)
                     .overloads
@@ -2675,13 +2756,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             formal_signature,
                             constraints,
                         );
-                        self.add_type_mappings_from_constraint_set(when)
-                            .ok()
-                            .map(|()| when)
+                        match self.add_type_mappings_from_constraint_set(when) {
+                            Ok(()) => Some(when),
+                            Err(error) => {
+                                first_error.get_or_insert(error);
+                                None
+                            }
+                        }
                     })
                     .reduce(|lhs, rhs| lhs.or(db, constraints, || rhs));
                 let Some(combined) = combined else {
-                    return Err(());
+                    self.pending.intersect(
+                        self.db,
+                        self.constraints,
+                        ConstraintSet::from_bool(self.constraints, false),
+                    );
+                    return Err(first_error.unwrap_or(ConstraintSetInferenceError::Unsatisfiable));
                 };
                 self.pending.intersect(self.db, self.constraints, combined);
             }
@@ -3278,7 +3368,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // (replacing the logic below).
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                         let when = self.constraints.load(self.db, &when);
-                        self.infer_from_protocol_constraint_set(when);
+                        self.infer_from_protocol_constraint_set(when)?;
                         return Ok(());
                     }
 
@@ -3323,14 +3413,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .unwrap_or_else(|| {
                         actual.when_constraint_set_assignable_to(self.db, formal, self.constraints)
                     });
-                self.infer_from_protocol_constraint_set(when);
+                self.infer_from_protocol_constraint_set(when)?;
                 return Ok(());
             }
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 let when = self.constraints.load(self.db, &when);
-                self.infer_from_protocol_constraint_set(when);
+                self.infer_from_protocol_constraint_set(when)?;
                 return Ok(());
             }
 
@@ -3350,11 +3440,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // instance access.
                 let formal_signature = call_method.signatures(self.db);
 
-                // For callable-signature inference, keep unsatisfiable constraint-set
-                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
-                // depends on post-specialization assignability checks for some callable wrapper
-                // patterns (e.g. `functools.wraps`, callback adapters).
-                let _ = self.infer_from_callable_signature(formal_signature, &actual_callables);
+                if let Err(ConstraintSetInferenceError::InvalidTypeVar(error)) =
+                    self.infer_from_callable_signature(formal_signature, &actual_callables)
+                {
+                    return Err(error);
+                }
             }
 
             (Type::Callable(formal_callable), _) => {
@@ -3363,11 +3453,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 };
                 let formal_signature = formal_callable.signatures(self.db);
 
-                // For callable-signature inference, keep unsatisfiable constraint-set
-                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
-                // depends on post-specialization assignability checks for some callable wrapper
-                // patterns (e.g. `functools.wraps`, callback adapters).
-                let _ = self.infer_from_callable_signature(formal_signature, &actual_callables);
+                if let Err(ConstraintSetInferenceError::InvalidTypeVar(error)) =
+                    self.infer_from_callable_signature(formal_signature, &actual_callables)
+                {
+                    return Err(error);
+                }
             }
 
             // Expand type aliases in the actual type.
@@ -3412,5 +3502,70 @@ impl<'db> SpecializationError<'db> {
             Self::MismatchedBound { argument, .. } => *argument,
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::db::tests::setup_db;
+    use crate::types::KnownClass;
+    use ruff_python_ast::name::Name;
+
+    #[test]
+    fn unsatisfiable_pending_constraints_recover_diagnostic_specialization() {
+        let db = setup_db();
+        let typevar =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let generic_context = GenericContext::from_typevar_instances(&db, [typevar]);
+        let inferable = generic_context.inferable_typevars(&db);
+        let constraints = ConstraintSetBuilder::new();
+
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let formal = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(typevar)]);
+        let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+        let list_str = KnownClass::List.to_specialized_instance(&db, &[str]);
+        let int_relation = list_int.when_constraint_set_assignable_to(&db, formal, &constraints);
+        let str_relation = list_str.when_constraint_set_assignable_to(&db, formal, &constraints);
+
+        assert!(matches!(
+            int_relation.solutions(&db, &constraints, inferable),
+            Solutions::Constrained(_)
+        ));
+        assert!(matches!(
+            str_relation.solutions(&db, &constraints, inferable),
+            Solutions::Constrained(_)
+        ));
+
+        let mut builder = SpecializationBuilder::new(&db, &constraints, inferable);
+        builder.pending.intersect(&db, &constraints, int_relation);
+        builder.pending.intersect(&db, &constraints, str_relation);
+
+        assert_eq!(
+            builder.pending.solutions(&db, &constraints, inferable),
+            Solutions::Unsatisfiable
+        );
+        assert!(
+            builder
+                .build_inference_with(generic_context, |_, _| None)
+                .is_err()
+        );
+        assert!(
+            builder
+                .build_inference_with(generic_context, |_, _| Some(int))
+                .is_err()
+        );
+
+        let inference = builder.build_diagnostic_inference_with(
+            generic_context,
+            [(formal, list_int), (formal, list_str)],
+            |_, _| None,
+        );
+        let specialization = inference.specialization(&db);
+        let expected = KnownClass::List
+            .to_specialized_instance(&db, &[UnionType::from_two_elements(&db, int, str)]);
+        assert_eq!(formal.apply_specialization(&db, specialization), expected);
     }
 }

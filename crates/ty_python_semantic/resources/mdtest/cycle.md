@@ -343,7 +343,7 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
-min(X)
+min(X)  # error: [invalid-argument-type]
 T = f()
 
 X = NewType("X", C)
@@ -363,7 +363,7 @@ from typing import NamedTuple, NewType
 
 X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
-min(Y)
+min(Y)  # error: [invalid-argument-type]
 T = f()
 ```
 
