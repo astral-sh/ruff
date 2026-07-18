@@ -211,7 +211,7 @@ closed TypedDict namespace should NOT be marked as dynamic, and accessing unknow
 emit an error instead of returning `Unknown`.
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 class ClosedNamespace(TypedDict, closed=True):
     x: int
