@@ -71,10 +71,10 @@ fn function_signature_expression_type<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(db, definition).expression_type(expression)
+        infer_deferred_types(db, definition).expression_type(db, expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -3494,7 +3494,7 @@ impl<'db> Parameters<'db> {
                 // Defaults are always deferred (see infer_function_definition), so we can go
                 // directly to infer_deferred_types without first checking infer_definition_types.
                 infer_deferred_types(db, definition)
-                    .expression_type(default)
+                    .expression_type(db, default)
                     .replace_parameter_defaults(db)
             })
         };

@@ -1251,7 +1251,7 @@ fn extract_local_override_definitions<'db>(
             .iter()
             .copied()
             .find(|function| function.contains_definition(db, definition))
-            .or_else(|| infer_definition_types(db, definition).function_type(definition));
+            .or_else(|| infer_definition_types(db, definition).function_type(db, definition));
 
         let Some(function) = function else {
             continue;

@@ -72,7 +72,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             return;
         }
 
-        let value_type = value_inference.expression_type(value_expr);
+        let value_type = value_inference.expression_type(self.db(), value_expr);
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -135,8 +135,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     ) -> bool {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.targets
-                    .insert(target.into(), value_inference.expression_type(value_expr));
+                self.targets.insert(
+                    target.into(),
+                    value_inference.expression_type(self.db(), value_expr),
+                );
                 true
             }
             ast::Expr::List(ast::ExprList { elts, .. })

@@ -567,7 +567,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .as_deref()
                         .map(|annotation| {
                             TypeContext::new(Some(
-                                type_params_inference.expression_type(annotation),
+                                type_params_inference.expression_type(db, annotation),
                             ))
                         })
                         .unwrap_or_else(TypeContext::default);
@@ -991,7 +991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut is_classmethod = is_implicit_classmethod(function_name);
         let inference = infer_definition_types(db, method_definition);
         for decorator in &function_node.decorator_list {
-            let decorator_ty = inference.expression_type(&decorator.expression);
+            let decorator_ty = inference.expression_type(db, &decorator.expression);
             if let Some(known_class) = decorator_ty
                 .as_class_literal()
                 .and_then(|class| class.known(db))
@@ -1170,7 +1170,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
-        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
+        let callable = enclosing_stmt
+            .expression_type(self.db(), lambda)
+            .as_callable()?;
         let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
             // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
             return None;
