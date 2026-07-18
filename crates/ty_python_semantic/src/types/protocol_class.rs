@@ -1285,10 +1285,17 @@ pub(super) struct ProtocolMember<'a, 'db> {
     data: &'a ProtocolMemberData<'db>,
 }
 
+/// Orders protocol members so that finite constraints are established before recursive relations.
+///
+/// The declaration order is significant because the derived ordering is used when comparing
+/// protocol interfaces.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 enum StructuralMemberPriority {
+    /// A non-recursive member with at most one callable signature.
     Simple,
+    /// A non-recursive callable member with multiple overloads.
     FiniteOverload,
+    /// A member that may recurse through a protocol or type alias, or whose finiteness is unknown.
     Recursive,
 }
 
