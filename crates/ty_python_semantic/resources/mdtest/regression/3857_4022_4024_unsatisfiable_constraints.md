@@ -83,3 +83,31 @@ def callback(value: B) -> A:
 # error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(A, /) -> A`, found `def callback(value: B) -> A`"
 call(callback, A())
 ```
+
+## Precise constraint errors suppress fallback mismatches
+
+Once constraint inference reports the violated bound, the later assignability check should not
+repeat the same incompatibility against its fallback specialization.
+
+```py
+from typing import Protocol
+
+class A: ...
+class B(A): ...
+class C: ...
+
+class P[T, U](Protocol):
+    def put(self, value: T) -> None: ...
+    def get(self) -> U: ...
+
+class Bad:
+    def put(self, value: B) -> None: ...
+    def get(self) -> C:
+        return C()
+
+def f[T: A](x: P[T, T], fallback: T) -> None:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+f(Bad(), B())
+```
