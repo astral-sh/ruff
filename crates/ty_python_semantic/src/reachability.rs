@@ -1120,11 +1120,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
-            if subject_ty.is_single_valued(db) {
-                equality_truthiness(db, subject_ty, value_ty)
-            } else {
-                Truthiness::Ambiguous
-            }
+            equality_truthiness(db, subject_ty, value_ty)
         }
         PatternPredicateKind::Singleton(singleton) => {
             let singleton_ty = singleton_pattern_type(db, *singleton);

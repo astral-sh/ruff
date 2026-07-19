@@ -130,11 +130,7 @@ This leads us to infer `Literal[1, 3]` as the type of `y` after the `match` stat
 `Literal[1]`:
 
 ```py
-from typing import final
-
-@final
-class C:
-    pass
+class C: ...
 
 def _(subject: C):
     y = 1
@@ -142,6 +138,24 @@ def _(subject: C):
         case 2:
             y = 3
     reveal_type(y)  # revealed: Literal[1, 3]
+```
+
+However, in this variant, we can prove that `D` here does not have a custom `__eq__` implementation,
+since it is `@final`. This means that we know it does not compare equal to `2`, allowing us to infer
+`Literal[1]` after the `match` statement
+
+```py
+from typing import final
+
+@final
+class D: ...
+
+def _(subject: D):
+    y = 1
+    match subject:
+        case 2:
+            y = 3
+    reveal_type(y)  # revealed: Literal[1]
 ```
 
 ## Class match
