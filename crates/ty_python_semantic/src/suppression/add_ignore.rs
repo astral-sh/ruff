@@ -249,10 +249,6 @@ fn suppression_comment_fix(
         return Some(SuppressionCommentFix::SameLine);
     }
 
-    if !db.analysis_settings(file).respect_type_ignore_comments {
-        return None;
-    }
-
     // A suppression before the first non-trivia token is file-level, so adding one there would
     // affect diagnostics throughout the file.
     if suppressions(db, file)
@@ -272,8 +268,8 @@ fn suppression_comment_fix(
 
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
     let insertion = format!(
-        "# type:ignore[{codes}, unused-ignore]  ",
-        codes = Codes(SuppressionKind::TypeIgnore, codes)
+        "# ty:ignore[{codes}]  ",
+        codes = Codes(SuppressionKind::Ty, codes)
     );
     Fix::safe_edit(Edit::insertion(insertion, start))
 }
