@@ -467,10 +467,9 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    use super::{CycleDetector, Db, HasIdentity};
+    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
     use crate::db::tests::setup_db;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct TestVisit;
 
@@ -494,8 +493,17 @@ mod tests {
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
-            0
+            self.0
         }
+    }
+
+    #[derive(Clone, Eq, Hash, PartialEq)]
+    struct ConstantIdentityItem(u8);
+
+    impl<'db> HasIdentity<'db> for ConstantIdentityItem {
+        type Id = ();
+
+        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {}
     }
 
     #[test]
@@ -535,9 +543,39 @@ mod tests {
             detector.visit(&db, CountingIdentityItem(1), || {
                 detector.visit(&db, CountingIdentityItem(2), || 1)
             }),
-            0
+            1
         );
         assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn different_items_with_same_identity_form_cycle() {
+        let db = setup_db();
+        let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
+
+        let CycleDetectorVisit::Pending(pending) = detector.entry(&db, ConstantIdentityItem(1))
+        else {
+            panic!("the first identity should be pending");
+        };
+        let CycleDetectorVisit::Cycle(item) = detector.entry(&db, ConstantIdentityItem(2)) else {
+            panic!("a different item with the same identity should form a cycle");
+        };
+        assert_eq!(item.0, 2);
+        pending.finish(1);
+
+        let CycleDetectorVisit::Ready(seen) = detector.entry(&db, ConstantIdentityItem(1)) else {
+            panic!("the first identity should be ready after the pending visit is finished");
+        };
+        assert_eq!(seen, 1);
+        let CycleDetectorVisit::Pending(pending) = detector.entry(&db, ConstantIdentityItem(2))
+        else {
+            panic!("the second identity should be pending after the first is finished");
+        };
+        pending.finish(2);
+        let CycleDetectorVisit::Ready(seen) = detector.entry(&db, ConstantIdentityItem(2)) else {
+            panic!("the second identity should be ready after the pending visit is finished");
+        };
+        assert_eq!(seen, 2);
     }
 
     #[test]
