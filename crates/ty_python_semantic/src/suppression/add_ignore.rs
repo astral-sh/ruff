@@ -16,6 +16,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
+use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 
@@ -47,10 +49,20 @@ pub fn suppress_all(
 
     for &(id, diagnostic_range) in ids_with_range {
         if is_suppression_comment_lint(id) {
-            if let Some(start) = line_local_suppression_start(db, file, diagnostic_range) {
-                let (lints, suppressed_diagnostics) = line_local.entry(start).or_default();
-                lints.insert(id);
-                *suppressed_diagnostics += 1;
+            match suppression_comment_fix(db, file, diagnostic_range) {
+                Some(SuppressionCommentFix::LineLocal(start)) => {
+                    let (lints, suppressed_diagnostics) = line_local.entry(start).or_default();
+                    lints.insert(id);
+                    *suppressed_diagnostics += 1;
+                }
+                Some(SuppressionCommentFix::SameLine) => {
+                    ids_with_suppression_range.push((
+                        id,
+                        diagnostic_range,
+                        suppression_range(db, file, diagnostic_range),
+                    ));
+                }
+                None => {}
             }
         } else {
             ids_with_suppression_range.push((
@@ -187,8 +199,12 @@ pub struct SuppressFix {
 /// Creates a fix to suppress a single lint.
 pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Option<Fix> {
     if is_suppression_comment_lint(id.name()) {
-        let start = line_local_suppression_start(db, file, range)?;
-        return Some(add_line_local_suppression(&[id.name()], start));
+        match suppression_comment_fix(db, file, range)? {
+            SuppressionCommentFix::LineLocal(start) => {
+                return Some(add_line_local_suppression(&[id.name()], start));
+            }
+            SuppressionCommentFix::SameLine => {}
+        }
     }
 
     let suppression_range = suppression_range(db, file, range);
@@ -209,19 +225,31 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
 }
 
 pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
-    !is_suppression_comment_lint(id) || line_local_suppression_start(db, file, range).is_some()
+    !is_suppression_comment_lint(id) || suppression_comment_fix(db, file, range).is_some()
 }
 
-fn line_local_suppression_start(db: &dyn Db, file: File, range: TextRange) -> Option<TextSize> {
-    if !db.analysis_settings(file).respect_type_ignore_comments {
-        return None;
-    }
+enum SuppressionCommentFix {
+    LineLocal(TextSize),
+    SameLine,
+}
 
+fn suppression_comment_fix(
+    db: &dyn Db,
+    file: File,
+    range: TextRange,
+) -> Option<SuppressionCommentFix> {
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
     let comment = tokens
         .at_offset(range.start())
         .find(|token| token.kind() == TokenKind::Comment)?;
+
+    let source = source_text(db, file);
+    if !db.analysis_settings(file).respect_type_ignore_comments {
+        return indentation_at_offset(comment.start(), &source)
+            .is_none()
+            .then_some(SuppressionCommentFix::SameLine);
+    }
 
     // A suppression before the first non-trivia token is file-level, so adding one there would
     // affect diagnostics throughout the file.
@@ -232,11 +260,12 @@ fn line_local_suppression_start(db: &dyn Db, file: File, range: TextRange) -> Op
         return None;
     }
 
-    let source = source_text(db, file);
     let before_diagnostic = &source[TextRange::new(comment.start(), range.end())];
     let hash = before_diagnostic.rfind('#')?;
 
-    Some(comment.start() + before_diagnostic[..hash].text_len())
+    Some(SuppressionCommentFix::LineLocal(
+        comment.start() + before_diagnostic[..hash].text_len(),
+    ))
 }
 
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
@@ -281,7 +310,7 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> TextRange {
             )
         })
         .map(Ranged::start)
-        .unwrap_or(range.end());
+        .unwrap_or_else(|| source_text(db, file).line_end(range.end()));
 
     TextRange::new(line_start, line_end)
 }

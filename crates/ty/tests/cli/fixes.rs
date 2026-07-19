@@ -174,6 +174,7 @@ fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
             seen_code = True
             # ty: ignore[not-a-rule]
             value = 1
+            value = 1  # ty: ignore[another-not-a-rule]
             "#,
     )?;
 
@@ -194,7 +195,7 @@ fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
       |
 
     Found 1 diagnostic
-    Added 0 ignore comment
+    Added 1 ignore comment
 
     ----- stderr -----
     "
@@ -205,6 +206,7 @@ fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
     seen_code = True
     # ty: ignore[not-a-rule]
     value = 1
+    value = 1  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
     ");
 
     Ok(())
