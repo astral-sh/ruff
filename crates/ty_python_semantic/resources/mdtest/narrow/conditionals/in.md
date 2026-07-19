@@ -1093,19 +1093,22 @@ def range_membership(value: Literal["x", 1], values: range) -> None:
 
 ## `TypedDict` key membership
 
-Membership in a `TypedDict` checks its string keys. Equality against a broad `str` key type cannot
-rule out an integer literal. We do not apply key-based narrowing to arbitrary values, because `in`
-may test substrings or elements instead:
+Membership in a closed `TypedDict` checks its finite set of literal string keys, so the tested value
+can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys.
+We do not apply key-based narrowing to arbitrary values, because `in` may test substrings or
+elements instead:
 
 ```py
-from typing import Literal, TypedDict
+from typing import Literal
+from typing_extensions import TypedDict
 
-class Values(TypedDict):
+class Values(TypedDict, closed=True):
     present: int
+    other: str
 
-def typed_dict_container(value: Literal["present", 1], values: Values) -> None:
+def typed_dict_container(value: Literal["present", "other", "missing", 1], values: Values) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal["present", 1]
+        reveal_type(value)  # revealed: Literal["other", "present"]
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
