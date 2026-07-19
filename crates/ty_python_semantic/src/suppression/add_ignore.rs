@@ -245,10 +245,12 @@ fn suppression_comment_fix(
         .find(|token| token.kind() == TokenKind::Comment)?;
 
     let source = source_text(db, file);
+    if indentation_at_offset(comment.start(), &source).is_none() {
+        return Some(SuppressionCommentFix::SameLine);
+    }
+
     if !db.analysis_settings(file).respect_type_ignore_comments {
-        return indentation_at_offset(comment.start(), &source)
-            .is_none()
-            .then_some(SuppressionCommentFix::SameLine);
+        return None;
     }
 
     // A suppression before the first non-trivia token is file-level, so adding one there would
