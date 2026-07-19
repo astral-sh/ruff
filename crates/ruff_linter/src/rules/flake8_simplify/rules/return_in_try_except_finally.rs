@@ -16,26 +16,24 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// def squared(n):
+/// def process_data(data):
 ///     try:
-///         sqr = n**2
-///         return sqr
-///     except Exception:
-///         return "An exception occurred"
+///         return transform(data)
+///     except ValueError:
+///         return None
 ///     finally:
 ///         return -1  # Always returns -1.
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def squared(n):
+/// def process_data(data):
 ///     try:
-///         return_value = n**2
-///     except Exception:
-///         return_value = "An exception occurred"
+///         return transform(data)
+///     except ValueError:
+///         return None
 ///     finally:
-///         return_value = -1
-///     return return_value
+///         cleanup(data)
 /// ```
 ///
 /// ## References
