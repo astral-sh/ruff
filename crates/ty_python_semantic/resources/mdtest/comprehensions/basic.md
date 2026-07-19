@@ -36,8 +36,8 @@ class Table:
 [PEP 572] specifies that an assignment expression in a comprehension binds its target in the scope
 containing the outermost comprehension.
 
-ty currently assumes that a comprehension runs at least once. It also analyzes a generator
-expression as though it is consumed immediately. The tests below follow those existing assumptions.
+ty currently assumes that a comprehension runs at least once and that a generator expression is
+consumed immediately.
 
 ### Basic forms
 
@@ -76,8 +76,8 @@ reveal_type(ordered)  # revealed: str
 
 ### Branches that do not assign
 
-A target in a branch known not to run remains unbound. A target in the branch that does run is
-available after the comprehension:
+A target in a branch known not to run remains unbound, while the other target is available after the
+comprehension:
 
 ```py
 [(dead := 1) if False else (live := 2) for _ in [0]]
@@ -106,9 +106,9 @@ def conditional_without_previous_value(flag: bool):
     reveal_type(value)  # revealed: int
 ```
 
-A comprehension may execute repeatedly, so the exported binding conservatively retains its value
-type when a condition is only proven false during type inference. The target remains possibly
-unbound, and reading it must not make the rest of the function appear unreachable:
+ty conservatively keeps the type of an assignment that is unreachable on the first iteration, since
+a later iteration may take a different branch. Even though `0 == 1` is always false, the target is
+therefore possibly unbound, and checking must continue after the read:
 
 ```py
 def statically_false_condition():
@@ -156,9 +156,12 @@ def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+```
 
-# TODO: Model repeated comprehension iterations with a fixed point. The second iteration assigns
-# `int`, so the final type should be `str | int` and `value.upper()` should report an error.
+ty does not yet account for a type that changes between iterations. The second iteration below
+assigns `int`, so the final type should be `str | int` and `value.upper()` should report an error:
+
+```py
 def type_changes_across_iterations():
     value = 0
     [value := "" if isinstance(value, int) else 0 for _ in [0, 1]]
@@ -190,8 +193,8 @@ def loop_carried_guard():
 
 ### Function-local targets
 
-Even if the assignment is in a branch known not to run, its target belongs to the containing
-function. A read in that function must not fall back to a global variable with the same name:
+An assignment in a branch known not to run still makes its target local to the containing function.
+A read must not fall back to a global variable with the same name:
 
 ```py
 local_target = "global"
@@ -203,15 +206,16 @@ def read_local_target():
 
 ### Nested comprehensions
 
-An assignment in an inner comprehension still binds outside the outermost comprehension. The order
-of assignments in the outer comprehension is preserved:
+An assignment in an inner comprehension still binds outside the outermost comprehension. A later
+assignment in the outer comprehension replaces the inner value:
 
 ```py
-[([nested_order := 1 for _ in [0]], (nested_order := 2)) for _ in [0]]
-reveal_type(nested_order)  # revealed: int
+[([nested_order := 1 for _ in [0]], (nested_order := "")) for _ in [0]]
+reveal_type(nested_order)  # revealed: str
 ```
 
-An inner comprehension that is never evaluated must not replace an earlier value:
+These are controls for an inner comprehension that is never evaluated. It must not replace an
+earlier value:
 
 ```py
 def unreachable_nested_assignment_with_previous_value():
