@@ -130,6 +130,22 @@ pub(super) fn evaluate_type_equality<'db>(
     is_positive: bool,
     soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
+    let right = right.resolve_type_alias(db);
+
+    // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar before
+    // comparing it with `left` would lose the correlation with other occurrences in the function.
+    if is_positive
+        && let Type::TypeVar(typevar) = right
+        && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+            typevar.typevar(db).bound_or_constraints(db)
+        && constraints.elements(db).iter().all(|constraint| {
+            evaluate_type_equality(db, left, *constraint, true, soundness_policy)
+                .is_some_and(|narrowed| narrowed.is_equivalent_to(db, *constraint))
+        })
+    {
+        return Some(right);
+    }
+
     let branch = ComparisonBranch::from(is_positive);
     let condition_expects_equality =
         ComparisonOperator::Equality.condition_expects_equality(branch);

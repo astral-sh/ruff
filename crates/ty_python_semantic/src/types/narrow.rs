@@ -2979,43 +2979,23 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let rhs_values = iterable
             .homogeneous_element_type(self.db)
             .resolve_type_alias(self.db);
+        let soundness_policy = self.comparison_soundness_policy();
 
         if let Type::Union(union) = rhs_values {
             let mut builder = UnionBuilder::new(self.db);
             for rhs_value in union.elements(self.db) {
-                builder = builder.add(self.evaluate_membership_equality(lhs_ty, *rhs_value)?);
+                builder = builder.add(evaluate_type_equality(
+                    self.db,
+                    lhs_ty,
+                    *rhs_value,
+                    true,
+                    soundness_policy,
+                )?);
             }
             Some(builder.build())
         } else {
-            self.evaluate_membership_equality(lhs_ty, rhs_values)
+            evaluate_type_equality(self.db, lhs_ty, rhs_values, true, soundness_policy)
         }
-    }
-
-    /// Apply equality compatibility without losing the container's declared element type.
-    fn evaluate_membership_equality(
-        &self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
-        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
-        let soundness_policy = self.comparison_soundness_policy();
-
-        // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar
-        // before comparing it with `lhs_ty` would lose the correlation between this occurrence
-        // and other occurrences in the same function.
-        if let Type::TypeVar(typevar) = rhs_ty
-            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.typevar(self.db).bound_or_constraints(self.db)
-            && constraints.elements(self.db).iter().all(|constraint| {
-                evaluate_type_equality(self.db, lhs_ty, *constraint, true, soundness_policy)
-                    .is_some_and(|narrowed| narrowed.is_equivalent_to(self.db, *constraint))
-            })
-        {
-            return Some(rhs_ty);
-        }
-
-        evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, soundness_policy)
     }
 
     fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
