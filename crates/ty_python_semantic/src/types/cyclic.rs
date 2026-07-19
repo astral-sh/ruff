@@ -22,6 +22,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Eq;
+use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
@@ -76,6 +77,7 @@ impl<'db> Type<'db> {
 pub trait HasIdentity<'db> {
     type Id: PartialEq;
 
+    /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 }
 
@@ -116,8 +118,9 @@ where
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
-    /// The active recursion stack. Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[T; INLINE_CAPACITY]>>,
+    /// The active recursion stack and the identity of each item.
+    /// Completed visits are removed from the end of the stack.
+    seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
 
     /// Memoized results from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
@@ -168,17 +171,20 @@ where
         }
 
         let seen = self.seen.borrow();
-        if seen.contains(&item) {
+        if seen.iter().any(|active| active.item == item) {
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
         let identity = item.to_identity(db);
-        if seen.iter().any(|active| active.to_identity(db) == identity) {
+        if seen.iter().any(|active| active.identity == identity) {
             return CycleDetectorVisit::Cycle(item);
         }
         drop(seen);
 
-        self.seen.borrow_mut().push(item.clone());
+        self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
+            item: item.clone(),
+            identity,
+        });
         CycleDetectorVisit::Pending(CycleDetectorPendingVisit {
             detector: self,
             item,
@@ -189,11 +195,22 @@ where
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
     fn finish_visit(&self, item: T, result: R) -> R {
         let active = self.seen.borrow_mut().pop();
-        debug_assert!(active.as_ref().is_some_and(|active| active == &item));
+        debug_assert!(active.as_ref().is_some_and(|active| active.item == item));
         self.cache
             .borrow_mut()
             .insert_completed(item, result.clone());
         result
+    }
+}
+
+struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
+    item: T,
+    identity: T::Id,
+}
+
+impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.item.fmt(f)
     }
 }
 
@@ -450,6 +467,8 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::{CycleDetector, Db, HasIdentity};
     use crate::db::tests::setup_db;
 
@@ -462,6 +481,20 @@ mod tests {
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             *self
+        }
+    }
+
+    static IDENTITY_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Clone, Eq, Hash, PartialEq)]
+    struct CountingIdentityItem(u8);
+
+    impl<'db> HasIdentity<'db> for CountingIdentityItem {
+        type Id = u8;
+
+        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+            IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
+            0
         }
     }
 
@@ -490,6 +523,21 @@ mod tests {
             detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
             10
         );
+    }
+
+    #[test]
+    fn computes_each_active_identity_once() {
+        let db = setup_db();
+        IDENTITY_CALLS.store(0, Ordering::Relaxed);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem(1), || {
+                detector.visit(&db, CountingIdentityItem(2), || 1)
+            }),
+            0
+        );
+        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
     }
 
     #[test]
