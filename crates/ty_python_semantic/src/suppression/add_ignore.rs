@@ -59,7 +59,8 @@ pub fn suppress_all(
                     *suppressed_diagnostics += 1;
                 }
                 Some(
-                    SuppressionCommentFix::SameLine | SuppressionCommentFix::FileLevelSameLine,
+                    SuppressionCommentFix::SameLine
+                    | SuppressionCommentFix::FileLevelSameLine { .. },
                 ) => {
                     ids_with_suppression_range.push((
                         id,
@@ -208,8 +209,9 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
             SuppressionCommentFix::LineLocal(start) => {
                 return Some(add_line_local_suppression(&[id.name()], start));
             }
-            SuppressionCommentFix::SameLine => {}
-            SuppressionCommentFix::FileLevelSameLine => return None,
+            SuppressionCommentFix::SameLine
+            | SuppressionCommentFix::FileLevelSameLine { is_shebang: false } => {}
+            SuppressionCommentFix::FileLevelSameLine { is_shebang: true } => return None,
         }
     }
 
@@ -237,7 +239,7 @@ pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRan
 enum SuppressionCommentFix {
     LineLocal(TextSize),
     SameLine,
-    FileLevelSameLine,
+    FileLevelSameLine { is_shebang: bool },
 }
 
 fn suppression_comment_fix(
@@ -262,7 +264,9 @@ fn suppression_comment_fix(
         .first_non_trivia_token
         .is_none_or(|start| comment.start() < start)
     {
-        return Some(SuppressionCommentFix::FileLevelSameLine);
+        return Some(SuppressionCommentFix::FileLevelSameLine {
+            is_shebang: source[comment.range()].starts_with("#!"),
+        });
     }
 
     let before_diagnostic = &source[TextRange::new(comment.start(), range.start())];

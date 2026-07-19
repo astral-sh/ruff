@@ -507,6 +507,31 @@ mod tests {
     }
 
     #[test]
+    fn add_code_file_level_unknown_rule_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            # ty: ignore[<START>not-a-rule<END>]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:2:14
+          |
+        2 | # ty: ignore[not-a-rule]
+          |              ^^^^^^^^^^
+          |
+          |
+        1 |
+          - # ty: ignore[not-a-rule]
+        2 + # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        3 | value = 1
+          |
+        ");
+    }
+
+    #[test]
     fn no_ignore_code_action_for_shebang_suppression() {
         let test = CodeActionTest::with_source(
             r#"
