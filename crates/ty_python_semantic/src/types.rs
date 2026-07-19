@@ -3493,31 +3493,40 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
-            } => (
-                union
+            } => {
+                let mut all_data_descriptors = true;
+
+                let place = union
                     .map_with_boundness(db, |elem| {
+                        let ty = match elem.try_call_dunder_get(db, instance, owner) {
+                            Some((ty, kind)) => {
+                                all_data_descriptors &= kind.is_data();
+                                ty
+                            }
+                            None => {
+                                all_data_descriptors = false;
+                                *elem
+                            }
+                        };
+
                         Place::Defined(DefinedPlace {
-                            ty: elem
-                                .try_call_dunder_get(db, instance, owner)
-                                .map_or(*elem, |(ty, _)| ty),
+                            ty,
                             origin,
                             definedness: boundness,
                             public_type_policy,
-                            provenance: Provenance::Unknown,
+                            provenance: attribute_provenance,
                         })
                     })
-                    .with_provenance(attribute_provenance)
-                    .with_qualifiers(qualifiers),
-                // TODO: avoid the duplication here:
-                if union.elements(db).iter().all(|elem| {
-                    elem.try_call_dunder_get(db, instance, owner)
-                        .is_some_and(|(_, kind)| kind.is_data())
-                }) {
+                    .with_qualifiers(qualifiers);
+
+                let kind = if all_data_descriptors {
                     AttributeKind::DataDescriptor
                 } else {
                     AttributeKind::NormalOrNonDataDescriptor
-                },
-            ),
+                };
+
+                (place, kind)
+            }
 
             attribute @ PlaceAndQualifiers {
                 place:
@@ -3542,10 +3551,9 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
-                                provenance: Provenance::Unknown,
+                                provenance: attribute_provenance,
                             })
                         })
-                        .with_provenance(attribute_provenance)
                         .with_qualifiers(qualifiers)
                 },
                 // TODO: Discover data descriptors in intersections.
