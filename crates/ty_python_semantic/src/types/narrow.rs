@@ -2992,11 +2992,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     /// Apply equality compatibility without losing the container's declared element type.
-    ///
-    /// Generic equality retains disjoint single-valued arms when an element subclass could define
-    /// custom equality. Membership narrowing instead removes those arms unless the equality
-    /// evaluator can establish a more specific compatibility, while retaining broader arms whose
-    /// runtime values may still match an element.
     fn evaluate_membership_equality(
         &self,
         lhs_ty: Type<'db>,
@@ -3020,39 +3015,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return Some(rhs_ty);
         }
 
-        let has_single_valued_component = match lhs_ty {
-            Type::Union(union) => union
-                .elements(self.db)
-                .iter()
-                .any(|element| element.is_single_valued(self.db)),
-            _ => lhs_ty.is_single_valued(self.db),
-        };
-        if !has_single_valued_component {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, soundness_policy);
-        }
-
-        let mut builder = UnionBuilder::new(self.db);
-        let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
-            let element = element.resolve_type_alias(self.db);
-            match evaluate_type_equality(self.db, element, rhs_ty, true, soundness_policy) {
-                Some(Type::Never) => builder,
-                Some(constraint) => builder.add(constraint),
-                None if !element.is_single_valued(self.db) => builder.add(element),
-                None => builder,
-            }
-        };
-
-        if let Type::Union(union) = lhs_ty {
-            for element in union.elements(self.db).iter().copied() {
-                builder = add_lhs_element(builder, element);
-            }
-        } else {
-            builder = add_lhs_element(builder, lhs_ty);
-        }
-
-        builder = builder.add(rhs_ty);
-        let narrowed = builder.build();
-        (narrowed != lhs_ty).then_some(narrowed)
+        evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, soundness_policy)
     }
 
     fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {

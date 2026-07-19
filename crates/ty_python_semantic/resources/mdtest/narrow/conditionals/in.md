@@ -441,14 +441,14 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
 
 def broad_element_type(x: str | None, values: dict[str, int]):
     if x in values:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
 
 def broad_element_type_with_unknown(values: dict[str, int]):
     x = [None][0]
     if x in values:
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: None | Unknown
     else:
         reveal_type(x)  # revealed: None | Unknown
 ```
@@ -517,7 +517,7 @@ def broad_dict_element(x: str | None, values: dict[str, int]) -> None:
     if x not in values:
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str | None
 
 def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
     if x not in values:
@@ -575,6 +575,19 @@ When containment is known to compare items using equality, we can remove a union
 compare equal to any item in the container. A `TypedDict` cannot compare equal to a string, and a
 final class with the default identity-based equality cannot compare equal to an integer. We retain
 types such as `int` and classes with custom equality when they might still match an item.
+
+A non-final element type can have a subclass that compares equal to `None`, so membership must
+preserve `None` just as an equality check does:
+
+```py
+class Foo: ...
+
+def equality_and_membership(x: Foo | None, y: Foo, values: list[Foo]):
+    if x == y:
+        reveal_type(x)  # revealed: Foo | None
+    if x in values:
+        reveal_type(x)  # revealed: Foo | None
+```
 
 ```py
 from typing import Literal, TypedDict, final
@@ -1061,21 +1074,22 @@ def custom_containment_component_prevents_narrowing(
 
 ## Range membership
 
-A `range` contains integers, so a string literal can be removed from the type of the tested value:
+A `range` contains integers, but equality against a broad `int` element type cannot rule out a
+string literal:
 
 ```py
 from typing import Literal
 
 def range_membership(value: Literal["x", 1], values: range) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal[1]
+        reveal_type(value)  # revealed: Literal["x", 1]
 ```
 
 ## `TypedDict` key membership
 
-Membership in a `TypedDict` checks its string keys, so the tested value can be narrowed to a
-possible key. We do not apply key-based narrowing to arbitrary values, because `in` may test
-substrings or elements instead:
+Membership in a `TypedDict` checks its string keys. Equality against a broad `str` key type cannot
+rule out an integer literal. We do not apply key-based narrowing to arbitrary values, because `in`
+may test substrings or elements instead:
 
 ```py
 from typing import Literal, TypedDict
@@ -1085,7 +1099,7 @@ class Values(TypedDict):
 
 def typed_dict_container(value: Literal["present", 1], values: Values) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal["present"]
+        reveal_type(value)  # revealed: Literal["present", 1]
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
