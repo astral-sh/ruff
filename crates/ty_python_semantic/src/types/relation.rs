@@ -415,6 +415,35 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _| true,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn is_assignable_to_cached<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+        ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
+            source
+                .has_relation_to(
+                    db,
+                    target,
+                    &constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::Assignability,
+                )
+                .is_always_satisfied(db)
+        }
+
+        if inferable == InferableTypeVars::None {
+            return ConstraintSet::from_bool(
+                constraints,
+                is_assignable_to_cached(db, self, target),
+            );
+        }
+
         self.has_relation_to(
             db,
             target,

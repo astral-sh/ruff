@@ -438,15 +438,24 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
-        Self::from_typevar_instances(
-            db,
-            self.variables(db).filter(|bound_typevar| {
-                !(bound_typevar.typevar(db).is_self(db)
-                    && binding_context.is_none_or(|binding_context| {
-                        bound_typevar.binding_context(db) == binding_context
-                    }))
-            }),
-        )
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn remove_self_inner<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+            binding_context: Option<BindingContext<'db>>,
+        ) -> GenericContext<'db> {
+            GenericContext::from_typevar_instances(
+                db,
+                generic_context.variables(db).filter(|bound_typevar| {
+                    !(bound_typevar.typevar(db).is_self(db)
+                        && binding_context.is_none_or(|binding_context| {
+                            bound_typevar.binding_context(db) == binding_context
+                        }))
+                }),
+            )
+        }
+
+        remove_self_inner(db, self, binding_context)
     }
 
     /// Returns the typevars that are inferable in this generic context. This set might include
