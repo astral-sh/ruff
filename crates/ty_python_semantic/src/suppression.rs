@@ -627,7 +627,7 @@ impl<'a> SuppressionsBuilder<'a> {
         let is_own_line_comment = indentation_at_offset(comment_token_start, self.source).is_some();
         let is_own_line_suppression = !comment.kind().is_type_ignore() && is_own_line_comment;
         let line_range = if is_own_line_comment {
-            TextRange::new(comment_token_start, line_range.end())
+            TextRange::new(comment.range().start(), line_range.end())
         } else {
             line_range
         };
