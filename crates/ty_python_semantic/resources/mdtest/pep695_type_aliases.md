@@ -643,6 +643,55 @@ type Right[T] = tuple[Right[list[T]]]
 static_assert(not is_subtype_of(Left[int], Right[int]))
 ```
 
+### Recursive alias relations that reach an exact cycle
+
+Different specializations of the same recursive aliases are explored until the relation returns to
+an exact pair.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Left[T] = tuple[T] | tuple[T, Left[int]]
+type Right[T] = tuple[T] | tuple[T, Right[int]]
+
+static_assert(is_subtype_of(Left[str], Right[str]))
+static_assert(is_subtype_of(Right[str], Left[str]))
+static_assert(not is_subtype_of(Left[int], Right[str]))
+
+def _(left: Left[str], right: Right[str]):
+    right = left
+    left = right
+
+type Left10[A, B, C, D, E, F, G, H, I, J] = tuple[A, Left10[B, C, D, E, F, G, H, I, J, None]]
+type Right10[A, B, C, D, E, F, G, H, I, J] = tuple[A, Right10[B, C, D, E, F, G, H, I, J, None]]
+
+type Left11[A, B, C, D, E, F, G, H, I, J, K] = tuple[A, Left11[B, C, D, E, F, G, H, I, J, K, None]]
+type Right11[A, B, C, D, E, F, G, H, I, J, K] = tuple[A, Right11[B, C, D, E, F, G, H, I, J, K, None]]
+
+# The tenth expansion reaches the all-`None` specialization, whose next expansion is exact.
+static_assert(
+    is_subtype_of(
+        Left10[int, int, int, int, int, int, int, int, int, int],
+        Right10[int, int, int, int, int, int, int, int, int, int],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        Left10[int, int, int, int, int, int, int, int, int, int],
+        Right10[int, int, int, int, str, int, int, int, int, int],
+    )
+)
+
+# Reaching the same specialization requires an eleventh expansion, so the result is conservative.
+static_assert(
+    not is_subtype_of(
+        Left11[int, int, int, int, int, int, int, int, int, int, int],
+        Right11[int, int, int, int, int, int, int, int, int, int, int],
+    )
+)
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.
