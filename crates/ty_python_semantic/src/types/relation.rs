@@ -956,13 +956,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         match self
             .relation_visitor
-            .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
+            .entry(db, (source, target, self.relation, self.typevar_evaluation))
         {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(item) => self.recursive_type_pair_fallback(item.0, item.1),
-            CycleDetectorVisit::Pending(item) => {
+            CycleDetectorVisit::Pending(entry) => {
                 let result = work();
-                self.relation_visitor.finish_visit(item, result)
+                entry.finish(result)
             }
         }
     }

@@ -26,6 +26,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
 
+use drop_bomb::DebugDropBomb;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
@@ -147,17 +148,21 @@ where
 {
     #[inline]
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.begin_visit(db, item) {
+        match self.entry(db, item) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
-            CycleDetectorVisit::Pending(item) => {
+            CycleDetectorVisit::Pending(entry) => {
                 let result = compute();
-                self.finish_visit(item, result)
+                entry.finish(result)
             }
         }
     }
 
-    pub(crate) fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+    pub(super) fn entry(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+    ) -> CycleDetectorVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -174,11 +179,15 @@ where
         drop(seen);
 
         self.seen.borrow_mut().push(item.clone());
-        CycleDetectorVisit::Pending(item)
+        CycleDetectorVisit::Pending(CycleDetectorPendingVisit {
+            detector: self,
+            item,
+            bomb: DebugDropBomb::new("Pending cycle-detector visits must be finished."),
+        })
     }
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
-    pub(crate) fn finish_visit(&self, item: T, result: R) -> R {
+    fn finish_visit(&self, item: T, result: R) -> R {
         let active = self.seen.borrow_mut().pop();
         debug_assert!(active.as_ref().is_some_and(|active| active == &item));
         self.cache
@@ -189,13 +198,43 @@ where
 }
 
 /// Result of starting a cycle-detector visit.
-pub(crate) enum CycleDetectorVisit<T, R> {
+pub(super) enum CycleDetectorVisit<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
+where
+    T: HasIdentity<'db>,
+{
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
     Cycle(T),
-    /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
-    Pending(T),
+    /// The caller should compute the result and finish the pending visit.
+    Pending(CycleDetectorPendingVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>),
+}
+
+/// A pending cycle-detector visit that must be completed with [`Self::finish`].
+#[must_use = "pending cycle-detector visits must be finished"]
+pub(super) struct CycleDetectorPendingVisit<
+    'a,
+    'db,
+    Tag,
+    T: HasIdentity<'db>,
+    R,
+    const INLINE_CAPACITY: usize,
+> {
+    detector: &'a CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>,
+    item: T,
+    bomb: DebugDropBomb,
+}
+
+impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
+    CycleDetectorPendingVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+{
+    /// Finishes the visit and caches its result.
+    pub(super) fn finish(mut self, result: R) -> R {
+        self.bomb.defuse();
+        self.detector.finish_visit(self.item, result)
+    }
 }
 
 /// Guards recursive type transformations.
@@ -451,5 +490,15 @@ mod tests {
             detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
             10
         );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "Pending cycle-detector visits must be finished.")]
+    fn pending_visit_must_be_finished() {
+        let db = setup_db();
+        let detector = Detector::new(0);
+
+        let _pending = detector.entry(&db, 1);
     }
 }
