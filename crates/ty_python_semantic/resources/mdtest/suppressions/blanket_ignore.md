@@ -70,3 +70,12 @@ A blanket ignore can be suppressed by a code-specific ignore:
 ```py
 a = unresolved  # ty: ignore # ty: ignore[blanket-ignore-comment]
 ```
+
+An own-line `blanket-ignore-comment` suppression also covers a blanket ignore on the following
+logical line.
+
+```py
+def f():
+    # ty: ignore[blanket-ignore-comment]
+    return missing  # ty: ignore
+```
