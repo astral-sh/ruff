@@ -1076,6 +1076,12 @@ def correlated_typevar_eq(value: E, other: EnumT) -> EnumT:
         reveal_type(value)  # revealed: EnumT@correlated_typevar_eq
         return value
     return other
+
+def correlated_typevar_ne(value: E, other: EnumT) -> EnumT:
+    if value != other:
+        return other
+    reveal_type(value)  # revealed: EnumT@correlated_typevar_ne
+    return value
 ```
 
 ## `LiteralString` and string-valued enums
