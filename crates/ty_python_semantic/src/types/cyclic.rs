@@ -27,7 +27,6 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
 
-use drop_bomb::DebugDropBomb;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
@@ -151,21 +150,38 @@ where
 {
     #[inline]
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.entry(db, item) {
+        match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
-            CycleDetectorVisit::Pending(entry) => {
+            CycleDetectorVisit::Pending(item) => {
                 let result = compute();
-                entry.finish(result)
+                self.finish_visit(item, result)
             }
         }
     }
 
-    pub(super) fn entry(
+    /// Visits `item`, returning it in `Err` if another active item has the same identity.
+    ///
+    /// The caller must convert `Err(item)` into an operation-specific conservative result. An
+    /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    #[inline]
+    pub(super) fn try_visit(
         &self,
         db: &'db dyn Db,
         item: T,
-    ) -> CycleDetectorVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY> {
+        compute: impl FnOnce() -> R,
+    ) -> Result<R, T> {
+        match self.begin_visit(db, item) {
+            CycleDetectorVisit::Ready(result) => Ok(result),
+            CycleDetectorVisit::Cycle(item) => Err(item),
+            CycleDetectorVisit::Pending(item) => {
+                let result = compute();
+                Ok(self.finish_visit(item, result))
+            }
+        }
+    }
+
+    fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -185,11 +201,7 @@ where
             item: item.clone(),
             identity,
         });
-        CycleDetectorVisit::Pending(CycleDetectorPendingVisit {
-            detector: self,
-            item,
-            bomb: DebugDropBomb::new("Pending cycle-detector visits must be finished."),
-        })
+        CycleDetectorVisit::Pending(item)
     }
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
@@ -215,43 +227,13 @@ impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVi
 }
 
 /// Result of starting a cycle-detector visit.
-pub(super) enum CycleDetectorVisit<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
-where
-    T: HasIdentity<'db>,
-{
+pub(super) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
     Cycle(T),
     /// The caller should compute the result and finish the pending visit.
-    Pending(CycleDetectorPendingVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>),
-}
-
-/// A pending cycle-detector visit that must be completed with [`Self::finish`].
-#[must_use = "pending cycle-detector visits must be finished"]
-pub(super) struct CycleDetectorPendingVisit<
-    'a,
-    'db,
-    Tag,
-    T: HasIdentity<'db>,
-    R,
-    const INLINE_CAPACITY: usize,
-> {
-    detector: &'a CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>,
-    item: T,
-    bomb: DebugDropBomb,
-}
-
-impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetectorPendingVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY>
-where
-    T: Hash + Eq + Clone + HasIdentity<'db>,
-{
-    /// Finishes the visit and caches its result.
-    pub(super) fn finish(mut self, result: R) -> R {
-        self.bomb.defuse();
-        self.detector.finish_visit(self.item, result)
-    }
+    Pending(T),
 }
 
 /// Guards recursive type transformations.
@@ -553,38 +535,33 @@ mod tests {
         let db = setup_db();
         let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
 
-        let CycleDetectorVisit::Pending(pending) = detector.entry(&db, ConstantIdentityItem(1))
+        let CycleDetectorVisit::Pending(pending) =
+            detector.begin_visit(&db, ConstantIdentityItem(1))
         else {
             panic!("the first identity should be pending");
         };
-        let CycleDetectorVisit::Cycle(item) = detector.entry(&db, ConstantIdentityItem(2)) else {
+        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(&db, ConstantIdentityItem(2))
+        else {
             panic!("a different item with the same identity should form a cycle");
         };
         assert_eq!(item.0, 2);
-        pending.finish(1);
+        detector.finish_visit(pending, 1);
 
-        let CycleDetectorVisit::Ready(seen) = detector.entry(&db, ConstantIdentityItem(1)) else {
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&db, ConstantIdentityItem(1))
+        else {
             panic!("the first identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 1);
-        let CycleDetectorVisit::Pending(pending) = detector.entry(&db, ConstantIdentityItem(2))
+        let CycleDetectorVisit::Pending(pending) =
+            detector.begin_visit(&db, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be pending after the first is finished");
         };
-        pending.finish(2);
-        let CycleDetectorVisit::Ready(seen) = detector.entry(&db, ConstantIdentityItem(2)) else {
+        detector.finish_visit(pending, 2);
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&db, ConstantIdentityItem(2))
+        else {
             panic!("the second identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 2);
-    }
-
-    #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "Pending cycle-detector visits must be finished.")]
-    fn pending_visit_must_be_finished() {
-        let db = setup_db();
-        let detector = Detector::new(0);
-
-        let _pending = detector.entry(&db, 1);
     }
 }

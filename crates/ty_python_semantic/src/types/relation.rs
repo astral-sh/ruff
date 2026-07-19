@@ -9,7 +9,7 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -954,17 +954,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        match self
-            .relation_visitor
-            .entry(db, (source, target, self.relation, self.typevar_evaluation))
-        {
-            CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(item) => self.recursive_type_pair_fallback(item.0, item.1),
-            CycleDetectorVisit::Pending(entry) => {
-                let result = work();
-                entry.finish(result)
-            }
-        }
+        self.relation_visitor
+            .try_visit(
+                db,
+                (source, target, self.relation, self.typevar_evaluation),
+                work,
+            )
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
     }
 
     fn recursive_type_pair_fallback(
