@@ -88,6 +88,9 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
+    use ty_project::metadata::Options;
+    use ty_project::metadata::options::AnalysisOptions;
+    use ty_python_core::program::FallibleStrategy;
     use ty_python_core::ProgramFile;
     use ty_python_semantic::{
         default_lint_registry,
@@ -456,6 +459,27 @@ mod tests {
             test.code_actions_for("ignore-comment-unknown-rule")
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn add_code_inline_unknown_rule_ignore_with_type_ignores_disabled() {
+        let test = CodeActionTest::with_source_and_type_ignores(
+            r#"value = 1  # ty: ignore[<START>not-a-rule<END>]"#,
+            false,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:1:25
+          |
+        1 | value = 1  # ty: ignore[not-a-rule]
+          |                         ^^^^^^^^^^
+          |
+          |
+          - value = 1  # ty: ignore[not-a-rule]
+        1 + value = 1  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+          |
+        ");
     }
 
     #[test]
@@ -1092,8 +1116,24 @@ mod tests {
 
     impl CodeActionTest {
         fn with_source(source: &str) -> Self {
-            let mut db =
-                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
+            Self::with_source_and_type_ignores(source, true)
+        }
+
+        fn with_source_and_type_ignores(source: &str, respect_type_ignores: bool) -> Self {
+            let project = ProjectMetadata::from_options(
+                Options {
+                    analysis: Some(AnalysisOptions {
+                        respect_type_ignore_comments: Some(respect_type_ignores),
+                        ..AnalysisOptions::default()
+                    }),
+                    ..Options::default()
+                },
+                SystemPathBuf::from("/"),
+                None,
+                &FallibleStrategy,
+            )
+            .unwrap();
+            let mut db = ty_project::TestDb::new(project);
 
             let mut cleansed = dedent(source).to_string();
 
