@@ -58,7 +58,9 @@ pub fn suppress_all(
                     lints.insert(id);
                     *suppressed_diagnostics += 1;
                 }
-                Some(SuppressionCommentFix::SameLine) => {
+                Some(
+                    SuppressionCommentFix::SameLine | SuppressionCommentFix::FileLevelSameLine,
+                ) => {
                     ids_with_suppression_range.push((
                         id,
                         diagnostic_range,
@@ -207,6 +209,7 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
                 return Some(add_line_local_suppression(&[id.name()], start));
             }
             SuppressionCommentFix::SameLine => {}
+            SuppressionCommentFix::FileLevelSameLine => return None,
         }
     }
 
@@ -234,6 +237,7 @@ pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRan
 enum SuppressionCommentFix {
     LineLocal(TextSize),
     SameLine,
+    FileLevelSameLine,
 }
 
 fn suppression_comment_fix(
@@ -252,13 +256,13 @@ fn suppression_comment_fix(
         return Some(SuppressionCommentFix::SameLine);
     }
 
-    // A suppression before the first non-trivia token is file-level, so adding one there would
-    // affect diagnostics throughout the file.
+    // A suppression before the first non-trivia token is file-level, so bulk fixes append a
+    // ty-specific suppression on the same line instead of prepending a line-local one.
     if suppressions(db, file)
         .first_non_trivia_token
         .is_none_or(|start| comment.start() < start)
     {
-        return None;
+        return Some(SuppressionCommentFix::FileLevelSameLine);
     }
 
     let before_diagnostic = &source[TextRange::new(comment.start(), range.start())];

@@ -1645,31 +1645,43 @@ class B(A):
     }
 
     #[test]
-    fn add_ignore_preserves_shebang_suppression() {
+    fn add_ignore_updates_file_level_suppression_comments() {
         assert_snapshot!(
             suppress_all_in(r#"
-                #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
+                # ty: ignore[not-a-rule]
+                # ty: ignore[*-*]
                 value = 1
                 "#),
             @"
-        Added 0 suppressions
+        Added 2 suppressions
 
         ## Fixed source
 
         ```py
-        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
+        # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
         value = 1
         ```
+        "
+        );
+    }
 
-        ## Diagnostics after applying fixes
+    #[test]
+    fn add_ignore_preserves_shebang_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+                value = 1
+                "#),
+            @"
+        Added 2 suppressions
 
-        warning[ignore-comment-unknown-rule]: Unknown rule `not-a-rule`
-         --> test.py:1:43
-          |
-        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
-          |                                           ^^^^^^^^^^
-        2 | value = 1
-          |
+        ## Fixed source
+
+        ```py
+        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]  # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
+        value = 1
+        ```
         "
         );
     }
