@@ -1377,7 +1377,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
         value = 1
         ```
         "
@@ -1396,7 +1396,7 @@ class B(A):
         ## Fixed source
 
         ```py
-        value = missing  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]
+        value = missing  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]
         ```
         "
         );
@@ -1418,9 +1418,9 @@ class B(A):
 
         ```py
         seen_code = True
-        items = []  # type: list[int]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
-        invalid = []  # type: list[str]  # type:ignore[ty:invalid-ignore-comment]  # ty: ignore[*-*]
-        value = "x"  # type: ignore[assignment]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule]
+        items = []  # type: list[int]  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        invalid = []  # type: list[str]  # type:ignore[ty:invalid-ignore-comment, unused-ignore]  # ty: ignore[*-*]
+        value = "x"  # type: ignore[assignment]  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[another-not-a-rule]
         ```
         "#
         );
@@ -1441,7 +1441,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1491,7 +1491,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        # type:ignore[ty:invalid-ignore-comment, unused-ignore]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1513,8 +1513,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
-        value = 1  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule]
+        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        value = 1  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[another-not-a-rule]
         ```
         "
         );
