@@ -187,10 +187,12 @@ def parse_run_reference(value: str) -> tuple[int, int | None]:
     raise MetadataError(f"invalid Actions run ID or URL: {value}")
 
 
-def job_by_name(jobs: Sequence[dict[str, Any]], name: str) -> dict[str, Any]:
-    matches = [job for job in jobs if job.get("name") == name]
+def build_job(jobs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    matches = [
+        job for job in jobs if job.get("name") in {"Build ty", "Build ty (base)"}
+    ]
     if len(matches) != 1:
-        raise MetadataError(f"expected exactly one {name!r} job")
+        raise MetadataError("expected exactly one 'Build ty' or 'Build ty (base)' job")
     return matches[0]
 
 
@@ -241,7 +243,7 @@ def collect_metadata(
     jobs = run_data.get("jobs")
     if not isinstance(jobs, list):
         raise MetadataError("the Actions run did not include job metadata")
-    build_job = job_by_name(jobs, "Build ty")
+    selected_build_job = build_job(jobs)
     shard_job = first_shard_job(jobs)
 
     def job_log(job: dict[str, Any]) -> str:
@@ -261,7 +263,7 @@ def collect_metadata(
             ]
         )
 
-    merge_base, pr_revision = parse_build_log(job_log(build_job))
+    merge_base, pr_revision = parse_build_log(job_log(selected_build_job))
     exclude_newer, analyzer_revision, shard_merge_base = parse_shard_log(
         job_log(shard_job)
     )
