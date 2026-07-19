@@ -330,7 +330,9 @@ pub(crate) struct Suppressions {
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
-    /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
+    /// The suppressions are indexed by [`Suppression::suppressed_range`] and sorted by interval
+    /// start. A nested `type: ignore` can cover an earlier sub-comment on the same line, so this
+    /// order isn't necessarily source order.
     /// Their range ends aren't necessarily sorted because own-line suppressions can be nested:
     ///
     /// ```py
@@ -604,6 +606,8 @@ impl<'a> SuppressionsBuilder<'a> {
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
+        self.inline
+            .sort_by_key(|suppression| suppression.suppressed_range.start());
 
         Suppressions {
             first_non_trivia_token: self.first_non_trivia_token,
@@ -630,10 +634,7 @@ impl<'a> SuppressionsBuilder<'a> {
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
         } else if is_own_line_suppression {
-            TextRange::new(
-                line_range.start(),
-                own_line_suppression_range(comment.range(), tokens).end(),
-            )
+            own_line_suppression_range(comment.range(), tokens)
         } else {
             line_range
         };
@@ -692,7 +693,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 && is_suppression_comment_lint(lint.name())
                                 && lint.name() != UNUSED_IGNORE_COMMENT.name()
                             {
-                                line_range
+                                TextRange::new(comment.range().start(), line_range.end())
                             } else {
                                 suppressed_range
                             };

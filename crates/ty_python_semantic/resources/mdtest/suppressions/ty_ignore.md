@@ -414,6 +414,16 @@ def f():
     value = 1
 ```
 
+A later blanket `ty: ignore` does not suppress a malformed earlier sub-comment.
+
+```py
+def f():
+    # error: [ignore-comment-unknown-rule]
+    # error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
+    # ty: ignore[not-a-rule] # ty: ignore
+    value = 1
+```
+
 ## Extra whitespace in type ignore comments is allowed
 
 ```py
