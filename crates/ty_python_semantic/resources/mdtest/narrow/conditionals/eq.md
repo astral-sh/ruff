@@ -1042,7 +1042,8 @@ Equality analysis expands the constraints of a constrained type variable in eith
 The resulting constraint is intersected with the type variable, preserving its identity:
 
 ```py
-from typing import TypeVar, final
+from enum import Enum
+from typing import Literal, TypeVar, final
 
 @final
 class ConstraintA: ...
@@ -1063,6 +1064,18 @@ def constrained_right(value: ConstraintA | None, other: T):
         pass
     else:
         reveal_type(value)  # revealed: ConstraintA
+
+class E(Enum):
+    A = 1
+    B = 2
+
+EnumT = TypeVar("EnumT", Literal[E.A], Literal[E.B])
+
+def correlated_typevar_eq(value: E, other: EnumT) -> EnumT:
+    if value == other:
+        reveal_type(value)  # revealed: EnumT@correlated_typevar_eq
+        return value
+    return other
 ```
 
 ## `LiteralString` and string-valued enums
