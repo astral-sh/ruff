@@ -624,8 +624,13 @@ impl<'a> SuppressionsBuilder<'a> {
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = self.first_non_trivia_token.is_none();
         let comment_token_start = tokens.token_range(comment.range().start()).start();
-        let is_own_line_suppression = !comment.kind().is_type_ignore()
-            && indentation_at_offset(comment_token_start, self.source).is_some();
+        let is_own_line_comment = indentation_at_offset(comment_token_start, self.source).is_some();
+        let is_own_line_suppression = !comment.kind().is_type_ignore() && is_own_line_comment;
+        let line_range = if is_own_line_comment {
+            TextRange::new(comment_token_start, line_range.end())
+        } else {
+            line_range
+        };
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())

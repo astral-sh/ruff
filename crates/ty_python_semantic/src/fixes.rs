@@ -1525,6 +1525,40 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_handles_indented_mixed_type_ignore() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f():
+                    # type: ignore[ty:division-by-zero, ty:not-a-rule]
+                    value = 1
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f():
+            # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
+            value = 1
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
+         --> test.py:2:62
+          |
+        1 | def f():
+        2 |     # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
+          |                                                              ^^^^^^^^^^^^^^^^^^^
+        3 |     value = 1
+          |
+        help: Remove the unused suppression code
+        "
+        );
+    }
+
+    #[test]
     fn add_ignore_deduplicates_nested_suppression_comments() {
         assert_snapshot!(
             suppress_all_in(r#"
