@@ -80,8 +80,6 @@ pub fn goto_implementation(
         .with_min_len(minimum_job_len)
         .map_with_db(db, |db, (index, file)| {
             let definitions = finder.implementations_for_file(db, file);
-            // Definitions borrow this worker's Salsa database, so convert them to lifetime-free
-            // navigation targets before returning from the job.
             (
                 index,
                 definitions_to_implementation_targets(db, definitions),
@@ -698,6 +696,83 @@ mod tests {
         4 |
         5 | class Dog(Animal):
         6 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_classmethod_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                @classmethod
+                def speak(cls): ...
+
+                @classmethod
+                def call(cls):
+                    cls.speak<CURSOR>()
+
+            class Dog(Animal):
+                @classmethod
+                def speak(cls): ...
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:8:13
+          |
+        8 |         cls.speak()
+          |             ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+          --> main.py:4:9
+           |
+         4 |     def speak(cls): ...
+           |         -----
+           |
+          ::: main.py:12:9
+           |
+        12 |     def speak(cls): ...
+           |         -----
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_typevar_bound_class_object_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                @classmethod
+                def speak(cls): ...
+
+            class Dog(Animal):
+                @classmethod
+                def speak(cls): ...
+
+            def f[T: Animal](cls: type[T]):
+                cls.speak<CURSOR>()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:11:9
+           |
+        11 |     cls.speak()
+           |         ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:4:9
+          |
+        4 |     def speak(cls): ...
+          |         -----
+        5 |
+        6 | class Dog(Animal):
+        7 |     @classmethod
+        8 |     def speak(cls): ...
           |         -----
           |
         ");

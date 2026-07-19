@@ -960,6 +960,11 @@ fn collect_implementation_root_classes<'db>(
             }
             None => {}
         },
+        Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
+            // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
+            // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
+            collect_implementation_root_classes(db, subclass_of.to_instance(db), seen, roots);
+        }
         ty => {
             // `dog: Dog` maps directly to the `Dog` class root.
             let root = match ty {
