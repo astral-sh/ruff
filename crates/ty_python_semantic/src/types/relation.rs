@@ -874,6 +874,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    /// Checks class subtyping without discarding the active recursive relation state.
+    pub(super) fn is_class_subtype(
+        &self,
+        db: &'db dyn Db,
+        source: ClassType<'db>,
+        target: ClassType<'db>,
+    ) -> bool {
+        Self::subtyping(
+            self.constraints,
+            InferableTypeVars::None,
+            self.relation_visitor,
+            self.disjointness_visitor,
+            self.signature_relation_visitor,
+            self.materialization_visitor,
+        )
+        .check_class_pair(db, source, target)
+        .is_always_satisfied(db)
+    }
+
     pub(super) const fn is_eager_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
@@ -970,15 +989,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
-            // TODO: Recursive aliases can encode context-free languages, whose inclusion and
-            // equivalence are undecidable. No complete fallback exists, but more decidable cases
-            // can be recognized here before conservatively rejecting the pair.
+        if matches!(
+            (source, target),
+            (Type::TypeAlias(_), Type::TypeAlias(_))
+                | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
+                | (Type::TypedDict(_), Type::TypedDict(_))
+        ) {
+            // TODO: Recursively-specialized structural types can encode context-free languages,
+            // whose inclusion and equivalence are undecidable. No complete fallback exists, but
+            // more decidable cases can be recognized here before conservatively rejecting the pair.
             return self.never();
         }
 
-        // Mixed recursive cycles (for example, alias vs. protocol) keep the existing coinductive
-        // fallback. Alias pairs are rejected above instead of generating another recursive
+        // Mixed recursive cycles keep the existing coinductive fallback. Pairs of the same
+        // recursively structural kind are rejected above instead of generating another recursive
         // obligation.
         self.always()
     }

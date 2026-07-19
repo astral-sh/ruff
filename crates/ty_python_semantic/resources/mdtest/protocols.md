@@ -5294,6 +5294,61 @@ class Bar(Protocol):
 static_assert(is_equivalent_to(Foo, Bar))
 ```
 
+### Recursively-specialized generic protocols
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class LeftProtocol[T](Protocol):
+    child: LeftAlias[list[T]]
+
+class RightProtocol[T](Protocol):
+    child: RightAlias[list[T]]
+
+class DifferentProtocol[T](Protocol):
+    child: DifferentProtocol[set[T]]
+
+type LeftAlias[T] = LeftProtocol[T]
+type RightAlias[T] = RightProtocol[T]
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(LeftProtocol[int], RightProtocol[int]))
+static_assert(not is_subtype_of(LeftAlias[int], RightAlias[int]))
+# A conservative cycle fallback must not accept structurally different recursive protocols.
+static_assert(not is_subtype_of(LeftProtocol[int], DifferentProtocol[int]))
+
+class FiniteLeft[T](Protocol):
+    value: T
+
+class FiniteRight[T](Protocol):
+    value: T
+
+# Reusing a non-recursive protocol at a finite nesting depth is not a recursive definition.
+static_assert(is_subtype_of(FiniteLeft[FiniteLeft[int]], FiniteRight[FiniteRight[int]]))
+static_assert(not is_subtype_of(FiniteLeft[FiniteLeft[int]], FiniteRight[FiniteRight[str]]))
+
+class ProtocolBox[T](Protocol):
+    value: T
+
+class NestedLeftProtocol[T](Protocol):
+    child: ProtocolBox[ProtocolBox[NestedLeftProtocol[list[T]]]]
+
+class NestedRightProtocol[T](Protocol):
+    child: ProtocolBox[ProtocolBox[NestedRightProtocol[list[T]]]]
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
+```
+
 ### Disjointness of recursive protocol and recursive final type
 
 ```py

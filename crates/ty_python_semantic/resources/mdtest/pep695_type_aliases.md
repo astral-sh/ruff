@@ -641,6 +641,14 @@ type Right[T] = tuple[Right[list[T]]]
 
 # TODO: Left[int] should be equivalent to (subtype of) Right[int]
 static_assert(not is_subtype_of(Left[int], Right[int]))
+
+type Box[T] = list[T]
+type WrappedLeft[T] = tuple[Box[Box[WrappedLeft[list[T]]]]]
+type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
+
+# A repeated non-recursive alias must not hide the recursive reference in its type arguments.
+# TODO: WrappedLeft[int] should be equivalent to (subtype of) WrappedRight[int]
+static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
 ### Non-recursive nested generic aliases

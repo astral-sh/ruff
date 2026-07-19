@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
@@ -31,6 +31,7 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
+        generics::Specialization,
         signatures::walk_signature,
     },
 };
@@ -73,6 +74,107 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
         cached_protocol_interface(db, *self)
+    }
+
+    /// Walk the effective non-method member types declared by this protocol.
+    ///
+    /// Method relations have their own declaration-based recursion guard. Keeping them out of this
+    /// walk also avoids requesting a method signature while one of its annotations is being
+    /// inferred.
+    pub(super) fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
+        self,
+        db: &'db dyn Db,
+        visitor: &V,
+    ) {
+        let mut seen_members = FxHashSet::default();
+
+        self.for_each_member_candidate(db, |name, candidate, specialization| {
+            if !seen_members.insert(name.clone()) {
+                return;
+            }
+            let candidate = candidate.apply_specialization(db, specialization);
+            if candidate.is_bound_method_like(db) {
+                return;
+            }
+            visitor.visit_type(db, candidate.ty);
+        });
+    }
+
+    /// Visits protocol member candidates in MRO order after applying declaration precedence.
+    ///
+    /// Consumers discard shadowed names before applying the accompanying specialization.
+    fn for_each_member_candidate(
+        self,
+        db: &'db dyn Db,
+        mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
+    ) {
+        for (parent_scope, specialization) in self
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(|class| {
+                let (class_literal, specialization) = class.static_class_literal(db)?;
+                let protocol_class = class_literal.into_protocol_class(db)?;
+                Some((
+                    protocol_class.static_class_literal(db)?.0.body_scope(db),
+                    specialization,
+                ))
+            })
+        {
+            let use_def_map = use_def_map(db, parent_scope);
+            let place_table = place_table(db, parent_scope);
+            let mut direct_members = FxHashMap::default();
+
+            // Bindings that are not declared in the class body are invalid protocol members, but
+            // runtime-checkable protocols still consider them members for `isinstance()` and
+            // `issubclass()`.
+            for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
+                let place_and_definition = place_from_bindings(db, bindings);
+                if let Some(ty) = place_and_definition.place.ignore_possibly_undefined() {
+                    direct_members.insert(
+                        symbol_id,
+                        ProtocolMemberCandidate {
+                            ty,
+                            qualifiers: TypeQualifiers::default(),
+                            definition: place_and_definition.first_definition,
+                            bound_on_class: BoundOnClass::Yes,
+                        },
+                    );
+                }
+            }
+
+            for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+                let place_result = place_from_declarations(db, declarations);
+                let first_declaration = place_result.first_declaration;
+                let place = place_result.ignore_conflicting_declarations();
+                if let Some(ty) = place.place.ignore_possibly_undefined() {
+                    direct_members
+                        .entry(symbol_id)
+                        .and_modify(|candidate| {
+                            candidate.ty = ty;
+                            candidate.qualifiers = place.qualifiers;
+                        })
+                        .or_insert(ProtocolMemberCandidate {
+                            ty,
+                            qualifiers: place.qualifiers,
+                            definition: first_declaration,
+                            bound_on_class: BoundOnClass::No,
+                        });
+                }
+            }
+
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "member names are unique within each class and both consumers are order-independent"
+            )]
+            for (symbol_id, candidate) in direct_members {
+                let name = place_table.symbol(symbol_id).name();
+                if excluded_from_proto_members(name) {
+                    continue;
+                }
+
+                visit(name, candidate, specialization);
+            }
+        }
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
@@ -2835,6 +2937,34 @@ impl BoundOnClass {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+struct ProtocolMemberCandidate<'db> {
+    ty: Type<'db>,
+    qualifiers: TypeQualifiers,
+    definition: Option<Definition<'db>>,
+    bound_on_class: BoundOnClass,
+}
+
+impl<'db> ProtocolMemberCandidate<'db> {
+    fn apply_specialization(
+        mut self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        self.ty = self.ty.apply_optional_specialization(db, specialization);
+        self
+    }
+
+    fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
+        self.bound_on_class.is_yes()
+            && match self.ty {
+                Type::FunctionLiteral(_) => true,
+                Type::Callable(callable) => callable.is_method_like(db),
+                _ => false,
+            }
+    }
+}
+
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
@@ -2848,118 +2978,54 @@ fn cached_protocol_interface<'db>(
 ) -> ProtocolInterface<'db> {
     let mut members = BTreeMap::default();
 
-    for (parent_scope, specialization) in class
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|class| {
-            let (class_literal, specialization) = class.static_class_literal(db)?;
-            let protocol_class = class_literal.into_protocol_class(db)?;
-            let parent_scope = protocol_class.static_class_literal(db)?.0.body_scope(db);
-            Some((parent_scope, specialization))
-        })
-    {
-        let use_def_map = use_def_map(db, parent_scope);
-        let place_table = place_table(db, parent_scope);
-        let mut direct_members = FxHashMap::default();
-
-        // Bindings in the class body that are not declared in the class body
-        // are not valid protocol members, and we plan to emit diagnostics for them
-        // elsewhere. Invalid or not, however, it's important that we still consider
-        // them to be protocol members. The implementation of `issubclass()` and
-        // `isinstance()` for runtime-checkable protocols considers them to be protocol
-        // members at runtime, and it's important that we accurately understand
-        // type narrowing that uses `isinstance()` or `issubclass()` with
-        // runtime-checkable protocols.
-        for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-            let place_and_definition = place_from_bindings(db, bindings);
-            let Some(ty) = place_and_definition.place.ignore_possibly_undefined() else {
-                continue;
-            };
-            direct_members.insert(
-                symbol_id,
-                (
-                    ty,
-                    TypeQualifiers::default(),
-                    place_and_definition.first_definition,
-                    BoundOnClass::Yes,
-                ),
-            );
+    ProtocolClass(class).for_each_member_candidate(db, |name, candidate, specialization| {
+        if members.contains_key(name) {
+            return;
         }
 
-        for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-            let place_result = place_from_declarations(db, declarations);
-            let first_declaration = place_result.first_declaration;
-            let place = place_result.ignore_conflicting_declarations();
-            if let Some(new_type) = place.place.ignore_possibly_undefined() {
-                direct_members
-                    .entry(symbol_id)
-                    .and_modify(|(ty, quals, _, _)| {
-                        *ty = new_type;
-                        *quals = place.qualifiers;
-                    })
-                    .or_insert((
-                        new_type,
-                        place.qualifiers,
-                        first_declaration,
-                        BoundOnClass::No,
-                    ));
+        let candidate = candidate.apply_specialization(db, specialization);
+        let ProtocolMemberCandidate {
+            ty,
+            qualifiers,
+            definition,
+            bound_on_class,
+        } = candidate;
+
+        let member = match ty {
+            Type::PropertyInstance(property) => ProtocolMemberData::property(
+                property.getter(db).map(ProtocolMemberType::property_getter),
+                property
+                    .setter(db)
+                    .map(ProtocolMemberType::property_setter)
+                    .map(ProtocolMemberWrite::from_type),
+                definition,
+            ),
+            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
+                ProtocolMemberData::method(db, callable, definition)
             }
-        }
-
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "direct members have unique names and the final map is ordered"
-        )]
-        for (symbol_id, (ty, qualifiers, definition, bound_on_class)) in direct_members {
-            let name = place_table.symbol(symbol_id).name();
-            if excluded_from_proto_members(name) {
-                continue;
+            Type::FunctionLiteral(function)
+                if bound_on_class.is_yes()
+                    || function.is_staticmethod(db)
+                    || function.is_classmethod(db) =>
+            {
+                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
             }
-            if members.contains_key(name) {
-                continue;
+            _ if bound_on_class.is_yes()
+                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
+            {
+                if let Some(descriptor) =
+                    descriptor_decorated_protocol_member(db, ty, class, definition)
+                {
+                    descriptor
+                } else {
+                    ProtocolMemberData::attribute(ty, qualifiers, definition)
+                }
             }
+            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+        };
 
-            let ty = ty.apply_optional_specialization(db, specialization);
-
-            let member = match ty {
-                Type::PropertyInstance(property) => ProtocolMemberData::property(
-                    property.getter(db).map(ProtocolMemberType::property_getter),
-                    property
-                        .setter(db)
-                        .map(ProtocolMemberType::property_setter)
-                        .map(ProtocolMemberWrite::from_type),
-                    definition,
-                ),
-                Type::Callable(callable)
-                    if bound_on_class.is_yes() && callable.is_method_like(db) =>
-                {
-                    ProtocolMemberData::method(db, callable, definition)
-                }
-                Type::FunctionLiteral(function)
-                    if bound_on_class.is_yes()
-                        || function.is_staticmethod(db)
-                        || function.is_classmethod(db) =>
-                {
-                    ProtocolMemberData::method(db, function.into_callable_type(db), definition)
-                }
-                _ if bound_on_class.is_yes()
-                    && definition
-                        .is_some_and(|definition| definition.kind(db).is_function_def()) =>
-                {
-                    if let Some(descriptor) =
-                        descriptor_decorated_protocol_member(db, ty, class, definition)
-                    {
-                        descriptor
-                    } else {
-                        ProtocolMemberData::attribute(ty, qualifiers, definition)
-                    }
-                }
-                _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
-            };
-
-            members.insert(name.clone(), member);
-        }
-    }
+        members.insert(name.clone(), member);
+    });
 
     ProtocolInterface::new(db, members)
 }

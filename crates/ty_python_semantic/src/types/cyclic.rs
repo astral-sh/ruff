@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -32,15 +32,19 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::Db;
-use crate::types::Type;
 use crate::types::function::FunctionLiteral;
+use crate::types::generics::Specialization;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
+    RecursiveProtocol(Definition<'db>),
     RecursiveTypeAlias(Definition<'db>),
+    RecursiveTypedDict(Definition<'db>),
     NonRecursive(Type<'db>),
 }
 
@@ -67,8 +71,168 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) if alias.is_recursive(db) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
+            Type::ProtocolInstance(protocol) if protocol.is_recursive(db) => {
+                let class = protocol.class_origin()?;
+                let (origin, _) = class.static_class_literal(db)?;
+                let definition = origin.definition(db);
+                Some(TypeIdentity::RecursiveProtocol(definition))
+            }
+            Type::TypedDict(typed_dict) if typed_dict.is_recursive(db) => {
+                let definition = typed_dict.definition(db)?;
+                Some(TypeIdentity::RecursiveTypedDict(definition))
+            }
             _ => None,
         }
+    }
+}
+
+struct DefinitionReferenceVisitor<'db> {
+    target: Definition<'db>,
+    active_definitions: ActiveRecursionDetector<Definition<'db>>,
+    visited_types: TypeCollector<'db>,
+    found: Cell<bool>,
+}
+
+impl<'db> DefinitionReferenceVisitor<'db> {
+    /// Returns whether the definition represented by `ty` references `target`.
+    fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
+        let visitor = Self::new(target);
+        visitor.visit_definition_body(db, ty);
+        visitor.found.get()
+    }
+
+    fn new(target: Definition<'db>) -> Self {
+        Self {
+            target,
+            active_definitions: ActiveRecursionDetector::default(),
+            visited_types: TypeCollector::default(),
+            found: Cell::new(false),
+        }
+    }
+
+    fn definition_and_specialization(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(Definition<'db>, Option<Specialization<'db>>)> {
+        if let Type::TypeAlias(alias) = ty {
+            return Some((alias.definition(db), alias.specialization(db)));
+        }
+
+        let class = match ty {
+            Type::ProtocolInstance(protocol) => *protocol.class_origin()?,
+            Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
+            _ => return None,
+        };
+        let definition = class.definition(db)?;
+        let specialization = class
+            .into_generic_alias()
+            .map(|generic| generic.specialization(db));
+        Some((definition, specialization))
+    }
+
+    fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        for ty in specialization.types(db) {
+            self.visit_type(db, *ty);
+        }
+    }
+
+    fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
+            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(db, protocol),
+            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
+            _ => {}
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+
+        if let Some((definition, specialization)) = Self::definition_and_specialization(db, ty) {
+            if definition == self.target {
+                self.found.set(true);
+                return;
+            }
+
+            if let Some(specialization) = specialization {
+                self.visit_specialization(db, specialization);
+            }
+
+            if !self.found.get() {
+                self.active_definitions.visit(
+                    &definition,
+                    || {},
+                    || self.visit_definition_body(db, ty),
+                );
+            }
+        } else {
+            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        }
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        if let Some(class) = protocol.class_origin() {
+            class.walk_recursive_member_types(db, self);
+        }
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.visit_type(db, alias.raw_value_type(db));
+    }
+
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        for field in typed_dict.items(db).values() {
+            self.visit_type(db, field.declared_ty);
+        }
+        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+            self.visit_type(db, extra_items.declared_ty);
+        }
+    }
+}
+
+impl<'db> TypeAliasType<'db> {
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        DefinitionReferenceVisitor::references(db, Type::TypeAlias(self), self.definition(db))
+    }
+}
+
+impl<'db> ProtocolInstanceType<'db> {
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        let Some(class) = self.class_origin() else {
+            return false;
+        };
+        let Some((origin, _)) = class.static_class_literal(db) else {
+            return false;
+        };
+        let definition = origin.definition(db);
+        // Inspect the definition without its current specialization. Otherwise, a finite
+        // type such as `Protocol[Protocol[int]]` would appear recursive.
+        let unspecialized = Type::instance(db, ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(db, unspecialized, definition)
+    }
+}
+
+impl<'db> TypedDictType<'db> {
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        let Some(class) = self.defining_class() else {
+            return false;
+        };
+        let Some((origin, _)) = class.static_class_literal(db) else {
+            return false;
+        };
+        let definition = origin.definition(db);
+        // Inspect the definition without its current specialization for the same reason as
+        // protocols above.
+        let unspecialized = Type::typed_dict(ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(db, unspecialized, definition)
     }
 }
 
