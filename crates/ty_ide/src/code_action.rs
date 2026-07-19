@@ -343,7 +343,7 @@ mod tests {
           |
         1 |
           - value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
-        2 + value = missing  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
+        2 + value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]  # ty:ignore[ignore-comment-unknown-rule]
           |
         ");
     }
@@ -366,7 +366,7 @@ mod tests {
           |
         1 |
           - items = []  # type: list[int]  # ty: ignore[not-a-rule]
-        2 + items = []  # type: list[int]  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        2 + items = []  # type: list[int]  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
           |
         ");
     }
@@ -389,7 +389,7 @@ mod tests {
           |
         1 |
           - value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
-        2 + value = "x"  # type: ignore[assignment]  # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        2 + value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
           |
         "#);
     }
