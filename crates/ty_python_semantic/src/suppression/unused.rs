@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use crate::lint::LintId;
 use crate::suppression::{
     CheckSuppressionsContext, Suppression, SuppressionKind, SuppressionTarget,
-    UNUSED_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+    UNUSED_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT, select_preferred_suppression,
 };
 
 /// Checks for unused suppression comments in `file` and
@@ -42,12 +42,14 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         // suppress its own unused-ignore-comment diagnostic.
         // An `unused-ignore-comment` suppression can't ignore itself. It can only ignore other
         // suppressions, so exclude the suppression whose diagnostic we're checking.
-        if let Some(unused_suppression) = all.find_code_suppression(
+        if let Some(unused_suppression) = select_preferred_suppression(
+            all.lint_suppressions(suppression.range, LintId::of(&UNUSED_IGNORE_COMMENT))
+                .filter(|candidate| {
+                    candidate.target.is_lint() && candidate.id() != suppression.id()
+                }),
             suppression.range,
-            LintId::of(&UNUSED_IGNORE_COMMENT),
-            Some(suppression.id()),
         ) {
-            diagnostics.mark_used(unused_suppression);
+            diagnostics.mark_used(unused_suppression.id());
             continue;
         }
 
