@@ -1,7 +1,7 @@
 use super::variance::VarianceInferable;
 use super::{
-    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeIdentity, TypeVarVariance,
-    UnionType, visitor,
+    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
+    visitor,
 };
 use crate::Db;
 
@@ -39,18 +39,17 @@ impl<'db> Type<'db> {
     pub(crate) fn project_type_form(self, db: &'db dyn Db) -> Type<'db> {
         struct TypeFormArgument;
         type TypeFormArgumentVisitor<'db> =
-            CycleDetector<TypeFormArgument, Type<'db>, TypeIdentity<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
 
         fn project<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
             visitor: &TypeFormArgumentVisitor<'db>,
         ) -> Option<Type<'db>> {
-            let identity = |ty: &Type<'db>| ty.to_type_identity(db);
             match ty {
                 Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, identity, || project(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || project(db, alias.value_type(db), visitor))
                 }
                 Type::Union(union) => {
                     let mut elements = union
@@ -69,7 +68,7 @@ impl<'db> Type<'db> {
                     elements.peek()?;
                     Some(IntersectionType::from_elements(db, elements))
                 }
-                Type::TypeVar(typevar) => visitor.visit(ty, identity, || {
+                Type::TypeVar(typevar) => visitor.visit(db, ty, || {
                     typevar
                         .typevar(db)
                         .bound_or_constraints(db)

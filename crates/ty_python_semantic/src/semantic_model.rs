@@ -18,8 +18,8 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, SpecialFormType, Type, TypeIdentity, TypeQualifiers, binding_type,
-    infer_complete_scope_types, inferred_declaration,
+    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
@@ -531,9 +531,9 @@ impl<'db> SemanticModel<'db> {
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            'db,
             StringLiteralCandidates,
             Type<'db>,
-            TypeIdentity<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
             3,
         >;
@@ -564,11 +564,9 @@ impl<'db> SemanticModel<'db> {
                     .iter()
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
-                Type::TypeAlias(alias) => visitor.visit(
-                    ty,
-                    |ty| ty.to_type_identity(db),
-                    || collect(db, alias.value_type(db), visitor),
-                ),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
+                }
                 _ => Vec::new(),
             }
         }

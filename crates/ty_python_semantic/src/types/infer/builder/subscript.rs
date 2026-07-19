@@ -28,8 +28,8 @@ use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeIdentity, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
+    UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
@@ -63,13 +63,8 @@ fn string_literal_values<'db>(
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
-        type TypedDictKeyExpectedTypeVisitor<'db> = CycleDetector<
-            TypedDictKeyExpectedType,
-            Type<'db>,
-            TypeIdentity<'db>,
-            Option<Type<'db>>,
-            3,
-        >;
+        type TypedDictKeyExpectedTypeVisitor<'db> =
+            CycleDetector<'db, TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
 
         fn imp<'db>(
             db: &'db dyn Db,
@@ -104,11 +99,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
-                Type::TypeAlias(alias) => visitor.visit(
-                    ty,
-                    |ty| ty.to_type_identity(db),
-                    || imp(db, alias.value_type(db), visitor),
-                ),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))
+                }
                 _ => None,
             }
         }

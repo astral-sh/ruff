@@ -11,7 +11,7 @@ use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeIdentity,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
@@ -25,9 +25,9 @@ enum IntersectionOn {
 
 /// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
 pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
+    'db,
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
-    (TypeIdentity<'db>, ast::CmpOp, TypeIdentity<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
     1,
 >;
@@ -129,9 +129,6 @@ pub(super) fn infer_binary_type_comparison<'db>(
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let identity = |&(left, op, right): &(Type<'db>, ast::CmpOp, Type<'db>)| {
-        (left.to_type_identity(db), op, right.to_type_identity(db))
-    };
 
     // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
     // language spec.
@@ -283,11 +280,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
             )
         }
 
-        (Type::TypeAlias(alias), right) => Some(visitor.visit((left, op, right), identity, || {
+        (Type::TypeAlias(alias), right) => Some(visitor.visit(db, (left, op, right), || {
             infer_binary_type_comparison(context, alias.value_type(db), op, right, range, visitor)
         })),
 
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), identity, || {
+        (left, Type::TypeAlias(alias)) => Some(visitor.visit(db, (left, op, right), || {
             infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
         })),
 
@@ -299,7 +296,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // type, so that it hits the `Type::Union` branches above.
         (Type::NewTypeInstance(newtype), right) => Some(
             try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                visitor.visit((left, op, right), identity, || {
+                visitor.visit(db, (left, op, right), || {
                     infer_binary_type_comparison(
                         context,
                         newtype.concrete_base_type(db),
@@ -313,7 +310,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         ),
         (left, Type::NewTypeInstance(newtype)) => Some(
             try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                visitor.visit((left, op, right), identity, || {
+                visitor.visit(db, (left, op, right), || {
                     infer_binary_type_comparison(
                         context,
                         left,
@@ -337,7 +334,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             match left_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit((left, op, right), identity, || {
+                        visitor.visit(db, (left, op, right), || {
                             infer_binary_type_comparison(
                                 context, bound, op, bound, range, visitor,
                             )
@@ -363,7 +360,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             match left_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit((left, op, right), identity, || {
+                        visitor.visit(db, (left, op, right), || {
                             infer_binary_type_comparison(
                                 context, bound, op, right, range, visitor,
                             )
@@ -388,7 +385,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             match right_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit((left, op, right), identity, || {
+                        visitor.visit(db, (left, op, right), || {
                             infer_binary_type_comparison(
                                 context, left, op, bound, range, visitor,
                             )
@@ -612,7 +609,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(db)?)))
             .map(|(lhs_tuple, rhs_tuple)| {
                 let tuple_rich_comparison = |rich_op| {
-                    visitor.visit((left, op, right), identity, || {
+                    visitor.visit(db, (left, op, right), || {
                         infer_tuple_rich_comparison(
                             context, &lhs_tuple, rich_op, &rhs_tuple, range, visitor,
                         )

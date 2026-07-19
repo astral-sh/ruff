@@ -23,9 +23,8 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
-use self::cyclic::PairVisitor;
+pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
-pub use self::cyclic::{CycleDetector, TypeIdentity};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -295,7 +294,7 @@ struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<PairVisitor<'db, ApplyMaterializationEquivalence, bool>>;
+    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -353,11 +352,10 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> bool {
-        self.materialization_equivalence().visit(
-            (left, right),
-            |&(left, right)| (left.to_type_identity(db), right.to_type_identity(db)),
-            || left.is_equivalent_to_with_materialization_visitor(db, right, self),
-        )
+        self.materialization_equivalence()
+            .visit(db, (left, right), || {
+                left.is_equivalent_to_with_materialization_visitor(db, right, self)
+            })
     }
 
     pub(crate) fn for_new_materialization_root(&self) -> Self {
@@ -375,14 +373,14 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> =
-    CycleDetector<FindLegacyTypeVars, Type<'db>, TypeIdentity<'db>, (), 3>;
+    CycleDetector<'db, FindLegacyTypeVars, Type<'db>, (), 3>;
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
 pub(crate) type SpecializationVisitor<'db> =
-    CycleDetector<VisitSpecialization, Type<'db>, TypeIdentity<'db>, (), 3>;
+    CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
 pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
@@ -2304,7 +2302,6 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let identity = |ty: &Type<'db>| ty.to_type_identity(db);
         let Some((_, specialization)) = self.class_specialization(db) else {
             match self {
                 Type::Union(union) => {
@@ -2317,7 +2314,7 @@ impl<'db> Type<'db> {
                         element.visit_specialization_impl(db, polarity, f, visitor);
                     }
                 }
-                Type::TypeAlias(alias) => visitor.visit(self, identity, || {
+                Type::TypeAlias(alias) => visitor.visit(db, self, || {
                     alias
                         .value_type(db)
                         .visit_specialization_impl(db, polarity, f, visitor);
@@ -2329,14 +2326,14 @@ impl<'db> Type<'db> {
 
                             f(parameter.annotated_type(), variance);
 
-                            visitor.visit(parameter.annotated_type(), identity, || {
+                            visitor.visit(db, parameter.annotated_type(), || {
                                 parameter
                                     .annotated_type()
                                     .visit_specialization_impl(db, variance, f, visitor);
                             });
                         }
 
-                        visitor.visit(signature.return_ty, identity, || {
+                        visitor.visit(db, signature.return_ty, || {
                             signature
                                 .return_ty
                                 .visit_specialization_impl(db, polarity, f, visitor);
@@ -2357,7 +2354,7 @@ impl<'db> Type<'db> {
 
             f(*ty, variance);
 
-            visitor.visit(*ty, identity, || {
+            visitor.visit(db, *ty, || {
                 ty.visit_specialization_impl(db, variance, f, visitor);
             });
         }
@@ -6840,7 +6837,6 @@ impl<'db> Type<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let identity = |ty: &Type<'db>| ty.to_type_identity(db);
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
             match bound_typevar.typevar(db).kind(db) {
                 TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
@@ -6882,12 +6878,12 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => {}
 
             Type::FunctionLiteral(function) => {
-                visitor.visit(self, identity, || {
+                visitor.visit(db, self, || {
                     function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 });
             }
 
-            Type::BoundMethod(method) => visitor.visit(self, identity, || {
+            Type::BoundMethod(method) => visitor.visit(db, self, || {
                 method.self_instance(db).find_legacy_typevars_impl(
                     db,
                     binding_context,
@@ -6905,7 +6901,7 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(function)
                 | KnownBoundMethodType::FunctionTypeDunderCall(function),
-            ) => visitor.visit(self, identity, || {
+            ) => visitor.visit(db, self, || {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }),
 
@@ -6913,7 +6909,7 @@ impl<'db> Type<'db> {
                 KnownBoundMethodType::PropertyDunderGet(property)
                 | KnownBoundMethodType::PropertyDunderSet(property)
                 | KnownBoundMethodType::PropertyDunderDelete(property),
-            ) => visitor.visit(self, identity, || {
+            ) => visitor.visit(db, self, || {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }),
 
@@ -6921,7 +6917,7 @@ impl<'db> Type<'db> {
                 callable.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
 
-            Type::PropertyInstance(property) => visitor.visit(self, identity, || {
+            Type::PropertyInstance(property) => visitor.visit(db, self, || {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }),
 
@@ -6994,7 +6990,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, identity, || {
+                visitor.visit(db, self, || {
                     alias.value_type(db).find_legacy_typevars_impl(
                         db,
                         binding_context,

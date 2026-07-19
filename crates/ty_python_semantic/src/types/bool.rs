@@ -5,9 +5,8 @@ use crate::{
     Db,
     types::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeIdentity,
-        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
-        constraints::ConstraintSetBuilder, context::InferContext,
+        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
+        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
@@ -322,15 +321,11 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(
-                *self,
-                |ty| ty.to_type_identity(db),
-                || {
-                    alias
-                        .value_type(db)
-                        .try_bool_impl(db, allow_short_circuit, visitor)
-                },
-            )?,
+            Type::TypeAlias(alias) => visitor.visit(db, *self, || {
+                alias
+                    .value_type(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)
+            })?,
             Type::NewTypeInstance(newtype) => {
                 newtype
                     .concrete_base_type(db)
@@ -344,7 +339,7 @@ impl<'db> Type<'db> {
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
 pub(crate) type TryBoolVisitor<'db> =
-    CycleDetector<TryBool, Type<'db>, TypeIdentity<'db>, Result<Truthiness, BoolError<'db>>, 3>;
+    CycleDetector<'db, TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
 pub(crate) struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
