@@ -20,7 +20,7 @@ use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    types::{CycleDetector, KnownClass, Type, TypeIdentity},
 };
 
 use crate::docstring::Docstring;
@@ -3085,7 +3085,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
+        CycleDetector<CompletionKind, Type<'db>, TypeIdentity<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
@@ -3131,9 +3131,11 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
-            Type::TypeAlias(alias) => {
-                visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
-            }
+            Type::TypeAlias(alias) => visitor.visit(
+                ty,
+                |ty| ty.to_type_identity(db),
+                || imp(db, alias.value_type(db), visitor),
+            )?,
         })
     }
     imp(db, ty, &CompletionKindVisitor::default())

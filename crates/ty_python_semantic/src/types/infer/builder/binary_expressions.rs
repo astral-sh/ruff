@@ -13,8 +13,8 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    MemberLookupPolicy, Type, TypeContext, TypeIdentity, TypeVarBoundOrConstraints, TypedDictType,
+    UnionBuilder, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -22,8 +22,13 @@ enum BinaryExpressionOperandTypes<'db> {
     TypedDictResult(Type<'db>),
 }
 
-type BinaryExpressionVisitor<'db> =
-    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+type BinaryExpressionVisitor<'db> = CycleDetector<
+    ast::Operator,
+    (Type<'db>, ast::Operator, Type<'db>),
+    (TypeIdentity<'db>, ast::Operator, TypeIdentity<'db>),
+    Option<Type<'db>>,
+    1,
+>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -306,6 +311,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         visitor: &BinaryExpressionVisitor<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let identity = |&(left, op, right): &(Type<'db>, ast::Operator, Type<'db>)| {
+            (left.to_type_identity(db), op, right.to_type_identity(db))
+        };
 
         // Check for division by zero; this doesn't change the inferred type for the expression, but
         // may emit a diagnostic
@@ -343,27 +351,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
-                )
-            }),
+            (Type::TypeAlias(alias), rhs, _) => {
+                visitor.visit((left_ty, op, right_ty), identity, || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        alias.value_type(db),
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                })
+            }
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
-                )
-            }),
+            (lhs, Type::TypeAlias(alias), _) => {
+                visitor.visit((left_ty, op, right_ty), identity, || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        alias.value_type(db),
+                        op,
+                        visitor,
+                    )
+                })
+            }
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>

@@ -46,7 +46,8 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
+    /// Returns the identity used to recognize recursive re-entries of this type.
+    pub fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::NonRecursive(self))
     }
@@ -73,67 +74,30 @@ impl<'db> Type<'db> {
     }
 }
 
-/// An item that provides the identity used to detect active recursive cycles.
-pub trait HasIdentity<'db> {
-    type Id: PartialEq;
+pub(crate) type PairVisitor<'db, Tag, C> =
+    CycleDetector<Tag, (Type<'db>, Type<'db>), (TypeIdentity<'db>, TypeIdentity<'db>), C, 1>;
 
-    /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
-}
-
-impl<'db> HasIdentity<'db> for Type<'db> {
-    type Id = TypeIdentity<'db>;
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        Type::to_type_identity(*self, db)
-    }
-}
-
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, Type<'db>), C, 1>;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
-    type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_type_identity(db), self.1.to_type_identity(db))
-    }
-}
-
-impl<'db, Context> HasIdentity<'db> for (Type<'db>, Context, Type<'db>)
-where
-    Context: Copy + PartialEq,
-{
-    type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (
-            self.0.to_type_identity(db),
-            self.1,
-            self.2.to_type_identity(db),
-        )
-    }
-}
-
-/// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
-/// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
+/// Detects active recursive cycles and memoizes completed results.
+///
+/// Callers provide an abstract identity after cache and exact-cycle lookup, keeping the identity's
+/// domain-specific semantics out of the detector. `CycleDetector` is temporary, so callers should
+/// choose the capacity that keeps observed cycle paths inline even when that makes `seen` slightly
+/// larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
-pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
+pub struct CycleDetector<Tag, T, I, R, const INLINE_CAPACITY: usize> {
     /// The active recursion stack and the identity of each item.
     /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
+    seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<T, I>; INLINE_CAPACITY]>>,
 
     /// Memoized results from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
 
     fallback: R,
 
-    _tag: PhantomData<fn() -> &'db Tag>,
+    _tag: PhantomData<fn() -> Tag>,
 }
 
-impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
-where
-    T: HasIdentity<'db>,
-{
+impl<Tag, T, I, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, I, R, INLINE_CAPACITY> {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
@@ -144,55 +108,47 @@ where
     }
 }
 
-impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
+impl<Tag, T, I, R: Clone, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, I, R, INLINE_CAPACITY>
 where
-    T: Hash + Eq + Clone + HasIdentity<'db>,
+    T: Hash + Eq + Clone,
+    I: PartialEq,
 {
+    /// Visits `item`, computing its abstract identity only after cache and exact-cycle checks.
     #[inline]
-    pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.entry(db, item) {
-            CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
-            CycleDetectorVisit::Pending(entry) => {
-                let result = compute();
-                entry.finish(result)
+    pub fn visit(&self, item: T, identity: impl FnOnce(&T) -> I, compute: impl FnOnce() -> R) -> R {
+        match self.entry(item) {
+            Entry::Ready(result) => result,
+            Entry::Vacant(entry) => {
+                let identity = identity(entry.item());
+                match entry.with_identity(identity) {
+                    IdentityEntry::Cycle(_) => self.fallback.clone(),
+                    IdentityEntry::Pending(entry) => {
+                        let result = compute();
+                        entry.finish(result)
+                    }
+                }
             }
         }
     }
 
-    pub(super) fn entry(
-        &self,
-        db: &'db dyn Db,
-        item: T,
-    ) -> CycleDetectorVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY> {
+    pub(super) fn entry(&self, item: T) -> Entry<'_, Tag, T, I, R, INLINE_CAPACITY> {
         if let Some(result) = self.cache.borrow().get(&item) {
-            return CycleDetectorVisit::Ready(result.clone());
+            return Entry::Ready(result.clone());
         }
 
         let seen = self.seen.borrow();
         if seen.iter().any(|active| active.item == item) {
-            return CycleDetectorVisit::Ready(self.fallback.clone());
-        }
-
-        let identity = item.to_identity(db);
-        if seen.iter().any(|active| active.identity == identity) {
-            return CycleDetectorVisit::Cycle(item);
+            return Entry::Ready(self.fallback.clone());
         }
         drop(seen);
 
-        self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
-            item: item.clone(),
-            identity,
-        });
-        CycleDetectorVisit::Pending(CycleDetectorPendingVisit {
+        Entry::Vacant(VacantEntry {
             detector: self,
             item,
-            bomb: DebugDropBomb::new("Pending cycle-detector visits must be finished."),
         })
     }
 
-    /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
+    /// Finish an [`IdentityEntry::Pending`] visit and cache its result.
     fn finish_visit(&self, item: T, result: R) -> R {
         let active = self.seen.borrow_mut().pop();
         debug_assert!(active.as_ref().is_some_and(|active| active.item == item));
@@ -203,49 +159,93 @@ where
     }
 }
 
-struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
+struct ActiveCycleDetectorVisit<T, I> {
     item: T,
-    identity: T::Id,
+    identity: I,
 }
 
-impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
+impl<T: fmt::Debug, I> fmt::Debug for ActiveCycleDetectorVisit<T, I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.item.fmt(f)
     }
 }
 
-/// Result of starting a cycle-detector visit.
-pub(super) enum CycleDetectorVisit<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
-where
-    T: HasIdentity<'db>,
-{
+/// Result of looking up an item in a [`CycleDetector`].
+pub(super) enum Entry<'a, Tag, T, I, R, const INLINE_CAPACITY: usize> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
+    /// The item needs an identity before cycle detection can proceed.
+    Vacant(VacantEntry<'a, Tag, T, I, R, INLINE_CAPACITY>),
+}
+
+/// A cycle-detector entry whose abstract identity has not yet been computed.
+pub(super) struct VacantEntry<'a, Tag, T, I, R, const INLINE_CAPACITY: usize> {
+    detector: &'a CycleDetector<Tag, T, I, R, INLINE_CAPACITY>,
+    item: T,
+}
+
+impl<'a, Tag, T, I, R: Clone, const INLINE_CAPACITY: usize>
+    VacantEntry<'a, Tag, T, I, R, INLINE_CAPACITY>
+where
+    T: Hash + Eq + Clone,
+    I: PartialEq,
+{
+    /// Returns the item whose abstract identity is needed to continue cycle detection.
+    pub(super) fn item(&self) -> &T {
+        &self.item
+    }
+
+    /// Continues cycle detection after the caller computes the item's abstract identity.
+    pub(super) fn with_identity(
+        self,
+        identity: I,
+    ) -> IdentityEntry<'a, Tag, T, I, R, INLINE_CAPACITY> {
+        if self
+            .detector
+            .seen
+            .borrow()
+            .iter()
+            .any(|active| active.identity == identity)
+        {
+            return IdentityEntry::Cycle(self.item);
+        }
+
+        self.detector
+            .seen
+            .borrow_mut()
+            .push(ActiveCycleDetectorVisit {
+                item: self.item.clone(),
+                identity,
+            });
+        IdentityEntry::Pending(PendingEntry {
+            detector: self.detector,
+            item: self.item,
+            bomb: DebugDropBomb::new("Pending cycle-detector entries must be finished."),
+        })
+    }
+}
+
+/// Result of adding an abstract identity to a vacant cycle-detector entry.
+pub(super) enum IdentityEntry<'a, Tag, T, I, R, const INLINE_CAPACITY: usize> {
     /// A different item with the same abstract identity is already pending.
     Cycle(T),
     /// The caller should compute the result and finish the pending visit.
-    Pending(CycleDetectorPendingVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>),
+    Pending(PendingEntry<'a, Tag, T, I, R, INLINE_CAPACITY>),
 }
 
-/// A pending cycle-detector visit that must be completed with [`Self::finish`].
-#[must_use = "pending cycle-detector visits must be finished"]
-pub(super) struct CycleDetectorPendingVisit<
-    'a,
-    'db,
-    Tag,
-    T: HasIdentity<'db>,
-    R,
-    const INLINE_CAPACITY: usize,
-> {
-    detector: &'a CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>,
+/// A pending cycle-detector entry that must be completed with [`Self::finish`].
+#[must_use = "pending cycle-detector entries must be finished"]
+pub(super) struct PendingEntry<'a, Tag, T, I, R, const INLINE_CAPACITY: usize> {
+    detector: &'a CycleDetector<Tag, T, I, R, INLINE_CAPACITY>,
     item: T,
     bomb: DebugDropBomb,
 }
 
-impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetectorPendingVisit<'_, 'db, Tag, T, R, INLINE_CAPACITY>
+impl<Tag, T, I, R: Clone, const INLINE_CAPACITY: usize>
+    PendingEntry<'_, Tag, T, I, R, INLINE_CAPACITY>
 where
-    T: Hash + Eq + Clone + HasIdentity<'db>,
+    T: Hash + Eq + Clone,
+    I: PartialEq,
 {
     /// Finishes the visit and caches its result.
     pub(super) fn finish(mut self, result: R) -> R {
@@ -333,10 +333,8 @@ enum TypeTransformerVisit<'db> {
     Pending(Type<'db>),
 }
 
-impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
-    for CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
-where
-    T: HasIdentity<'db>,
+impl<Tag, T, I, R: Default, const INLINE_CAPACITY: usize> Default
+    for CycleDetector<Tag, T, I, R, INLINE_CAPACITY>
 {
     fn default() -> Self {
         CycleDetector::new(R::default())
@@ -469,72 +467,81 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::{CycleDetector, Db, HasIdentity};
-    use crate::db::tests::setup_db;
+    use super::{CycleDetector, Entry, IdentityEntry};
 
     struct TestVisit;
 
-    type Detector<'db> = CycleDetector<'db, TestVisit, u8, u8, 1>;
-
-    impl<'db> HasIdentity<'db> for u8 {
-        type Id = Self;
-
-        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            *self
-        }
-    }
+    type Detector = CycleDetector<TestVisit, u8, u8, u8, 1>;
 
     static IDENTITY_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(Clone, Eq, Hash, PartialEq)]
     struct CountingIdentityItem(u8);
 
-    impl<'db> HasIdentity<'db> for CountingIdentityItem {
-        type Id = u8;
-
-        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
-            0
-        }
+    fn counting_identity(_item: &CountingIdentityItem) -> u8 {
+        IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
+        0
     }
 
     #[test]
     fn caches_results_and_spills_after_two_entries() {
-        let db = setup_db();
         let detector = Detector::new(0);
 
-        assert_eq!(detector.visit(&db, 1, || 10), 10);
-        assert_eq!(detector.visit(&db, 1, || 40), 10);
-        assert_eq!(detector.visit(&db, 2, || 20), 20);
+        assert_eq!(detector.visit(1, |item| *item, || 10), 10);
+        assert_eq!(detector.visit(1, |item| *item, || 40), 10);
+        assert_eq!(detector.visit(2, |item| *item, || 20), 20);
         assert!(!detector.cache.borrow().is_spilled());
-        assert_eq!(detector.visit(&db, 3, || 30), 30);
+        assert_eq!(detector.visit(3, |item| *item, || 30), 30);
         assert!(detector.cache.borrow().is_spilled());
 
-        assert_eq!(detector.visit(&db, 2, || 40), 20);
-        assert_eq!(detector.visit(&db, 3, || 40), 30);
+        assert_eq!(detector.visit(2, |item| *item, || 40), 20);
+        assert_eq!(detector.visit(3, |item| *item, || 40), 30);
     }
 
     #[test]
-    fn nested_visit_short_circuits_on_cycle() {
-        let db = setup_db();
+    fn classifies_exact_and_identity_cycles() {
         let detector = Detector::new(0);
 
-        assert_eq!(
-            detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
-            10
-        );
+        let Entry::Vacant(entry) = detector.entry(1) else {
+            panic!("first entry should be vacant");
+        };
+        let IdentityEntry::Pending(pending) = entry.with_identity(10) else {
+            panic!("first identity should be pending");
+        };
+
+        assert!(matches!(detector.entry(1), Entry::Ready(0)));
+
+        let Entry::Vacant(entry) = detector.entry(2) else {
+            panic!("a different item should be vacant");
+        };
+        let IdentityEntry::Cycle(item) = entry.with_identity(10) else {
+            panic!("an active identity should be a cycle");
+        };
+        assert_eq!(item, 2);
+
+        assert_eq!(pending.finish(20), 20);
+        assert!(matches!(detector.entry(1), Entry::Ready(20)));
     }
 
     #[test]
-    fn computes_each_active_identity_once() {
-        let db = setup_db();
+    fn computes_identity_only_for_vacant_entries() {
         IDENTITY_CALLS.store(0, Ordering::Relaxed);
-        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem(1), || {
-                detector.visit(&db, CountingIdentityItem(2), || 1)
+            detector.visit(CountingIdentityItem(1), counting_identity, || {
+                assert_eq!(
+                    detector.visit(CountingIdentityItem(1), counting_identity, || 1),
+                    0
+                );
+                detector.visit(CountingIdentityItem(2), counting_identity, || 1)
             }),
+            0
+        );
+        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+
+        assert_eq!(
+            detector.visit(CountingIdentityItem(1), counting_identity, || 1),
             0
         );
         assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
@@ -542,11 +549,14 @@ mod tests {
 
     #[test]
     #[cfg(debug_assertions)]
-    #[should_panic(expected = "Pending cycle-detector visits must be finished.")]
-    fn pending_visit_must_be_finished() {
-        let db = setup_db();
+    #[should_panic(expected = "Pending cycle-detector entries must be finished.")]
+    fn pending_entry_must_be_finished() {
         let detector = Detector::new(0);
 
-        let _pending = detector.entry(&db, 1);
+        let Entry::Vacant(entry) = detector.entry(1) else {
+            panic!("first entry should be vacant");
+        };
+        let pending = entry.with_identity(1);
+        assert!(matches!(pending, IdentityEntry::Pending(_)));
     }
 }

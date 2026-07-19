@@ -9,7 +9,7 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{Entry, IdentityEntry, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -715,30 +715,17 @@ impl<'db> Type<'db> {
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
-    'db,
     TypeRelation,
     (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
-    ConstraintSet<'db, 'c>,
-    1,
->;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
-    type Id = (
+    (
         TypeIdentity<'db>,
         TypeIdentity<'db>,
         TypeRelation,
         TypeVarEvaluation,
-    );
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (
-            self.0.to_type_identity(db),
-            self.1.to_type_identity(db),
-            self.2,
-            self.3,
-        )
-    }
-}
+    ),
+    ConstraintSet<'db, 'c>,
+    1,
+>;
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -956,13 +943,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         match self
             .relation_visitor
-            .entry(db, (source, target, self.relation, self.typevar_evaluation))
+            .entry((source, target, self.relation, self.typevar_evaluation))
         {
-            CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(item) => self.recursive_type_pair_fallback(item.0, item.1),
-            CycleDetectorVisit::Pending(entry) => {
-                let result = work();
-                entry.finish(result)
+            Entry::Ready(result) => result,
+            Entry::Vacant(entry) => {
+                let &(source, target, relation, typevar_evaluation) = entry.item();
+                let identity = (
+                    source.to_type_identity(db),
+                    target.to_type_identity(db),
+                    relation,
+                    typevar_evaluation,
+                );
+                match entry.with_identity(identity) {
+                    IdentityEntry::Cycle(item) => self.recursive_type_pair_fallback(item.0, item.1),
+                    IdentityEntry::Pending(entry) => {
+                        let result = work();
+                        entry.finish(result)
+                    }
+                }
             }
         }
     }
@@ -2566,7 +2564,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.disjointness_visitor.visit(db, (source, target), work)
+        self.disjointness_visitor.visit(
+            (source, target),
+            |&(source, target)| (source.to_type_identity(db), target.to_type_identity(db)),
+            work,
+        )
     }
 
     fn any_protocol_members_absent_or_disjoint(
