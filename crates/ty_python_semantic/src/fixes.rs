@@ -1525,6 +1525,36 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_deduplicates_nested_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
+                value = 1
+                # ty: ignore[*-*]  # ty: ignore[*-*]
+                value = 1
+                # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
+                value = 1
+                "#),
+            @"
+        Added 6 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
+        value = 1
+        # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[*-*]
+        value = 1
+        # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]  # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
     fn add_ignore_does_not_suppress_following_logical_line() {
         assert_snapshot!(
             suppress_all_in(r#"

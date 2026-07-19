@@ -44,14 +44,17 @@ pub fn suppress_all(
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
-    let mut line_local = BTreeMap::<TextSize, (BTreeSet<LintName>, usize)>::new();
+    let mut line_local = BTreeMap::<TextSize, (TextSize, BTreeSet<LintName>, usize)>::new();
     let mut ids_with_suppression_range = Vec::with_capacity(ids_with_range.len());
 
     for &(id, diagnostic_range) in ids_with_range {
         if is_suppression_comment_lint(id) {
             match suppression_comment_fix(db, file, diagnostic_range) {
                 Some(SuppressionCommentFix::LineLocal(start)) => {
-                    let (lints, suppressed_diagnostics) = line_local.entry(start).or_default();
+                    let (insertion_start, lints, suppressed_diagnostics) = line_local
+                        .entry(source.line_start(start))
+                        .or_insert_with(|| (start, BTreeSet::new(), 0));
+                    *insertion_start = (*insertion_start).min(start);
                     lints.insert(id);
                     *suppressed_diagnostics += 1;
                 }
@@ -98,8 +101,8 @@ pub fn suppress_all(
 
     fixes.extend(
         line_local
-            .into_iter()
-            .map(|(start, (lints, suppressed_diagnostics))| SuppressFix {
+            .into_values()
+            .map(|(start, lints, suppressed_diagnostics)| SuppressFix {
                 fix: add_line_local_suppression(
                     &lints.into_iter().collect::<SmallVec<[_; 2]>>(),
                     start,
