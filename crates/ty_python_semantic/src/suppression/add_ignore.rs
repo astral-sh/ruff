@@ -258,12 +258,14 @@ fn suppression_comment_fix(
         return None;
     }
 
-    let before_diagnostic = &source[TextRange::new(comment.start(), range.end())];
-    let hash = before_diagnostic.rfind('#')?;
+    let before_diagnostic = &source[TextRange::new(comment.start(), range.start())];
+    let start = before_diagnostic
+        .rfind('#')
+        .map_or(comment.start(), |hash| {
+            comment.start() + before_diagnostic[..hash].text_len()
+        });
 
-    Some(SuppressionCommentFix::LineLocal(
-        comment.start() + before_diagnostic[..hash].text_len(),
-    ))
+    Some(SuppressionCommentFix::LineLocal(start))
 }
 
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
