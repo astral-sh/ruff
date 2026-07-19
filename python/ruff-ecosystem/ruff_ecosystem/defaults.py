@@ -38,7 +38,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="binary-husky", name="gpt_academic", ref="master")),
     Project(repo=Repository(owner="bloomberg", name="pytest-memray", ref="main")),
     Project(
-        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
+        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.10"),
         check_options=CheckOptions(select="ALL"),
     ),
     # Disabled due to use of explicit `select` with `E999`, which has been removed.
