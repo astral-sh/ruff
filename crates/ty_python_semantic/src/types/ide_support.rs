@@ -10,7 +10,8 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
+    KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, binding_type,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -343,7 +344,10 @@ pub struct ImplementationsFinder<'db> {
 
 enum ImplementationsFinderKind {
     ClassFamily,
-    MemberFamily { name: Name },
+    MemberFamily {
+        name: Name,
+        accessor_role: Option<PropertyAccessorRole>,
+    },
 }
 
 impl<'db> ImplementationsFinder<'db> {
@@ -371,13 +375,15 @@ impl<'db> ImplementationsFinder<'db> {
         db: &'db dyn Db,
         roots: Vec<ClassLiteral<'db>>,
         member_name: Name,
+        accessor_role: Option<PropertyAccessorRole>,
     ) -> Option<Self> {
         let mut initial_definitions = Vec::new();
         let mut family_roots = FxHashSet::default();
 
         for root in roots {
             // Avoid scanning every known subclass when the member doesn't resolve on this root.
-            let Some(root_definitions) = mro_member_definitions(db, root, member_name.as_str())
+            let Some(root_definitions) =
+                mro_member_definitions(db, root, member_name.as_str(), accessor_role)
             else {
                 continue;
             };
@@ -398,7 +404,10 @@ impl<'db> ImplementationsFinder<'db> {
         Some(Self {
             initial_definitions,
             roots: family_roots,
-            kind: ImplementationsFinderKind::MemberFamily { name: member_name },
+            kind: ImplementationsFinderKind::MemberFamily {
+                name: member_name,
+                accessor_role,
+            },
         })
     }
 
@@ -416,9 +425,10 @@ impl<'db> ImplementationsFinder<'db> {
             ImplementationsFinderKind::ClassFamily => {
                 class_implementations_for_file(db, file, roots)
             }
-            ImplementationsFinderKind::MemberFamily { name } => {
-                member_implementations_for_file(db, file, roots, name.as_str())
-            }
+            ImplementationsFinderKind::MemberFamily {
+                name,
+                accessor_role,
+            } => member_implementations_for_file(db, file, roots, name.as_str(), *accessor_role),
         }
     }
 
@@ -453,7 +463,14 @@ impl<'db> ImplementationsFinder<'db> {
         let mut seen = FxHashSet::default();
         collect_implementation_root_classes(db, lhs_ty, &mut seen, &mut roots);
 
-        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.id.clone())
+        let accessor_role = match attribute.ctx {
+            ast::ExprContext::Load => Some(PropertyAccessorRole::Getter),
+            ast::ExprContext::Store => Some(PropertyAccessorRole::Setter),
+            ast::ExprContext::Del => Some(PropertyAccessorRole::Deleter),
+            ast::ExprContext::Invalid => None,
+        };
+
+        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.id.clone(), accessor_role)
     }
 
     /// Prepares an implementation query for a method declaration.
@@ -474,13 +491,22 @@ impl<'db> ImplementationsFinder<'db> {
         let db = model.db();
         let function_definition = function.definition(model);
         let containing_scope = function_definition.scope(db);
+        let accessor_role = function
+            .inferred_type(model)
+            .and_then(Type::as_property_instance)
+            .and_then(|property| property.accessor_role(db, function_definition));
         let class_node = containing_scope.node(db).as_class()?;
         let class_definition =
             semantic_index(db, containing_scope.file(db)).expect_single_definition(class_node);
         let class_ty = binding_type(db, class_definition);
         let root = extract_class_literal(db, class_ty)?;
 
-        ImplementationsFinder::for_member_roots(db, vec![root], function.name.id.clone())
+        ImplementationsFinder::for_member_roots(
+            db,
+            vec![root],
+            function.name.id.clone(),
+            accessor_role,
+        )
     }
 
     /// Prepares an implementation query for a class declaration.
@@ -681,6 +707,7 @@ fn member_implementations_for_file<'db>(
     file: File,
     roots: &FxHashSet<ClassLiteral<'db>>,
     member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
@@ -700,7 +727,9 @@ fn member_implementations_for_file<'db>(
             continue;
         }
 
-        for definition in own_member_definitions(db, candidate, member_name).unwrap_or_default() {
+        for definition in
+            own_member_definitions(db, candidate, member_name, accessor_role).unwrap_or_default()
+        {
             if !definitions.contains(&definition) {
                 definitions.push(definition);
             }
@@ -732,11 +761,14 @@ fn mro_member_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .find_map(|class| own_member_definitions(db, class.class_literal(db), member_name))
+        .find_map(|class| {
+            own_member_definitions(db, class.class_literal(db), member_name, accessor_role)
+        })
 }
 
 /// Returns member definitions for `member_name` that are declared directly in `class`.
@@ -771,6 +803,7 @@ fn own_member_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let class = class.as_static()?;
     let class_scope = class.body_scope(db);
@@ -793,6 +826,9 @@ fn own_member_definitions<'db>(
             return Some(
                 definitions
                     .into_iter()
+                    .filter(|definition| {
+                        property_accessor_role_matches(db, *definition, accessor_role)
+                    })
                     .filter_map(|definition| member_implementation_definition(db, definition))
                     .collect(),
             );
@@ -832,6 +868,24 @@ fn own_member_definitions<'db>(
             .filter_map(|definition| member_implementation_definition(db, definition))
             .collect(),
     )
+}
+
+/// Returns whether `definition` is either not a property accessor or has the requested role.
+fn property_accessor_role_matches(
+    db: &dyn Db,
+    definition: Definition<'_>,
+    requested_role: Option<PropertyAccessorRole>,
+) -> bool {
+    if !matches!(definition.kind(db), DefinitionKind::Function(_)) {
+        return true;
+    }
+
+    requested_role.is_none_or(|requested_role| {
+        binding_type(db, definition)
+            .as_property_instance()
+            .and_then(|property| property.accessor_role(db, definition))
+            .is_none_or(|definition_role| definition_role == requested_role)
+    })
 }
 
 /// Normalize a member definition to the implementation target that should be navigated to.

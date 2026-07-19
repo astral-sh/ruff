@@ -488,6 +488,153 @@ mod tests {
     }
 
     #[test]
+    fn implementation_property_setter_definition() {
+        let test = cursor_test(
+            r#"
+            class Base:
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value<CURSOR>(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+
+            class Child(Base):
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:7:9
+          |
+        7 |     def value(self, value: int) -> None: ...
+          |         ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+          --> main.py:7:9
+           |
+         7 |     def value(self, value: int) -> None: ...
+           |         -----
+           |
+          ::: main.py:17:9
+           |
+        17 |     def value(self, value: int) -> None: ...
+           |         -----
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_property_read() {
+        let test = cursor_test(
+            r#"
+            class Base:
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+
+            class Child(Base):
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+
+            def f(base: Base):
+                return base.value<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:23:17
+           |
+        23 |     return base.value
+           |                 ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+          --> main.py:4:9
+           |
+         4 |     def value(self) -> int: ...
+           |         -----
+           |
+          ::: main.py:14:9
+           |
+        14 |     def value(self) -> int: ...
+           |         -----
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_property_write() {
+        let test = cursor_test(
+            r#"
+            class Base:
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+
+            class Child(Base):
+                @property
+                def value(self) -> int: ...
+
+                @value.setter
+                def value(self, value: int) -> None: ...
+
+                @value.deleter
+                def value(self) -> None: ...
+
+            def f(base: Base, value: int):
+                base.value<CURSOR> = value
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:23:10
+           |
+        23 |     base.value = value
+           |          ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+          --> main.py:7:9
+           |
+         7 |     def value(self, value: int) -> None: ...
+           |         -----
+           |
+          ::: main.py:17:9
+           |
+        17 |     def value(self, value: int) -> None: ...
+           |         -----
+           |
+        ");
+    }
+
+    #[test]
     fn implementation_inherited_method_from_union_receivers_deduplicates() {
         let test = cursor_test(
             r#"
