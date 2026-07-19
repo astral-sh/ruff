@@ -451,6 +451,43 @@ mod tests {
     }
 
     #[test]
+    fn implementation_overload_only_root_scans_subclasses() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            class Animal:
+                @overload
+                def speak(self, volume: int) -> int: ...
+                @overload
+                def speak(self, volume: str) -> str: ...
+
+            class Dog(Animal):
+                def speak(self, volume: int | str) -> int | str:
+                    return volume
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:15:12
+           |
+        15 |     animal.speak(1)
+           |            ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+          --> main.py:11:9
+           |
+        11 |     def speak(self, volume: int | str) -> int | str:
+           |         -----
+           |
+        ");
+    }
+
+    #[test]
     fn implementation_inherited_method_from_union_receivers_deduplicates() {
         let test = cursor_test(
             r#"

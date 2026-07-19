@@ -376,12 +376,11 @@ impl<'db> ImplementationsFinder<'db> {
         let mut family_roots = FxHashSet::default();
 
         for root in roots {
-            let root_definitions = mro_member_definitions(db, root, member_name.as_str());
-
             // Avoid scanning every known subclass when the member doesn't resolve on this root.
-            if root_definitions.is_empty() {
+            let Some(root_definitions) = mro_member_definitions(db, root, member_name.as_str())
+            else {
                 continue;
-            }
+            };
 
             for definition in root_definitions {
                 if !initial_definitions.contains(&definition) {
@@ -723,20 +722,21 @@ fn class_mro_intersects<'db>(
         .any(|ancestor| roots.contains(&ancestor.class_literal(db)))
 }
 
-/// Finds the member definition selected by normal Python MRO lookup for `class`.
+/// Finds the member definitions selected by normal Python MRO lookup for `class`.
 ///
 /// This intentionally stops at the first class in the MRO that defines `member_name`; inherited
 /// members should navigate to the definition that actually provides the behavior for the receiver.
+/// The returned vector can be empty when the selected member has no implementation definition,
+/// such as an overload-only method.
 fn mro_member_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     member_name: &str,
-) -> Vec<ResolvedDefinition<'db>> {
+) -> Option<Vec<ResolvedDefinition<'db>>> {
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
         .find_map(|class| own_member_definitions(db, class.class_literal(db), member_name))
-        .unwrap_or_default()
 }
 
 /// Returns member definitions for `member_name` that are declared directly in `class`.
