@@ -1,13 +1,15 @@
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
-use crate::{Db, NavigationTargets, RangedValue};
+use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
+use rayon::prelude::*;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_semantic::{
-    ImportAliasResolution, SemanticModel, implementation_definitions_for_attribute,
-    implementation_definitions_for_class, implementation_definitions_for_class_references,
-    implementation_definitions_for_method,
+    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticModel,
 };
+
+const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Navigate from an attribute access or method declaration to that member and known subclass overrides.
 ///
@@ -54,6 +56,8 @@ pub fn goto_implementation(
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
+    let finder = prepare_implementations_finder_for_goto_target(&model, &goto_target)?;
+
     let mut candidate_files: Vec<File> = db
         .project()
         .files(db)
@@ -62,20 +66,55 @@ pub fn goto_implementation(
         .filter(|candidate| *candidate != file)
         .collect();
     candidate_files.push(file);
+
+    // Project files have no guaranteed iteration order, so sort them to keep the returned targets
+    // deterministic after restoring the batch order below.
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
-    let class_reference_implementations = || {
-        let resolved_definitions =
-            goto_target.definitions(&model, ImportAliasResolution::ResolveAliases);
-        let resolved_definitions = resolved_definitions
-            .as_ref()
-            .map(|definitions| definitions.iter().as_slice())
-            .unwrap_or(&[]);
+    let minimum_job_len =
+        minimum_parallel_job_len(candidate_files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
 
-        implementation_definitions_for_class_references(db, resolved_definitions, &candidate_files)
-    };
+    let mut batches = candidate_files
+        .into_par_iter()
+        .enumerate()
+        .with_min_len(minimum_job_len)
+        .map_with_db(db, |db, (index, file)| {
+            let definitions = finder.implementations_for_file(db, file);
+            // Definitions borrow this worker's Salsa database, so convert them to lifetime-free
+            // navigation targets before returning from the job.
+            (
+                index,
+                definitions_to_implementation_targets(db, definitions),
+            )
+        })
+        .collect::<Vec<_>>();
+    batches.sort_unstable_by_key(|(index, _)| *index);
 
-    let implementations = match &goto_target {
+    // The returned implementation targets should start with those selected by MRO lookup or class roots.
+    let mut implementation_targets =
+        definitions_to_implementation_targets(db, finder.into_initial_definitions());
+
+    // Then, add all remaining targets.
+    implementation_targets.extend(batches.into_iter().flat_map(|(_, definitions)| definitions));
+
+    if implementation_targets.is_empty() {
+        return None;
+    }
+
+    let implementation_targets = implementation_targets.into_iter().collect();
+
+    Some(RangedValue {
+        range: FileRange::new(file, goto_target.range()),
+        value: implementation_targets,
+    })
+}
+
+/// Resolve the type of the `goto_target` to the correct constructor, and prepare the finder.
+fn prepare_implementations_finder_for_goto_target<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+) -> Option<ImplementationsFinder<'db>> {
+    match goto_target {
         GotoTarget::Expression(expression)
         | GotoTarget::Call {
             callable: expression,
@@ -85,35 +124,47 @@ pub fn goto_implementation(
             ruff_python_ast::ExprRef::Name(_) | ruff_python_ast::ExprRef::Attribute(_)
         ) =>
         {
-            class_reference_implementations().or_else(|| match expression {
-                ruff_python_ast::ExprRef::Attribute(attribute) => Some(
-                    implementation_definitions_for_attribute(&model, attribute, &candidate_files),
-                ),
-                _ => None,
-            })?
+            goto_target
+                .definitions(model, ImportAliasResolution::ResolveAliases)
+                .and_then(|definitions| {
+                    ImplementationsFinder::for_class_reference(
+                        model.db(),
+                        definitions.iter().as_slice(),
+                    )
+                })
+                .or_else(|| match expression {
+                    ruff_python_ast::ExprRef::Attribute(attribute) => {
+                        ImplementationsFinder::for_attribute(model, attribute)
+                    }
+                    _ => None,
+                })
         }
-        GotoTarget::StringAnnotationSubexpr { .. } => class_reference_implementations()?,
-        GotoTarget::FunctionDef(function) => {
-            implementation_definitions_for_method(&model, function, &candidate_files)
-        }
-        GotoTarget::ClassDef(class) => {
-            implementation_definitions_for_class(&model, class, &candidate_files)
-        }
-        _ => return None,
-    };
-
-    if implementations.is_empty() {
-        return None;
+        GotoTarget::StringAnnotationSubexpr { .. } => goto_target
+            .definitions(model, ImportAliasResolution::ResolveAliases)
+            .and_then(|definitions| {
+                ImplementationsFinder::for_class_reference(
+                    model.db(),
+                    definitions.iter().as_slice(),
+                )
+            }),
+        GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, function),
+        GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, class),
+        _ => None,
     }
-
-    let implementation_targets = Definitions::new(implementations)
-        .map_stubs_for_implementation(model.db())?
-        .into_navigation_targets(model.db());
-
-    Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
-        value: implementation_targets,
-    })
+}
+fn definitions_to_implementation_targets(
+    db: &dyn Db,
+    definitions: Vec<ResolvedDefinition>,
+) -> Vec<NavigationTarget> {
+    Definitions::new(definitions)
+        .map_stubs_for_implementation(db)
+        .map(|definitions| {
+            definitions
+                .into_navigation_targets(db)
+                .into_iter()
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -509,6 +560,62 @@ mod tests {
           |         ------
           |
          ::: child.py:5:9
+          |
+        5 |     def method(self): ...
+          |         ------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_parallel_candidate_batches_preserve_order() {
+        let test = CursorTest::builder()
+            .source(
+                "base.py",
+                r#"
+                class Base:
+                    def me<CURSOR>thod(self): ...
+                "#,
+            )
+            .source(
+                "z_child.py",
+                r#"
+                from base import Base
+
+                class ZChild(Base):
+                    def method(self): ...
+                "#,
+            )
+            .source(
+                "a_child.py",
+                r#"
+                from base import Base
+
+                class AChild(Base):
+                    def method(self): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> base.py:3:9
+          |
+        3 |     def method(self): ...
+          |         ^^^^^^ Clicking here
+          |
+        info: Found 3 implementations
+         --> a_child.py:5:9
+          |
+        5 |     def method(self): ...
+          |         ------
+          |
+         ::: base.py:3:9
+          |
+        3 |     def method(self): ...
+          |         ------
+          |
+         ::: z_child.py:5:9
           |
         5 |     def method(self): ...
           |         ------
