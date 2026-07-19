@@ -425,33 +425,20 @@ print(K)
 print(L)
 ```
 
-### Definitions in function-like scopes are not global definitions
+### Comprehension and lambda locals are not global definitions
 
-Names local to a comprehension or lambda are not module globals. Assignment-expression targets in
-comprehensions are an exception: they bind in the containing scope. At module level, that makes them
-available to a wildcard import. An assignment inside a lambda remains local to that lambda.
+Comprehension iteration variables, lambda parameters, and assignments inside lambdas are not module
+globals and are therefore not available to a wildcard import.
 
 `exporter.py`:
 
 ```py
-class Iterator:
-    def __next__(self) -> int:
-        return 42
-
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
-
-[a for a in Iterable()]
-{b for b in Iterable()}
-{c: c for c in Iterable()}
-(d for d in Iterable())
+[a for a in [1]]
+{b for b in [1]}
+{c: c for c in [1]}
+(d for d in [1])
 lambda e: (f := 42)
-
-[(g := h * 2) for h in Iterable()]
-[[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
-
-[(lambda s=s: (t := 42))() for s in Iterable()]
+[(lambda s=s: (t := 42))() for s in [1]]
 ```
 
 `importer.py`:
@@ -465,13 +452,37 @@ c  # error: [unresolved-reference]
 d  # error: [unresolved-reference]
 e  # error: [unresolved-reference]
 f  # error: [unresolved-reference]
-h  # error: [unresolved-reference]
-r  # error: [unresolved-reference]
 s  # error: [unresolved-reference]
 t  # error: [unresolved-reference]
+```
 
-reveal_type(g)  # revealed: int
-reveal_type(q)  # revealed: int
+### Assignment-expression targets in comprehensions are global definitions
+
+Assignment-expression targets bind in the scope containing the comprehension. At module level,
+targets in an element, filter, dictionary key or value, generator expression, or nested
+comprehension are all available to a wildcard import.
+
+`exporter.py`:
+
+```py
+[(list_value := item) for item in [1]]
+[item for item in [1] if (filtered_value := item - 10) > 0]
+{(dict_key := item * 2): (dict_value := item * 3) for item in [1]}
+list((generator_value := item * 2) for item in [1])
+[[[[(nested_value := item) for item in [1]]] for _ in [1]] for _ in [1]]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(list_value)  # revealed: int
+reveal_type(filtered_value)  # revealed: int
+reveal_type(dict_key)  # revealed: int
+reveal_type(dict_value)  # revealed: int
+reveal_type(generator_value)  # revealed: int
+reveal_type(nested_value)  # revealed: int
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file
