@@ -241,7 +241,7 @@ fn line_local_suppression_start(db: &dyn Db, file: File, range: TextRange) -> Op
 
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
     let insertion = format!(
-        "# type:ignore[{codes}]  ",
+        "# type:ignore[{codes}, unused-ignore]  ",
         codes = Codes(SuppressionKind::TypeIgnore, codes)
     );
     Fix::safe_edit(Edit::insertion(insertion, start))
