@@ -44,6 +44,22 @@ def from_dict(value: str, valid_values: dict[MyType, int]) -> int | None:
     return None
 ```
 
+Explicitly annotated literals remain unpromotable through membership narrowing and inferred instance
+attributes:
+
+```py
+from typing import Literal
+
+class Backend:
+    def connect(self, mode: Literal["streaming", "batch"]) -> None:
+        if mode not in ("batch", "streaming"):
+            return
+        self._mode = mode
+
+    def mode(self) -> Literal["streaming", "batch"]:
+        return self._mode
+```
+
 ```py
 from typing import Literal
 
