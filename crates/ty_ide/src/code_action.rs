@@ -327,7 +327,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty: ignore[not-a-rule] tracked by [123]
-        3 + # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule] tracked by [123]
+        3 + # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule] tracked by [123]
         4 | value = 1
           |
         ");
@@ -422,7 +422,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
-        3 + # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        3 + # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
         4 | value = missing
           |
         ");
@@ -448,7 +448,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
-        3 + # type:ignore[ty:invalid-ignore-comment, unused-ignore]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         4 | value = missing
           |
         ");

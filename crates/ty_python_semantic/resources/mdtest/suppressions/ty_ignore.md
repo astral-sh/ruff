@@ -370,6 +370,24 @@ a = 10
 reveal_type(a)  # ty: ignore[revealed-type]
 ```
 
+## Suppressing suppression diagnostics on an own line
+
+Suppression-comment rules on an own line apply only to that physical line, so they don't silently
+suppress a similar diagnostic on the following logical line.
+
+```py
+seen_code = True
+# ty: ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+value = 1
+# error: [ignore-comment-unknown-rule]
+value = 1  # ty: ignore[another-not-a-rule]
+
+# ty: ignore[invalid-ignore-comment]  # ty: ignore[*-*]
+value = 1
+# error: [invalid-ignore-comment]
+value = 1  # ty: ignore[*-*]
+```
+
 ## Extra whitespace in type ignore comments is allowed
 
 ```py

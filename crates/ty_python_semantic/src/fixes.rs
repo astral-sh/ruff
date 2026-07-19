@@ -1377,7 +1377,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
         value = 1
         ```
         "
@@ -1441,7 +1441,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1491,7 +1491,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:invalid-ignore-comment, unused-ignore]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1513,7 +1513,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # type:ignore[ty:ignore-comment-unknown-rule, unused-ignore]  # ty: ignore[not-a-rule]
+        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
         value = 1  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
         ```
         "
