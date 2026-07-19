@@ -634,7 +634,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal["missing", 1, True]
+        reveal_type(x)  # revealed: Literal[1, True, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -1125,7 +1125,7 @@ class OpenValues(TypedDict):
 
 def closed_typed_dict_container(value: Literal["present", "other", "missing", 1], values: ClosedValues) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal["other", "present"]
+        reveal_type(value)  # revealed: Literal["present", "other"]
 
 def open_typed_dict_container(value: Literal["present", "other", "missing", 1], values: OpenValues) -> None:
     if value in values:
