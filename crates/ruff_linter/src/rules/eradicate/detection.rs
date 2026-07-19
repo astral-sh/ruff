@@ -75,6 +75,7 @@ static VERSION_REQUIREMENT: LazyLock<Regex> = LazyLock::new(|| {
             \s*
             [vV]?\d[0-9A-Za-z.*+!_-]*
         )*
+        (?:\s*#.*)?
         $
         ",
     )
@@ -202,6 +203,14 @@ mod tests {
         assert!(!comment_contains_code("# django == 4.2.1", &[]));
         assert!(!comment_contains_code("# django != 4.2.1", &[]));
         assert!(!comment_contains_code("# django ~= 4.2", &[]));
+        assert!(!comment_contains_code(
+            "# django >= 4.2  # pin for CVE",
+            &[]
+        ));
+        assert!(!comment_contains_code(
+            "# django>=4.2,<5 # pin for CVE",
+            &[]
+        ));
         assert!(comment_contains_code("# django >= minimum_version", &[]));
         assert!(comment_contains_code("# django >= 4.2 and enabled", &[]));
         assert!(comment_contains_code("\t# x = 1", &[]));
