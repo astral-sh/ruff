@@ -331,6 +331,21 @@ def union_literal_haystack(x: Literal["a", "ab", "z"], flag: bool):
     else:
         reveal_type(x)  # revealed: Literal["a", "ab", "z"]
 
+def literal_union_haystack(x: Literal["abc", "def"]):
+    if "a" in x:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
+    if "a" not in x:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
 def mixed_literal_union_haystack(
     x: Literal["a", "z", "missing"],
     values: Literal["abc"] | tuple[Literal["z"]],
@@ -1094,36 +1109,29 @@ def range_membership(value: Literal["x", 1], values: range) -> None:
 ## `TypedDict` key membership
 
 Membership in a closed `TypedDict` checks its finite set of literal string keys, so the tested value
-can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys.
-We do not apply key-based narrowing to arbitrary values, because `in` may test substrings or
-elements instead:
+can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys:
 
 ```py
 from typing import Literal
 from typing_extensions import TypedDict
 
-class Values(TypedDict, closed=True):
+class ClosedValues(TypedDict, closed=True):
     present: int
     other: str
 
-def typed_dict_container(value: Literal["present", "other", "missing", 1], values: Values) -> None:
+class OpenValues(TypedDict):
+    present: int
+    other: str
+
+def closed_typed_dict_container(value: Literal["present", "other", "missing", 1], values: ClosedValues) -> None:
     if value in values:
         reveal_type(value)  # revealed: Literal["other", "present"]
 
-def f(x: Literal["abc", "def"]):
-    if "a" in x:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-    else:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-
-    if "a" not in x:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-    else:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+def open_typed_dict_container(value: Literal["present", "other", "missing", 1], values: OpenValues) -> None:
+    if value in values:
+        # TODO: It would be safe to narrow `1` away if we could distinguish exact `str` from a
+        # subclass of `str` with custom equality.
+        reveal_type(value)  # revealed: Literal["present", "other", "missing", 1]
 ```
 
 ## bool
