@@ -688,7 +688,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 && is_own_line_suppression
                                 && is_suppression_comment_lint(lint.name())
                             {
-                                line_range
+                                TextRange::new(comment.range().start(), line_range.end())
                             } else {
                                 suppressed_range
                             };

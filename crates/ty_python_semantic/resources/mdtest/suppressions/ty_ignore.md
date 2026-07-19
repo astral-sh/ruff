@@ -388,6 +388,15 @@ value = 1
 value = 1  # ty: ignore[*-*]
 ```
 
+An indented own-line comment can mix a suppression-comment rule with an ordinary rule without
+changing the source order of its suppression ranges.
+
+```py
+def f():
+    # ty: ignore[unresolved-reference, ignore-comment-unknown-rule, not-a-rule]
+    value = missing
+```
+
 ## Extra whitespace in type ignore comments is allowed
 
 ```py
