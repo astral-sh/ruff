@@ -455,6 +455,58 @@ mod tests {
     }
 
     #[test]
+    fn add_code_invalid_hash_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[<START>#<END>]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("invalid-ignore-comment"), @"
+        info[code-action]: Ignore 'invalid-ignore-comment' for this line
+         --> main.py:3:14
+          |
+        3 | # ty: ignore[#]
+          |              ^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[#]
+        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[#]
+        4 | value = 1
+          |
+        ");
+    }
+
+    #[test]
+    fn add_code_invalid_trailing_hash_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[unresolved-reference<START>#<END>]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("invalid-ignore-comment"), @"
+        info[code-action]: Ignore 'invalid-ignore-comment' for this line
+         --> main.py:3:34
+          |
+        3 | # ty: ignore[unresolved-reference#]
+          |                                  ^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[unresolved-reference#]
+        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[unresolved-reference#]
+        4 | value = 1
+          |
+        ");
+    }
+
+    #[test]
     fn no_ignore_code_action_for_shebang_suppression() {
         let test = CodeActionTest::with_source(
             r#"

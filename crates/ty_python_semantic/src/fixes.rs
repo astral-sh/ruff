@@ -1499,6 +1499,32 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_handles_invalid_hash_in_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[#]
+                value = 1
+                # ty: ignore[unresolved-reference#]
+                value = 1
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty:ignore[invalid-ignore-comment]  # ty: ignore[#]
+        value = 1
+        # ty:ignore[invalid-ignore-comment]  # ty: ignore[unresolved-reference#]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
     fn add_ignore_does_not_suppress_following_logical_line() {
         assert_snapshot!(
             suppress_all_in(r#"
