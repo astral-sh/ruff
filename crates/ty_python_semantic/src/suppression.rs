@@ -626,16 +626,14 @@ impl<'a> SuppressionsBuilder<'a> {
         let comment_token_start = tokens.token_range(comment.range().start()).start();
         let is_own_line_comment = indentation_at_offset(comment_token_start, self.source).is_some();
         let is_own_line_suppression = !comment.kind().is_type_ignore() && is_own_line_comment;
-        let line_range = if is_own_line_comment {
-            TextRange::new(comment.range().start(), line_range.end())
-        } else {
-            line_range
-        };
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
         } else if is_own_line_suppression {
-            own_line_suppression_range(comment.range(), tokens)
+            TextRange::new(
+                line_range.start(),
+                own_line_suppression_range(comment.range(), tokens).end(),
+            )
         } else {
             line_range
         };
@@ -694,7 +692,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 && is_suppression_comment_lint(lint.name())
                                 && lint.name() != UNUSED_IGNORE_COMMENT.name()
                             {
-                                TextRange::new(comment.range().start(), line_range.end())
+                                line_range
                             } else {
                                 suppressed_range
                             };

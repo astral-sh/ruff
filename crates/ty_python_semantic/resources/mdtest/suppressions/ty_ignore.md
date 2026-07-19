@@ -406,6 +406,14 @@ def f():
     value = missing
 ```
 
+A nested `type: ignore` retains whole-line coverage and can suppress an earlier sub-comment.
+
+```py
+def f():
+    # ty: ignore[not-a-rule] # type: ignore[ty:ignore-comment-unknown-rule]
+    value = 1
+```
+
 ## Extra whitespace in type ignore comments is allowed
 
 ```py
