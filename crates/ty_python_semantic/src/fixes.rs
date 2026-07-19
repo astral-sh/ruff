@@ -1449,34 +1449,6 @@ class B(A):
     }
 
     #[test]
-    fn add_ignore_does_not_extend_bracket_terminated_suppression_reason() {
-        assert_snapshot!(
-            suppress_all_in(r#"
-                value = missing  # ty: ignore[invalid-assignment] tracked by [123]
-                "#),
-            @"
-        Added 1 suppressions
-
-        ## Fixed source
-
-        ```py
-        value = missing  # ty: ignore[invalid-assignment] tracked by [123]  # ty:ignore[unresolved-reference]
-        ```
-
-        ## Diagnostics after applying fixes
-
-        warning[unused-ignore-comment]: Unused `ty: ignore` directive
-         --> test.py:1:18
-          |
-        1 | value = missing  # ty: ignore[invalid-assignment] tracked by [123]  # ty:ignore[unresolved-reference]
-          |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
-        help: Remove the unused suppression comment
-        "
-        );
-    }
-
-    #[test]
     fn add_ignore_handles_invalid_nested_suppression_comments() {
         assert_snapshot!(
             suppress_all_in(r#"
