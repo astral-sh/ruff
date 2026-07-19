@@ -9,7 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
-use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested_context};
+use super::{
+    DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested_context, TypeVar,
+};
 
 /// ## What it does
 ///
@@ -90,7 +92,7 @@ pub(crate) struct NonPEP695GenericFunction {
 }
 
 impl Violation for NonPEP695GenericFunction {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -169,21 +171,33 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         return;
     };
 
+    let diagnostic_range = TextRange::new(name.start(), parameters.end());
+    let mut diagnostic = checker.report_diagnostic(
+        NonPEP695GenericFunction {
+            name: name.to_string(),
+        },
+        diagnostic_range,
+    );
+
+    // A `TypeVar("T", *constraints)` (starred positional constraint) cannot
+    // be expressed in PEP 695 syntax — `[T: (*constraints)]` is a syntax
+    // error. Emit the diagnostic without an autofix so the user is informed
+    // they need to migrate manually. See issue #26954.
+    if type_vars
+        .iter()
+        .any(TypeVar::has_unrepresentable_restriction)
+    {
+        return;
+    }
+
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = DisplayTypeVars {
         type_vars: &type_vars,
         source: checker.source(),
     };
 
-    checker
-        .report_diagnostic(
-            NonPEP695GenericFunction {
-                name: name.to_string(),
-            },
-            TextRange::new(name.start(), parameters.end()),
-        )
-        .set_fix(Fix::unsafe_edit(Edit::insertion(
-            type_params.to_string(),
-            name.end(),
-        )));
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+        type_params.to_string(),
+        name.end(),
+    )));
 }

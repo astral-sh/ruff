@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP046 Generic class `GenericClass` uses `Generic` subclass instead of type parameters
+  --> UP046_3.py:15:20
+   |
+15 | class GenericClass(Generic[T1]):
+   |                    ^^^^^^^^^^^
+16 |     var: T1
+   |
+help: Use type parameters
+
+UP046 Generic class `Mixed` uses `Generic` subclass instead of type parameters
+  --> UP046_3.py:25:13
+   |
+25 | class Mixed(Generic[S, T2]):
+   |             ^^^^^^^^^^^^^^
+26 |     var: S
+27 |     other: T2
+   |
+help: Use type parameters

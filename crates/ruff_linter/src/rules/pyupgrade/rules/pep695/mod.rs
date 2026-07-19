@@ -93,6 +93,28 @@ impl TypeVar<'_> {
             source,
         }
     }
+
+    /// Returns `true` if this `TypeVar`'s restriction cannot be expressed in
+    /// PEP 695 type-parameter syntax.
+    ///
+    /// PEP 695's `[T: (...)]` constraint syntax requires the constraint tuple
+    /// to be a syntactic literal — it cannot reference a runtime-unpacked
+    /// tuple like `TypeVar("T", *constraints)` produces. Emitting a fix for
+    /// such a `TypeVar` would yield invalid syntax such as
+    /// `[T: (*constraints)]`, which Python rejects and Ruff reports as a
+    /// "Fix introduced a syntax error" failure (see issue #26954).
+    ///
+    /// Callers should skip the autofix when any `TypeVar` in the collected
+    /// set reports `true` here, while still emitting the diagnostic so the
+    /// user is aware the legacy `Generic[...]` / standalone `TypeVar` form
+    /// needs to be migrated manually.
+    pub(crate) fn has_unrepresentable_restriction(&self) -> bool {
+        matches!(
+            &self.restriction,
+            Some(TypeVarRestriction::Constraint(constraints))
+                if constraints.iter().any(|expr| expr.is_starred_expr())
+        )
+    }
 }
 
 impl Display for DisplayTypeVar<'_> {

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP047 Generic function `generic_function` should use type parameters
+  --> UP047_2.py:15:5
+   |
+15 | def generic_function(var: T1) -> T1:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     return var
+   |
+help: Use type parameters
+
+UP047 Generic function `mixed_function` should use type parameters
+  --> UP047_2.py:25:5
+   |
+25 | def mixed_function(t: T, x: T2) -> tuple[T, T2]:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 |     return (t, x)
+   |
+help: Use type parameters

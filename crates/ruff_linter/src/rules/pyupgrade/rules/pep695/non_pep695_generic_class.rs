@@ -10,6 +10,7 @@ use ruff_python_ast::PythonVersion;
 
 use super::{
     DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, find_generic, in_nested_context,
+    TypeVar,
 };
 
 /// ## What it does
@@ -236,6 +237,17 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             diagnostic.defuse();
             return;
         };
+
+        // A `TypeVar("T", *constraints)` (starred positional constraint) cannot
+        // be expressed in PEP 695 syntax — `[T: (*constraints)]` is a syntax
+        // error. Keep the diagnostic but skip the autofix so the user is
+        // informed they need to migrate manually. See issue #26954.
+        if type_vars
+            .iter()
+            .any(TypeVar::has_unrepresentable_restriction)
+        {
+            return;
+        }
 
         // build the fix as a String to avoid removing comments from the entire function body
         let type_params = DisplayTypeVars {
