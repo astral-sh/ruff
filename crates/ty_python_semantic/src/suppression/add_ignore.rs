@@ -58,10 +58,7 @@ pub fn suppress_all(
                     lints.insert(id);
                     *suppressed_diagnostics += 1;
                 }
-                Some(
-                    SuppressionCommentFix::SameLine
-                    | SuppressionCommentFix::FileLevelSameLine { .. },
-                ) => {
+                Some(SuppressionCommentFix::SameLine | SuppressionCommentFix::Shebang) => {
                     ids_with_suppression_range.push((
                         id,
                         diagnostic_range,
@@ -202,16 +199,15 @@ pub struct SuppressFix {
     pub suppressed_diagnostics: usize,
 }
 
-/// Creates a fix to suppress a single lint.
+/// Creates a fix to suppress a single lint, except for suppression diagnostics in a shebang.
 pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Option<Fix> {
     if is_suppression_comment_lint(id.name()) {
         match suppression_comment_fix(db, file, range)? {
             SuppressionCommentFix::LineLocal(start) => {
                 return Some(add_line_local_suppression(&[id.name()], start));
             }
-            SuppressionCommentFix::SameLine
-            | SuppressionCommentFix::FileLevelSameLine { is_shebang: false } => {}
-            SuppressionCommentFix::FileLevelSameLine { is_shebang: true } => return None,
+            SuppressionCommentFix::SameLine => {}
+            SuppressionCommentFix::Shebang => return None,
         }
     }
 
@@ -232,6 +228,7 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     ))
 }
 
+/// Returns whether a diagnostic can be included in a bulk suppression fix.
 pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
     !is_suppression_comment_lint(id) || suppression_comment_fix(db, file, range).is_some()
 }
@@ -239,9 +236,18 @@ pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRan
 enum SuppressionCommentFix {
     LineLocal(TextSize),
     SameLine,
-    FileLevelSameLine { is_shebang: bool },
+    Shebang,
 }
 
+/// Classifies how to suppress a diagnostic emitted for an existing ignore comment.
+///
+/// Own-line diagnostics get a line-local prefix, while inline and file-level diagnostics use an
+/// end-of-line suppression. Shebangs remain eligible for bulk fixes but not IDE quick fixes.
+///
+/// ```python
+/// seen_code = True
+/// # ty: ignore[not-a-rule]  # receives a line-local prefix
+/// ```
 fn suppression_comment_fix(
     db: &dyn Db,
     file: File,
@@ -264,8 +270,10 @@ fn suppression_comment_fix(
         .first_non_trivia_token
         .is_none_or(|start| comment.start() < start)
     {
-        return Some(SuppressionCommentFix::FileLevelSameLine {
-            is_shebang: source[comment.range()].starts_with("#!"),
+        return Some(if source[comment.range()].starts_with("#!") {
+            SuppressionCommentFix::Shebang
+        } else {
+            SuppressionCommentFix::SameLine
         });
     }
 
@@ -279,6 +287,7 @@ fn suppression_comment_fix(
     Some(SuppressionCommentFix::LineLocal(start))
 }
 
+/// Prepends a `ty: ignore` that suppresses only diagnostics on the existing comment line.
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
     let insertion = format!(
         "# ty:ignore[{codes}]  ",

@@ -75,6 +75,7 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 
+/// Returns whether `name` diagnoses an ignore comment rather than the code it suppresses.
 fn is_suppression_comment_lint(name: LintName) -> bool {
     name == IGNORE_COMMENT_UNKNOWN_RULE.name()
         || name == INVALID_IGNORE_COMMENT.name()
@@ -628,8 +629,8 @@ impl<'a> SuppressionsBuilder<'a> {
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = self.first_non_trivia_token.is_none();
         let comment_token_start = tokens.token_range(comment.range().start()).start();
-        let is_own_line_comment = indentation_at_offset(comment_token_start, self.source).is_some();
-        let is_own_line_suppression = !comment.kind().is_type_ignore() && is_own_line_comment;
+        let is_own_line_suppression = !comment.kind().is_type_ignore()
+            && indentation_at_offset(comment_token_start, self.source).is_some();
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
