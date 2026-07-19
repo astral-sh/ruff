@@ -1802,20 +1802,6 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    // TODO: This branch can be removed once https://github.com/astral-sh/ty/issues/501 is resolved
-                    Type::BoundMethod(bound_method)
-                        if bound_method.function(db).name(db) == "__iter__"
-                            && is_enum_class(db, bound_method.self_instance(db)) =>
-                    {
-                        if let Some(enum_instance) =
-                            bound_method.self_instance(db).to_instance_approximation(db)
-                        {
-                            overload.set_return_type(
-                                KnownClass::Iterator.to_specialized_instance(db, &[enum_instance]),
-                            );
-                        }
-                    }
-
                     function @ Type::FunctionLiteral(function_type)
                         if dataclass_field_specifiers.contains(&function) =>
                     {
