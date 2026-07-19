@@ -108,7 +108,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
     {
         for is_slice in [lower, upper, step].into_iter().flatten() {
             let Some(is_slice_type) = CheckableExprType::try_from(is_slice) else {
-                return;
+                continue;
             };
             if is_slice_type.is_literal() {
                 // If the index is a slice, require integer or null bounds
