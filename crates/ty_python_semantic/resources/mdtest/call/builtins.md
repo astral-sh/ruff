@@ -161,6 +161,25 @@ def _(
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
 ```
 
+An `isinstance` check against `Callable` is always true when the checked value is known to be
+callable. This applies to both `typing.Callable` and `collections.abc.Callable`, including after a
+preceding `isinstance` check narrows a union.
+
+```py
+from collections.abc import Callable
+from typing import Callable as TypingCallable
+
+def reveal_callable_result(x: Callable[[int], int], y: Callable[[int], int] | dict[str, int]):
+    reveal_type(isinstance(x, Callable))  # revealed: Literal[True]
+    reveal_type(isinstance(x, TypingCallable))  # revealed: Literal[True]
+
+    if isinstance(y, dict):
+        return
+
+    reveal_type(isinstance(y, Callable))  # revealed: Literal[True]
+    reveal_type(isinstance(y, TypingCallable))  # revealed: Literal[True]
+```
+
 An `isinstance` check against a tuple is always true when each possible type of the checked value is
 accepted by at least one class in the tuple. This avoids a false implicit-return error when the
 check is the only path that returns a value. The same applies when the tuple is assigned to a local

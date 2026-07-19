@@ -5400,6 +5400,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
+
+        // Some typing special forms are valid class-info arguments at runtime but are not
+        // assignable to typeshed's `isinstance`/`issubclass` class-info annotation.
+        let is_valid_isinstance_target = parameter_index == 1
+            && adjusted_argument_index == Some(1)
+            && matches!(
+                self.signature_type
+                    .as_function_literal()
+                    .and_then(|function| function.known(self.db)),
+                Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+            )
+            && argument_type
+                .as_special_form()
+                .is_some_and(SpecialFormType::is_valid_isinstance_target);
+
         // This is one of the few places where we want to check if there's _any_ specialization
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
@@ -5416,6 +5431,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
+            && !is_valid_isinstance_target
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
@@ -7453,31 +7469,6 @@ impl<'db> BindingError<'db> {
                 provided_ty,
                 provenance,
             } => {
-                // Certain special forms in the typing module are aliases for classes
-                // elsewhere in the standard library. These special forms are not instances of `type`,
-                // and you cannot use them in place of their aliased classes in *all* situations:
-                // for example, `dict()` succeeds at runtime, but `typing.Dict()` fails. However,
-                // they *can* all be used as the second argument to `isinstance` and `issubclass`.
-                // We model that specific aspect of their behaviour here.
-                //
-                // This is implemented as a special case in call-binding machinery because overriding
-                // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
-                // error-prone, due to the fact that they are annotated with recursive type aliases.
-                if parameter.index == 1
-                    && *argument_index == Some(1)
-                    && matches!(
-                        callable_ty
-                            .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
-                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
-                    )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
-                {
-                    return;
-                }
-
                 // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
                 // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
                 // silenced diagnostics during overload evaluation, and rely on the assignability
