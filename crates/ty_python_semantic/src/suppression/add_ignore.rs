@@ -232,7 +232,11 @@ fn line_local_suppression_start(db: &dyn Db, file: File, range: TextRange) -> Op
         return None;
     }
 
-    Some(comment.start())
+    let source = source_text(db, file);
+    let before_diagnostic = &source[TextRange::new(comment.start(), range.end())];
+    let hash = before_diagnostic.rfind('#')?;
+
+    Some(comment.start() + before_diagnostic[..hash].text_len())
 }
 
 fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {

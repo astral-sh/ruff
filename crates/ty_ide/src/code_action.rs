@@ -354,6 +354,52 @@ mod tests {
     }
 
     #[test]
+    fn add_code_unknown_rule_after_type_comment() {
+        let test = CodeActionTest::with_source(
+            r#"
+            items = []  # type: list[int]  # ty: ignore[<START>not-a-rule<END>]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:2:45
+          |
+        2 | items = []  # type: list[int]  # ty: ignore[not-a-rule]
+          |                                             ^^^^^^^^^^
+          |
+          |
+        1 |
+          - items = []  # type: list[int]  # ty: ignore[not-a-rule]
+        2 + items = []  # type: list[int]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+          |
+        ");
+    }
+
+    #[test]
+    fn add_code_unknown_rule_after_type_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            value = "x"  # type: ignore[assignment]  # ty: ignore[<START>not-a-rule<END>]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @r#"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:2:55
+          |
+        2 | value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
+          |                                                       ^^^^^^^^^^
+          |
+          |
+        1 |
+          - value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
+        2 + value = "x"  # type: ignore[assignment]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+          |
+        "#);
+    }
+
+    #[test]
     fn add_code_nested_unknown_rule_ignore() {
         let test = CodeActionTest::with_source(
             r#"

@@ -1403,6 +1403,30 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_preserves_leading_type_directives() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                items = []  # type: list[int]  # ty: ignore[not-a-rule]
+                invalid = []  # type: list[str]  # ty: ignore[*-*]
+                value = "x"  # type: ignore[assignment]  # ty: ignore[another-not-a-rule]
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        items = []  # type: list[int]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        invalid = []  # type: list[str]  # type:ignore[ty:invalid-ignore-comment]  # ty: ignore[*-*]
+        value = "x"  # type: ignore[assignment]  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule]
+        ```
+        "#
+        );
+    }
+
+    #[test]
     fn add_ignore_handles_nested_suppression_comments() {
         assert_snapshot!(
             suppress_all_in(r#"
