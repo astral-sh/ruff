@@ -3328,7 +3328,8 @@ impl<'db> Type<'db> {
                     return Some((ty, AttributeKind::NormalOrNonDataDescriptor));
                 }
                 Type::Callable(callable)
-                    if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
+                    if let is_function_like = callable.is_function_like(db)
+                        && (is_function_like || callable.is_classmethod_like(db)) =>
                 {
                     // For "function-like" or "classmethod-like" callables, model the behavior of
                     // `FunctionType.__get__` or `classmethod.__get__`.
@@ -3338,7 +3339,7 @@ impl<'db> Type<'db> {
                     // method of these synthesized functions. The method-wrapper would then be returned from
                     // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                     // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                    return if instance.is_none() && callable.is_function_like(db) {
+                    return if instance.is_none() && is_function_like {
                         Some((ty, AttributeKind::NormalOrNonDataDescriptor))
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
@@ -4258,7 +4259,7 @@ impl<'db> Type<'db> {
                     let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    (match name_str {
+                    let ty = match name_str {
                         "name" if is_enum_subclass => {
                             enum_class.name_type(db, enum_literal.name(db))
                         }
@@ -4268,9 +4269,9 @@ impl<'db> Type<'db> {
                         }
                         "_value_" => enum_class.value_type(db, enum_literal.name(db)),
                         _ => None,
-                    })
-                    .map_or_else(|| Place::Undefined, Place::bound)
-                    .into()
+                    };
+
+                    ty.map(Place::bound).unwrap_or_default().into()
                 }
 
                 Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -4308,27 +4309,22 @@ impl<'db> Type<'db> {
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                        && enum_metadata(db, instance.class_literal(db)).is_some()
-                        && !enums::class_defines_property(
-                            db,
-                            instance.class_literal(db),
-                            name_str,
-                        ) =>
+                        && let class_literal = instance.class_literal(db)
+                        && let Some(metadata) = enum_metadata(db, class_literal)
+                        && !enums::class_defines_property(db, class_literal, name_str) =>
                 {
-                    let class_literal = instance.class_literal(db);
                     let is_enum_subclass = Type::ClassLiteral(class_literal)
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    enum_metadata(db, class_literal)
-                        .and_then(|metadata| match name_str {
-                            "name" if is_enum_subclass => metadata.instance_name_type(db),
-                            "_name_" => metadata.instance_name_type(db),
-                            "value" if is_enum_subclass => metadata.instance_value_type(db),
-                            "_value_" => metadata.instance_value_type(db),
-                            _ => None,
-                        })
-                        .map_or_else(Place::default, Place::bound)
-                        .into()
+                    let ty = match name_str {
+                        "name" if is_enum_subclass => metadata.instance_name_type(db),
+                        "_name_" => metadata.instance_name_type(db),
+                        "value" if is_enum_subclass => metadata.instance_value_type(db),
+                        "_value_" => metadata.instance_value_type(db),
+                        _ => None,
+                    };
+
+                    ty.map(Place::bound).unwrap_or_default().into()
                 }
 
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))

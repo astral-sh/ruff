@@ -1194,15 +1194,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ),
 
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
-                if source_instance.is_type_form_value() =>
+                if let Some(source_argument) = source_instance.type_form_argument(db) =>
             {
-                source_instance.type_form_argument(db).when_some_and(
-                    db,
-                    self.constraints,
-                    |source_argument| {
-                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
-                    },
-                )
+                self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
             }
 
             (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form

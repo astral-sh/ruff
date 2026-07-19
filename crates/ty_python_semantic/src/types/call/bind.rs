@@ -1748,52 +1748,44 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::BoundMethod(bound_method)
-                        if bound_method.self_instance(db).is_property_instance() =>
+                        if let Type::PropertyInstance(property) =
+                            bound_method.self_instance(db) =>
                     {
                         match bound_method.function(db).name(db).as_str() {
                             "setter" => {
                                 if let [Some(_), Some(setter)] = overload.parameter_types() {
-                                    let mut ty_property = bound_method.self_instance(db);
-                                    if let Type::PropertyInstance(property) = ty_property {
-                                        ty_property =
-                                            Type::PropertyInstance(property.with_accessors(
-                                                db,
-                                                property.getter(db),
-                                                Some(*setter),
-                                                property.deleter(db),
-                                            ));
-                                    }
-                                    overload.set_return_type(ty_property);
+                                    overload.set_return_type(Type::PropertyInstance(
+                                        property.with_accessors(
+                                            db,
+                                            property.getter(db),
+                                            Some(*setter),
+                                            property.deleter(db),
+                                        ),
+                                    ));
                                 }
                             }
                             "getter" => {
                                 if let [Some(_), Some(getter)] = overload.parameter_types() {
-                                    let mut ty_property = bound_method.self_instance(db);
-                                    if let Type::PropertyInstance(property) = ty_property {
-                                        ty_property =
-                                            Type::PropertyInstance(property.with_accessors(
-                                                db,
-                                                Some(*getter),
-                                                property.setter(db),
-                                                property.deleter(db),
-                                            ));
-                                    }
-                                    overload.set_return_type(ty_property);
+                                    overload.set_return_type(Type::PropertyInstance(
+                                        property.with_accessors(
+                                            db,
+                                            Some(*getter),
+                                            property.setter(db),
+                                            property.deleter(db),
+                                        ),
+                                    ));
                                 }
                             }
                             "deleter" => {
                                 if let [Some(_), Some(deleter)] = overload.parameter_types() {
-                                    let mut ty_property = bound_method.self_instance(db);
-                                    if let Type::PropertyInstance(property) = ty_property {
-                                        ty_property =
-                                            Type::PropertyInstance(property.with_accessors(
-                                                db,
-                                                property.getter(db),
-                                                property.setter(db),
-                                                Some(*deleter),
-                                            ));
-                                    }
-                                    overload.set_return_type(ty_property);
+                                    overload.set_return_type(Type::PropertyInstance(
+                                        property.with_accessors(
+                                            db,
+                                            property.getter(db),
+                                            property.setter(db),
+                                            Some(*deleter),
+                                        ),
+                                    ));
                                 }
                             }
                             _ => {
@@ -5734,7 +5726,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     callable_binding.overload_call_return_type,
                     Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
                 ) {
-                    extend_errors(&callable_binding.overloads().first().unwrap().errors);
+                    extend_errors(&callable_binding.overloads()[0].errors);
                 }
             }
         }
