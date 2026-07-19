@@ -587,6 +587,12 @@ def equality_and_membership(x: Foo | None, y: Foo, values: list[Foo]):
         reveal_type(x)  # revealed: Foo | None
     if x in values:
         reveal_type(x)  # revealed: Foo | None
+
+class C: ...
+
+def broad_union_membership(origin: C | int):
+    if origin in ("x",):
+        reveal_type(origin)  # revealed: C & ~int
 ```
 
 ```py
