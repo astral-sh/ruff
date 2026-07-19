@@ -17,6 +17,7 @@ use rustc_hash::FxHasher;
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
+pub(crate) use crate::suppression::add_ignore::can_suppress;
 pub use crate::suppression::add_ignore::{SuppressFix, suppress_all, suppress_single};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
@@ -74,6 +75,13 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 
+fn is_suppression_comment_lint(name: LintName) -> bool {
+    name == IGNORE_COMMENT_UNKNOWN_RULE.name()
+        || name == INVALID_IGNORE_COMMENT.name()
+        || name == BLANKET_IGNORE_COMMENT.name()
+        || is_unused_ignore_comment_lint(name)
+}
+
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
@@ -86,7 +94,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
 
     for token in parsed.tokens() {
         if !token.kind().is_trivia() {
-            builder.set_seen_non_trivia_token();
+            builder.set_first_non_trivia_token(token.start());
         }
 
         match token.kind() {
@@ -309,6 +317,9 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
 /// The suppressions of a single file.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppressions {
+    /// The start of the first non-trivia token, if any.
+    first_non_trivia_token: Option<TextSize>,
+
     /// Suppressions that apply to the entire file.
     ///
     /// The suppressions are sorted by [`Suppression::comment_range`] and the [`Suppression::suppressed_range`]
@@ -563,8 +574,8 @@ struct SuppressionsBuilder<'a> {
     source: &'a str,
 
     /// Ignore comments at the top of the file before any non-trivia code apply to the entire file.
-    /// This boolean tracks if there has been any non trivia token.
-    seen_non_trivia_token: bool,
+    /// This offset tracks whether there has been any non-trivia token.
+    first_non_trivia_token: Option<TextSize>,
 
     inline: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
@@ -577,7 +588,7 @@ impl<'a> SuppressionsBuilder<'a> {
         Self {
             source,
             lint_registry,
-            seen_non_trivia_token: false,
+            first_non_trivia_token: None,
             inline: Vec::new(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
@@ -585,8 +596,8 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn set_seen_non_trivia_token(&mut self) {
-        self.seen_non_trivia_token = true;
+    fn set_first_non_trivia_token(&mut self, start: TextSize) {
+        self.first_non_trivia_token.get_or_insert(start);
     }
 
     fn finish(mut self) -> Suppressions {
@@ -595,6 +606,7 @@ impl<'a> SuppressionsBuilder<'a> {
         self.invalid.shrink_to_fit();
 
         Suppressions {
+            first_non_trivia_token: self.first_non_trivia_token,
             file: self.file,
             inline: IntervalIndex::from_sorted(self.inline),
             unknown: self.unknown,
@@ -610,7 +622,7 @@ impl<'a> SuppressionsBuilder<'a> {
         // > Blank lines and other comments, such as shebang lines and coding cookies,
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
-        let is_file_suppression = !self.seen_non_trivia_token;
+        let is_file_suppression = self.first_non_trivia_token.is_none();
         let comment_token_start = tokens.token_range(comment.range().start()).start();
 
         let suppressed_range = if is_file_suppression {

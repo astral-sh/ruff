@@ -167,6 +167,50 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
 }
 
 #[test]
+fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "unknown_rule.py",
+        r#"
+            seen_code = True
+            # ty: ignore[not-a-rule]
+            value = 1
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--add-ignore")
+            .arg("--config")
+            .arg("analysis.respect-type-ignore-comments=false"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[ignore-comment-unknown-rule]: Unknown rule `not-a-rule`
+     --> unknown_rule.py:3:14
+      |
+    3 | # ty: ignore[not-a-rule]
+      |              ^^^^^^^^^^
+      |
+
+    Found 1 diagnostic
+    Added 0 ignore comment
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("unknown_rule.py"))?, @"
+
+    seen_code = True
+    # ty: ignore[not-a-rule]
+    value = 1
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn fix() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "unused_ignore.py",

@@ -22,7 +22,8 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::lint::LintId;
 use crate::suppression::{
-    SuppressionKind, Suppressions, select_preferred_suppression, suppressions,
+    SuppressionKind, Suppressions, is_suppression_comment_lint, select_preferred_suppression,
+    suppressions,
 };
 
 /// Creates fixes to suppress all violations in `ids_with_range`.
@@ -41,18 +42,24 @@ pub fn suppress_all(
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
-    // Compute the full suppression ranges for each diagnostic, while retaining the original
-    // diagnostic ranges for matching existing suppressions.
-    let mut ids_with_suppression_range: Vec<_> = ids_with_range
-        .iter()
-        .map(|&(id, diagnostic_range)| {
-            (
+    let mut line_local = BTreeMap::<TextSize, (BTreeSet<LintName>, usize)>::new();
+    let mut ids_with_suppression_range = Vec::with_capacity(ids_with_range.len());
+
+    for &(id, diagnostic_range) in ids_with_range {
+        if is_suppression_comment_lint(id) {
+            if let Some(start) = line_local_suppression_start(db, file, diagnostic_range) {
+                let (lints, suppressed_diagnostics) = line_local.entry(start).or_default();
+                lints.insert(id);
+                *suppressed_diagnostics += 1;
+            }
+        } else {
+            ids_with_suppression_range.push((
                 id,
                 diagnostic_range,
                 suppression_range(db, file, diagnostic_range),
-            )
-        })
-        .collect();
+            ));
+        }
+    }
 
     // Sort the suppression ranges by their start position and length (end position).
     // This ensures that a diagnostic with a shorter range is processed before
@@ -73,9 +80,21 @@ pub fn suppress_all(
     // but also the diagnostic with the wider range (because the suppression is on its start line).
     ids_with_suppression_range.sort_unstable_by_key(|(_, _, range)| (range.start(), range.end()));
 
-    let mut fixes = Vec::with_capacity(ids_with_suppression_range.len());
+    let mut fixes = Vec::with_capacity(ids_with_suppression_range.len() + line_local.len());
     let mut with_existing = Vec::new();
     let mut without_existing = Vec::new();
+
+    fixes.extend(
+        line_local
+            .into_iter()
+            .map(|(start, (lints, suppressed_diagnostics))| SuppressFix {
+                fix: add_line_local_suppression(
+                    &lints.into_iter().collect::<SmallVec<[_; 2]>>(),
+                    start,
+                ),
+                suppressed_diagnostics,
+            }),
+    );
 
     // Choose the final existing suppression for every diagnostic before grouping any edits.
     for (id, diagnostic_range, suppression_range) in ids_with_suppression_range {
@@ -166,7 +185,12 @@ pub struct SuppressFix {
 }
 
 /// Creates a fix to suppress a single lint.
-pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
+pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Option<Fix> {
+    if is_suppression_comment_lint(id.name()) {
+        let start = line_local_suppression_start(db, file, range)?;
+        return Some(add_line_local_suppression(&[id.name()], start));
+    }
+
     let suppression_range = suppression_range(db, file, range);
 
     let suppressions = suppressions(db, file);
@@ -174,10 +198,49 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     let codes = &[id.name()];
 
     if let Some(existing) = find_existing_suppression(suppressions, &source, range) {
-        return add_to_existing_suppression(existing, codes);
+        return Some(add_to_existing_suppression(existing, codes));
     }
 
-    add_end_of_line_suppression(&source, codes, suppression_range.end())
+    Some(add_end_of_line_suppression(
+        &source,
+        codes,
+        suppression_range.end(),
+    ))
+}
+
+pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
+    !is_suppression_comment_lint(id) || line_local_suppression_start(db, file, range).is_some()
+}
+
+fn line_local_suppression_start(db: &dyn Db, file: File, range: TextRange) -> Option<TextSize> {
+    if !db.analysis_settings(file).respect_type_ignore_comments {
+        return None;
+    }
+
+    let parsed = parsed_module(db, file).load(db);
+    let tokens = parsed.tokens();
+    let comment = tokens
+        .at_offset(range.start())
+        .find(|token| token.kind() == TokenKind::Comment)?;
+
+    // A suppression before the first non-trivia token is file-level, so adding one there would
+    // affect diagnostics throughout the file.
+    if suppressions(db, file)
+        .first_non_trivia_token
+        .is_none_or(|start| comment.start() < start)
+    {
+        return None;
+    }
+
+    Some(comment.start())
+}
+
+fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
+    let insertion = format!(
+        "# type:ignore[{codes}]  ",
+        codes = Codes(SuppressionKind::TypeIgnore, codes)
+    );
+    Fix::safe_edit(Edit::insertion(insertion, start))
 }
 
 /// Returns the suppression range for the given `range`.

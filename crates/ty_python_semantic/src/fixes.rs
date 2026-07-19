@@ -1,4 +1,4 @@
-use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
+use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all, suppression::can_suppress};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -93,7 +93,7 @@ where
 
     let has_fixable = diagnostics
         .iter()
-        .any(|diagnostic| fix_mode.is_fixable(diagnostic));
+        .any(|diagnostic| fix_mode.is_fixable(db, diagnostic));
 
     // Early return if there are no diagnostics that can be suppressed to avoid all the heavy work below.
     if !has_fixable {
@@ -204,6 +204,7 @@ where
 
                     if is_last_iteration {
                         let diagnostic = create_too_many_iterations_diagnostics(
+                            &*db,
                             file.file,
                             fix_mode,
                             file.diagnostics(),
@@ -324,13 +325,14 @@ fn create_fix_introduced_syntax_error_diagnostic(
 }
 
 fn create_too_many_iterations_diagnostics(
+    db: &dyn Db,
     file: File,
     fix_mode: FixMode,
     diagnostics: &[Diagnostic],
 ) -> Diagnostic {
     let mut fixable_ids = diagnostics
         .iter()
-        .filter(|diagnostic| fix_mode.is_fixable(diagnostic))
+        .filter(|diagnostic| fix_mode.is_fixable(db, diagnostic))
         .map(|diagnostic| diagnostic.id().as_str())
         .collect::<Vec<_>>();
 
@@ -362,19 +364,18 @@ enum FixMode {
 }
 
 impl FixMode {
-    fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+    fn is_fixable(self, db: &dyn Db, diagnostic: &Diagnostic) -> bool {
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
 
         match self {
-            FixMode::Suppress => {
-                primary_span.range().is_some()
-                    && diagnostic
-                        .id()
-                        .as_lint()
-                        .is_some_and(|name| !is_unused_ignore_comment_lint(name))
-            }
+            FixMode::Suppress => primary_span.range().is_some_and(|range| {
+                diagnostic.id().as_lint().is_some_and(|name| {
+                    !is_unused_ignore_comment_lint(name)
+                        && can_suppress(db, primary_span.expect_ty_file(), name, range)
+                })
+            }),
             FixMode::ApplyFixes(applicability) => diagnostic.has_applicable_fix(applicability),
         }
     }
@@ -395,6 +396,10 @@ impl FixMode {
                         // We can't suppress diagnostics without a corresponding file or range.
                         let span = diagnostic.primary_span()?;
                         let range = span.range()?;
+
+                        if !can_suppress(db, file, lint_id, range) {
+                            return None;
+                        }
 
                         Some((lint_id, range))
                     })
@@ -1358,6 +1363,170 @@ class B(A):
     }
 
     #[test]
+    fn add_ignore_updates_own_line_unknown_rule_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]
+                value = 1
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_preserves_bracket_terminated_suppression_reason() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_handles_nested_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+                value = missing
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        value = missing
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_extend_bracket_terminated_suppression_reason() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[invalid-assignment] tracked by [123]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # ty: ignore[invalid-assignment] tracked by [123]  # ty:ignore[unresolved-reference]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive
+         --> test.py:1:18
+          |
+        1 | value = missing  # ty: ignore[invalid-assignment] tracked by [123]  # ty:ignore[unresolved-reference]
+          |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |
+        help: Remove the unused suppression comment
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_handles_invalid_nested_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+                value = missing
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # type:ignore[ty:invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        value = missing
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_suppress_following_logical_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]
+                value = 1  # ty: ignore[another-not-a-rule]
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        value = 1  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_preserves_shebang_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
+                value = 1
+                "#),
+            @"
+        Added 0 suppressions
+
+        ## Fixed source
+
+        ```py
+        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
+        value = 1
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[ignore-comment-unknown-rule]: Unknown rule `not-a-rule`
+         --> test.py:1:43
+          |
+        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]
+          |                                           ^^^^^^^^^^
+        2 | value = 1
+          |
+        "
+        );
+    }
+
+    #[test]
     fn add_ignore_updates_inner_own_line_suppression() {
         assert_snapshot!(
             suppress_all_in(r#"
@@ -1965,11 +2134,11 @@ class B(A):
         let total_diagnostics = diagnostics.len();
         let suppressible_diagnostics = diagnostics
             .iter()
-            .filter(|diagnostic| FixMode::Suppress.is_fixable(diagnostic))
+            .filter(|diagnostic| FixMode::Suppress.is_fixable(&db, diagnostic))
             .count();
         let unsuppressible_diagnostics: Vec<_> = diagnostics
             .iter()
-            .filter(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            .filter(|diagnostic| !FixMode::Suppress.is_fixable(&db, diagnostic))
             .cloned()
             .collect();
         let cancellation_token_source = CancellationTokenSource::new();
@@ -1986,7 +2155,7 @@ class B(A):
                 fixes
                     .diagnostics
                     .iter()
-                    .all(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+                    .all(|diagnostic| !FixMode::Suppress.is_fixable(&db, diagnostic))
             );
 
             let unexpected_diagnostics =
