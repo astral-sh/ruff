@@ -1551,12 +1551,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Records an already-created definition in the current scope.
     ///
-    /// `binding_shadowing` overrides the ordinary assignment behavior for synthetic bindings.
+    /// `previous_definitions` overrides the ordinary assignment behavior for synthetic bindings.
     fn record_definition(
         &mut self,
         place: ScopedPlaceId,
         definition: Definition<'db>,
-        binding_shadowing: Option<(PreviousDefinitions, FutureDefinitions)>,
+        previous_definitions: Option<PreviousDefinitions>,
     ) {
         let kind = definition.kind(self.db);
         let is_loop_header = kind.is_loop_header();
@@ -1587,15 +1587,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                let (previous, future) = binding_shadowing.unwrap_or((
-                    if is_loop_header {
-                        PreviousDefinitions::AreKept
-                    } else {
-                        PreviousDefinitions::AreShadowed
-                    },
+                let previous = previous_definitions.unwrap_or(if is_loop_header {
+                    PreviousDefinitions::AreKept
+                } else {
+                    PreviousDefinitions::AreShadowed
+                });
+                use_def.record_binding(
+                    place,
+                    definition,
+                    previous,
                     FutureDefinitions::ShadowThisOne,
-                ));
-                use_def.record_binding(place, definition, previous, future);
+                );
                 if !is_loop_header {
                     self.delete_associated_bindings(place);
                 }
@@ -1877,8 +1879,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.forward_comprehension_binding(&name, first_declaration, symbol);
 
             let place: ScopedPlaceId = symbol.into();
-            self.mark_place_bound(place);
             if binding_status == LiveBindingStatus::Unbound {
+                self.mark_place_bound(place);
                 continue;
             }
 
@@ -1898,8 +1900,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             } else {
                 PreviousDefinitions::AreKept
             };
-            let shadowing = Some((previous, FutureDefinitions::ShadowThisOne));
-            self.record_definition(place, definition, shadowing);
+            self.record_definition(place, definition, Some(previous));
         }
     }
 
@@ -2003,37 +2004,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         let containing_scope_id = containing_scope.file_scope_id;
-        let kind = match self.scopes[containing_scope_id].kind() {
-            ScopeKind::Module => GlobalOrNonlocal::Global,
-            ScopeKind::Function | ScopeKind::Lambda => {
-                let is_global = self.place_tables[containing_scope_id]
-                    .symbol_id(&name)
-                    .is_some_and(|symbol| {
-                        self.place_tables[containing_scope_id]
-                            .symbol(symbol)
-                            .is_global()
-                    });
-                if is_global {
-                    GlobalOrNonlocal::Global
-                } else {
-                    GlobalOrNonlocal::Nonlocal
-                }
-            }
+        let is_global = match self.scopes[containing_scope_id].kind() {
+            ScopeKind::Module => true,
+            ScopeKind::Function | ScopeKind::Lambda => self.place_tables[containing_scope_id]
+                .symbol_id(&name)
+                .is_some_and(|symbol| {
+                    self.place_tables[containing_scope_id]
+                        .symbol(symbol)
+                        .is_global()
+                }),
             // Assignment expressions are invalid in comprehensions directly contained by these
             // scopes. Leave the recovered target local to the comprehension.
             ScopeKind::Class | ScopeKind::TypeAlias | ScopeKind::TypeParams => return,
             ScopeKind::Comprehension => return,
         };
 
-        match kind {
-            GlobalOrNonlocal::Global => self
-                .current_place_table_mut()
+        if is_global {
+            self.current_place_table_mut()
                 .symbol_mut(symbol)
-                .mark_global(),
-            GlobalOrNonlocal::Nonlocal => self
-                .current_place_table_mut()
+                .mark_global();
+        } else {
+            self.current_place_table_mut()
                 .symbol_mut(symbol)
-                .mark_nonlocal(),
+                .mark_nonlocal();
         }
         self.current_scope_info_mut()
             .this_scope_global_or_nonlocal_declarations
@@ -2673,13 +2666,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// ```
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
         self.visit_expr(if_expr);
-        let fallback = self.flow_snapshot();
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
             snapshots.falsy
         } else {
-            fallback
+            self.flow_snapshot()
         };
 
         let (predicate, narrowing_id) = self.record_expression_narrowing_constraint(if_expr);

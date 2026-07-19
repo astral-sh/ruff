@@ -2312,8 +2312,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 pending,
                 &mut self.reachability_constraints,
             )
-            .bindings()
-            .clone();
+            .bindings();
 
         let mut has_binding = false;
         let mut has_unbound = false;
@@ -2321,7 +2320,7 @@ impl<'db> UseDefMapBuilder<'db> {
             if binding.reachability_constraint() == ScopedReachabilityConstraintId::ALWAYS_FALSE {
                 continue;
             }
-            match self.definition(binding.binding()) {
+            match self.all_definitions[binding.binding()] {
                 DefinitionState::Defined(_) => has_binding = true,
                 DefinitionState::Undefined | DefinitionState::Deleted => has_unbound = true,
             }
