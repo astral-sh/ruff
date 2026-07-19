@@ -372,8 +372,8 @@ reveal_type(a)  # ty: ignore[revealed-type]
 
 ## Suppressing suppression diagnostics on an own line
 
-Suppression-comment rules on an own line apply only to that physical line, so they don't silently
-suppress a similar diagnostic on the following logical line.
+Unknown-rule and invalid-comment suppressions on an own line apply only to that physical line, so
+they don't silently suppress a similar diagnostic on the following logical line.
 
 ```py
 seen_code = True
@@ -386,6 +386,15 @@ value = 1  # ty: ignore[another-not-a-rule]
 value = 1
 # error: [invalid-ignore-comment]
 value = 1  # ty: ignore[*-*]
+```
+
+An `unused-ignore-comment` suppression retains normal own-line coverage so it can suppress an unused
+directive on the following logical line.
+
+```py
+seen_code = True
+# ty: ignore[unused-ignore-comment]
+value = 1  # type: ignore[ty:division-by-zero]
 ```
 
 An indented own-line comment can mix a suppression-comment rule with an ordinary rule without

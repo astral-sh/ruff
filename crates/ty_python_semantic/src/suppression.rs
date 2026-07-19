@@ -692,6 +692,7 @@ impl<'a> SuppressionsBuilder<'a> {
                             let suppressed_range = if !is_file_suppression
                                 && is_own_line_suppression
                                 && is_suppression_comment_lint(lint.name())
+                                && lint.name() != UNUSED_IGNORE_COMMENT.name()
                             {
                                 TextRange::new(comment.range().start(), line_range.end())
                             } else {
