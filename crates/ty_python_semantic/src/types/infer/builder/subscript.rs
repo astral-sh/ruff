@@ -64,7 +64,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
         type TypedDictKeyExpectedTypeVisitor<'db> =
-            CycleDetector<TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
 
         fn imp<'db>(
             db: &'db dyn Db,
@@ -100,7 +100,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))
                 }
                 _ => None,
             }

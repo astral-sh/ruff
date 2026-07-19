@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::{cell::Cell, fmt::Write};
 
 use crate::{
     Db,
@@ -8,7 +8,7 @@ use crate::{
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
-        visitor,
+        visitor::{self, TypeKind, TypeVisitor, walk_non_atomic_type},
     },
 };
 use ty_python_core::{
@@ -232,6 +232,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
+#[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
@@ -261,6 +262,41 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns whether this alias participates in a recursive alias definition.
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        self.unspecialized(db)
+            .references_alias(db, self.definition(db))
+    }
+
+    fn unspecialized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                None,
+            )),
+            TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
+    /// Returns whether this alias's value references `target` through named aliases.
+    ///
+    /// `false` seeds the least fixed point of alias reachability.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| false,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn references_alias(self, db: &'db dyn Db, target: Definition<'db>) -> bool {
+        let visitor = AliasReferenceVisitor {
+            target,
+            found: Cell::new(false),
+        };
+        visitor.visit_type(db, self.raw_value_type(db));
+        visitor.found.get()
+    }
+
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
@@ -283,13 +319,6 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
-        }
-    }
-
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -309,6 +338,45 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
+struct AliasReferenceVisitor<'db> {
+    target: Definition<'db>,
+    found: Cell<bool>,
+}
+
+impl<'db> TypeVisitor<'db> for AliasReferenceVisitor<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+
+        if let Type::TypeAlias(alias) = ty {
+            if alias.definition(db) == self.target {
+                self.found.set(true);
+                return;
+            }
+
+            if let Some(specialization) = alias.specialization(db) {
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
+            if !self.found.get() && alias.unspecialized(db).references_alias(db, self.target) {
+                self.found.set(true);
+            }
+            return;
+        }
+
+        if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
+            walk_non_atomic_type(db, non_atomic, self);
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
     #[salsa::tracked(
@@ -317,7 +385,35 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
-        self.value_type(db).variance_of(db, typevar)
+        let Some(generic_context) = self.generic_context(db) else {
+            return self.value_type(db).variance_of(db, typevar);
+        };
+
+        // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
+        // here would recursively request the same `variance_of` query.
+        if generic_context
+            .variables(db)
+            .any(|alias_typevar| alias_typevar.identity(db) == typevar)
+        {
+            return self.raw_value_type(db).variance_of(db, typevar);
+        }
+
+        let raw_value_type = self.raw_value_type(db);
+        let specialization = self
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+
+        // For external typevars, variance flows through the specialization arguments. Expanding
+        // the specialized alias body here can create ever-larger recursive alias applications.
+        generic_context
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(alias_typevar, argument_ty)| {
+                raw_value_type
+                    .variance_of(db, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(db, typevar))
+            })
+            .collect()
     }
 }
 

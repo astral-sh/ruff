@@ -630,6 +630,74 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Growing recursive alias relations without unions
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Left[T] = tuple[Left[list[T]]]
+type Right[T] = tuple[Right[list[T]]]
+
+# TODO: Left[int] should be equivalent to (subtype of) Right[int]
+static_assert(not is_subtype_of(Left[int], Right[int]))
+```
+
+### Non-recursive nested generic aliases
+
+A repeated use of the same generic alias can be a finite alias application instead of recursion.
+
+```py
+from typing import Literal
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type NonRecursiveId[T] = T
+
+static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
+static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
+static_assert(truth)
+
+one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
+reveal_type(one + 1)  # revealed: Literal[2]
+reveal_type(one == 1)  # revealed: Literal[True]
+
+def nested_union(
+    value: list[NonRecursiveId[NonRecursiveId[int]]] | list[int],
+):
+    reveal_type(value)  # revealed: list[NonRecursiveId[NonRecursiveId[int]]]
+
+# A finite nested application can also be hidden behind another named alias.
+type Intermediate[T] = T
+type LeftIntAlias = NonRecursiveId[int]
+type RightIntAlias = NonRecursiveId[int]
+
+def finite_alias_chain(x: NonRecursiveId[Intermediate[NonRecursiveId[int]]]):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(x == 1)  # revealed: bool
+    # error: [invalid-assignment]
+    invalid: str = x
+
+def equivalent_finite_aliases(x: NonRecursiveId[LeftIntAlias]):
+    valid: NonRecursiveId[RightIntAlias] = x
+
+type IntAlias = int
+
+def unchanged_alias_pair(x: NonRecursiveId[NonRecursiveId[bool]]):
+    # `bool` is a subtype of `int`. The unchanged target alias must not cause the finite source
+    # expansion to be treated as recursive.
+    valid: IntAlias = x
+
+type NoneAlias = NonRecursiveId[None]
+type NestedNoneAlias = NonRecursiveId[NoneAlias]
+
+def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
+    reveal_type(x if condition else 1)  # revealed: None | Literal[1]
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

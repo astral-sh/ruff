@@ -70,7 +70,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
         struct ContainsTypeFormValue;
         type ContainsTypeFormValueVisitor<'db> =
-            CycleDetector<ContainsTypeFormValue, Type<'db>, bool, 3>;
+            CycleDetector<'db, ContainsTypeFormValue, Type<'db>, bool, 3>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
@@ -99,10 +99,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
+                Type::TypeAlias(alias) => visitor.visit(builder.db(), ty, || {
                     imp(builder, expression, alias.value_type(builder.db()), visitor)
                 }),
-                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                Type::TypeVar(typevar) => visitor.visit(builder.db(), ty, || {
                     typevar
                         .typevar(builder.db())
                         .bound_or_constraints(builder.db())
