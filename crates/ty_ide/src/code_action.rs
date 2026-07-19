@@ -39,12 +39,14 @@ pub fn code_actions(
         actions.extend(import_quick_fix);
     }
 
-    // Suggest just suppressing the lint (always a valid option, but never ideal)
-    actions.push(QuickFix {
-        title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, file.python_file(db), lint_id, diagnostic_range).into_edits(),
-        preferred: false,
-    });
+    // Suggest just suppressing the lint when a safe suppression can be added.
+    if let Some(fix) = suppress_single(db, file.python_file(db), lint_id, diagnostic_range) {
+        actions.push(QuickFix {
+            title: format!("Ignore '{}' for this line", lint_id.name()),
+            edits: fix.into_edits(),
+            preferred: false,
+        });
+    }
 
     actions
 }
@@ -295,6 +297,122 @@ mod tests {
     }
 
     #[test]
+    fn add_code_own_line_unknown_rule_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[<START>not-a-rule<END>] tracked by [123]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:3:14
+          |
+        3 | # ty: ignore[not-a-rule] tracked by [123]
+          |              ^^^^^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[not-a-rule] tracked by [123]
+        3 + # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule] tracked by [123]
+        4 | value = 1
+          |
+        ");
+    }
+
+    #[test]
+    fn add_code_mixed_unknown_rule_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            value = missing  # ty: ignore[unresolved-reference, <START>not-a-rule<END>] tracked by [123]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:2:53
+          |
+        2 | value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
+          |                                                     ^^^^^^^^^^
+          |
+          |
+        1 |
+          - value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
+        2 + value = missing  # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
+          |
+        ");
+    }
+
+    #[test]
+    fn add_code_nested_unknown_rule_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[<START>not-a-rule<END>]  # ty: ignore[unresolved-reference]
+            value = missing
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:3:14
+          |
+        3 | # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+          |              ^^^^^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        3 + # type:ignore[ty:ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        4 | value = missing
+          |
+        ");
+    }
+
+    #[test]
+    fn add_code_nested_invalid_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[<START>*-*<END>]  # ty: ignore[unresolved-reference]
+            value = missing
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("invalid-ignore-comment"), @"
+        info[code-action]: Ignore 'invalid-ignore-comment' for this line
+         --> main.py:3:14
+          |
+        3 | # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+          |              ^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        3 + # type:ignore[ty:invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        4 | value = missing
+          |
+        ");
+    }
+
+    #[test]
+    fn no_ignore_code_action_for_shebang_suppression() {
+        let test = CodeActionTest::with_source(
+            r#"
+            #!/usr/bin/env -S python3 -u # ty: ignore[<START>not-a-rule<END>]
+            value = 1
+        "#,
+        );
+
+        assert!(
+            test.code_actions_for("ignore-comment-unknown-rule")
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn add_code_existing_type_ignore() {
         let test = CodeActionTest::with_source(
             r#"
@@ -410,7 +528,7 @@ mod tests {
     fn add_code_existing_ignore_with_reason() {
         let test = CodeActionTest::with_source(
             r#"
-            b = <START>a<END> / 0  # ty:ignore[division-by-zero] some explanation
+            b = <START>a<END> / 0  # ty:ignore[division-by-zero] some explanation [123]
         "#,
         );
 
@@ -418,12 +536,12 @@ mod tests {
         info[code-action]: Ignore 'unresolved-reference' for this line
          --> main.py:2:5
           |
-        2 | b = a / 0  # ty:ignore[division-by-zero] some explanation
+        2 | b = a / 0  # ty:ignore[division-by-zero] some explanation [123]
           |     ^
           |
         1 |
-          - b = a / 0  # ty:ignore[division-by-zero] some explanation
-        2 + b = a / 0  # ty:ignore[division-by-zero] some explanation  # ty: ignore[unresolved-reference]
+          - b = a / 0  # ty:ignore[division-by-zero] some explanation [123]
+        2 + b = a / 0  # ty:ignore[division-by-zero] some explanation [123]  # ty: ignore[unresolved-reference]
           |
         ");
     }
@@ -962,6 +1080,10 @@ mod tests {
         }
 
         fn code_actions(&self, lint: &LintMetadata) -> String {
+            self.code_actions_for(&lint.name)
+        }
+
+        fn code_actions_for(&self, diagnostic_id: &str) -> String {
             use std::fmt::Write;
 
             let mut buf = String::new();
@@ -976,7 +1098,7 @@ mod tests {
                     self.db.program_environment().program(&self.db),
                 ),
                 self.diagnostic_range,
-                &lint.name,
+                diagnostic_id,
             ) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
