@@ -325,9 +325,9 @@ pub fn definitions_for_attribute<'db>(
     resolved
 }
 
-/// A prepared implementations search.
+/// A prepared implementation search.
 ///
-/// Query preparation resolves the class roots and the implementations selected for those roots.
+/// Preparing the finder resolves the class roots and the implementations selected for those roots.
 /// Candidate subclasses can then be scanned one file at a time.
 pub struct ImplementationsFinder<'db> {
     /// Definitions selected directly for the goto target's roots:
@@ -432,12 +432,12 @@ impl<'db> ImplementationsFinder<'db> {
         }
     }
 
-    /// Returns the definitions selected directly for the query's roots.
+    /// Returns the definitions selected directly for the finder's roots.
     pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'db>> {
         self.initial_definitions
     }
 
-    /// Prepares an implementation query for an attribute expression `x.y`.
+    /// Creates an `ImplementationsFinder` for an attribute expression `x.y`.
     ///
     /// ```py
     /// def f(animal: Animal):
@@ -445,10 +445,10 @@ impl<'db> ImplementationsFinder<'db> {
     ///            ^^^^^
     /// ```
     ///
-    /// For a receiver of type `Animal`, this includes the definition `Animal` resolves through its MRO
-    /// plus same-named definitions on known subclasses such as `Dog` or `Cat`. For a receiver of type
-    /// `Dog`, the root is `Dog`: inherited behavior resolves through `Dog`'s MRO, and sibling classes
-    /// such as `Cat` are not included.
+    /// For a receiver of type `Animal`, this includes the member definition selected through
+    /// `Animal`'s MRO plus same-named definitions on known subclasses such as `Dog` or `Cat`. For a
+    /// receiver of type `Dog`, the root is `Dog`: inherited behavior resolves through `Dog`'s MRO,
+    /// and sibling classes such as `Cat` are not included.
     ///
     /// Both `def`-style methods and attribute definitions are returned, whether the attribute is
     /// declared in the class body (`sound: str = ...`, `sound = ...`, or a bare `sound: str`) or
@@ -473,7 +473,7 @@ impl<'db> ImplementationsFinder<'db> {
         ImplementationsFinder::for_member_roots(db, roots, attribute.attr.id.clone(), accessor_role)
     }
 
-    /// Prepares an implementation query for a method declaration.
+    /// Creates an `ImplementationsFinder` for a method declaration.
     ///
     /// ```py
     /// class Animal:
@@ -484,9 +484,9 @@ impl<'db> ImplementationsFinder<'db> {
     ///     def speak(self): ...
     /// ```
     ///
-    /// The containing class is used as the root, and same-named methods defined on known transitive
-    /// subclasses are returned along with the method itself. This does not walk to parent classes: on
-    /// `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
+    /// The containing class is used as the root. The method's implementation, if present, is returned
+    /// along with same-named methods defined on known transitive subclasses. This does not walk to
+    /// parent classes: on `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
     pub fn for_method(model: &SemanticModel<'db>, function: &ast::StmtFunctionDef) -> Option<Self> {
         let db = model.db();
         let function_definition = function.definition(model);
@@ -509,7 +509,7 @@ impl<'db> ImplementationsFinder<'db> {
         )
     }
 
-    /// Prepares an implementation query for a class declaration.
+    /// Creates an `ImplementationsFinder` for a class declaration.
     ///
     /// ```py
     /// class Animal:
@@ -530,7 +530,7 @@ impl<'db> ImplementationsFinder<'db> {
         Some(ImplementationsFinder::for_class_roots(db, vec![root]))
     }
 
-    /// Prepares an implementation query for classes referred to by `resolved`, covering class
+    /// Creates an `ImplementationsFinder` for classes referred to by `resolved`, covering class
     /// references such as a base class, an annotation, or a constructor call.
     ///
     /// ```py
@@ -718,7 +718,7 @@ fn member_implementations_for_file<'db>(
     }
 
     for candidate in reachable_class_literals_in_file(db, file) {
-        // The implementations selected for the roots were collected during query preparation.
+        // The implementations selected for the roots were collected during finder preparation.
         if roots.contains(&candidate) {
             continue;
         }
@@ -793,12 +793,12 @@ fn mro_member_definitions<'db>(
 /// class's own method bodies (`self.member = ...`) are used.
 ///
 /// Subclasses that only inherit the member do not add a new implementation target. The inherited
-/// definition is already returned by the root MRO lookup; this only finds subclasses that define a
-/// new method body or attribute.
+/// definition is already represented by the ancestor that defines it; this only finds subclasses
+/// that define a new method body or attribute.
 ///
 /// Returns `None` if `class` has no reachable user-visible definitions for `member_name`. Returns
-/// `Some` with an empty vector if the class defines the symbol but none of the reachable
-/// definitions are implementation targets (`def` methods or attributes).
+/// `Some` with an empty vector if the class defines the symbol but none of its reachable definitions
+/// produce a navigable implementation matching `accessor_role`.
 fn own_member_definitions<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,

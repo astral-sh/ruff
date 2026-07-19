@@ -349,6 +349,9 @@ impl<'db> Definitions<'db> {
     }
 
     /// Map stub definitions to corresponding source implementations for implementation lookup.
+    ///
+    /// Stub definitions without source mappings are discarded. Returns `None` if no definitions
+    /// remain.
     pub(crate) fn map_stubs_for_implementation(
         self,
         db: &'db dyn ty_python_semantic::Db,

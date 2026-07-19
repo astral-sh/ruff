@@ -11,18 +11,19 @@ use ty_python_semantic::{
 
 const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
-/// Navigate from an attribute access or method declaration to that member and known subclass overrides.
+/// Navigate from an attribute, method, or class target to its known implementations.
 ///
-/// For an attribute access, this resolves the receiver type and returns the implementation family
-/// for that type. The member may be a method or an attribute such as `sound: str = ...`:
+/// For an attribute access that resolves to a member, this resolves the receiver type and returns
+/// the implementation family for that type. The member may be a method or an attribute such as
+/// `sound: str = ...`:
 ///
 /// ```py
 /// animal.sound
 ///        ^^^^^
 /// ```
 ///
-/// For a method declaration, this uses the containing class as the root and returns that method
-/// along with known overrides on subclasses:
+/// For a method declaration, this uses the containing class as the root and returns that method's
+/// implementation, if present, along with known overrides on subclasses:
 ///
 /// ```py
 /// class Animal:
@@ -107,7 +108,7 @@ pub fn goto_implementation(
     })
 }
 
-/// Resolve the type of the `goto_target` to the correct constructor, and prepare the finder.
+/// Select and prepare the appropriate `ImplementationsFinder` for `goto_target`.
 fn prepare_implementations_finder_for_goto_target<'db>(
     model: &SemanticModel<'db>,
     goto_target: &GotoTarget<'_>,
@@ -150,6 +151,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
         _ => None,
     }
 }
+
 fn definitions_to_implementation_targets(
     db: &dyn Db,
     definitions: Vec<ResolvedDefinition>,
@@ -2387,7 +2389,7 @@ class MyClass:
     #[test]
     fn implementation_attribute_protocol_method_nominal_only() {
         // TODO: the receiver is a `Protocol`, so implementations should be determined by structural
-        // inheritance and return all three `speak` definitions (`Speaker`, `Dog`, and `Cat`). We
+        // subtyping and return all three `speak` definitions (`Speaker`, `Dog`, and `Cat`). We
         // currently use nominal inheritance only and return `Speaker.speak`. See
         // https://github.com/astral-sh/ruff/pull/25410#discussion_r3344203732.
         let test = cursor_test(
@@ -2427,7 +2429,7 @@ class MyClass:
     #[test]
     fn implementation_attribute_protocol_data_nominal_only() {
         // TODO: as with `implementation_attribute_protocol_method_nominal_only`, structural
-        // inheritance should return all three `name` definitions (`Named`, `Dog`, and `Cat`); we
+        // subtyping should return all three `name` definitions (`Named`, `Dog`, and `Cat`); we
         // currently return only `Named.name`.
         let test = cursor_test(
             r#"

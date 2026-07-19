@@ -123,7 +123,7 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DECLARATION_LINK_SUPPORT)
     }
 
-    /// Returns `true` if the client supports definition links in goto implementation.
+    /// Returns `true` if the client supports location links in goto implementation.
     pub(crate) const fn supports_implementation_link(self) -> bool {
         self.contains(Self::IMPLEMENTATION_LINK_SUPPORT)
     }
