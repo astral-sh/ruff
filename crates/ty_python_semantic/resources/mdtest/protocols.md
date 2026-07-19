@@ -1896,6 +1896,25 @@ class ImplicitProtocolSubtype(Protocol):
 static_assert(is_subtype_of(ImplicitProtocolSubtype, HasX))
 static_assert(is_assignable_to(ImplicitProtocolSubtype, HasX))
 
+class ImplicitProtocolSubtypeWithExtraMembers(Protocol):
+    z: int
+    a: int
+    x: int
+
+static_assert(is_subtype_of(ImplicitProtocolSubtypeWithExtraMembers, HasX))
+static_assert(is_assignable_to(ImplicitProtocolSubtypeWithExtraMembers, HasX))
+
+class HasAY(Protocol):
+    a: int
+    y: int
+
+class HasAZ(Protocol):
+    a: int
+    z: int
+
+static_assert(not is_subtype_of(HasAZ, HasAY))
+static_assert(not is_assignable_to(HasAZ, HasAY))
+
 class Meta(type):
     x: int
 
