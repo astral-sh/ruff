@@ -818,3 +818,41 @@ def i(x: ComplexN) -> bool:
     elif isinstance(x, complex):
         return False
 ```
+
+## `isinstance` checks with `Callable`
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+possibly-unresolved-reference = "error"
+```
+
+The final `Callable` check is exhaustive. These examples deliberately omit an `else` branch and any
+terminal-call assertions so that reachability is determined by the `isinstance` checks alone.
+
+```py
+from collections.abc import Callable
+from typing import Callable as TypingCallable
+
+def assigned(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        result = 1
+    elif isinstance(x, Callable):
+        result = 2
+    return result
+
+def returns(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        return 1
+    elif isinstance(x, TypingCallable):
+        return 2
+
+def match_exhaustive(x: Callable[[int], int] | dict[str, int]) -> int:
+    match x:
+        case dict():
+            return 1
+        case Callable():
+            return 2
+```

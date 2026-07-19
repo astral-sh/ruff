@@ -2629,6 +2629,18 @@ impl KnownFunction {
                 if self == KnownFunction::IsInstance {
                     let truthiness = match second_argument {
                         Type::ClassLiteral(class) => is_instance_truthiness(db, *first_arg, *class),
+                        Type::SpecialForm(
+                            SpecialFormType::TypingCallable
+                            | SpecialFormType::CollectionsAbcCallable,
+                        ) => {
+                            let callable_top =
+                                Type::Callable(CallableType::unknown(db)).top_materialization(db);
+                            if first_arg.is_subtype_of(db, callable_top) {
+                                Truthiness::AlwaysTrue
+                            } else {
+                                Truthiness::Ambiguous
+                            }
+                        }
                         _ if is_instance_tuple_exhaustive(db, *first_arg, *second_argument) => {
                             Truthiness::AlwaysTrue
                         }
