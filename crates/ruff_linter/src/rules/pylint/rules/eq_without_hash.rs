@@ -21,6 +21,10 @@ use crate::checkers::ast::Checker;
 /// cause issues when using instances of the class as keys in a dictionary or
 /// members of a set.
 ///
+/// Note that `__hash__` should only be defined for immutable objects. If the
+/// class is intended to be mutable, you should instead explicitly annotate it
+/// with `__hash__ = None`.
+///
 /// ## Example
 ///
 /// ```python
