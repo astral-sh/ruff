@@ -649,11 +649,14 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     Some(quote)
                 }
-                second if is_quote(self.cursor.second()) => {
+                second
+                    if let quote = self.cursor.second()
+                        && is_quote(quote) =>
+                {
                     self.try_double_char_prefix([first, second]).then(|| {
                         self.cursor.bump();
-                        // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                        self.cursor.bump().unwrap()
+                        self.cursor.bump();
+                        quote
                     })
                 }
                 _ => None,

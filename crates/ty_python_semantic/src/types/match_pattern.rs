@@ -624,9 +624,10 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
-                        && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
+                        && let callable_pattern_ty = callable_pattern_type(db)
+                        && subject_ty.is_subtype_of(db, callable_pattern_ty) =>
                 {
-                    return callable_pattern_type(db);
+                    return callable_pattern_ty;
                 }
                 _ => {}
             }

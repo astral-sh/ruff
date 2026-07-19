@@ -191,17 +191,18 @@ fn render_with_indentation_mode(
             match directive {
                 // Special directives that should be plaintext
                 Some(
-                    "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
-                    | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
-                    | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
-                    | "version-removed" | "versionremoved",
+                    directive @ ("attention" | "caution" | "danger" | "error" | "hint"
+                    | "important" | "note" | "tip" | "warning" | "admonition"
+                    | "versionadded" | "version-added" | "versionchanged"
+                    | "version-changed" | "version-deprecated" | "deprecated"
+                    | "version-removed" | "versionremoved"),
                 ) => {
                     // A directive starts a new block and cannot continue a
                     // pending hyperlink from the previous line.
                     renderer.flush_pending_link();
 
                     // Map version directives to human-readable phrases (matching Sphinx output)
-                    let pretty_directive = match directive.unwrap() {
+                    let pretty_directive = match directive {
                         "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
                         "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
                         "deprecated" | "version-deprecated" => {
