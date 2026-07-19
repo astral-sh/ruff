@@ -3020,17 +3020,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return Some(rhs_ty);
         }
 
-        let has_single_valued_component = match lhs_ty {
-            Type::Union(union) => union
-                .elements(self.db)
-                .iter()
-                .any(|element| element.is_single_valued(self.db)),
-            _ => lhs_ty.is_single_valued(self.db),
-        };
-        if !has_single_valued_component {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, soundness_policy);
-        }
-
         let mut builder = UnionBuilder::new(self.db);
         let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
             let element = element.resolve_type_alias(self.db);
