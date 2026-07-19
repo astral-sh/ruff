@@ -848,4 +848,11 @@ def returns(x: Callable[[int], int] | dict[str, int]) -> int:
         return 1
     elif isinstance(x, TypingCallable):
         return 2
+
+def match_exhaustive(x: Callable[[int], int] | dict[str, int]) -> int:
+    match x:
+        case dict():
+            return 1
+        case Callable():
+            return 2
 ```

@@ -5403,17 +5403,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Some typing special forms are valid class-info arguments at runtime but are not
         // assignable to typeshed's `isinstance`/`issubclass` class-info annotation.
-        let is_valid_isinstance_target = parameter_index == 1
-            && adjusted_argument_index == Some(1)
-            && matches!(
-                self.signature_type
-                    .as_function_literal()
-                    .and_then(|function| function.known(self.db)),
-                Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
-            )
-            && argument_type
-                .as_special_form()
-                .is_some_and(SpecialFormType::is_valid_isinstance_target);
+        let is_valid_isinstance_target = || {
+            parameter_index == 1
+                && adjusted_argument_index == Some(1)
+                && matches!(
+                    self.signature_type
+                        .as_function_literal()
+                        .and_then(|function| function.known(self.db)),
+                    Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                )
+                && argument_type
+                    .as_special_form()
+                    .is_some_and(SpecialFormType::is_valid_isinstance_target)
+        };
 
         // This is one of the few places where we want to check if there's _any_ specialization
         // where assignability holds; normally we want to check that assignability holds for
@@ -5431,7 +5433,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
-            && !is_valid_isinstance_target
+            && !is_valid_isinstance_target()
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
