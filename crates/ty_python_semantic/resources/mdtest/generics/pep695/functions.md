@@ -456,6 +456,24 @@ def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
 ```
 
+A union argument must not widen a bounded type variable with an incompatible union element:
+
+```py
+class MyClass: ...
+
+def accepts_instance_or_int[T: MyClass](instance: T, x: T | int) -> T:
+    return instance
+
+def _(x: int | None, valid: MyClass | int) -> MyClass:
+    # TODO: avoid the duplicate diagnostic when we move to new constraint solver for unions
+    # error: [invalid-argument-type] "Argument type `None` does not satisfy upper bound `MyClass` of type variable `T`"
+    # error: [invalid-argument-type] "Expected `MyClass | int`, found `int | None`"
+    result = accepts_instance_or_int(MyClass(), x)
+    reveal_type(result)  # revealed: MyClass
+    reveal_type(accepts_instance_or_int(MyClass(), valid))  # revealed: MyClass
+    return result
+```
+
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
 would also be a valid solution:
 
