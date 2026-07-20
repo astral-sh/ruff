@@ -211,12 +211,6 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     let comment_start = suppression.comment_range.start();
     let after_comment = &source[comment_end.to_usize()..];
 
-    if indentation_at_offset(comment_start, source).is_some()
-        && (after_comment.starts_with(['\n', '\r']) || after_comment.is_empty())
-    {
-        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
-    }
-
     if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
@@ -229,6 +223,10 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
         }
 
         return Fix::safe_edit(edit);
+    }
+
+    if indentation_at_offset(comment_start, source).is_some() {
+        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
     }
 
     // Remove any leading whitespace before the comment
