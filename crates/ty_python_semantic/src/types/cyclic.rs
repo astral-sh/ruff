@@ -685,7 +685,8 @@ mod tests {
     use crate::types::Type;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::cell::Cell;
+    use std::hash::{Hash, Hasher};
 
     struct TestVisit;
 
@@ -699,21 +700,45 @@ mod tests {
         }
     }
 
-    static IDENTITY_CALLS: AtomicUsize = AtomicUsize::new(0);
+    #[derive(Clone)]
+    struct CountingIdentityItem<'a> {
+        value: u8,
+        identity_calls: &'a Cell<usize>,
+    }
 
-    #[derive(Clone, Eq, Hash, PartialEq)]
-    struct CountingIdentityItem(u8);
+    impl<'a> CountingIdentityItem<'a> {
+        const fn new(value: u8, identity_calls: &'a Cell<usize>) -> Self {
+            Self {
+                value,
+                identity_calls,
+            }
+        }
+    }
 
-    impl<'db> HasIdentity<'db> for CountingIdentityItem {
+    impl PartialEq for CountingIdentityItem<'_> {
+        fn eq(&self, other: &Self) -> bool {
+            self.value == other.value
+        }
+    }
+
+    impl Eq for CountingIdentityItem<'_> {}
+
+    impl Hash for CountingIdentityItem<'_> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.value.hash(state);
+        }
+    }
+
+    impl<'db> HasIdentity<'db> for CountingIdentityItem<'_> {
         type Id = u8;
 
         fn may_share_identity(&self, _db: &'db dyn Db, other: &Self) -> bool {
-            self.0 % 2 == other.0 % 2
+            self.value % 2 == other.value % 2
         }
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
-            self.0
+            self.identity_calls.set(self.identity_calls.get() + 1);
+            self.value
         }
     }
 
@@ -807,42 +832,48 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn computes_each_active_identity_once() {
         let db = setup_db();
-        IDENTITY_CALLS.store(0, Ordering::Relaxed);
-        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem(1), || {
-                detector.visit(&db, CountingIdentityItem(3), || 1)
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&db, CountingIdentityItem::new(3, &identity_calls), || 1)
             }),
             1
         );
-        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+        assert_eq!(identity_calls.get(), 2);
     }
 
     #[test]
     fn skips_identity_for_distinct_candidates() {
         let db = setup_db();
-        IDENTITY_CALLS.store(0, Ordering::Relaxed);
-        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem(1), || {
-                detector.visit(&db, CountingIdentityItem(2), || 1)
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&db, CountingIdentityItem::new(2, &identity_calls), || 1)
             }),
             1
         );
-        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 0);
+        assert_eq!(identity_calls.get(), 0);
     }
 
     #[test]
     fn skips_identity_without_a_distinct_active_item() {
         let db = setup_db();
-        IDENTITY_CALLS.store(0, Ordering::Relaxed);
-        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
-        assert_eq!(detector.visit(&db, CountingIdentityItem(1), || 1), 1);
-        assert_eq!(detector.visit(&db, CountingIdentityItem(1), || 2), 1);
-        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 1),
+            1
+        );
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 2),
+            1
+        );
+        assert_eq!(identity_calls.get(), 0);
     }
 
     #[test]
