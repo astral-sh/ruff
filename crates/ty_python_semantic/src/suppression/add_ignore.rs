@@ -44,26 +44,25 @@ pub fn suppress_all(
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
-    let mut line_local = BTreeMap::<TextSize, (TextSize, BTreeSet<LintName>, usize)>::new();
+    let mut line_local = BTreeMap::<TextSize, (BTreeSet<LintName>, usize)>::new();
     let mut ids_with_suppression_range = Vec::with_capacity(ids_with_range.len());
 
     for &(id, diagnostic_range) in ids_with_range {
         if is_suppression_comment_lint(id) {
             match suppression_comment_fix(db, file, diagnostic_range) {
-                Some(SuppressionCommentFix::LineLocal(start))
+                Some(SuppressionCommentFix::LineLocal)
                     if find_existing_suppression(suppressions, &source, diagnostic_range, id)
                         .is_none() =>
                 {
-                    let (insertion_start, lints, suppressed_diagnostics) = line_local
-                        .entry(source.line_start(start))
-                        .or_insert_with(|| (start, BTreeSet::new(), 0));
-                    *insertion_start = (*insertion_start).min(start);
+                    let (lints, suppressed_diagnostics) = line_local
+                        .entry(source.line_start(diagnostic_range.start()))
+                        .or_default();
                     lints.insert(id);
                     *suppressed_diagnostics += 1;
                     continue;
                 }
                 Some(
-                    SuppressionCommentFix::LineLocal(_)
+                    SuppressionCommentFix::LineLocal
                     | SuppressionCommentFix::SameLine
                     | SuppressionCommentFix::Shebang,
                 ) => {}
@@ -103,8 +102,8 @@ pub fn suppress_all(
 
     fixes.extend(
         line_local
-            .into_values()
-            .map(|(start, lints, suppressed_diagnostics)| SuppressFix {
+            .into_iter()
+            .map(|(start, (lints, suppressed_diagnostics))| SuppressFix {
                 fix: add_line_local_suppression(
                     &source,
                     &lints.into_iter().collect::<SmallVec<[_; 2]>>(),
@@ -216,8 +215,12 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
 
     if is_suppression_comment_lint(id.name()) {
         match suppression_comment_fix(db, file, range)? {
-            SuppressionCommentFix::LineLocal(start) => {
-                return Some(add_line_local_suppression(&source, &[id.name()], start));
+            SuppressionCommentFix::LineLocal => {
+                return Some(add_line_local_suppression(
+                    &source,
+                    &[id.name()],
+                    range.start(),
+                ));
             }
             SuppressionCommentFix::SameLine => {}
             SuppressionCommentFix::Shebang => return None,
@@ -239,19 +242,19 @@ pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRan
 }
 
 enum SuppressionCommentFix {
-    LineLocal(TextSize),
+    LineLocal,
     SameLine,
     Shebang,
 }
 
 /// Classifies how to suppress a diagnostic emitted for an existing ignore comment.
 ///
-/// Own-line diagnostics get a line-local prefix, while inline and file-level diagnostics use an
+/// Own-line diagnostics get a preceding-line suppression, while inline and file-level diagnostics use an
 /// end-of-line suppression. Shebangs remain eligible for bulk fixes but not IDE quick fixes.
 ///
 /// ```python
 /// seen_code = True
-/// # ty: ignore[not-a-rule]  # receives a line-local prefix
+/// # ty: ignore[not-a-rule]  # receives a preceding-line suppression
 /// ```
 fn suppression_comment_fix(
     db: &dyn Db,
@@ -282,14 +285,7 @@ fn suppression_comment_fix(
         });
     }
 
-    let before_diagnostic = &source[TextRange::new(comment.start(), range.start())];
-    let start = before_diagnostic
-        .rfind('#')
-        .map_or(comment.start(), |hash| {
-            comment.start() + before_diagnostic[..hash].text_len()
-        });
-
-    Some(SuppressionCommentFix::LineLocal(start))
+    Some(SuppressionCommentFix::LineLocal)
 }
 
 /// Adds an own-line `ty: ignore` before a diagnostic on an existing comment line.
