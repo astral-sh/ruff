@@ -358,6 +358,47 @@ Global options:
 
 <!-- End auto-generated format help. -->
 
+Or `ruff help analyze` for more on the analysis command:
+
+<!-- Begin auto-generated analyze help. -->
+
+```text
+Run analysis over Python source code
+
+Usage: ruff analyze [OPTIONS] <COMMAND>
+
+Commands:
+  graph  Generate a map of Python file dependencies or dependents
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help (see more with '--help')
+
+Log levels:
+  -v, --verbose  Enable verbose logging
+  -q, --quiet    Print diagnostics, but nothing else
+  -s, --silent   Disable all logging (but still exit with status code "1" upon
+                 detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option (e.g., `--config "lint.line-length = 100"` or
+          `--config "format.quote-style = 'single'"`). Overrides of individual
+          settings using this option always take precedence over all
+          configuration files, including configuration files that were also
+          specified using `--config`
+      --isolated
+          Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
+```
+
+<!-- End auto-generated analyze help. -->
+
 ## Shell autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated

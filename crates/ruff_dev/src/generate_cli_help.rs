@@ -21,6 +21,9 @@ const CHECK_HELP_END_PRAGMA: &str = "<!-- End auto-generated check help. -->";
 const FORMAT_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated format help. -->\n";
 const FORMAT_HELP_END_PRAGMA: &str = "<!-- End auto-generated format help. -->";
 
+const ANALYZE_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated analyze help. -->\n";
+const ANALYZE_HELP_END_PRAGMA: &str = "<!-- End auto-generated analyze help. -->";
+
 #[derive(clap::Args)]
 pub(crate) struct Args {
     #[arg(long, default_value_t, value_enum)]
@@ -63,10 +66,14 @@ pub(super) fn main(args: &Args) -> Result<()> {
     // Generate `ruff help format`.
     let format_help = trim_lines(&subcommand_help_text("format")?);
 
+    // Generate `ruff help analyze`.
+    let analyze_help = trim_lines(&subcommand_help_text("analyze")?);
+
     if args.mode.is_dry_run() {
         print!("{command_help}");
         print!("{check_help}");
         print!("{format_help}");
+        print!("{analyze_help}");
         return Ok(());
     }
 
@@ -92,6 +99,12 @@ pub(super) fn main(args: &Args) -> Result<()> {
         &format!("```text\n{format_help}\n```\n\n"),
         FORMAT_HELP_BEGIN_PRAGMA,
         FORMAT_HELP_END_PRAGMA,
+    )?;
+    let new = replace_docs_section(
+        &new,
+        &format!("```text\n{analyze_help}\n```\n\n"),
+        ANALYZE_HELP_BEGIN_PRAGMA,
+        ANALYZE_HELP_END_PRAGMA,
     )?;
 
     match args.mode {
