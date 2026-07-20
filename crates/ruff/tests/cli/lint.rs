@@ -5182,7 +5182,6 @@ fn preview_default_rules() -> Result<()> {
     	redirected-noqa (RUF101),
     	invalid-pyproject-toml (RUF200),
     	raise-vanilla-class (TRY002),
-    	type-check-without-type-error (TRY004),
     	verbose-raise (TRY201),
     	useless-try-except (TRY203),
     	verbose-log-message (TRY401),

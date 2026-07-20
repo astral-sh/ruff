@@ -723,7 +723,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnquotedTypeAlias), // TC007
     RuleSelector::rule(Rule::RuntimeStringUnion), // TC010
     RuleSelector::rule(Rule::RaiseVanillaClass), // TRY002
-    RuleSelector::rule(Rule::TypeCheckWithoutTypeError), // TRY004
     RuleSelector::rule(Rule::VerboseRaise), // TRY201
     RuleSelector::rule(Rule::UselessTryExcept), // TRY203
     RuleSelector::rule(Rule::VerboseLogMessage), // TRY401
