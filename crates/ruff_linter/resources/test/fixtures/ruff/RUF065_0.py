@@ -34,6 +34,18 @@ log(logging.INFO, "Hello %r", str("World!"))
 info("Hello %r", repr("World!"))
 log(logging.INFO, "Hello %r", repr("World!"))
 
+# https://github.com/astral-sh/ruff/issues/26912
+# A `*args` unpacking can supply any number of values, so arguments following it
+# don't necessarily line up with the specifier in the same position.
+args = ("a", "b")
+logging.warning("%s%s%s%s %r", *"1234", str(5))
+logging.warning("%s %s", *args, repr(5))
+log(logging.INFO, "%s %s", *args, ascii(5))
+
+# Arguments *before* the unpacking are still correctly aligned, so flag these.
+logging.warning("%s %s", str(5), *args)
+logging.warning("%s %s", repr(5), *args)
+
 def str(s): return f"str = {s}"
 # Don't flag this
 logging.info("Hello %s", str("World!"))
