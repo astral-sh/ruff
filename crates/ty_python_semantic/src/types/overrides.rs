@@ -108,7 +108,20 @@ pub(super) fn check_class<'db>(
 ///
 /// A multiple-inheritance join can place two otherwise-unrelated classes in the same MRO. Every
 /// source-defined method in that ordering must be compatible with each later definition of the
-/// same method, even if an earlier method happens to satisfy both contracts.
+/// same method, even if an earlier method happens to satisfy both contracts:
+///
+/// ```python
+/// class ReturnsStr:
+///     def method(self) -> str: ...
+///
+/// class ReturnsInt:
+///     def method(self) -> int: ...
+///
+/// class Combined(ReturnsStr, ReturnsInt): ...  # Error
+/// ```
+///
+/// The caller skips classes with inconsistent generic bases, since their specialized MRO is not a
+/// valid contract to check.
 fn check_inherited_method_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
@@ -159,12 +172,12 @@ fn check_inherited_method_conflicts<'db>(
             continue;
         };
         let scope = owner_literal.body_scope(db);
-        let mut members: Vec<_> = all_end_of_scope_members(db, scope)
-            .collect::<FxHashSet<_>>()
-            .into_iter()
-            .collect();
-        members.sort_unstable_by(|left, right| left.member.name.cmp(&right.member.name));
+        let members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each class member is checked independently"
+        )]
         'members: for member in members {
             let name = &member.member.name;
             if is_mangled_private(name.as_str()) || is_constructor_like_method(name.as_str()) {
