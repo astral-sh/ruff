@@ -46,7 +46,8 @@ inline-quotes = "single"
     test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
     test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
     test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    test.py:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -83,7 +84,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -117,7 +119,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -157,7 +160,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -3980,7 +3984,7 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py38")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: true
     exit_code: 0
@@ -3997,12 +4001,12 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:5: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -4766,7 +4770,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
 }
 
 #[test]
-fn preview_default_rules() -> Result<()> {
+fn default_rules() -> Result<()> {
     let test = CliTest::with_settings(|_path, mut settings| {
         settings.add_filter(r"(?s).*(linter\.rules\.enabled[^]]+]).*", "$1");
         settings
@@ -4775,7 +4779,7 @@ fn preview_default_rules() -> Result<()> {
     test.write_file("try.py", "1")?;
 
     assert_cmd_snapshot!(
-        test.check_command().args(["--preview", "--show-settings"]),
+        test.check_command().arg("--show-settings"),
         @"
     linter.rules.enabled = [
     	sys-version-slice3 (YTT101),
