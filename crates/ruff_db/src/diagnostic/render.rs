@@ -2169,10 +2169,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2198,10 +2196,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2229,10 +2225,8 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
-        6 | |  finch
-          | | _^
+        5 | /  elephant
+        6 | |/ finch
         7 | || gorilla
           | ||_______^
           |  |_______|
@@ -2264,13 +2258,11 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |   _^
-          |  |_|
+        5 | // elephant
         6 | || finch
           | ||_____^
-        7 |  | gorilla
-          |  |_______^
+        7 | |  gorilla
+          | |________^
         8 |    hippopotamus
         9 |    inchworm
           |
@@ -2292,8 +2284,7 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
+        5 | /  elephant
         6 | |  finch
           | |__^___^
           |   _|
