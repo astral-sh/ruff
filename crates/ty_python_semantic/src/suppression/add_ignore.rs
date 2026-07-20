@@ -216,11 +216,7 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     if is_suppression_comment_lint(id.name()) {
         match suppression_comment_fix(db, file, range)? {
             SuppressionCommentFix::LineLocal => {
-                return Some(add_line_local_suppression(
-                    &source,
-                    &[id.name()],
-                    range.start(),
-                ));
+                return Some(add_line_local_suppression(&source, codes, range.start()));
             }
             SuppressionCommentFix::SameLine => {}
             SuppressionCommentFix::Shebang => return None,

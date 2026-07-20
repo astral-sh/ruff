@@ -1369,9 +1369,11 @@ class B(A):
                 seen_code = True
                 # ty: ignore[not-a-rule]
                 value = 1
+                # ty: ignore[another-not-a-rule, third-not-a-rule]
+                value = 1
                 "#),
             @"
-        Added 1 suppressions
+        Added 3 suppressions
 
         ## Fixed source
 
@@ -1379,27 +1381,7 @@ class B(A):
         seen_code = True
         # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
         value = 1
-        ```
-        "
-        );
-    }
-
-    #[test]
-    fn add_ignore_updates_multiple_own_line_unknown_rules() {
-        assert_snapshot!(
-            suppress_all_in(r#"
-                seen_code = True
-                # ty: ignore[not-a-rule, another-not-a-rule]
-                value = 1
-                "#),
-            @"
-        Added 2 suppressions
-
-        ## Fixed source
-
-        ```py
-        seen_code = True
-        # ty: ignore[not-a-rule, another-not-a-rule, ignore-comment-unknown-rule]
+        # ty: ignore[another-not-a-rule, third-not-a-rule, ignore-comment-unknown-rule]
         value = 1
         ```
         "
@@ -1455,9 +1437,15 @@ class B(A):
                 seen_code = True
                 # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
                 value = missing
+                # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+                value = missing
+                # ty: ignore[#]
+                value = 1
+                # ty: ignore[unresolved-reference#]
+                value = 1
                 "#),
             @"
-        Added 1 suppressions
+        Added 4 suppressions
 
         ## Fixed source
 
@@ -1465,51 +1453,9 @@ class B(A):
         seen_code = True
         # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference]
         value = missing
-        ```
-        "
-        );
-    }
-
-    #[test]
-    fn add_ignore_handles_invalid_nested_suppression_comments() {
-        assert_snapshot!(
-            suppress_all_in(r#"
-                seen_code = True
-                # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
-                value = missing
-                "#),
-            @"
-        Added 1 suppressions
-
-        ## Fixed source
-
-        ```py
-        seen_code = True
         # ty:ignore[invalid-ignore-comment]
         # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         value = missing
-        ```
-        "
-        );
-    }
-
-    #[test]
-    fn add_ignore_handles_invalid_hash_in_suppression_comments() {
-        assert_snapshot!(
-            suppress_all_in(r#"
-                seen_code = True
-                # ty: ignore[#]
-                value = 1
-                # ty: ignore[unresolved-reference#]
-                value = 1
-                "#),
-            @"
-        Added 2 suppressions
-
-        ## Fixed source
-
-        ```py
-        seen_code = True
         # ty:ignore[invalid-ignore-comment]
         # ty: ignore[#]
         value = 1
@@ -1528,9 +1474,11 @@ class B(A):
                 def f():
                     # type: ignore[ty:division-by-zero, ty:not-a-rule]
                     value = 1
+                    # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
+                    value = 1
                 "#),
             @"
-        Added 1 suppressions
+        Added 2 suppressions
 
         ## Fixed source
 
@@ -1538,6 +1486,9 @@ class B(A):
         def f():
             # ty:ignore[ignore-comment-unknown-rule]
             # type: ignore[ty:division-by-zero, ty:not-a-rule]
+            value = 1
+            # ty:ignore[ignore-comment-unknown-rule]
+            # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
             value = 1
         ```
 
@@ -1551,42 +1502,18 @@ class B(A):
         3 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]
           |                    ^^^^^^^^^^^^^^^^^^^
         4 |     value = 1
+        5 |     # ty:ignore[ignore-comment-unknown-rule]
           |
         help: Remove the unused suppression code
-        "
-        );
-    }
-
-    #[test]
-    fn add_ignore_handles_indented_nested_type_ignore() {
-        assert_snapshot!(
-            suppress_all_in(r#"
-                def f():
-                    # fmt: off # type: ignore[ty:division-by-zero, ty:not-a-rule]
-                    value = 1
-                "#),
-            @"
-        Added 1 suppressions
-
-        ## Fixed source
-
-        ```py
-        def f():
-            # ty:ignore[ignore-comment-unknown-rule]
-            # fmt: off # type: ignore[ty:division-by-zero, ty:not-a-rule]
-            value = 1
-        ```
-
-        ## Diagnostics after applying fixes
 
         warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
-         --> test.py:3:31
+         --> test.py:6:31
           |
-        1 | def f():
-        2 |     # ty:ignore[ignore-comment-unknown-rule]
-        3 |     # fmt: off # type: ignore[ty:division-by-zero, ty:not-a-rule]
-          |                               ^^^^^^^^^^^^^^^^^^^
         4 |     value = 1
+        5 |     # ty:ignore[ignore-comment-unknown-rule]
+        6 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
+          |                               ^^^^^^^^^^^^^^^^^^^
+        7 |     value = 1
           |
         help: Remove the unused suppression code
         "
