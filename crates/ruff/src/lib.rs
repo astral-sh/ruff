@@ -212,14 +212,8 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
-    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
-    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
-        warn_user_once!(
-            "The --output-format flag for the formatter is unstable and requires preview mode to use."
-        );
-    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
