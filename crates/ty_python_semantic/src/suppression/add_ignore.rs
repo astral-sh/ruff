@@ -50,30 +50,32 @@ pub fn suppress_all(
     for &(id, diagnostic_range) in ids_with_range {
         if is_suppression_comment_lint(id) {
             match suppression_comment_fix(db, file, diagnostic_range) {
-                Some(SuppressionCommentFix::LineLocal(start)) => {
+                Some(SuppressionCommentFix::LineLocal(start))
+                    if find_existing_suppression(suppressions, &source, diagnostic_range, id)
+                        .is_none() =>
+                {
                     let (insertion_start, lints, suppressed_diagnostics) = line_local
                         .entry(source.line_start(start))
                         .or_insert_with(|| (start, BTreeSet::new(), 0));
                     *insertion_start = (*insertion_start).min(start);
                     lints.insert(id);
                     *suppressed_diagnostics += 1;
+                    continue;
                 }
-                Some(SuppressionCommentFix::SameLine | SuppressionCommentFix::Shebang) => {
-                    ids_with_suppression_range.push((
-                        id,
-                        diagnostic_range,
-                        suppression_range(db, file, diagnostic_range),
-                    ));
-                }
-                None => {}
+                Some(
+                    SuppressionCommentFix::LineLocal(_)
+                    | SuppressionCommentFix::SameLine
+                    | SuppressionCommentFix::Shebang,
+                ) => {}
+                None => continue,
             }
-        } else {
-            ids_with_suppression_range.push((
-                id,
-                diagnostic_range,
-                suppression_range(db, file, diagnostic_range),
-            ));
         }
+
+        ids_with_suppression_range.push((
+            id,
+            diagnostic_range,
+            suppression_range(db, file, diagnostic_range),
+        ));
     }
 
     // Sort the suppression ranges by their start position and length (end position).
@@ -113,7 +115,9 @@ pub fn suppress_all(
 
     // Choose the final existing suppression for every diagnostic before grouping any edits.
     for (id, diagnostic_range, suppression_range) in ids_with_suppression_range {
-        if let Some(existing) = find_existing_suppression(suppressions, &source, diagnostic_range) {
+        if let Some(existing) =
+            find_existing_suppression(suppressions, &source, diagnostic_range, id)
+        {
             with_existing.push((id, suppression_range, existing));
         } else {
             without_existing.push((id, suppression_range));
@@ -201,6 +205,14 @@ pub struct SuppressFix {
 
 /// Creates a fix to suppress a single lint, except for suppression diagnostics in a shebang.
 pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Option<Fix> {
+    let suppressions = suppressions(db, file);
+    let source = source_text(db, file);
+    let codes = &[id.name()];
+
+    if let Some(existing) = find_existing_suppression(suppressions, &source, range, id.name()) {
+        return Some(add_to_existing_suppression(existing, codes));
+    }
+
     if is_suppression_comment_lint(id.name()) {
         match suppression_comment_fix(db, file, range)? {
             SuppressionCommentFix::LineLocal(start) => {
@@ -212,14 +224,6 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     }
 
     let suppression_range = suppression_range(db, file, range);
-
-    let suppressions = suppressions(db, file);
-    let source = source_text(db, file);
-    let codes = &[id.name()];
-
-    if let Some(existing) = find_existing_suppression(suppressions, &source, range) {
-        return Some(add_to_existing_suppression(existing, codes));
-    }
 
     Some(add_end_of_line_suppression(
         &source,
@@ -374,7 +378,8 @@ fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextS
 /// Returns insertion metadata for the preferred editable suppression covering `range`.
 ///
 /// When multiple comments apply, a same-line or otherwise nested comment takes precedence over an
-/// outer own-line suppression.
+/// outer own-line suppression. Diagnostics about suppression comments never extend a
+/// `type: ignore`, since that would affect other type checkers.
 ///
 /// ```python
 /// # ty: ignore[invalid-assignment]
@@ -384,12 +389,14 @@ fn find_existing_suppression(
     suppressions: &Suppressions,
     source: &str,
     range: TextRange,
+    id: LintName,
 ) -> Option<ExistingSuppression> {
     let suppression = select_preferred_suppression(
         suppressions
             .editable_inline_suppressions_rev(range)
             .filter(|suppression| {
-                editable_suppression_prefix(&source[suppression.comment_range]).is_some()
+                (!is_suppression_comment_lint(id) || !suppression.kind.is_type_ignore())
+                    && editable_suppression_prefix(&source[suppression.comment_range]).is_some()
             }),
         range,
     )?;
