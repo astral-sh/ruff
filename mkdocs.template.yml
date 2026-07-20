@@ -81,6 +81,7 @@ plugins:
           - tutorial.md
         Configuration:
           - configuration.md
+          - cli.md
         Linter:
           - linter.md
         Formatter:

@@ -71,7 +71,7 @@ pub(super) fn main(args: &Args) -> Result<()> {
     }
 
     // Read the existing file.
-    let filename = "docs/configuration.md";
+    let filename = "docs/cli.md";
     let file = PathBuf::from(ROOT_DIR).join(filename);
     let existing = fs::read_to_string(&file)?;
 

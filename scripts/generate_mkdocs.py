@@ -45,6 +45,7 @@ SECTIONS: list[Section] = [
         ],
     ),
     Section("Configuring Ruff", "configuration.md", generated=False),
+    Section("Command-line Interface", "cli.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
