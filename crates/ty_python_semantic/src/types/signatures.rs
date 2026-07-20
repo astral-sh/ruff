@@ -442,26 +442,33 @@ impl<'db> CallableSignature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        if let Some(receiver_type) = receiver_type
-            && self.overloads.len() > 1
-            && self
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-        {
-            Self::from_overloads(
-                self.overloads
+        let [signature] = self.overloads.as_slice() else {
+            if let Some(receiver_type) = receiver_type
+                && self
+                    .overloads
                     .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
-                    .map(|signature| {
-                        signature.bind_self_with_receiver(db, Some(receiver_type), typing_self_type)
-                    }),
-            )
-        } else {
-            Self::from_overloads(self.overloads.iter().map(|signature| {
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return Self::from_overloads(
+                    self.overloads
+                        .iter()
+                        .filter(|signature| signature.can_bind_self_to(db, receiver_type))
+                        .map(|signature| {
+                            signature.bind_self_with_receiver(
+                                db,
+                                Some(receiver_type),
+                                typing_self_type,
+                            )
+                        }),
+                );
+            }
+
+            return Self::from_overloads(self.overloads.iter().map(|signature| {
                 signature.bind_self_with_receiver(db, receiver_type, typing_self_type)
-            }))
-        }
+            }));
+        };
+
+        Self::single(signature.bind_self_with_receiver(db, receiver_type, typing_self_type))
     }
 
     pub(crate) fn has_parameters(&self) -> bool {
