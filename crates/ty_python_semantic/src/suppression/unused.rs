@@ -1,6 +1,7 @@
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
@@ -209,6 +210,12 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     let comment_end = suppression.comment_range.end();
     let comment_start = suppression.comment_range.start();
     let after_comment = &source[comment_end.to_usize()..];
+
+    if indentation_at_offset(comment_start, source).is_some()
+        && (after_comment.starts_with(['\n', '\r']) || after_comment.is_empty())
+    {
+        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
+    }
 
     if !after_comment.starts_with(['\n', '\r']) && !after_comment.is_empty() {
         // For example: `# ty: ignore # fmt: off`
