@@ -1964,7 +1964,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_instance_property_write(db, *object_ty, member, member_name, value_ty)
             }
             AttributeWriteRequirement::Class { object_ty, member } => {
-                self.check_class_property_write(db, *object_ty, member, value_ty)
+                self.check_class_property_write(db, *object_ty, member, member_name, value_ty)
             }
         }
     }
@@ -2024,6 +2024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         object_ty: Type<'db>,
         member: &ClassAttributeWriteMember<'db>,
+        member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match member {
@@ -2044,7 +2045,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ClassAttributeWriteMember::ClassAttribute(fallback) => {
                 self.check_fallback_property_write(db, fallback, value_ty)
             }
-            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+            ClassAttributeWriteMember::Unresolved { .. } => {
+                self.check_class_setattr_property_write(db, object_ty, member_name, value_ty)
+            }
         }
     }
 
@@ -2123,6 +2126,69 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         self.check_callable_write_parameter(db, setattr_ty, 1, object_ty, value_ty)
+    }
+
+    fn check_class_setattr_property_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Type::Union(union) = value_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |value_ty| {
+                    self.check_class_setattr_property_write(db, object_ty, member_name, *value_ty)
+                });
+        }
+
+        let setattr_result = object_ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        if match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        } {
+            return self.never();
+        }
+
+        let setattr_bindings = match &setattr_result {
+            Ok(bindings) => bindings,
+            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => bindings,
+            Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable) => {
+                return self.never();
+            }
+        };
+        setattr_bindings
+            .iter_flat()
+            .when_all(db, self.constraints, |callable| {
+                callable
+                    .matching_overloads()
+                    .when_any(db, self.constraints, |(_, overload)| {
+                        overload
+                            .argument_matches()
+                            .get(1 + usize::from(callable.bound_type.is_some()))
+                            .when_some_and(db, self.constraints, |argument| {
+                                argument.parameters.iter().when_all(
+                                    db,
+                                    self.constraints,
+                                    |parameter| {
+                                        let write_ty = overload.signature.parameters()
+                                            [parameter.index]
+                                            .annotated_type()
+                                            .bind_self_typevars(db, object_ty);
+                                        self.check_type_pair(db, value_ty, write_ty)
+                                    },
+                                )
+                            })
+                    })
+            })
     }
 
     fn check_callable_write_parameter(
