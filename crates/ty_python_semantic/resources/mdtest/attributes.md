@@ -2958,6 +2958,7 @@ The same applies when the class object is annotated as `type[Foo]`:
 ```py
 def set_on_subclass(cls: type[Foo]) -> None:
     cls.whatever = 42
+    cls.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
 ```
 
 The setter also provides the expected type when inferring the assigned value:
@@ -2973,9 +2974,9 @@ class ContextMeta(type):
 
 class ContextClass(metaclass=ContextMeta): ...
 
-ContextClass.callback = lambda value: (
+ContextClass.callback = lambda number: (
     # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
-    value.missing
+    number.missing
 )
 ContextClass.payload = {"value": 1}
 ```
