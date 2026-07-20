@@ -2981,7 +2981,7 @@ ContextClass.callback = lambda number: (
 ContextClass.payload = {"value": 1}
 ```
 
-Name-specific overloads provide the corresponding expected type:
+Name-specific overloads select the expected type based on the assigned attribute:
 
 ```py
 from typing import Any, Literal, overload
@@ -2996,11 +2996,12 @@ class OverloadedMeta(type):
 
 class OverloadedClass(metaclass=OverloadedMeta): ...
 
-OverloadedClass.callback = lambda value: (
+OverloadedClass.callback = lambda number: (
     # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
-    value.missing
+    number.missing
 )
 OverloadedClass.payload = {"value": 1}
+OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "with custom `__setattr__` method"
 ```
 
 A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
