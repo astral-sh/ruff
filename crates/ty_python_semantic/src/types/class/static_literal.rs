@@ -119,6 +119,7 @@ pub struct StaticClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
+/// An attribute-mutator method generated for a frozen dataclass.
 #[derive(Clone, Copy)]
 enum FrozenDataclassMutator {
     Set,
@@ -126,6 +127,7 @@ enum FrozenDataclassMutator {
 }
 
 impl FrozenDataclassMutator {
+    /// Returns the frozen-dataclass mutator for `name`, if it is an attribute-mutator method.
     fn from_name(name: &str) -> Option<Self> {
         match name {
             "__setattr__" => Some(Self::Set),
@@ -134,6 +136,7 @@ impl FrozenDataclassMutator {
         }
     }
 
+    /// Returns the corresponding Python special-method name.
     const fn name(self) -> &'static str {
         match self {
             Self::Set => "__setattr__",
