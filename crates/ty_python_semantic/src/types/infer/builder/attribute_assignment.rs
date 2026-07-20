@@ -6,7 +6,8 @@ use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
-    ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
+    ProtocolMemberWriteRequirement, SetAttrWriteRequirement, attribute_write_requirement,
+    property_setter_returns_never, setattr_write_requirement,
 };
 use crate::types::call::{Bindings, CallArguments, CallError};
 use crate::types::diagnostic::{
@@ -357,11 +358,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         };
 
         // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_returns_never = match &setattr_result {
-            Ok(bindings) => bindings.return_type(db).is_never(),
-            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
-        };
-        if setattr_returns_never {
+        let setattr_requirement = setattr_write_requirement(db, &setattr_result);
+        if matches!(setattr_requirement, SetAttrWriteRequirement::Terminal) {
             if emit_diagnostics {
                 let is_setattr_synthesized = match object_ty.class_member_with_policy(
                     db,
@@ -408,15 +406,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             InstanceAttributeWriteMember::Instance(fallback) => {
                 self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics)
             }
-            InstanceAttributeWriteMember::SetAttr => match setattr_result {
-                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                Err(CallDunderError::CallError(..)) => {
+            InstanceAttributeWriteMember::SetAttr => match setattr_requirement {
+                SetAttrWriteRequirement::Callable(_) => true,
+                SetAttrWriteRequirement::Invalid => {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
                     }
                     false
                 }
-                Err(CallDunderError::MethodNotAvailable) => {
+                SetAttrWriteRequirement::Missing => {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
                             with_period: false,
@@ -424,6 +422,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     }
                     false
                 }
+                SetAttrWriteRequirement::Terminal => false,
             },
         }
     }
@@ -468,11 +467,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let db = self.builder.db();
                 let (setattr_result, value_ty) =
                     self.infer_and_try_call_setattr(object_ty, emit_diagnostics);
-                let setattr_returns_never = match &setattr_result {
-                    Ok(bindings) => bindings.return_type(db).is_never(),
-                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
-                };
-                if setattr_returns_never {
+                let setattr_requirement = setattr_write_requirement(db, &setattr_result);
+                if matches!(setattr_requirement, SetAttrWriteRequirement::Terminal) {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                             member_exists: false,
@@ -482,9 +478,9 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     return false;
                 }
 
-                match setattr_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                    Err(CallDunderError::CallError(..)) => {
+                match setattr_requirement {
+                    SetAttrWriteRequirement::Callable(_) => true,
+                    SetAttrWriteRequirement::Invalid => {
                         if emit_diagnostics {
                             self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                                 value_ty,
@@ -492,7 +488,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         }
                         false
                     }
-                    Err(CallDunderError::MethodNotAvailable) => {
+                    SetAttrWriteRequirement::Missing => {
                         if emit_diagnostics {
                             self.report(if *has_instance_attribute {
                                 AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
@@ -502,6 +498,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         }
                         false
                     }
+                    SetAttrWriteRequirement::Terminal => false,
                 }
             }
         }
