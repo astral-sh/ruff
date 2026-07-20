@@ -534,6 +534,9 @@ impl SuppressionTarget {
     }
 
     /// Returns the conservative bit used to skip subtrees without this target.
+    ///
+    /// Lints are hashed into 63 buckets, with one bucket reserved for blanket suppressions. The
+    /// interval index only traverses subtrees whose buckets overlap the queried lint.
     fn target_mask(self) -> u64 {
         match self {
             // Keep blanket suppressions separate so they are always considered.
