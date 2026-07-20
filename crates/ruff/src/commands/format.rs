@@ -489,12 +489,6 @@ pub(crate) fn format_source(
             )))
         }
         SourceKind::Markdown(unformatted_document) => {
-            if !settings.preview.is_enabled() {
-                return Err(FormatCommandError::MarkdownExperimental(
-                    path.map(Path::to_path_buf),
-                ));
-            }
-
             if range.is_some() {
                 return Err(FormatCommandError::RangeFormatNotSupported(
                     path.map(Path::to_path_buf),
@@ -830,7 +824,6 @@ pub(crate) enum FormatCommandError {
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
     RangeFormatNotSupported(Option<PathBuf>),
-    MarkdownExperimental(Option<PathBuf>),
 }
 
 impl FormatCommandError {
@@ -848,8 +841,7 @@ impl FormatCommandError {
             | Self::Read(path, _)
             | Self::Format(path, _)
             | Self::Write(path, _)
-            | Self::RangeFormatNotSupported(path)
-            | Self::MarkdownExperimental(path) => path.as_deref(),
+            | Self::RangeFormatNotSupported(path) => path.as_deref(),
         }
     }
 }
@@ -885,11 +877,6 @@ impl From<&FormatCommandError> for Diagnostic {
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,
                 "Range formatting is only supported for Python files.",
-            ),
-            FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
-                DiagnosticId::PreviewFeature,
-                Severity::Warning,
-                "Markdown formatting is experimental, enable preview mode.",
             ),
         };
 
@@ -981,23 +968,6 @@ impl Display for FormatCommandError {
                     write!(
                         f,
                         "{header} Range formatting is only supported for Python files",
-                        header = "Failed to format:".bold()
-                    )
-                }
-            }
-            Self::MarkdownExperimental(path) => {
-                if let Some(path) = path {
-                    write!(
-                        f,
-                        "{header}{path}{colon} Markdown formatting is experimental, enable preview mode.",
-                        header = "Failed to format ".bold(),
-                        path = fs::relativize_path(path).bold(),
-                        colon = ":".bold()
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{header} Markdown formatting is experimental, enable preview mode",
                         header = "Failed to format:".bold()
                     )
                 }
