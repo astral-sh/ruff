@@ -253,6 +253,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
 
     let AnalysisSettings {
         strict_literal_narrowing: strict_literal_narrowing_default,
+        strict_equality_narrowing: strict_equality_narrowing_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
         allowed_unresolved_imports: allowed_unresolved_imports_default,
         replace_imports_with_any: replace_imports_with_any_default,
@@ -288,6 +289,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         strict_literal_narrowing: options
             .strict_literal_narrowing
             .unwrap_or(strict_literal_narrowing_default),
+        strict_equality_narrowing: options
+            .strict_equality_narrowing
+            .unwrap_or(strict_equality_narrowing_default),
         respect_type_ignore_comments: options
             .respect_type_ignore_comments
             .unwrap_or(respect_type_ignore_comments_default),

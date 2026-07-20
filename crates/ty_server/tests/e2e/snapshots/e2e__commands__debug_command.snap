@@ -164,6 +164,7 @@ Settings: Settings {
     },
     analysis: AnalysisSettings {
         strict_literal_narrowing: false,
+        strict_equality_narrowing: false,
         respect_type_ignore_comments: true,
         allowed_unresolved_imports: ModuleGlobSet {
             regex_set: RegexSet([]),

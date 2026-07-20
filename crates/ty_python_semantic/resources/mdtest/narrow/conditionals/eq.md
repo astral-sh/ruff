@@ -85,12 +85,11 @@ def _(x: Single | int):
     if x != Single.VALUE:
         reveal_type(x)  # revealed: int
     else:
-        # `int` is not eliminated here because there could be subclasses of `int` with custom `__eq__`/`__ne__` methods
-        reveal_type(x)  # revealed: Single | int
+        reveal_type(x)  # revealed: Single
 
 def _(x: Single | int):
     if x == Single.VALUE:
-        reveal_type(x)  # revealed: Single | int
+        reveal_type(x)  # revealed: Single
     else:
         reveal_type(x)  # revealed: int
 
@@ -113,7 +112,7 @@ def after_excluding_red(x: Color | int):
         return
 
     if x == Color.GREEN:
-        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+        reveal_type(x)  # revealed: Literal[Color.GREEN]
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 
@@ -1156,6 +1155,38 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
 ```
 
+## Narrowing unions against broad types
+
+When comparing against a broad type, we assume that its subclasses do not override equality. This
+allows union members with incompatible builtin comparison semantics to be removed:
+
+```py
+class Foo: ...
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def strings(value: str | None, other: str):
+    if value == other:
+        reveal_type(value)  # revealed: str
+    else:
+        reveal_type(value)  # revealed: str | None
+
+    if value != other:
+        reveal_type(value)  # revealed: str | None
+    else:
+        reveal_type(value)  # revealed: str
+
+def classes(value: Foo | None, other: Foo):
+    if value == other:
+        reveal_type(value)  # revealed: Foo
+
+def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
+    if value == other:
+        reveal_type(value)  # revealed: AlwaysEqual | None
+```
+
 ## Narrowing builtin types to literals
 
 Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
@@ -1683,6 +1714,34 @@ def inequality(value: str):
         reveal_type(value)  # revealed: str
 
 def literal(value: Literal["a", "b"]):
+    if value == "a":
+        reveal_type(value)  # revealed: Literal["a"]
+
+class Foo: ...
+
+def union(value: Foo | None, other: Foo):
+    if value == other:
+        reveal_type(value)  # revealed: Foo
+```
+
+## Enabling strict equality narrowing
+
+The `strict-equality-narrowing` option can be enabled to preserve union members when comparing
+against a non-final class. It does not affect builtin-to-literal narrowing.
+
+```toml
+[analysis]
+strict-equality-narrowing = true
+```
+
+```py
+class Foo: ...
+
+def union(value: Foo | None, other: Foo):
+    if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+def literal(value: str):
     if value == "a":
         reveal_type(value)  # revealed: Literal["a"]
 ```

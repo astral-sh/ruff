@@ -151,6 +151,9 @@ pub(crate) struct Analysis {
     /// Whether equality comparisons should only narrow to literals when it is safe to do so.
     pub(crate) strict_literal_narrowing: Option<bool>,
 
+    /// Whether equality comparisons should preserve possible subclass overrides.
+    pub(crate) strict_equality_narrowing: Option<bool>,
+
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,
 

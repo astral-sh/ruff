@@ -1391,10 +1391,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     }
 
     fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
-        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
-            self.db
-                .analysis_settings(self.scope.file(self.db))
-                .strict_literal_narrowing,
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope.file(self.db)),
         )
     }
 
@@ -2683,10 +2681,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
-        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
-            self.db
-                .analysis_settings(self.scope().file(self.db))
-                .strict_literal_narrowing,
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope().file(self.db)),
         )
     }
 

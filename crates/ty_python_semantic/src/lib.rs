@@ -95,6 +95,10 @@ pub struct AnalysisSettings {
     /// literal types.
     pub strict_literal_narrowing: bool,
 
+    /// Whether equality-based checks preserve union members that could compare equal through a
+    /// subclass overriding a comparison method.
+    pub strict_equality_narrowing: bool,
+
     /// Whether errors can be suppressed with `type: ignore` comments.
     ///
     /// If set to false, ty won't:
@@ -113,6 +117,7 @@ impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
             strict_literal_narrowing: false,
+            strict_equality_narrowing: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),

@@ -160,6 +160,54 @@ Defaults to `true`.
 
 ---
 
+### `strict-equality-narrowing`
+
+Whether equality-based checks should preserve union members that could compare equal through
+a subclass overriding a comparison method.
+
+By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
+`__ne__` when narrowing. This allows equality and membership checks to remove otherwise
+incompatible union members:
+
+```python
+class Foo: ...
+
+def narrow(value: Foo | None, other: Foo) -> Foo | None:
+    if value == other:
+        return value  # Narrowed to `Foo` by default.
+    return None
+```
+
+This narrowing is unsound if an instance reaches the function through a subclass that
+overrides equality to compare equal to an incompatible value. Enable this option to
+preserve all possible union members instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve union members that could compare equal through a subclass
+    strict-equality-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve union members that could compare equal through a subclass
+    strict-equality-narrowing = true
+    ```
+
+---
+
 ### `strict-literal-narrowing`
 
 Whether equality-based checks should preserve broad builtin types rather than narrow them to
@@ -731,6 +779,54 @@ Defaults to `true`.
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `strict-equality-narrowing`
+
+Whether equality-based checks should preserve union members that could compare equal through
+a subclass overriding a comparison method.
+
+By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
+`__ne__` when narrowing. This allows equality and membership checks to remove otherwise
+incompatible union members:
+
+```python
+class Foo: ...
+
+def narrow(value: Foo | None, other: Foo) -> Foo | None:
+    if value == other:
+        return value  # Narrowed to `Foo` by default.
+    return None
+```
+
+This narrowing is unsound if an instance reaches the function through a subclass that
+overrides equality to compare equal to an incompatible value. Enable this option to
+preserve all possible union members instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve union members that could compare equal through a subclass
+    strict-equality-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve union members that could compare equal through a subclass
+    strict-equality-narrowing = true
     ```
 
 ---

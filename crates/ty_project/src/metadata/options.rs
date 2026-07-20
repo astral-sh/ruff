@@ -1536,6 +1536,37 @@ pub struct AnalysisOptions {
     )]
     pub strict_literal_narrowing: Option<bool>,
 
+    /// Whether equality-based checks should preserve union members that could compare equal through
+    /// a subclass overriding a comparison method.
+    ///
+    /// By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
+    /// `__ne__` when narrowing. This allows equality and membership checks to remove otherwise
+    /// incompatible union members:
+    ///
+    /// ```python
+    /// class Foo: ...
+    ///
+    /// def narrow(value: Foo | None, other: Foo) -> Foo | None:
+    ///     if value == other:
+    ///         return value  # Narrowed to `Foo` by default.
+    ///     return None
+    /// ```
+    ///
+    /// This narrowing is unsound if an instance reaches the function through a subclass that
+    /// overrides equality to compare equal to an incompatible value. Enable this option to
+    /// preserve all possible union members instead.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve union members that could compare equal through a subclass
+        strict-equality-narrowing = true
+        "#
+    )]
+    pub strict_equality_narrowing: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1613,6 +1644,7 @@ impl AnalysisOptions {
     ) -> AnalysisSettings {
         let Self {
             strict_literal_narrowing,
+            strict_equality_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
@@ -1620,6 +1652,7 @@ impl AnalysisOptions {
 
         let AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing_default,
+            strict_equality_narrowing: strict_equality_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1650,6 +1683,8 @@ impl AnalysisOptions {
         AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing
                 .unwrap_or(strict_literal_narrowing_default),
+            strict_equality_narrowing: strict_equality_narrowing
+                .unwrap_or(strict_equality_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
