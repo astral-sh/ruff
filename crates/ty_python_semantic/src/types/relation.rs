@@ -418,18 +418,17 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, _| Some(true),
+            cycle_initial=|_, _, _| Some(true),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn protocol_assignability_terminal<'db>(
             db: &'db dyn Db,
-            source: Type<'db>,
-            target: Type<'db>,
+            types: TypePair<'db>,
         ) -> Option<bool> {
             let constraints = ConstraintSetBuilder::new();
-            let result = source.has_relation_to(
+            let result = types.first(db).has_relation_to(
                 db,
-                target,
+                types.second(db),
                 &constraints,
                 InferableTypeVars::None,
                 TypeRelation::Assignability,
@@ -456,7 +455,8 @@ impl<'db> Type<'db> {
                             if matches!(target.subclass_of(), SubclassOfInner::Protocol(_))
                     )
             })
-            && let Some(result) = protocol_assignability_terminal(db, self, target)
+            && let Some(result) =
+                protocol_assignability_terminal(db, TypePair::new(db, self, target))
         {
             return ConstraintSet::from_bool(constraints, result);
         }
