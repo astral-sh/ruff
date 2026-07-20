@@ -93,48 +93,38 @@ pub(super) fn diagnostic_to_json<'a>(
         edits: ExpandedEdits {
             edits: fix.edits(),
             notebook_index,
-            config,
             diagnostic_source,
         },
     });
 
-    // In preview, the locations and filename can be optional
-    // and the severity is displayed.
-    if config.preview {
-        JsonDiagnostic {
-            code: diagnostic.secondary_code().map(|code| code.as_str()),
-            name: diagnostic.id().as_str(),
-            severity: diagnostic.severity(),
-            url: diagnostic.documentation_url(),
-            message: diagnostic.concise_message(),
-            fix,
-            cell: notebook_cell_index,
-            location: start_location.map(JsonLocation::from),
-            end_location: end_location.map(JsonLocation::from),
-            filename,
-            noqa_row: noqa_location.map(|location| location.line),
-        }
+    // In preview, the code can be optional and the severity is displayed.
+    let (code, severity) = if config.preview {
+        (
+            diagnostic.secondary_code().map(|code| code.as_str()),
+            diagnostic.severity(),
+        )
     } else {
-        JsonDiagnostic {
-            code: Some(diagnostic.secondary_code_or_id()),
-            name: diagnostic.id().as_str(),
-            severity: Severity::Error,
-            url: diagnostic.documentation_url(),
-            message: diagnostic.concise_message(),
-            fix,
-            cell: notebook_cell_index,
-            location: Some(start_location.unwrap_or_default().into()),
-            end_location: Some(end_location.unwrap_or_default().into()),
-            filename: Some(filename.unwrap_or_default()),
-            noqa_row: noqa_location.map(|location| location.line),
-        }
+        (Some(diagnostic.secondary_code_or_id()), Severity::Error)
+    };
+
+    JsonDiagnostic {
+        code,
+        name: diagnostic.id().as_str(),
+        severity,
+        url: diagnostic.documentation_url(),
+        message: diagnostic.concise_message(),
+        fix,
+        cell: notebook_cell_index,
+        location: start_location.map(JsonLocation::from),
+        end_location: end_location.map(JsonLocation::from),
+        filename,
+        noqa_row: noqa_location.map(|location| location.line),
     }
 }
 
 struct ExpandedEdits<'a> {
     edits: &'a [Edit],
     notebook_index: Option<NotebookIndex>,
-    config: &'a DisplayDiagnosticConfig,
     diagnostic_source: Option<DiagnosticSource>,
 }
 
@@ -199,19 +189,10 @@ impl Serialize for ExpandedEdits<'_> {
                 (None, None)
             };
 
-            // In preview, the locations can be optional.
-            let value = if self.config.preview {
-                JsonEdit {
-                    content: edit.content().unwrap_or_default(),
-                    location: location.map(JsonLocation::from),
-                    end_location: end_location.map(JsonLocation::from),
-                }
-            } else {
-                JsonEdit {
-                    content: edit.content().unwrap_or_default(),
-                    location: Some(location.unwrap_or_default().into()),
-                    end_location: Some(end_location.unwrap_or_default().into()),
-                }
+            let value = JsonEdit {
+                content: edit.content().unwrap_or_default(),
+                location: location.map(JsonLocation::from),
+                end_location: end_location.map(JsonLocation::from),
             };
 
             s.serialize_element(&value)?;
@@ -298,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_stable() {
+    fn missing_file() {
         let mut env = TestEnvironment::new();
         env.format(DiagnosticFormat::Json);
         env.preview(false);
@@ -315,45 +296,6 @@ mod tests {
           {
             "cell": null,
             "code": "test-diagnostic",
-            "end_location": {
-              "column": 1,
-              "row": 1
-            },
-            "filename": "",
-            "fix": null,
-            "location": {
-              "column": 1,
-              "row": 1
-            },
-            "message": "main diagnostic message",
-            "name": "test-diagnostic",
-            "noqa_row": null,
-            "severity": "error",
-            "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
-          }
-        ]
-        "#,
-        );
-    }
-
-    #[test]
-    fn missing_file_preview() {
-        let mut env = TestEnvironment::new();
-        env.format(DiagnosticFormat::Json);
-        env.preview(true);
-
-        let diag = env
-            .err()
-            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
-            .build();
-
-        insta::assert_snapshot!(
-            env.render(&diag),
-            @r#"
-        [
-          {
-            "cell": null,
-            "code": null,
             "end_location": null,
             "filename": null,
             "fix": null,
