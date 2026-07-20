@@ -2832,7 +2832,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity);
+                // Infer through the TypeVar arm so its bound or constraints are still enforced.
+                return self.infer_map_impl(
+                    Type::TypeVar(*formal_bound_typevar),
+                    remaining_actual,
+                    polarity,
+                    seen,
+                );
             }
             (Type::Union(union_formal), _) => {
                 // If the formal is a union and the actual is a bare inferable TypeVar in an
