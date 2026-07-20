@@ -3935,8 +3935,17 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let selected_name = selected_owner.name(db);
-    let contract_name = contract_owner.name(db);
+    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
+        (
+            selected_owner.qualified_name(db).to_string(),
+            contract_owner.qualified_name(db).to_string(),
+        )
+    } else {
+        (
+            selected_owner.name(db).to_string(),
+            contract_owner.name(db).to_string(),
+        )
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Base classes for class `{}` define method `{member}` incompatibly",
         class.name(db)

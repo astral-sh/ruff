@@ -988,6 +988,55 @@ class Parent[U](Base):
 class Child(Parent[str], object): ...
 ```
 
+### Bases with the same name are distinguished
+
+When two bases have the same name, their qualified names make the incompatible methods clear in both
+the primary message and the definition annotations.
+
+`left.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> str: ...
+```
+
+`right.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> int: ...
+```
+
+`main.pyi`:
+
+```pyi
+from left import Base as LeftBase
+from right import Base as RightBase
+
+class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `Combined` define method `method` incompatibly
+ --> src/main.pyi:4:7
+  |
+4 | class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `left.Base.method` is incompatible with `right.Base.method`
+  |
+ ::: src/left.pyi:2:9
+  |
+2 |     def method(self) -> str: ...
+  |         ------ `left.Base.method` defined here
+  |
+ ::: src/right.pyi:2:9
+  |
+2 |     def method(self) -> int: ...
+  |         ------ `right.Base.method` defined here
+  |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
 ### Inconsistent generic bases do not produce override errors
 
 The type arguments are already inconsistent, so there is no resolved generic MRO to check. The same
