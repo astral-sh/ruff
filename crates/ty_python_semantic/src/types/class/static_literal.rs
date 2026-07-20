@@ -2024,7 +2024,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Returns the inherited fields protected by a generated frozen-dataclass method.
+    /// Returns the inherited fields whose generated `__setattr__` or `__delattr__` still applies.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
