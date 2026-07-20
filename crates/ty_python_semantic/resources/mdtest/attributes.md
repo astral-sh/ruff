@@ -2938,98 +2938,6 @@ class Foo(metaclass=Meta): ...
 reveal_type(Foo.x)  # revealed: int
 ```
 
-## Metaclasses with custom `__setattr__` methods
-
-A class is an instance of its metaclass. If an attribute is not defined on the class, the
-metaclass's `__setattr__` method determines which values can be assigned:
-
-```py
-class Meta(type):
-    def __setattr__(cls, name: str, value: int) -> None: ...
-
-class Foo(metaclass=Meta): ...
-
-Foo.whatever = 42
-Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
-```
-
-The same applies when the class object is annotated as `type[Foo]`:
-
-```py
-def set_on_subclass(cls: type[Foo]) -> None:
-    cls.whatever = 42
-    cls.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
-```
-
-The setter also provides the expected type when inferring the assigned value:
-
-```py
-from typing import Callable, TypedDict
-
-class Payload(TypedDict):
-    value: int
-
-class ContextMeta(type):
-    def __setattr__(cls, name: str, value: Callable[[int], int] | Payload) -> None: ...
-
-class ContextClass(metaclass=ContextMeta): ...
-
-ContextClass.callback = lambda number: (
-    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
-    number.missing
-)
-ContextClass.payload = {"value": 1}
-```
-
-Name-specific overloads select the expected type based on the assigned attribute:
-
-```py
-from typing import Any, Literal, overload
-
-class OverloadedMeta(type):
-    @overload
-    def __setattr__(cls, name: Literal["callback"], value: Callable[[int], int]) -> None: ...
-    @overload
-    def __setattr__(cls, name: Literal["payload"], value: Payload) -> None: ...
-    # error: [invalid-method-override]
-    def __setattr__(cls, name: str, value: Any) -> None: ...
-
-class OverloadedClass(metaclass=OverloadedMeta): ...
-
-OverloadedClass.callback = lambda number: (
-    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
-    number.missing
-)
-OverloadedClass.payload = {"value": 1}
-OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "with custom `__setattr__` method"
-```
-
-A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
-
-```py
-from typing_extensions import Never
-
-class FrozenMeta(type):
-    def __setattr__(cls, name: str, value: object) -> Never:
-        raise AttributeError("immutable")
-
-class Frozen(metaclass=FrozenMeta):
-    existing: int = 1
-
-Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attribute `new`"
-
-# TODO: terminal setters should also prevent writes to declared attributes.
-Frozen.existing = 2
-```
-
-A class without a custom metaclass still produces an error for an unknown attribute:
-
-```py
-class Regular: ...
-
-Regular.whatever = 42  # error: [unresolved-attribute]
-```
-
 ## Classes with custom `__setattr__` methods
 
 ### Basic
@@ -3215,6 +3123,98 @@ def _(obj: Immutable) -> None:
     # Same for assignments that would match `__setattr__`'s parameter type.
     # error: [invalid-assignment] "Cannot assign to attribute `x` on type `Immutable` whose `__setattr__` method returns `Never`/`NoReturn`"
     obj.x = 42
+```
+
+## Metaclasses with custom `__setattr__` methods
+
+A class is an instance of its metaclass. If an attribute is not defined on the class, the
+metaclass's `__setattr__` method determines which values can be assigned:
+
+```py
+class Meta(type):
+    def __setattr__(cls, name: str, value: int) -> None: ...
+
+class Foo(metaclass=Meta): ...
+
+Foo.whatever = 42
+Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+```
+
+The same applies when the class object is annotated as `type[Foo]`:
+
+```py
+def set_on_subclass(cls: type[Foo]) -> None:
+    cls.whatever = 42
+    cls.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+```
+
+The setter also provides the expected type when inferring the assigned value:
+
+```py
+from typing import Callable, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContextMeta(type):
+    def __setattr__(cls, name: str, value: Callable[[int], int] | Payload) -> None: ...
+
+class ContextClass(metaclass=ContextMeta): ...
+
+ContextClass.callback = lambda number: (
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    number.missing
+)
+ContextClass.payload = {"value": 1}
+```
+
+Name-specific overloads select the expected type based on the assigned attribute:
+
+```py
+from typing import Any, Literal, overload
+
+class OverloadedMeta(type):
+    @overload
+    def __setattr__(cls, name: Literal["callback"], value: Callable[[int], int]) -> None: ...
+    @overload
+    def __setattr__(cls, name: Literal["payload"], value: Payload) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(cls, name: str, value: Any) -> None: ...
+
+class OverloadedClass(metaclass=OverloadedMeta): ...
+
+OverloadedClass.callback = lambda number: (
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    number.missing
+)
+OverloadedClass.payload = {"value": 1}
+OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "with custom `__setattr__` method"
+```
+
+A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
+
+```py
+from typing_extensions import Never
+
+class FrozenMeta(type):
+    def __setattr__(cls, name: str, value: object) -> Never:
+        raise AttributeError("immutable")
+
+class Frozen(metaclass=FrozenMeta):
+    existing: int = 1
+
+Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attribute `new`"
+
+# TODO: terminal setters should also prevent writes to declared attributes.
+Frozen.existing = 2
+```
+
+A class without a custom metaclass still produces an error for an unknown attribute:
+
+```py
+class Regular: ...
+
+Regular.whatever = 42  # error: [unresolved-attribute]
 ```
 
 ## Objects of all types have a `__class__` method
