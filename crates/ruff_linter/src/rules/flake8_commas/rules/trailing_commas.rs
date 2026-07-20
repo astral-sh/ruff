@@ -175,6 +175,10 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 /// The presence of a misplaced comma will cause Python to interpret the value
 /// as a tuple, which can lead to unexpected behaviour.
 ///
+/// Note that this rule only applies to bare tuples that end with a statement-final newline.
+/// Bare tuples in subscripts are instead handled by [`incorrectly-parenthesized-tuple-in-subscript`]
+/// (`RUF031`).
+///
 /// ## Example
 /// ```python
 /// import json
