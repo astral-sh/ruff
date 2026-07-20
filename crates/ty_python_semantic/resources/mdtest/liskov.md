@@ -794,6 +794,34 @@ class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
 class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
 ```
 
+### Enum mixins
+
+Ordinary mixin methods continue to contribute inherited contracts when the resulting class is an
+enum, including methods with names that `EnumType` can replace.
+
+```pyi
+from enum import Enum
+from typing import Literal
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class MixedEnum(ReturnsStr, ReturnsInt, Enum):  # error: [invalid-method-override]
+    MEMBER = 1
+
+class FirstString:
+    def __str__(self) -> Literal["first"]: ...
+
+class SecondString:
+    def __str__(self) -> Literal["second"]: ...
+
+class StringConflict(FirstString, SecondString, Enum):  # error: [invalid-method-override]
+    MEMBER = 1
+```
+
 ### Unreachable definitions do not shadow inherited methods
 
 An assignment in an unreachable branch does not replace the method inherited from `ReturnsStr`.
