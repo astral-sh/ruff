@@ -1924,18 +1924,19 @@ impl<'db> StaticClassLiteral<'db> {
         for base in self.iter_mro(db, specialization).skip(1) {
             let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
 
-            // Stop if another class in the MRO replaces the generated frozen setter:
+            // Stop if another class in the MRO replaces the relevant generated frozen mutator:
             //
             //   @dataclass(frozen=True)
             //   class Frozen: x: int
             //
             //   class Mutable(Frozen):
             //       def __setattr__(self, name: str, value: object) -> None: ...
+            //       def __delattr__(self, name: str) -> None: ...
             //
             //   class Child(Mutable): ...
             //
-            // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
-            // `Frozen.__setattr__`.
+            // Writes and deletions of `Child().x` dispatch to the corresponding `Mutable` method,
+            // not to the synthesized `Frozen` method.
             if class_member(db, base_class.body_scope(db), mutator.name())
                 .ignore_possibly_undefined()
                 .is_some()
