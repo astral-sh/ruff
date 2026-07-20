@@ -4,12 +4,10 @@ use rayon::prelude::*;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_project::parallel::ParallelIteratorExt;
 use ty_python_semantic::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticModel,
 };
-
-const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Navigate from an attribute, method, or class target to its known implementations.
 ///
@@ -72,13 +70,9 @@ pub fn goto_implementation(
     // deterministic after restoring the batch order below.
     candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
 
-    let minimum_job_len =
-        minimum_parallel_job_len(candidate_files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-
     let mut batches = candidate_files
         .into_par_iter()
         .enumerate()
-        .with_min_len(minimum_job_len)
         .map_with_db(db, |db, (index, file)| {
             let definitions = finder.implementations_for_file(db, file);
             (
