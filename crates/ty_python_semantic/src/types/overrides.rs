@@ -197,7 +197,14 @@ fn check_inherited_method_conflicts<'db>(
                 // This matters for intentionally suppressed typeshed overrides such as
                 // `str.__contains__` versus `Sequence.__contains__`, while still allowing a
                 // receiver-sensitive incompatibility that appears only when rebound to `class`.
-                if owner.is_subclass_of(db, contract_owner) {
+                // Resolve the ancestor in the parent's own MRO so that its generic specialization
+                // matches the one used by the normal Liskov check on the parent.
+                if let Some(parent_contract_owner) = owner
+                    .iter_mro(db)
+                    .skip(1)
+                    .filter_map(ClassBase::into_class)
+                    .find(|ancestor| ancestor.class_literal(db) == contract_owner.class_literal(db))
+                {
                     let parent_receiver = Type::instance(db, owner);
                     let Some((parent_decorator, parent_ty)) =
                         source_method_contract(db, owner, parent_receiver, name)
@@ -205,7 +212,7 @@ fn check_inherited_method_conflicts<'db>(
                         continue;
                     };
                     let Some((ancestor_decorator, ancestor_ty)) =
-                        source_method_contract(db, contract_owner, parent_receiver, name)
+                        source_method_contract(db, parent_contract_owner, parent_receiver, name)
                     else {
                         continue;
                     };

@@ -961,6 +961,33 @@ class InvalidStr:
 class Combined(Empty, InvalidStr): ...
 ```
 
+### Existing violations on generic parents are not repeated
+
+An invalid override on a generic parent is already reported at its definition. Specializing that
+parent and adding another base to a descendant must not report the same violation again.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "ignore"
+```
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def method(self, value: object) -> None: ...
+
+class Parent[U](Base):
+    def method(self, value: U) -> None: ...  # error: [invalid-method-override]
+
+class Child(Parent[str], object): ...
+```
+
 ## The entire class hierarchy is checked
 
 If a child class's method definition is Liskov-compatible with the method definition on its parent
