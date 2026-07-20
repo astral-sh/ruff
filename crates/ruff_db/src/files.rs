@@ -108,6 +108,12 @@ impl Files {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with the appropriate [`FileStatus`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
+        if path.is_absolute()
+            && let Some(file) = self.inner.system_by_path.get(path)
+        {
+            return *file;
+        }
+
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
         // DashMap's entry API requires an owned key. Avoid cloning it for cached paths.
@@ -153,6 +159,12 @@ impl Files {
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
     pub fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
+        if path.is_absolute()
+            && let Some(file) = self.inner.system_by_path.get(path)
+        {
+            return Some(*file);
+        }
+
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .system_by_path
@@ -708,7 +720,7 @@ mod tests {
     use crate::file_revision::FileRevision;
     use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
     use crate::source::source_text;
-    use crate::system::DbWithWritableSystem as _;
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
     use zip::CompressionMethod;
@@ -739,17 +751,26 @@ mod tests {
 
     #[test]
     fn system_normalize_paths() {
-        let db = TestDb::new();
+        let mut db = TestDb::new();
+        db.write_file("/foo/bar.py", "x = 1").unwrap();
+        db.write_file("/foo/baz/bar.py", "x = 2").unwrap();
 
-        assert_eq!(
-            system_path_to_file(&db, "test.py"),
-            system_path_to_file(&db, "/test.py")
-        );
+        let canonical = system_path_to_file(&db, "/foo/bar.py").unwrap();
+        for path in [
+            "foo/bar.py",
+            "/foo//bar.py",
+            "/foo/./bar.py",
+            "/foo/baz/../bar.py",
+        ] {
+            assert_eq!(system_path_to_file(&db, path), Ok(canonical));
+            assert_eq!(
+                db.files().try_system(&db, SystemPath::new(path)),
+                Some(canonical)
+            );
+        }
 
-        assert_eq!(
-            system_path_to_file(&db, "/root/.././test.py"),
-            system_path_to_file(&db, "/root/test.py")
-        );
+        let distinct = system_path_to_file(&db, "/foo/baz/bar.py").unwrap();
+        assert_ne!(canonical, distinct);
     }
 
     #[test]
