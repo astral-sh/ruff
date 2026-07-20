@@ -732,6 +732,13 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
         TypeVarEvaluation,
     );
 
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0)
+            && self.1.may_share_type_identity(db, other.1)
+            && self.2 == other.2
+            && self.3 == other.3
+    }
+
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (
             self.0.to_type_identity(db),

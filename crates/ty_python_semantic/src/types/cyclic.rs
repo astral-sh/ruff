@@ -54,6 +54,25 @@ impl<'db> Type<'db> {
             .unwrap_or(TypeIdentity::NonRecursive(self))
     }
 
+    /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
+    ///
+    /// A `true` result is only a candidate match and must be confirmed with
+    /// [`Type::to_type_identity`].
+    pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
+            (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
+            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            _ => false,
+        }
+    }
+
     #[allow(clippy::inline_always)]
     #[inline(always)]
     pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
@@ -72,10 +91,7 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
             Type::ProtocolInstance(protocol) if protocol.is_recursive(db) => {
-                let class = protocol.class_origin()?;
-                let (origin, _) = class.static_class_literal(db)?;
-                let definition = origin.definition(db);
-                Some(TypeIdentity::RecursiveProtocol(definition))
+                Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
             }
             Type::TypedDict(typed_dict) if typed_dict.is_recursive(db) => {
                 let definition = typed_dict.definition(db)?;
@@ -215,6 +231,11 @@ impl<'db> TypeAliasType<'db> {
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let (origin, _) = self.class_origin()?.static_class_literal(db)?;
+        Some(origin.definition(db))
+    }
+
     fn is_recursive(self, db: &'db dyn Db) -> bool {
         let Some(class) = self.class_origin() else {
             return false;
@@ -250,12 +271,24 @@ impl<'db> TypedDictType<'db> {
 pub trait HasIdentity<'db> {
     type Id: PartialEq;
 
+    /// Returns `false` if `self` and `other` cannot have the same identity.
+    ///
+    /// Implementations can use this to avoid constructing an expensive identity. Returning
+    /// `true` does not imply that the identities match; [`HasIdentity::to_identity`] confirms it.
+    fn may_share_identity(&self, _db: &'db dyn Db, _other: &Self) -> bool {
+        true
+    }
+
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
     type Id = TypeIdentity<'db>;
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.may_share_type_identity(db, *other)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         Type::to_type_identity(*self, db)
@@ -267,6 +300,10 @@ pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, T
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
 
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
+    }
+
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_type_identity(db), self.1.to_type_identity(db))
     }
@@ -277,6 +314,12 @@ where
     Context: Copy + PartialEq,
 {
     type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0)
+            && self.1 == other.1
+            && self.2.may_share_type_identity(db, other.2)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (
@@ -365,13 +408,17 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        let identity = if seen.is_empty() {
+        let mut candidates = seen
+            .iter()
+            .filter(|active| item.may_share_identity(db, &active.item))
+            .peekable();
+        let identity = if candidates.peek().is_none() {
             OnceCell::new()
         } else {
-            // Deriving an identity can require a structural definition walk. Defer it until
-            // another active item could actually form a cycle.
+            // Deriving an identity can require a structural definition walk. Defer it until a
+            // cheap candidate match shows that another active item could form a cycle.
             let identity = item.to_identity(db);
-            if seen.iter().any(|active| {
+            if candidates.any(|active| {
                 active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
             }) {
                 return CycleDetectorVisit::Cycle(item);
@@ -656,6 +703,10 @@ mod tests {
     impl<'db> HasIdentity<'db> for CountingIdentityItem {
         type Id = u8;
 
+        fn may_share_identity(&self, _db: &'db dyn Db, other: &Self) -> bool {
+            self.0 % 2 == other.0 % 2
+        }
+
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
             self.0
@@ -706,11 +757,26 @@ mod tests {
 
         assert_eq!(
             detector.visit(&db, CountingIdentityItem(1), || {
-                detector.visit(&db, CountingIdentityItem(2), || 1)
+                detector.visit(&db, CountingIdentityItem(3), || 1)
             }),
             1
         );
         assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn skips_identity_for_distinct_candidates() {
+        let db = setup_db();
+        IDENTITY_CALLS.store(0, Ordering::Relaxed);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem(1), || {
+                detector.visit(&db, CountingIdentityItem(2), || 1)
+            }),
+            1
+        );
+        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 0);
     }
 
     #[test]
