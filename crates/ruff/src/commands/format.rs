@@ -78,7 +78,6 @@ pub(crate) fn format(
     let (paths, resolver) = project_files_in_path(&files, pyproject_config, config_arguments)?;
 
     let output_format = pyproject_config.settings.output_format;
-    let preview = pyproject_config.settings.formatter.preview;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -191,9 +190,9 @@ pub(crate) fn format(
 
     // Report on any errors.
     //
-    // We only convert errors to `Diagnostic`s in `Check` mode with preview enabled, otherwise we
-    // fall back on printing simple messages.
-    if !(preview.is_enabled() && mode.is_check()) {
+    // We only convert errors to `Diagnostic`s in `Check` mode, otherwise we fall back on printing
+    // simple messages.
+    if !mode.is_check() {
         errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
 
         for error in &errors {
@@ -206,11 +205,7 @@ pub(crate) fn format(
         match mode {
             FormatMode::Write => {}
             FormatMode::Check => {
-                if preview.is_enabled() {
-                    results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
-                } else {
-                    results.write_changed(&mut stdout().lock())?;
-                }
+                results.write_changed(&mut stdout().lock(), output_format, &errors)?;
             }
             FormatMode::Diff => {
                 results.write_diff(&mut stdout().lock())?;
@@ -223,7 +218,7 @@ pub(crate) fn format(
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
-        } else if !preview.is_enabled() || output_format.is_human_readable() {
+        } else if output_format.is_human_readable() {
             results.write_summary(&mut stdout().lock())?;
         }
     }
@@ -588,28 +583,8 @@ impl<'a> FormatResults<'a> {
         Ok(())
     }
 
-    /// Write a list of the files that would be changed to the given writer.
-    fn write_changed(&self, f: &mut impl Write) -> io::Result<()> {
-        for path in self
-            .results
-            .iter()
-            .filter_map(|result| {
-                if result.result.is_diff() {
-                    Some(result.path.as_path())
-                } else {
-                    None
-                }
-            })
-            .sorted_unstable()
-        {
-            writeln!(f, "Would reformat: {}", fs::relativize_path(path).bold())?;
-        }
-
-        Ok(())
-    }
-
     /// Write a list of the files that would be changed and any errors to the given writer.
-    fn write_changed_preview(
+    fn write_changed(
         &self,
         f: &mut impl Write,
         output_format: OutputFormat,
@@ -1346,7 +1321,7 @@ mod tests {
 
         let results = FormatResults::new(&[], FormatMode::Check);
         let mut buf = Vec::new();
-        results.write_changed_preview(
+        results.write_changed(
             &mut buf,
             ruff_linter::settings::types::OutputFormat::Full,
             &errors,

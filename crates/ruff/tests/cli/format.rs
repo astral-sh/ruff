@@ -51,16 +51,28 @@ fn default_files() -> Result<()> {
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
-        .arg("--check"), @"
+        .arg("--check"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: bar.py
-    Would reformat: foo.py
+    unformatted: File would be reformatted
+     --> bar.py:1:1
+      |
+      - bar =     "needs formatting"
+    1 + bar = "needs formatting"
+      |
+
+    unformatted: File would be reformatted
+     --> foo.py:1:1
+      |
+      - foo =     "needs formatting"
+    1 + foo = "needs formatting"
+      |
+
     2 files would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
 
     Ok(())
 }
@@ -446,16 +458,30 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @"
+        .arg("."), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
-    Would reformat: test.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
+    unformatted: File would be reformatted
+     --> test.py:1:1
+      |
+      -
+    1 | def say_hy(name: str):
+      -         print(f"Hy {name}")
+    2 +     print(f"Hy {name}")
+      |
+
     2 files would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
     Ok(())
 }
 
@@ -490,7 +516,13 @@ exclude = ["format_excluded.py"]
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -512,7 +544,13 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - x   = 1
+    1 + x = 1
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -538,9 +576,11 @@ from module import =
     success: false
     exit_code: 2
     ----- stdout -----
+    invalid-syntax: Expected an import name
+    --> main.py:1:1
+
 
     ----- stderr -----
-    error: Failed to parse main.py:2:20: Expected an import name
     ");
 
     Ok(())
@@ -565,7 +605,13 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -628,13 +674,8 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(
         snapshot,
-        test.format_command().args([
-            "--output-format",
-            output_format,
-            "--preview",
-            "--check",
-            "input.py",
-        ]),
+        test.format_command()
+            .args(["--output-format", output_format, "--check", "input.py",]),
     );
 
     Ok(())
@@ -646,7 +687,7 @@ fn output_format_notebook() -> Result<()> {
     let path = test.fixture_path("unformatted.ipynb");
 
     assert_cmd_snapshot!(
-        test.format_command().args(["--isolated", "--preview", "--check"]).arg(path),
+        test.format_command().args(["--isolated", "--check"]).arg(path),
         @"
     success: false
     exit_code: 1
@@ -786,7 +827,15 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
 
     ----- stderr -----
     ");
@@ -802,7 +851,15 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -859,7 +916,13 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -2437,25 +2500,6 @@ fn cookiecutter_globbing() -> Result<()> {
     1 file already formatted
     ");
 
-    Ok(())
-}
-
-#[test]
-fn stable_output_format_warning() -> Result<()> {
-    let test = CliTest::new()?;
-    assert_cmd_snapshot!(
-        test.format_command()
-            .args(["--output-format=full", "-"])
-            .pass_stdin(""),
-        @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-
-    ----- stderr -----
-    warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
-    ",
-    );
     Ok(())
 }
 
