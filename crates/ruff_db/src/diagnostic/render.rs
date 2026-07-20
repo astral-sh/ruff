@@ -2637,12 +2637,6 @@ watermelon
             self.config = config.with_show_fix_status(yes);
         }
 
-        /// Show a diff for the fix when rendering.
-        pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let config = self.config.clone();
-            self.config = config.show_fix_diff(yes);
-        }
-
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let config = self.config.clone();
