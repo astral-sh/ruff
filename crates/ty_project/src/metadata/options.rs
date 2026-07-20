@@ -1544,12 +1544,19 @@ pub struct AnalysisOptions {
     /// incompatible union members:
     ///
     /// ```python
+    /// from typing import reveal_type
+    ///
     /// class Foo: ...
     ///
-    /// def narrow(value: Foo | None, other: Foo) -> Foo | None:
+    /// class AlwaysEqual(Foo):
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    /// def narrow(value: Foo | None, other: Foo) -> None:
     ///     if value == other:
-    ///         return value  # Narrowed to `Foo` by default.
-    ///     return None
+    ///         reveal_type(value)  # Foo (but can still be None!)
+    ///
+    /// narrow(None, AlwaysEqual())
     /// ```
     ///
     /// This narrowing is unsound if an instance reaches the function through a subclass that
