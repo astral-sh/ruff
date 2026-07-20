@@ -136,7 +136,7 @@ REPOSITORIES: list[Repository] = [
     Repository("fronzbot", "blinkpy", "dev"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
-    Repository("jrnl-org", "jrnl", "develop"),
+    Repository("jrnl-org", "jrnl", "main"),
     Repository("langchain-ai", "langchain", "main"),
     Repository("latchbio", "latch", "main"),
     Repository("lnbits", "lnbits", "main"),
