@@ -311,6 +311,36 @@ def _(n: int):
     reveal_type(a not in d)  # revealed: bool
 ```
 
+Membership in a tuple compares each element using equality, so literal needles can also produce a
+definite result. This makes exhaustive membership checks sufficient to prove that a function
+returns.
+
+```py
+from typing import Literal
+
+def literal_membership(value: Literal["foo"]):
+    reveal_type(value in ("foo",))  # revealed: Literal[True]
+    reveal_type(value not in ("foo",))  # revealed: Literal[False]
+    reveal_type(value in ("bar",))  # revealed: Literal[False]
+    reveal_type(value not in ("bar",))  # revealed: Literal[True]
+
+def exhaustive_membership(value: Literal["foo"]) -> int:
+    if value in ("foo",):
+        return 42
+
+def exhaustive_union_membership(value: Literal["foo", "bar"]) -> int:
+    if value in ("foo", "bar"):
+        return 42
+
+class NeverContains(tuple[str]):
+    def __contains__(self, value: object) -> Literal[False]:
+        return False
+
+def overridden_membership(value: Literal["foo"]):
+    reveal_type(value in NeverContains(("foo",)))  # revealed: Literal[False]
+    reveal_type(value not in NeverContains(("foo",)))  # revealed: Literal[True]
+```
+
 ### Identity Comparisons
 
 "Identity Comparisons" refers to `is` and `is not`.

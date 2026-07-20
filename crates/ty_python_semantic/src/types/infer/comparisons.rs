@@ -172,11 +172,25 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    let comparison_truthiness = match op {
-        ast::CmpOp::Eq => equality_truthiness(db, left, right),
-        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
-        _ => Truthiness::Ambiguous,
-    };
+    let comparison_truthiness =
+        match op {
+            ast::CmpOp::Eq => equality_truthiness(db, left, right),
+            ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+            ast::CmpOp::In | ast::CmpOp::NotIn => right
+                .exact_tuple_instance_spec(db)
+                .and_then(|tuple| {
+                    let tuple = tuple.as_fixed_length()?;
+                    Some(tuple.all_elements().iter().fold(
+                        Truthiness::AlwaysFalse,
+                        |truthiness, element| {
+                            truthiness.or(equality_truthiness(db, left, *element))
+                        },
+                    ))
+                })
+                .unwrap_or(Truthiness::Ambiguous)
+                .negate_if(op.is_not_in()),
+            _ => Truthiness::Ambiguous,
+        };
     if comparison_truthiness != Truthiness::Ambiguous {
         return Ok(Type::from_truthiness(db, comparison_truthiness));
     }
