@@ -317,6 +317,32 @@ def _(p: P) -> None:
     pass
 ```
 
+## Recursive TypeVarTuple alias defaults
+
+Recursive aliases that extend a `TypeVarTuple` specialization must not recursively expand while
+checking their defaults.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Nested[*Ts = Nested[*Ts]] = tuple[Nested[*Ts, Nested[*Ts]]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Suffix[*Ts = Suffix[*Ts]] = list[Suffix[*Ts, int]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Prefix[*Ts = Prefix[*Ts]] = tuple[Prefix[int, *Ts]]
+
+type ValidDefault[*Ts = *tuple[ValidDefault[int]]] = tuple[ValidDefault[*Ts, int]]
+```
+
 ## Snapshots of verbose diagnostics
 
 ```py

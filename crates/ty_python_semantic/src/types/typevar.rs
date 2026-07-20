@@ -365,7 +365,7 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
-        type SeenTypeAliases<'db> = SmallVec<[TypeAliasType<'db>; 1]>;
+        type SeenTypeAliases<'db> = SmallVec<[Definition<'db>; 1]>;
 
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
@@ -402,10 +402,13 @@ impl<'db> TypeVarInstance<'db> {
         ) -> bool {
             {
                 let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
-                if seen_type_aliases.contains(&type_alias) {
+                let definition = type_alias.definition(state.db);
+                // A recursive alias can produce a new specialization every time its body is
+                // expanded, so use its definition as the stable recursion key.
+                if seen_type_aliases.contains(&definition) {
                     return false;
                 }
-                seen_type_aliases.push(type_alias);
+                seen_type_aliases.push(definition);
             }
 
             let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
