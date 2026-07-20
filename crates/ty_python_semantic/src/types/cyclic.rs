@@ -109,14 +109,8 @@ struct DefinitionReferenceVisitor<'db> {
     found: Cell<bool>,
 }
 
-#[salsa::tracked]
 impl<'db> DefinitionReferenceVisitor<'db> {
     /// Returns whether the definition represented by `ty` references `target`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _| false,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
     fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
         let visitor = Self::new(target);
         visitor.visit_definition_body(db, ty);
