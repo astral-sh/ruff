@@ -21,7 +21,7 @@ anstream = { workspace = true }
 snapbox = { workspace = true }
 
 [features]
-default = ["std"]
+default = ["std", "simd"]
 std = ["anstyle/std", "memchr?/std"]
 simd = ["dep:memchr"]
 testing-colors = []
