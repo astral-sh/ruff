@@ -1408,8 +1408,29 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]
-        # ty: ignore[not-a-rule]
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_multiple_own_line_unknown_rules() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule, another-not-a-rule]
+                value = 1
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[not-a-rule, another-not-a-rule, ignore-comment-unknown-rule]
         value = 1
         ```
         "
@@ -1450,9 +1471,9 @@ class B(A):
 
         ```py
         seen_code = True
-        items = []  # type: list[int]  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        items = []  # type: list[int]  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
         invalid = []  # type: list[str]  # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
-        value = "x"  # type: ignore[assignment]  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        value = "x"  # type: ignore[assignment]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
         ```
         "#
         );
@@ -1473,8 +1494,7 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]
-        # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1623,14 +1643,13 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]
-        # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
         value = 1
         # ty:ignore[invalid-ignore-comment]
         # ty: ignore[*-*]  # ty: ignore[*-*]
         value = 1
-        # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
-        # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
+        # ty:ignore[invalid-ignore-comment]
+        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[*-*]
         value = 1
         ```
         "
@@ -1652,9 +1671,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]
-        # ty: ignore[not-a-rule]
-        value = 1  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        value = 1  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
         ```
         "
         );
@@ -1674,7 +1692,7 @@ class B(A):
         ## Fixed source
 
         ```py
-        # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
         # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
         value = 1
         ```
