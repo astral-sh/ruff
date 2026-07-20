@@ -61,6 +61,7 @@ impl Db {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
                 strict_literal_narrowing: strict_literal_narrowing_default,
+                strict_subclass_narrowing: strict_subclass_narrowing_default,
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
                 allowed_unresolved_imports: allowed_unresolved_imports_default,
                 replace_imports_with_any: replace_imports_with_any_default,
@@ -98,6 +99,9 @@ impl Db {
                 strict_literal_narrowing: options
                     .strict_literal_narrowing
                     .unwrap_or(strict_literal_narrowing_default),
+                strict_subclass_narrowing: options
+                    .strict_subclass_narrowing
+                    .unwrap_or(strict_subclass_narrowing_default),
                 respect_type_ignore_comments: options
                     .respect_type_ignore_comments
                     .unwrap_or(respect_type_ignore_comments_default),

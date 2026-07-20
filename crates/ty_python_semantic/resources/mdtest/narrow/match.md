@@ -141,35 +141,84 @@ def f(x: Covariant[int]):
 ## Mapping patterns
 
 ```py
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
+from typing_extensions import TypedDict
 
 def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Any, Any]
     else:
         reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
 def test_match(x: dict[Any, Any] | int) -> None:
     match x:
         case {}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
             reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
 def test_match_double_star(x: dict[Any, Any] | int) -> None:
     match x:
         case {**rest}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
             reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
 def test_match_refutable(x: dict[Any, Any] | int) -> None:
     match x:
         case {"k": _}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
             reveal_type(x)  # revealed: dict[Any, Any] | int
+
+def test_known_mapping_overlap(
+    x: Mapping[str, int] | Iterable[tuple[str, int]],
+) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: Mapping[str, int] | (Iterable[tuple[str, int]] & Top[Mapping[Unknown, object]])
+
+def test_synthetic_interface_overlap(
+    x: Mapping[str, int] | Sequence[int],
+) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: Mapping[str, int]
+
+class Payload(TypedDict):
+    key: int
+
+def test_typed_dict_mapping_pattern(x: Payload | dict[str, int]) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: Payload | dict[str, int]
+
+def test_typed_dict_class_pattern(x: Payload | dict[str, int]) -> None:
+    match x:
+        case dict():
+            reveal_type(x)  # revealed: Payload | dict[str, int]
+```
+
+## Mapping patterns with strict subclass narrowing
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+from collections.abc import Mapping
+from typing import Any
+
+def test_isinstance(x: dict[Any, Any] | int) -> None:
+    if isinstance(x, Mapping):
+        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+
+def test_match(x: dict[Any, Any] | int) -> None:
+    match x:
+        case {}:
+            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
 ```
 
 ## Sequence patterns
@@ -189,6 +238,12 @@ def test_match_star(x: Sequence[int] | int) -> None:
             # fixed, the `Sequence[int] & str` intersection should simplify to
             # `Never`.
             reveal_type(x)  # revealed: (Sequence[int] & str) | bytes | bytearray | (int & ~Sequence[object])
+
+def test_direct_sequence_arm(x: list[int] | int) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: list[int]
+            reveal_type(rest)  # revealed: list[int]
 
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:
@@ -299,6 +354,21 @@ def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
             reveal_type(value[0])  # revealed: int
             reveal_type(value[1])  # revealed: int | str
             reveal_type(rest)  # revealed: list[int | str]
+```
+
+## Sequence patterns with strict subclass narrowing
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+def test_match_star(x: list[int] | int) -> None:
+    match x:
+        case [*rest]:
+            reveal_type(x)  # revealed: list[int] | (int & Sequence[object])
+            reveal_type(rest)  # revealed: list[int] | list[object]
 ```
 
 ## Sequence capture types
@@ -788,6 +858,39 @@ def class_pattern_preserves_alias(value: Container) -> None:
             sequence.append("bad")  # error: [invalid-argument-type]
 ```
 
+## Union-relative class pattern narrowing
+
+Positive class patterns use the same union-relative subclass policy as `isinstance`.
+
+```py
+class Area: ...
+
+def direct_class_pattern(value: list[Area] | Area) -> None:
+    match value:
+        case list():
+            reveal_type(value)  # revealed: list[Area]
+        case _:
+            reveal_type(value)  # revealed: Area & ~Top[list[Unknown]]
+```
+
+## Strict subclass narrowing for class patterns
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+class Area: ...
+
+def strict_class_pattern(value: list[Area] | Area) -> None:
+    match value:
+        case list():
+            reveal_type(value)  # revealed: list[Area] | (Area & Top[list[Unknown]])
+        case _:
+            reveal_type(value)  # revealed: Area & ~Top[list[Unknown]]
+```
+
 ## Binding overlapping classes with `as`
 
 Unrelated classes can share a subclass through multiple inheritance. Binding the whole class pattern
@@ -842,12 +945,24 @@ class ProtocolPayload(TypedDict):
 class SizedProtocol(Protocol):
     def __len__(self) -> int: ...
 
+@runtime_checkable
+class ClearProtocol(Protocol):
+    def clear(self) -> None: ...
+
 def test_match_typed_dict_alias_preserves_runtime_protocol_overlap(
     value: ProtocolPayload,
 ) -> None:
     match value:
         case SizedProtocol() as item:
             reveal_type(item)  # revealed: ProtocolPayload
+
+def test_match_typed_dict_alias_adds_hidden_runtime_protocol(
+    value: ProtocolPayload,
+) -> None:
+    match value:
+        case ClearProtocol() as item:
+            reveal_type(item)  # revealed: ProtocolPayload & ClearProtocol
+            item.clear()
 
 def test_match_typed_dict_alias_preserves_mapping_runtime_type(
     value: ProtocolPayload,
@@ -2749,8 +2864,8 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
 
 Pattern captures can affect the type of a later match subject, including through a loop or a
 function defined before the capture. Direct, sequence, class, and built-in positional captures
-resolve to a concrete type. For a mapping capture, the recursive subject is known only to be a
-mapping, so its entry type is `object`.
+resolve to a concrete type. Union-relative narrowing also lets the mapping capture below reject the
+loop-carried non-mapping arm, so it resolves to the concrete value type of the original dictionary.
 
 ```py
 def match_loop_carried_capture(flag: bool, x: int) -> None:
@@ -2781,7 +2896,7 @@ def match_loop_carried_mapping_capture(flag: bool) -> None:
     while flag:
         match x:
             case {"value": x}:
-                reveal_type(x)  # revealed: object
+                reveal_type(x)  # revealed: int
 
 def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
     while flag:

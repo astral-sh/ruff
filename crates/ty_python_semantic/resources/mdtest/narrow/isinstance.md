@@ -722,12 +722,13 @@ def _(x: list[int] | set[str]):
         reveal_type(x)  # revealed: set[str]
 ```
 
-Though if the types involved are not disjoint bases, we necessarily keep a more complex type.
+When one union member directly matches, the positive branch drops unrelated subclass intersections
+while the negative branch remains conservative.
 
 ```py
 def _(x: Invariant[int] | Covariant[str]):
     if isinstance(x, Invariant):
-        reveal_type(x)  # revealed: Invariant[int] | (Covariant[str] & Top[Invariant[Unknown]])
+        reveal_type(x)  # revealed: Invariant[int]
     else:
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
@@ -857,4 +858,101 @@ def f():
     else:
         reveal_type(value)  # revealed: str
         reveal_type(result)  # revealed: Literal[False]
+```
+
+## Union-relative subclass narrowing
+
+By default, a positive runtime check prefers union members that match through an existing
+inheritance relationship. It drops intersections whose only inhabitants would require a new,
+unrelated subclass. Without a matching union member, narrowing remains conservative.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Any
+from typing_extensions import TypeGuard, TypedDict
+
+class Area: ...
+class Base: ...
+class Direct(Base): ...
+
+def dynamic_arm(value: Any | Direct) -> None:
+    if isinstance(value, Base):
+        # Dynamic arms never count as a definite match, but remain possible once another arm
+        # establishes the intended runtime branch.
+        reveal_type(value)  # revealed: (Any & Base) | Direct
+
+class Payload(TypedDict):
+    key: int
+
+def typed_dict_arm(value: Payload | dict[str, int]) -> None:
+    if isinstance(value, dict):
+        # A `TypedDict` is not a static subtype of `dict`, but all of its runtime values are dicts.
+        reveal_type(value)  # revealed: Payload | dict[str, int]
+
+def typed_dict_direct_match(value: Payload | Area) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload
+    else:
+        # Negative narrowing remains conservative, even for runtime facts used by the positive
+        # union-arm preference.
+        reveal_type(value)  # revealed: (Payload & ~Top[dict[Unknown, Unknown]]) | (Area & ~Top[dict[Unknown, Unknown]])
+
+def direct_match(value: list[Area] | Area) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[Area]
+    else:
+        reveal_type(value)  # revealed: Area & ~Top[list[Unknown]]
+
+def lone_fallback(value: Area) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: Area & Top[list[Unknown]]
+
+def known_overlap(
+    value: Mapping[str, int] | Iterable[tuple[str, int]],
+) -> None:
+    if isinstance(value, Mapping):
+        # `Mapping` is already an `Iterable`, so both possibilities remain.
+        reveal_type(value)  # revealed: Mapping[str, int] | (Iterable[tuple[str, int]] & Top[Mapping[Unknown, object]])
+
+class A: ...
+class B: ...
+class C: ...
+
+def classinfo_union(value: A | B | C) -> None:
+    if isinstance(value, (A, B)):
+        reveal_type(value)  # revealed: A | B
+
+def combined_runtime_constraints(value: A | B) -> None:
+    if isinstance(value, A) and isinstance(value, B):
+        # Multiple runtime constraints use the conservative intersection semantics.
+        reveal_type(value)  # revealed: A & B
+
+def three_runtime_constraints(value: A | B | C) -> None:
+    if isinstance(value, A) and isinstance(value, B) and isinstance(value, C):
+        reveal_type(value)  # revealed: A & B & C
+
+def guard(value: object) -> TypeGuard[Area | list[Area]]:
+    return True
+
+def typeguard_then_runtime_test(value: object) -> None:
+    if guard(value) and isinstance(value, list):
+        # Runtime preference still applies after `TypeGuard` replaces the original type.
+        reveal_type(value)  # revealed: list[Area]
+```
+
+## Strict subclass narrowing
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+class Area: ...
+
+def strict(value: list[Area] | Area) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[Area] | (Area & Top[list[Unknown]])
+    else:
+        reveal_type(value)  # revealed: Area & ~Top[list[Unknown]]
 ```

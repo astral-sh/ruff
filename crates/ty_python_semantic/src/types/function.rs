@@ -2036,6 +2036,8 @@ pub(super) enum FunctionBodyKind {
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownFunction {
+    /// `builtins.callable`
+    Callable,
     /// `builtins.isinstance`
     #[strum(serialize = "isinstance")]
     IsInstance,
@@ -2191,7 +2193,8 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module`
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance
+            Self::Callable
+            | Self::IsInstance
             | Self::IsSubclass
             | Self::HasAttr
             | Self::Len
@@ -2749,7 +2752,8 @@ pub(crate) mod tests {
             let function_name = function.name();
 
             let module = match function {
-                KnownFunction::Len
+                KnownFunction::Callable
+                | KnownFunction::Len
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
                 | KnownFunction::HasAttr

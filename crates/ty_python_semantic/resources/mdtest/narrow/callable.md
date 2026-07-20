@@ -42,6 +42,50 @@ def h(x: Callable[..., int] | None):
         reveal_type(x)  # revealed: None
 ```
 
+## Union-relative callable narrowing
+
+Builtin `callable()` uses the same union-relative policy as `isinstance`. Dynamic arms remain
+possible, and user-defined `TypeIs` functions retain their specified intersection semantics.
+
+```py
+from collections.abc import Callable
+from typing import Any
+from typing_extensions import TypeIs
+
+def direct_callable(value: Callable[[], int] | int) -> int:
+    if callable(value):
+        reveal_type(value)  # revealed: () -> int
+        return value()
+    reveal_type(value)  # revealed: int & ~Top[(...) -> object]
+    return value
+
+def is_callable(value: object) -> TypeIs[Callable[..., object]]:
+    return callable(value)
+
+def user_typeis(value: Callable[[], int] | int) -> None:
+    if is_callable(value):
+        reveal_type(value)  # revealed: (() -> int) | (int & Top[(...) -> object])
+
+def dynamic_arm(value: Any | Callable[[], int]) -> None:
+    if callable(value):
+        reveal_type(value)  # revealed: (Any & Top[(...) -> object]) | (() -> int)
+```
+
+## Strict subclass narrowing for `callable()`
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+from collections.abc import Callable
+
+def strict(value: Callable[[], int] | int) -> None:
+    if callable(value):
+        reveal_type(value)  # revealed: (() -> int) | (int & Top[(...) -> object])
+```
+
 ## Narrowing from object
 
 ```py

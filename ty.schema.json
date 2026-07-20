@@ -105,6 +105,13 @@
             "boolean",
             "null"
           ]
+        },
+        "strict-subclass-narrowing": {
+          "description": "Whether positive runtime narrowing should preserve intersections that can only be inhabited\nby an unrelated subclass when another union member already matches the runtime test.\n\nBy default, a positive runtime check prefers union members that match through an existing\ninheritance or structural relationship. It discards remaining intersections whose only\ninhabitants would require a new subclass combining otherwise unrelated classes. This\nproduces simpler types for annotations such as `T | list[T]` while retaining ordinary\noverlaps such as `Mapping[K, V] | Iterable[K]`.\n\nThe policy applies to positive `isinstance`, `issubclass`, and builtin `callable` checks,\nalong with class, mapping, and sequence patterns.\n\nThis default is deliberately pragmatic rather than fully sound. Python permits an\nunannotated runtime class to inherit from otherwise unrelated bases, so a discarded\nintersection can still be inhabited. For example, a value reaching this function through\nthe `Area` arm could be a `list[int]` subclass, even though the direct list arm is\n`list[str]`:\n\n```python\nclass Area: ...\nclass IntegerAreaList(Area, list[int]): ...\n\ndef first(value: Area | list[str]) -> str:\n    if isinstance(value, list):\n        return value[0]  # Accepted by default, but can return an `int`.\n    return \"\"\n\nfirst(IntegerAreaList([1]))\n```\n\nEnable this option to preserve all possible subclass intersections.\n\nDefaults to `false`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

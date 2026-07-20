@@ -1529,6 +1529,49 @@ pub struct AnalysisOptions {
     )]
     pub strict_literal_narrowing: Option<bool>,
 
+    /// Whether positive runtime narrowing should preserve intersections that can only be inhabited
+    /// by an unrelated subclass when another union member already matches the runtime test.
+    ///
+    /// By default, a positive runtime check prefers union members that match through an existing
+    /// inheritance or structural relationship. It discards remaining intersections whose only
+    /// inhabitants would require a new subclass combining otherwise unrelated classes. This
+    /// produces simpler types for annotations such as `T | list[T]` while retaining ordinary
+    /// overlaps such as `Mapping[K, V] | Iterable[K]`.
+    ///
+    /// The policy applies to positive `isinstance`, `issubclass`, and builtin `callable` checks,
+    /// along with class, mapping, and sequence patterns.
+    ///
+    /// This default is deliberately pragmatic rather than fully sound. Python permits an
+    /// unannotated runtime class to inherit from otherwise unrelated bases, so a discarded
+    /// intersection can still be inhabited. For example, a value reaching this function through
+    /// the `Area` arm could be a `list[int]` subclass, even though the direct list arm is
+    /// `list[str]`:
+    ///
+    /// ```python
+    /// class Area: ...
+    /// class IntegerAreaList(Area, list[int]): ...
+    ///
+    /// def first(value: Area | list[str]) -> str:
+    ///     if isinstance(value, list):
+    ///         return value[0]  # Accepted by default, but can return an `int`.
+    ///     return ""
+    ///
+    /// first(IntegerAreaList([1]))
+    /// ```
+    ///
+    /// Enable this option to preserve all possible subclass intersections.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve intersections involving hypothetical unrelated subclasses
+        strict-subclass-narrowing = true
+        "#
+    )]
+    pub strict_subclass_narrowing: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1606,6 +1649,7 @@ impl AnalysisOptions {
     ) -> AnalysisSettings {
         let Self {
             strict_literal_narrowing,
+            strict_subclass_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
@@ -1613,6 +1657,7 @@ impl AnalysisOptions {
 
         let AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing_default,
+            strict_subclass_narrowing: strict_subclass_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1643,6 +1688,8 @@ impl AnalysisOptions {
         AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing
                 .unwrap_or(strict_literal_narrowing_default),
+            strict_subclass_narrowing: strict_subclass_narrowing
+                .unwrap_or(strict_subclass_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

@@ -93,6 +93,48 @@ def _(t: type[object]):
         reveal_type(t)  # revealed: type & ~type[A]
 ```
 
+### Union-relative subclass narrowing
+
+When a union contains a class that is already known to derive from the tested base, the positive
+branch drops intersections that would require an unrelated class to gain a new common subclass.
+
+```py
+from typing import Any
+
+class Base: ...
+class Derived(Base): ...
+class Unrelated: ...
+
+def _(t: type[Derived] | type[Unrelated]):
+    if issubclass(t, Base):
+        reveal_type(t)  # revealed: type[Derived]
+    else:
+        reveal_type(t)  # revealed: type[Unrelated] & ~type[Base]
+
+def dynamic_arm(t: type[Any] | type[Derived]) -> None:
+    if issubclass(t, Base):
+        reveal_type(t)  # revealed: (type[Any] & type[Base]) | type[Derived]
+```
+
+### Strict union-relative subclass narrowing
+
+The strict setting preserves the hypothetical subclass intersection:
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+class Base: ...
+class Derived(Base): ...
+class Unrelated: ...
+
+def _(t: type[Derived] | type[Unrelated]):
+    if issubclass(t, Base):
+        reveal_type(t)  # revealed: type[Derived] | (type[Unrelated] & type[Base])
+```
+
 ### Handling of `None`
 
 `types.NoneType` is only available in Python 3.10 and later:
