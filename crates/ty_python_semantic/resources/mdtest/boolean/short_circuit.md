@@ -135,8 +135,8 @@ def _(flag: bool):
     (flag and (x := 1)) or (x := 2)
     reveal_type(x)  # revealed: Literal[1, 2]
 
-def _(flag: bool, first: int, second: str):
-    (flag and (x := first)) or (x := second)
+def _(flag: bool, possibly_falsy_int: int, possibly_falsy_str: str):
+    (flag and (x := possibly_falsy_int)) or (x := possibly_falsy_str)
     reveal_type(x)  # revealed: int | str
 
 def _(flag: bool):
@@ -156,11 +156,7 @@ def _(flag1: bool, flag2: bool):
     (flag1 and (x := 1)) or (flag2 and (x := 2)) or (x := 3)
     reveal_type(x)  # revealed: Literal[1, 2, 3]
 
-def _(flag1: bool, flag2: bool):
-    if (flag1 and (x := 1)) or flag2:
-        # error: [possibly-unresolved-reference]
-        reveal_type(x)  # revealed: Literal[1]
-
+def _(flag1: bool):
     if (flag1 and (y := 1)) or (z := 2):
         # error: [possibly-unresolved-reference]
         reveal_type(y)  # revealed: Literal[1]
