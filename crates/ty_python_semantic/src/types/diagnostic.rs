@@ -3911,6 +3911,54 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
+/// Reports an incompatible pair of source-defined methods in a resolved MRO.
+pub(super) fn report_incompatible_base_method<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    member: &str,
+    selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    contract: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
+    else {
+        return;
+    };
+
+    let (selected_owner, selected_definition, selected_decorator) = selected;
+    let (contract_owner, contract_definition, contract_decorator) = contract;
+    let selected_name = selected_owner.name(db);
+    let contract_name = contract_owner.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Base classes for class `{}` define method `{member}` incompatibly",
+        class.name(db)
+    ));
+    diagnostic.set_primary_message(format_args!(
+        "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
+    ));
+    if selected_decorator != contract_decorator {
+        diagnostic.info(format_args!(
+            "`{selected_name}.{member}` is {} but `{contract_name}.{member}` is {}",
+            selected_decorator.description(),
+            contract_decorator.description(),
+        ));
+    }
+    error_context().attach_to(db, &mut diagnostic);
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    for (definition, owner_name) in [
+        (selected_definition, selected_name),
+        (contract_definition, contract_name),
+    ] {
+        let module = parsed_module(db, definition.file(db)).load(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, &module)))
+                .message(format_args!("`{owner_name}.{member}` defined here")),
+        );
+    }
+}
+
 pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,

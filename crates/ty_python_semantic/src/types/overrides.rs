@@ -22,17 +22,18 @@ use crate::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
         Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
-        class::{CodeGeneratorKind, FieldKind},
+        class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
-        enums::{EnumMetadata, enum_metadata},
+        enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         infer::infer_definition_types,
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
@@ -75,6 +76,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 
     let class_specialized = class.identity_specialization(db);
+    if configuration.check_method_liskov_violations() {
+        check_inherited_method_conflicts(context, class, class_specialized);
+    }
+
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
@@ -93,6 +98,168 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             &member,
         );
     }
+}
+
+/// Rechecks methods defined on parents against the remainder of the resolved MRO.
+///
+/// A multiple-inheritance join can place two otherwise-unrelated classes in the same MRO. Every
+/// source-defined method in that ordering must be compatible with each later definition of the
+/// same method, even if an earlier method happens to satisfy both contracts.
+fn check_inherited_method_conflicts<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_specialized: ClassType<'db>,
+) {
+    let db = context.db();
+    if is_enum_class_by_inheritance(db, class) {
+        return;
+    }
+
+    let mut direct_bases = Vec::new();
+    for base in class.explicit_bases(db) {
+        match ClassBase::try_from_explicit_base(db, *base, Some(class.into())) {
+            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
+                direct_bases.push(base);
+            }
+            Some(ClassBase::Generic | ClassBase::Protocol) => {}
+            _ => return,
+        }
+    }
+    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+        return;
+    }
+
+    let constraints = ConstraintSetBuilder::new();
+    if direct_bases.iter().enumerate().any(|(index, left)| {
+        direct_bases[index + 1..]
+            .iter()
+            .any(|right| !left.could_coexist_in_mro_with(db, *right, &constraints))
+    }) {
+        return;
+    }
+
+    let mut mro = Vec::new();
+    for base in class_specialized.iter_mro(db).skip(1) {
+        match base {
+            ClassBase::Class(base) if base.is_object(db) => break,
+            ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
+            ClassBase::Protocol | ClassBase::Generic => {}
+            ClassBase::Any
+            | ClassBase::Dynamic(_)
+            | ClassBase::Divergent(_)
+            | ClassBase::TypedDict(_)
+            | ClassBase::Class(_) => return,
+        }
+    }
+    let receiver = Type::instance(db, class_specialized);
+
+    for (index, owner) in mro.iter().copied().enumerate() {
+        let Some((owner_literal, _)) = owner.static_class_literal(db) else {
+            continue;
+        };
+        let scope = owner_literal.body_scope(db);
+        let mut members: Vec<_> = all_end_of_scope_members(db, scope)
+            .collect::<FxHashSet<_>>()
+            .into_iter()
+            .collect();
+        members.sort_unstable_by(|left, right| left.member.name.cmp(&right.member.name));
+
+        'members: for member in members {
+            let name = &member.member.name;
+            if is_mangled_private(name.as_str()) || is_constructor_like_method(name.as_str()) {
+                continue;
+            }
+            let Some((selected_decorator, selected_ty)) =
+                source_method_contract(db, owner, receiver, name)
+            else {
+                continue;
+            };
+
+            for contract_owner in mro[index + 1..].iter().copied() {
+                let Some((contract_decorator, contract_ty)) =
+                    source_method_contract(db, contract_owner, receiver, name)
+                else {
+                    continue;
+                };
+                let Some((selected_ty, contract_ty)) =
+                    method_override_types(db, selected_ty, contract_ty)
+                else {
+                    continue;
+                };
+                if selected_decorator == contract_decorator
+                    && selected_ty.is_assignable_to(db, contract_ty)
+                {
+                    continue;
+                }
+
+                // Do not re-emit an incompatibility that already exists in the parent's own MRO.
+                // This matters for intentionally suppressed typeshed overrides such as
+                // `str.__contains__` versus `Sequence.__contains__`, while still allowing a
+                // receiver-sensitive incompatibility that appears only when rebound to `class`.
+                if owner.is_subclass_of(db, contract_owner) {
+                    let parent_receiver = Type::instance(db, owner);
+                    let Some((parent_decorator, parent_ty)) =
+                        source_method_contract(db, owner, parent_receiver, name)
+                    else {
+                        continue;
+                    };
+                    let Some((ancestor_decorator, ancestor_ty)) =
+                        source_method_contract(db, contract_owner, parent_receiver, name)
+                    else {
+                        continue;
+                    };
+                    if parent_decorator != ancestor_decorator
+                        || !is_assignable_method_override(db, parent_ty, ancestor_ty)
+                    {
+                        continue;
+                    }
+                }
+
+                let Some((contract_literal, _)) = contract_owner.static_class_literal(db) else {
+                    continue;
+                };
+                let contract_scope = contract_literal.body_scope(db);
+                let Some(contract_symbol) = place_table(db, contract_scope).symbol_id(name) else {
+                    continue;
+                };
+                let Some(contract_definition) =
+                    symbol_definition(db, contract_scope, contract_symbol)
+                else {
+                    continue;
+                };
+                report_incompatible_base_method(
+                    context,
+                    class,
+                    name,
+                    (owner, member.first_reachable_definition, selected_decorator),
+                    (contract_owner, contract_definition, contract_decorator),
+                    || selected_ty.assignability_error_context(db, contract_ty),
+                );
+                continue 'members;
+            }
+        }
+    }
+}
+
+/// Returns a source-defined method bound to the class whose MRO is being checked.
+fn source_method_contract<'db>(
+    db: &'db dyn Db,
+    owner: ClassType<'db>,
+    receiver: Type<'db>,
+    name: &Name,
+) -> Option<(MethodDecorator, Type<'db>)> {
+    let Type::FunctionLiteral(function) = owner
+        .own_class_member(db, None, name)
+        .inner
+        .place
+        .raw_type()?
+    else {
+        return None;
+    };
+    let ty = Type::FunctionLiteral(function)
+        .try_call_dunder_get(db, Some(receiver), receiver.to_meta_type(db))?
+        .0;
+    Some((MethodDecorator::try_from_fn_type(db, function)?, ty))
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
