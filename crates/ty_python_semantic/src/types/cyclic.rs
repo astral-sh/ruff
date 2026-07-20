@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -404,21 +404,11 @@ where
 
         let mut candidates = seen
             .iter()
-            .filter(|active| item.may_share_identity(db, &active.item))
-            .peekable();
-        let identity = if candidates.peek().is_none() {
-            OnceCell::new()
-        } else {
-            // Deriving an identity can require a structural definition walk. Defer it until a
-            // cheap candidate match shows that another active item could form a cycle.
-            let identity = item.to_identity(db);
-            if candidates.any(|active| {
-                active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
-            }) {
-                return CycleDetectorVisit::Cycle(item);
-            }
-            OnceCell::from(identity)
-        };
+            .filter(|active| item.may_share_identity(db, &active.item));
+        let identity = item.to_identity(db);
+        if candidates.any(|active| active.identity == identity) {
+            return CycleDetectorVisit::Cycle(item);
+        }
         drop(seen);
 
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
@@ -441,7 +431,7 @@ where
 
 struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
     item: T,
-    identity: OnceCell<T::Id>,
+    identity: T::Id,
 }
 
 impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
