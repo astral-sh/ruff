@@ -1861,15 +1861,6 @@ impl<'db> StaticClassLiteral<'db> {
     /// and deletions on exact instances of the frozen dataclass, but on subclass instances they
     /// only reject assignments and deletions of that dataclass's fields before delegating to the
     /// next method in the MRO.
-    ///
-    /// ```python
-    /// @dataclass(frozen=True)
-    /// class Frozen: x: int
-    /// class Child(Frozen): ...
-    ///
-    /// Child().x = 1  # raises FrozenInstanceError
-    /// del Child().x  # raises FrozenInstanceError
-    /// ```
     fn own_frozen_dataclass_subclass_method(
         self,
         db: &'db dyn Db,
