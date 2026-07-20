@@ -153,19 +153,19 @@ impl<'db> FrozenDataclassDispatch<'db> {
     }
 }
 
-/// An attribute-mutator method generated for a frozen dataclass.
+/// A method synthesized for a frozen dataclass.
 #[derive(Clone, Copy)]
-enum FrozenDataclassMutator {
-    Set,
-    Delete,
+enum FrozenDataclassMethod {
+    SetAttr,
+    DelAttr,
 }
 
-impl FrozenDataclassMutator {
-    /// Returns the frozen-dataclass mutator for `name`, if it is an attribute-mutator method.
+impl FrozenDataclassMethod {
+    /// Returns the frozen-dataclass method for `name`, if it is `__setattr__` or `__delattr__`.
     fn from_name(name: &str) -> Option<Self> {
         match name {
-            "__setattr__" => Some(Self::Set),
-            "__delattr__" => Some(Self::Delete),
+            "__setattr__" => Some(Self::SetAttr),
+            "__delattr__" => Some(Self::DelAttr),
             _ => None,
         }
     }
@@ -173,8 +173,8 @@ impl FrozenDataclassMutator {
     /// Returns the corresponding Python special-method name.
     const fn name(self) -> &'static str {
         match self {
-            Self::Set => "__setattr__",
-            Self::Delete => "__delattr__",
+            Self::SetAttr => "__setattr__",
+            Self::DelAttr => "__delattr__",
         }
     }
 }
@@ -1447,10 +1447,11 @@ impl<'db> StaticClassLiteral<'db> {
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
         // `CodeGeneratorKind::from_class` check below would return `None` before dataclass-like
         // synthesis runs. Still, an instance of such a subclass inherits the frozen dataclass's
-        // generated `__setattr__` and `__delattr__`, which reject mutations of frozen base fields.
-        if let Some(mutator) = FrozenDataclassMutator::from_name(name)
+        // generated `__setattr__` and `__delattr__`, which reject assignments and deletions of
+        // frozen base fields.
+        if let Some(method) = FrozenDataclassMethod::from_name(name)
             && let Some(synthesized_method) =
-                self.own_frozen_dataclass_subclass_mutator(db, specialization, mutator)
+                self.own_frozen_dataclass_subclass_method(db, specialization, method)
         {
             return Some(synthesized_method);
         }
@@ -1904,11 +1905,13 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Synthesize an attribute-mutator view for an ordinary subclass of a frozen dataclass.
+    /// Synthesize a `__setattr__` or `__delattr__` view for an ordinary subclass of a frozen
+    /// dataclass.
     ///
-    /// CPython's generated frozen-dataclass `__setattr__` and `__delattr__` reject all mutations on
-    /// exact instances of the frozen dataclass, but on subclass instances they only reject
-    /// mutations of that dataclass's fields before delegating to the next method in the MRO.
+    /// CPython's generated frozen-dataclass `__setattr__` and `__delattr__` reject all assignments
+    /// and deletions on exact instances of the frozen dataclass, but on subclass instances they
+    /// only reject assignments and deletions of that dataclass's fields before delegating to the
+    /// next method in the MRO.
     ///
     /// ```python
     /// @dataclass(frozen=True)
@@ -1918,32 +1921,29 @@ impl<'db> StaticClassLiteral<'db> {
     /// Child().x = 1  # raises FrozenInstanceError
     /// del Child().x  # raises FrozenInstanceError
     /// ```
-    fn own_frozen_dataclass_subclass_mutator(
+    fn own_frozen_dataclass_subclass_method(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        mutator: FrozenDataclassMutator,
+        method: FrozenDataclassMethod,
     ) -> Option<Type<'db>> {
         if CodeGeneratorKind::from_static_class(db, self).is_some() {
             return None;
         }
 
-        let frozen_base_fields = self.inherited_non_slotted_frozen_dataclass_fields(
-            db,
-            specialization,
-            mutator.name(),
-        )?;
+        let frozen_base_fields =
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, method.name())?;
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
-        let mutator_signature = |name_ty, return_ty| {
+        let method_signature = |name_ty, return_ty| {
             let mut parameters = vec![
                 Parameter::positional_or_keyword(Name::new_static("self"))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_or_keyword(Name::new_static("name"))
                     .with_annotated_type(name_ty),
             ];
-            if matches!(mutator, FrozenDataclassMutator::Set) {
+            if matches!(method, FrozenDataclassMethod::SetAttr) {
                 parameters.push(Parameter::positional_or_keyword(Name::new_static("value")));
             }
             Signature::new(Parameters::standard(parameters), return_ty)
@@ -1952,8 +1952,8 @@ impl<'db> StaticClassLiteral<'db> {
         let overloads = frozen_base_fields
             .names
             .iter()
-            .map(|field| mutator_signature(Type::string_literal(db, field), Type::Never))
-            .chain([mutator_signature(
+            .map(|field| method_signature(Type::string_literal(db, field), Type::Never))
+            .chain([method_signature(
                 KnownClass::Str.to_instance(db),
                 Type::none(db),
             )]);
@@ -2043,7 +2043,7 @@ impl<'db> StaticClassLiteral<'db> {
                 break;
             };
 
-            // Stop if another class in the MRO replaces the relevant generated frozen mutator:
+            // Stop if another class in the MRO replaces the relevant generated frozen method:
             //
             //   @dataclass(frozen=True)
             //   class Frozen: x: int
