@@ -695,7 +695,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 && lint.name() != UNUSED_IGNORE_COMMENT.name()
                                 && lint.name() != BLANKET_IGNORE_COMMENT.name()
                             {
-                                TextRange::new(comment.range().start(), line_range.end())
+                                own_line_suppression_comment_range(comment.range(), tokens)
                             } else {
                                 suppressed_range
                             };
@@ -722,6 +722,25 @@ impl<'a> SuppressionsBuilder<'a> {
     fn add_invalid_comment(&mut self, kind: SuppressionKind, error: ParseError) {
         self.invalid.push(InvalidSuppression { kind, error });
     }
+}
+
+/// Returns the range covered by an own-line suppression for a suppression-comment diagnostic.
+///
+/// Following comment-only lines are included so an own-line suppression can cover a diagnostic
+/// emitted on the next ignore comment, without also suppressing one on the next logical line.
+fn own_line_suppression_comment_range(range: TextRange, tokens: &Tokens) -> TextRange {
+    let comment_token_range = tokens.token_range(range.start());
+    let mut end = comment_token_range.end();
+
+    for token in tokens.after(comment_token_range.end()) {
+        match token.kind() {
+            TokenKind::Comment => end = token.end(),
+            TokenKind::NonLogicalNewline => {}
+            _ => break,
+        }
+    }
+
+    TextRange::new(range.start(), end)
 }
 
 /// Returns the range covered by an own-line suppression comment.

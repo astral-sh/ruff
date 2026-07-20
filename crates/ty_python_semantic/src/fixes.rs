@@ -1377,7 +1377,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule]
         value = 1
         ```
         "
@@ -1441,7 +1442,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1463,7 +1465,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        # ty:ignore[invalid-ignore-comment]
+        # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         value = missing
         ```
         "
@@ -1487,9 +1490,11 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[invalid-ignore-comment]  # ty: ignore[#]
+        # ty:ignore[invalid-ignore-comment]
+        # ty: ignore[#]
         value = 1
-        # ty:ignore[invalid-ignore-comment]  # ty: ignore[unresolved-reference#]
+        # ty:ignore[invalid-ignore-comment]
+        # ty: ignore[unresolved-reference#]
         value = 1
         ```
         "
@@ -1511,19 +1516,21 @@ class B(A):
 
         ```py
         def f():
-            # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
+            # ty:ignore[ignore-comment-unknown-rule]
+            # type: ignore[ty:division-by-zero, ty:not-a-rule]
             value = 1
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
-         --> test.py:2:62
+         --> test.py:3:20
           |
         1 | def f():
-        2 |     # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
-          |                                                              ^^^^^^^^^^^^^^^^^^^
-        3 |     value = 1
+        2 |     # ty:ignore[ignore-comment-unknown-rule]
+        3 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]
+          |                    ^^^^^^^^^^^^^^^^^^^
+        4 |     value = 1
           |
         help: Remove the unused suppression code
         "
@@ -1545,19 +1552,21 @@ class B(A):
 
         ```py
         def f():
-            # fmt: off # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
+            # ty:ignore[ignore-comment-unknown-rule]
+            # fmt: off # type: ignore[ty:division-by-zero, ty:not-a-rule]
             value = 1
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
-         --> test.py:2:73
+         --> test.py:3:31
           |
         1 | def f():
-        2 |     # fmt: off # ty:ignore[ignore-comment-unknown-rule]  # type: ignore[ty:division-by-zero, ty:not-a-rule]
-          |                                                                         ^^^^^^^^^^^^^^^^^^^
-        3 |     value = 1
+        2 |     # ty:ignore[ignore-comment-unknown-rule]
+        3 |     # fmt: off # type: ignore[ty:division-by-zero, ty:not-a-rule]
+          |                               ^^^^^^^^^^^^^^^^^^^
+        4 |     value = 1
           |
         help: Remove the unused suppression code
         "
@@ -1583,11 +1592,14 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
+        # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
         value = 1
-        # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[*-*]
+        # ty:ignore[invalid-ignore-comment]
+        # ty: ignore[*-*]  # ty: ignore[*-*]
         value = 1
-        # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]  # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
+        # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
+        # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
         value = 1
         ```
         "
@@ -1609,7 +1621,8 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+        # ty:ignore[ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule]
         value = 1  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
         ```
         "

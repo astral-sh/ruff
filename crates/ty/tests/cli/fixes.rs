@@ -197,7 +197,8 @@ fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
     assert_snapshot!(fs::read_to_string(case.root().join("unknown_rule.py"))?, @"
 
     seen_code = True
-    # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]
+    # ty:ignore[ignore-comment-unknown-rule]
+    # ty: ignore[not-a-rule]
     value = 1
     value = 1  # ty: ignore[another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
     ");

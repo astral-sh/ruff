@@ -16,8 +16,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_trivia::indentation_at_offset;
-use ruff_source_file::LineRanges;
+use ruff_python_trivia::{indentation_at_offset, leading_indentation};
+use ruff_source_file::{LineRanges, find_newline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 
@@ -106,6 +106,7 @@ pub fn suppress_all(
             .into_values()
             .map(|(start, lints, suppressed_diagnostics)| SuppressFix {
                 fix: add_line_local_suppression(
+                    &source,
                     &lints.into_iter().collect::<SmallVec<[_; 2]>>(),
                     start,
                 ),
@@ -216,7 +217,7 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
     if is_suppression_comment_lint(id.name()) {
         match suppression_comment_fix(db, file, range)? {
             SuppressionCommentFix::LineLocal(start) => {
-                return Some(add_line_local_suppression(&[id.name()], start));
+                return Some(add_line_local_suppression(&source, &[id.name()], start));
             }
             SuppressionCommentFix::SameLine => {}
             SuppressionCommentFix::Shebang => return None,
@@ -291,13 +292,16 @@ fn suppression_comment_fix(
     Some(SuppressionCommentFix::LineLocal(start))
 }
 
-/// Prepends a `ty: ignore` that suppresses only diagnostics on the existing comment line.
-fn add_line_local_suppression(codes: &[LintName], start: TextSize) -> Fix {
+/// Adds an own-line `ty: ignore` before a diagnostic on an existing comment line.
+fn add_line_local_suppression(source: &str, codes: &[LintName], start: TextSize) -> Fix {
+    let line_start = source.line_start(start);
+    let indentation = leading_indentation(&source[line_start.to_usize()..]);
+    let line_ending = find_newline(source).map_or("\n", |(_, ending)| ending.as_str());
     let insertion = format!(
-        "# ty:ignore[{codes}]  ",
+        "{indentation}# ty:ignore[{codes}]{line_ending}",
         codes = Codes(SuppressionKind::Ty, codes)
     );
-    Fix::safe_edit(Edit::insertion(insertion, start))
+    Fix::safe_edit(Edit::insertion(insertion, line_start))
 }
 
 /// Returns the suppression range for the given `range`.

@@ -326,9 +326,8 @@ mod tests {
           |
           |
         2 | seen_code = True
-          - # ty: ignore[not-a-rule] tracked by [123]
-        3 + # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule] tracked by [123]
-        4 | value = 1
+        3 + # ty:ignore[ignore-comment-unknown-rule]
+        4 | # ty: ignore[not-a-rule] tracked by [123]
           |
         ");
     }
@@ -421,9 +420,8 @@ mod tests {
           |
           |
         2 | seen_code = True
-          - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
-        3 + # ty:ignore[ignore-comment-unknown-rule]  # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
-        4 | value = missing
+        3 + # ty:ignore[ignore-comment-unknown-rule]
+        4 | # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
           |
         ");
     }
@@ -447,9 +445,8 @@ mod tests {
           |
           |
         2 | seen_code = True
-          - # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
-        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
-        4 | value = missing
+        3 + # ty:ignore[invalid-ignore-comment]
+        4 | # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
           |
         ");
     }
@@ -473,9 +470,8 @@ mod tests {
           |
           |
         2 | seen_code = True
-          - # ty: ignore[#]
-        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[#]
-        4 | value = 1
+        3 + # ty:ignore[invalid-ignore-comment]
+        4 | # ty: ignore[#]
           |
         ");
     }
@@ -499,9 +495,8 @@ mod tests {
           |
           |
         2 | seen_code = True
-          - # ty: ignore[unresolved-reference#]
-        3 + # ty:ignore[invalid-ignore-comment]  # ty: ignore[unresolved-reference#]
-        4 | value = 1
+        3 + # ty:ignore[invalid-ignore-comment]
+        4 | # ty: ignore[unresolved-reference#]
           |
         ");
     }
