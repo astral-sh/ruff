@@ -317,7 +317,6 @@ impl TestFile<'_> {
 pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
     DisplayDiagnosticConfig::new(tool_name)
         .color(false)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly)
         // Surrounding context in source annotations can be confusing in mdtests,
         // since you may get to see context from the *subsequent* code block (all

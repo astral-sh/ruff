@@ -240,8 +240,7 @@ impl Printer {
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-            .with_fix_applicability(self.unsafe_fixes.required_applicability())
-            .show_fix_diff(true);
+            .with_fix_applicability(self.unsafe_fixes.required_applicability());
 
         render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
 
@@ -414,8 +413,7 @@ impl Printer {
                 .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                .show_fix_diff(true);
+                .with_fix_applicability(self.unsafe_fixes.required_applicability());
             render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
