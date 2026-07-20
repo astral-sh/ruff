@@ -2959,6 +2959,27 @@ c = CustomSetAttr()
 c.whatever = 42
 ```
 
+### Contextual inference
+
+The `__setattr__` value parameter provides the expected type when inferring the assigned value:
+
+```py
+from typing import Callable, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContextSetAttr:
+    def __setattr__(self, name: str, value: Callable[[int], int] | Payload) -> None: ...
+
+instance = ContextSetAttr()
+instance.callback = lambda number: (
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    number.missing
+)
+instance.payload = {"value": 1}
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__setattr__` method is annotated with a (union of) literal type(s),
