@@ -2516,6 +2516,25 @@ ClassWithOverloadedSetAttr.x = 1
 static_assert(not is_subtype_of(TypeOf[ClassWithOverloadedSetAttr], HasMutableXProperty))
 ```
 
+A generic metaclass setter can satisfy a writable property protocol:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class MetaWithGenericSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: T) -> None: ...
+
+class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
+
+ClassWithGenericSetAttr.x = 1
+generic_x: HasMutableXProperty = ClassWithGenericSetAttr
+```
+
 ```py
 # For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
 # This matches other type checkers and likely user intent, even though a custom `__setattr__`

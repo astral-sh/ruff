@@ -2147,7 +2147,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .parameters()
                             .get_positional(2)
                             .map(|parameter| {
-                                parameter.annotated_type().bind_self_typevars(db, object_ty)
+                                let write_ty =
+                                    parameter.annotated_type().bind_self_typevars(db, object_ty);
+                                overload
+                                    .specialization(db)
+                                    .map_or(write_ty, |specialization| {
+                                        write_ty.apply_specialization(db, specialization)
+                                    })
                             })
                             .when_some_and(db, self.constraints, |write_ty| {
                                 self.check_type_pair(db, value_ty, write_ty)
