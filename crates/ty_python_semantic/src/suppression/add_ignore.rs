@@ -401,6 +401,8 @@ fn find_existing_suppression(
     )
     .map(|suppression| (suppression.comment_range, suppression.kind))
     .or_else(|| {
+        // A directive containing only unknown codes produces no editable suppression entry. The
+        // unknown codes are source-ordered, so locate the diagnosed directive without rescanning.
         if id != IGNORE_COMMENT_UNKNOWN_RULE.name() {
             return None;
         }
@@ -412,6 +414,7 @@ fn find_existing_suppression(
         let unknown = suppressions.unknown.get(index)?;
         let line_start = source.line_start(unknown.comment_range.start());
 
+        // Extending either a `type: ignore` or a shebang could change behavior outside ty.
         (unknown.range == range
             && unknown.kind == SuppressionKind::Ty
             && !source[line_start.to_usize()..].starts_with("#!"))
