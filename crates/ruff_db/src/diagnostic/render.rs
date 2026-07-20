@@ -2077,7 +2077,7 @@ watermelon
         4 |   dog
         5 | / elephant
         6 | | finch
-          | |______^
+          | |_____^
         7 |   gorilla
         8 |   hippopotamus
           |
