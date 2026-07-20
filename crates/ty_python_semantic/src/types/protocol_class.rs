@@ -93,10 +93,7 @@ impl<'db> ProtocolClass<'db> {
                 return;
             }
             let candidate = candidate.apply_specialization(db, specialization);
-            if candidate.is_bound_method_like(db) {
-                return;
-            }
-            visitor.visit_type(db, candidate.ty);
+            candidate.walk_recursive_member_types(db, visitor);
         });
     }
 
@@ -2962,6 +2959,33 @@ impl<'db> ProtocolMemberCandidate<'db> {
                 Type::Callable(callable) => callable.is_method_like(db),
                 _ => false,
             }
+    }
+
+    fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
+        self,
+        db: &'db dyn Db,
+        visitor: &V,
+    ) {
+        match self.ty {
+            Type::PropertyInstance(property) => {
+                // A property exposes its getter return and setter value types. Walking the
+                // accessor callables themselves would also visit their receiver and make every
+                // generic protocol property appear recursive.
+                for member in [
+                    property.getter(db).map(ProtocolMemberType::property_getter),
+                    property.setter(db).map(ProtocolMemberType::property_setter),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    if let Some(member) = member.resolve(db) {
+                        visitor.visit_type(db, member.ty());
+                    }
+                }
+            }
+            _ if self.is_bound_method_like(db) => {}
+            _ => visitor.visit_type(db, self.ty),
+        }
     }
 }
 

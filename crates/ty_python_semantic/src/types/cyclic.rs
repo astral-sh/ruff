@@ -679,8 +679,12 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
-    use crate::db::tests::setup_db;
+    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::Type;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct TestVisit;
@@ -720,6 +724,57 @@ mod tests {
         type Id = ();
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {}
+    }
+
+    fn global_instance_type<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+        let file = system_path_to_file(db, "/src/a.py").unwrap();
+        global_symbol(db, file, name)
+            .place
+            .expect_type()
+            .to_instance_approximation(db)
+            .unwrap()
+    }
+
+    #[test]
+    fn property_receiver_does_not_make_protocol_recursive() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from __future__ import annotations
+
+from typing import Protocol
+
+class GenericProperty[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class RecursiveProperty[T](Protocol):
+    @property
+    def child(self) -> RecursiveProperty[list[T]]: ...
+
+class RecursivePropertySetter[T](Protocol):
+    @property
+    def child(self) -> int: ...
+
+    @child.setter
+    def child(self, value: RecursivePropertySetter[list[T]]) -> None: ...
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            global_instance_type(&db, "GenericProperty").recursive_identity(&db),
+            None
+        );
+        assert!(matches!(
+            global_instance_type(&db, "RecursiveProperty").recursive_identity(&db),
+            Some(TypeIdentity::RecursiveProtocol(_))
+        ));
+        assert!(matches!(
+            global_instance_type(&db, "RecursivePropertySetter").recursive_identity(&db),
+            Some(TypeIdentity::RecursiveProtocol(_))
+        ));
     }
 
     #[test]
