@@ -119,6 +119,29 @@ pub struct StaticClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
+#[derive(Clone, Copy)]
+enum FrozenDataclassMutator {
+    Set,
+    Delete,
+}
+
+impl FrozenDataclassMutator {
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "__setattr__" => Some(Self::Set),
+            "__delattr__" => Some(Self::Delete),
+            _ => None,
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Set => "__setattr__",
+            Self::Delete => "__delattr__",
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -1381,12 +1404,12 @@ impl<'db> StaticClassLiteral<'db> {
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
         // `CodeGeneratorKind::from_class` check below would return `None` before dataclass-like
         // synthesis runs. Still, an instance of such a subclass inherits the frozen dataclass's
-        // generated `__setattr__`, which rejects writes to frozen base fields.
-        if name == "__setattr__"
-            && let Some(synthesized_setattr) =
-                self.own_frozen_dataclass_subclass_setattr(db, specialization)
+        // generated `__setattr__` and `__delattr__`, which reject mutations of frozen base fields.
+        if let Some(mutator) = FrozenDataclassMutator::from_name(name)
+            && let Some(synthesized_method) =
+                self.own_frozen_dataclass_subclass_mutator(db, specialization, mutator)
         {
-            return Some(synthesized_setattr);
+            return Some(synthesized_method);
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
@@ -1827,42 +1850,52 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Synthesize a `__setattr__` view for an ordinary subclass of a frozen dataclass.
+    /// Synthesize an attribute-mutator view for an ordinary subclass of a frozen dataclass.
     ///
-    /// CPython's generated frozen-dataclass `__setattr__` rejects all writes on exact instances of
-    /// the frozen dataclass, but on subclass instances it only rejects writes to that dataclass's
-    /// fields before delegating to the next `__setattr__` in the MRO.
-    fn own_frozen_dataclass_subclass_setattr(
+    /// CPython's generated frozen-dataclass `__setattr__` and `__delattr__` reject all mutations on
+    /// exact instances of the frozen dataclass, but on subclass instances they only reject
+    /// mutations of that dataclass's fields before delegating to the next method in the MRO.
+    ///
+    /// ```python
+    /// @dataclass(frozen=True)
+    /// class Frozen: x: int
+    /// class Child(Frozen): ...
+    ///
+    /// Child().x = 1  # raises FrozenInstanceError
+    /// del Child().x  # raises FrozenInstanceError
+    /// ```
+    fn own_frozen_dataclass_subclass_mutator(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        mutator: FrozenDataclassMutator,
     ) -> Option<Type<'db>> {
         if CodeGeneratorKind::from_static_class(db, self).is_some() {
             return None;
         }
 
         let frozen_base_fields =
-            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization)?;
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, mutator)?;
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
-        let setattr_signature = |name_ty, return_ty| {
-            Signature::new(
-                Parameters::standard([
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_or_keyword(Name::new_static("name"))
-                        .with_annotated_type(name_ty),
-                    Parameter::positional_or_keyword(Name::new_static("value")),
-                ]),
-                return_ty,
-            )
+        let mutator_signature = |name_ty, return_ty| {
+            let mut parameters = vec![
+                Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_or_keyword(Name::new_static("name"))
+                    .with_annotated_type(name_ty),
+            ];
+            if matches!(mutator, FrozenDataclassMutator::Set) {
+                parameters.push(Parameter::positional_or_keyword(Name::new_static("value")));
+            }
+            Signature::new(Parameters::standard(parameters), return_ty)
         };
 
         let overloads = frozen_base_fields
             .keys()
-            .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
-            .chain([setattr_signature(
+            .map(|field| mutator_signature(Type::string_literal(db, field), Type::Never))
+            .chain([mutator_signature(
                 KnownClass::Str.to_instance(db),
                 Type::none(db),
             )]);
@@ -1875,29 +1908,20 @@ impl<'db> StaticClassLiteral<'db> {
         )))
     }
 
-    /// Return the inherited frozen dataclass fields whose generated `__setattr__` still controls
-    /// assignments on this class.
+    /// Return the inherited frozen dataclass fields whose generated attribute mutator still
+    /// controls mutations on this class.
+    ///
+    /// Stops if an intermediate class overrides the relevant generated method.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        mutator: FrozenDataclassMutator,
     ) -> Option<&'db FxIndexMap<Name, Field<'db>>> {
         for base in self.iter_mro(db, specialization).skip(1) {
             let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
 
-            // Stop if another class in the MRO replaces the generated frozen setter:
-            //
-            //   @dataclass(frozen=True)
-            //   class Frozen: x: int
-            //
-            //   class Mutable(Frozen):
-            //       def __setattr__(self, name: str, value: object) -> None: ...
-            //
-            //   class Child(Mutable): ...
-            //
-            // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
-            // `Frozen.__setattr__`.
-            if class_member(db, base_class.body_scope(db), "__setattr__")
+            if class_member(db, base_class.body_scope(db), mutator.name())
                 .ignore_possibly_undefined()
                 .is_some()
             {

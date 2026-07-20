@@ -854,7 +854,7 @@ class MyFrozenClass:
 class MyFrozenChildClass(MyFrozenClass): ...
 
 frozen = MyFrozenChildClass()
-del frozen.x  # TODO this should emit an [invalid-assignment]
+del frozen.x  # error: [invalid-assignment]
 ```
 
 ### frozen/non-frozen inheritance
