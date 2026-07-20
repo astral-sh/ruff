@@ -635,18 +635,17 @@ class ProtocolWithClassVarImpl(ProtocolBase):
     instance_attr = 0
 ```
 
-## Inherited method conflicts in a resolved MRO
+## Inherited method conflicts in multiple inheritance
 
-Every method definition in a resolved MRO must be Liskov-compatible with later definitions of the
-same method. This also applies when the subclass does not define the method itself, when the
-conflicting definitions occur on later bases, and when an earlier method happens to satisfy both
-contracts.
+Every method definition in a class's resolved MRO must be compatible with the later definitions of
+that method. This matters even when the class does not define the method itself.
+
+### Basic conflicts
+
+`ReturnsStr.method` cannot satisfy the contract inherited from `ReturnsInt`. Returning `bool` is
+compatible because `bool` is a subtype of `int`.
 
 ```pyi
-from typing import Any, Generic, NoReturn, TypeVar, overload
-
-T = TypeVar("T")
-
 class ReturnsStr:
     def method(self) -> str: ...
 
@@ -656,22 +655,75 @@ class ReturnsInt:
 class ReturnsBool:
     def method(self) -> bool: ...
 
-class Compatible(ReturnsBool, ReturnsInt): ...
 class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+class Compatible(ReturnsBool, ReturnsInt): ...
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
+  --> src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def method(self) -> str: ...
+   |         ------ `ReturnsStr.method` defined here
+ 3 |
+ 4 | class ReturnsInt:
+ 5 |     def method(self) -> int: ...
+   |         ------ `ReturnsInt.method` defined here
+ 6 |
+ 7 | class ReturnsBool:
+ 8 |     def method(self) -> bool: ...
+ 9 |
+10 | class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
+   |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+### Conflicts between later bases
+
+An earlier base without the method does not prevent a conflict between the second and third bases.
+
+```pyi
 class Empty: ...
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
 class LaterBaseConflict(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### An earlier compatible method does not hide a conflict
+
+`SatisfiesBoth.method` is compatible with both later definitions because it returns `NoReturn`.
+`ReturnsStr.method` is still incompatible with the later `ReturnsInt.method`.
+
+```pyi
+from typing import NoReturn
 
 class SatisfiesBoth:
     def method(self) -> NoReturn: ...
 
-# `SatisfiesBoth.method` is compatible with both definitions, but the resolved MRO still puts
-# `ReturnsStr.method` before the incompatible `ReturnsInt.method`.
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
 class HiddenConflict(SatisfiesBoth, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
 
-class GenericReturn(Generic[T]):
-    def method(self) -> T: ...
+### An intermediate `Any` does not hide a conflict
 
-class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+`AcceptsAny.accepts` can accept either parameter type, so it is compatible with both adjacent
+definitions. That does not allow `AcceptsStr.accepts` to accept the `int` values required by
+`AcceptsInt.accepts`.
+
+```pyi
+from typing import Any
 
 class AcceptsInt:
     def accepts(self, value: int) -> None: ...
@@ -682,58 +734,54 @@ class AcceptsAny(AcceptsInt):
 class AcceptsStr:
     def accepts(self, value: str) -> None: ...
 
-# Assignability through `Any` is not transitive, so the full MRO suffix must be checked.
-class GradualConflict(AcceptsStr, AcceptsAny): ...  # error: [invalid-method-override]
-
-class ReceiverBase:
-    @overload
-    @classmethod
-    def selected(cls: type[ReceiverConflict]) -> int: ...
-    @overload
-    @classmethod
-    def selected(cls) -> str: ...
-
-class Left(ReceiverBase): ...
-
-class Right(ReceiverBase):
-    @classmethod
-    def selected(cls) -> str: ...
-
-# The classmethod contracts must be bound using the class whose MRO is being checked.
-class ReceiverConflict(Left, Right): ...  # error: [invalid-method-override]
+class AnyConflict(AcceptsStr, AcceptsAny): ...  # error: [invalid-method-override]
 ```
 
-```snapshot
-error[invalid-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
-  --> src/mdtest_snippet.pyi:15:7
-   |
-15 | class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
-   |
-  ::: src/mdtest_snippet.pyi:6:9
-   |
- 6 |     def method(self) -> str: ...
-   |         ------ `ReturnsStr.method` defined here
- 7 |
- 8 | class ReturnsInt:
- 9 |     def method(self) -> int: ...
-   |         ------ `ReturnsInt.method` defined here
-   |
-info: incompatible return types: `str` is not assignable to `int`
-info: This violates the Liskov Substitution Principle
-```
+### Generic bases
 
-The MRO walk must preserve the ordinary source-method cases too: assigned functions, indirect and
-generic bases, ordinary dunder methods, descriptor kinds, and classmethod lookup in the presence of
-a same-named metaclass descriptor. The shared `object` tail must not create a duplicate error.
-
-`edge_cases.pyi`:
+A method inherited from `GenericReturn[int]` returns `int`. A plain `Generic[T]` base adds no
+method, but it must not prevent the remaining bases from being checked.
 
 ```pyi
-from typing import Any, Generic, Iterator, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class GenericReturn(Generic[T]):
+    def method(self) -> T: ...
+
+class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+class GenericBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Methods inherited by a direct base
+
+A direct base can inherit the method from one of its own bases.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class Intermediate(ReturnsStr): ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Functions assigned in a class body
+
+A function assigned in a class body is bound as a method. It can conflict with a method definition
+in either base order.
+
+```pyi
 def returns_str(self) -> str: ...
 
 class Assigned:
@@ -744,22 +792,32 @@ class Defined:
 
 class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
 class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
+```
 
+### Unreachable definitions do not shadow inherited methods
+
+An assignment in an unreachable branch does not replace the method inherited from `ReturnsStr`.
+
+```pyi
 class ReturnsStr:
     def method(self) -> str: ...
-
-class ReturnsInt:
-    def method(self) -> int: ...
-
-class Intermediate(ReturnsStr): ...
-class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
 
 class UnreachableShadow(ReturnsStr):
     if False:
         method = 0
 
+class ReturnsInt:
+    def method(self) -> int: ...
+
 class UnreachableConflict(ReturnsInt, UnreachableShadow): ...  # error: [invalid-method-override]
-class GenericConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Special methods
+
+Special methods such as `__iter__` participate in the same compatibility check as other methods.
+
+```pyi
+from typing import Iterator
 
 class IteratesStr:
     def __iter__(self) -> Iterator[str]: ...
@@ -768,7 +826,14 @@ class IteratesInt:
     def __iter__(self) -> Iterator[int]: ...
 
 class IteratorConflict(IteratesStr, IteratesInt): ...  # error: [invalid-method-override]
+```
 
+### Instance, static, and class methods
+
+Instance methods, static methods, and class methods are bound differently. Each pair can therefore
+conflict even when the callable signatures look compatible.
+
+```pyi
 class InstanceMethod:
     def kind(self, value: int) -> int: ...
 
@@ -781,31 +846,91 @@ class ClassMethod:
     def kind(cls, value: int) -> int: ...
 
 class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
-class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
-class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
-class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # error: [invalid-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
 class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
-class ClassStaticConflict(ClassMethod, StaticMethod): ...  # error: [invalid-method-override]
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def kind(cls, value: int) -> int: ...
+   |         ---- `ClassMethod.kind` defined here
+11 |
+12 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+13 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def kind(self, value: int) -> int: ...
+   |         ---- `InstanceMethod.kind` defined here
+   |
+info: `ClassMethod.kind` is a classmethod but `InstanceMethod.kind` is an instance method
+info: This violates the Liskov Substitution Principle
+```
+
+### Class methods use the subclass as their receiver
+
+The signature selected for a class method overload can depend on the class used as the receiver.
+Here, binding through `Combined` selects the `int` overload, which conflicts with `Right.selected`.
+
+```pyi
+from typing import overload
+
+class ReceiverBase:
+    @overload
+    @classmethod
+    def selected(cls: type[Combined]) -> int: ...
+    @overload
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Left(ReceiverBase): ...
+
+class Right(ReceiverBase):
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Combined(Left, Right): ...  # error: [invalid-method-override]
+```
+
+### Metaclass descriptors do not replace class method contracts
+
+Looking up a class method by name on a class object can invoke a same-named descriptor on its
+metaclass. The inherited contract still comes from the class method defined in the class body.
+
+```pyi
+from typing import Any
 
 class Meta(type):
     @property
     def class_method(cls) -> Any: ...
 
-class ReturnsIntClassMethod(metaclass=Meta):
+class ReturnsInt(metaclass=Meta):
     @classmethod
     def class_method(cls) -> int: ...
 
-class ReturnsStrClassMethod:
+class ReturnsStr:
     @classmethod
     def class_method(cls) -> str: ...
 
-class MetaclassConflict(ReturnsIntClassMethod, ReturnsStrClassMethod): ...  # error: [invalid-method-override]
+class MetaclassConflict(ReturnsInt, ReturnsStr): ...  # error: [invalid-method-override]
+```
+
+### The implicit `object` base does not repeat an existing error
+
+Every class eventually inherits from `object`. An otherwise empty base does not add another contract
+for `__str__`: `InvalidStr` receives the ordinary override error, and `Combined` receives no second
+error.
+
+```pyi
 class Empty: ...
 
 class InvalidStr:
     def __str__(self) -> int: ...  # error: [invalid-method-override]
 
-class DoesNotRepeatObjectConflict(Empty, InvalidStr): ...
+class Combined(Empty, InvalidStr): ...
 ```
 
 ## The entire class hierarchy is checked
