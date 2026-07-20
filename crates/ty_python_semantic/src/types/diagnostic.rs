@@ -3559,12 +3559,15 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 /// class Parent(Grandparent[T1, T2]): ...
 /// class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
 /// ```
+///
+/// Returns `true` if an inconsistency was found, even when it is inherited or the diagnostic is
+/// disabled.
 pub(crate) fn report_inconsistent_generic_bases<'db>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
     base_nodes: Option<&[ast::Expr]>,
-) {
+) -> bool {
     let db = context.db();
     // Maps each generic ancestor's class literal to the first
     // specialization seen and the index of the explicit base it
@@ -3572,7 +3575,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     let mut ancestor_specs =
         FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
 
-    'outer: for (i, base) in explicit_bases.iter().enumerate() {
+    for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
@@ -3588,17 +3591,19 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             let origin = supercls_alias.origin(db);
 
             if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                if earlier_idx != i
-                    && earlier_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .zip(supercls_alias.specialization(db).types(db))
-                        .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
+                if earlier_alias
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .zip(supercls_alias.specialization(db).types(db))
+                    .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
                 {
+                    if earlier_idx == i {
+                        return true;
+                    }
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
                     else {
-                        break 'outer;
+                        return true;
                     };
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Inconsistent type arguments for `{}` among class bases",
@@ -3651,7 +3656,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         supercls_alias.display(db),
                         earlier_alias.display(db)
                     ));
-                    break 'outer;
+                    return true;
                 }
             } else if !supercls_alias
                 .specialization(db)
@@ -3663,6 +3668,8 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             }
         }
     }
+
+    false
 }
 
 pub(crate) fn report_shadowed_type_variable<'db>(

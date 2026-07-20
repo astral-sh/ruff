@@ -988,6 +988,28 @@ class Parent[U](Base):
 class Child(Parent[str], object): ...
 ```
 
+### Inconsistent generic bases do not produce override errors
+
+The type arguments are already inconsistent, so there is no resolved generic MRO to check. The same
+is true for a descendant of the invalid class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class User: ...
+class Member(User): ...
+
+class Base[T]:
+    def method(self) -> T: ...
+
+class UserBase(Base[User]): ...
+class MemberBase(UserBase, Base[Member]): ...  # error: [invalid-generic-class]
+class MemberChild(MemberBase, object): ...
+```
+
 ## The entire class hierarchy is checked
 
 If a child class's method definition is Liskov-compatible with the method definition on its parent
