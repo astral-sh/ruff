@@ -423,7 +423,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     db,
                     object_ty,
                     "__setattr__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (argument_index, _, tcx)| {

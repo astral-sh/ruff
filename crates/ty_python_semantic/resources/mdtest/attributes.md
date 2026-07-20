@@ -3140,6 +3140,21 @@ Foo.whatever = 42
 Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
 ```
 
+If both the metaclass and class define `__setattr__`, class-object assignments use the metaclass
+method and instance assignments use the class method:
+
+```py
+class WithSetAttr(metaclass=Meta):
+    def __setattr__(self, name: str, value: str) -> None: ...
+
+WithSetAttr.class_attribute = 42
+WithSetAttr.class_attribute = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+
+instance = WithSetAttr()
+instance.instance_attribute = "valid"
+instance.instance_attribute = 42  # error: [unresolved-attribute] "with custom `__setattr__` method"
+```
+
 The same applies when the class object is annotated as `type[Foo]`:
 
 ```py
