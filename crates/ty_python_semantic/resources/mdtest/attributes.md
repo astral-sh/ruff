@@ -2978,7 +2978,10 @@ class ContextMeta(type):
 
 class ContextClass(metaclass=ContextMeta): ...
 
-ContextClass.callback = lambda value: value.missing  # error: [unresolved-attribute]
+ContextClass.callback = lambda value: (
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    value.missing
+)
 ContextClass.payload = {"value": 1}
 ```
 
@@ -2997,7 +3000,10 @@ class OverloadedMeta(type):
 
 class OverloadedClass(metaclass=OverloadedMeta): ...
 
-OverloadedClass.callback = lambda value: value.missing  # error: [unresolved-attribute]
+OverloadedClass.callback = lambda value: (
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    value.missing
+)
 OverloadedClass.payload = {"value": 1}
 ```
 
@@ -3015,7 +3021,7 @@ class Frozen(metaclass=FrozenMeta):
 
 Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attribute `new`"
 
-# TODO: this should be an error
+# TODO: terminal setters should also prevent writes to declared attributes.
 Frozen.existing = 2
 ```
 

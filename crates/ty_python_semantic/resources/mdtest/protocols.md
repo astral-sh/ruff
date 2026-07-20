@@ -2463,11 +2463,11 @@ class MetaWithGetAttrAndSetAttr(type):
 class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
 
 ClassWithDynamicX.x = 1
-# TODO: this should pass
+# TODO: this should pass once metaclass setters are considered for protocol writes.
 dynamic_x: HasMutableXProperty = ClassWithDynamicX  # error: [invalid-assignment]
 ```
 
-A metaclass setter with an incompatible parameter type cannot satisfy the same protocol:
+Once metaclass setters are considered, one with an incompatible value type must still be rejected:
 
 ```py
 class MetaWithUnsuitableSetAttr(type):
@@ -2486,23 +2486,21 @@ protocol even when the attribute is declared:
 
 ```py
 class MetaWithTerminalSetAttr(type):
-    def __getattr__(cls, attr: str) -> int:
-        return 1
-
     def __setattr__(cls, attr: str, value: int) -> Never:
         raise AttributeError("immutable")
 
 class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
     x: int = 1
 
-# TODO: this should be an error
+# TODO: terminal setters should prevent all writes.
 terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr
 ```
 
-An overloaded metaclass setter must accept the protocol property's name, not just its value type:
+Once metaclass setters are considered, an overload for a different attribute must not make the class
+satisfy the protocol:
 
 ```py
-from typing import Any, Literal, overload
+from typing import Literal
 from ty_extensions._internal import TypeOf
 
 class MetaWithOverloadedSetAttr(type):
@@ -2538,14 +2536,15 @@ class MetaWithGenericSetAttr(type):
 class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
 
 ClassWithGenericSetAttr.x = 1
-# TODO: this should pass
+# TODO: this should pass once metaclass setters are considered for protocol writes.
 generic_x: HasMutableXProperty = ClassWithGenericSetAttr  # error: [invalid-assignment]
 ```
 
+For static checking, an explicit attribute declaration takes precedence over `__setattr__`. This
+matches other type checkers and likely user intent, even though a custom `__setattr__` intercepts
+every assignment at runtime:
+
 ```py
-# For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
-# This matches other type checkers and likely user intent, even though a custom `__setattr__`
-# intercepts every assignment at runtime.
 class ExplicitXWithBroadSetAttr:
     x: int
 
