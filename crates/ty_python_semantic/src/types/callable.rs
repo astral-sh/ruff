@@ -555,36 +555,41 @@ impl<'db> CallableType<'db> {
         ))
     }
 
+    /// Binds the first (presumably `self`) parameter of this callable.
+    ///
+    /// `self_type` is both used to select overloads with compatible explicit receiver annotations
+    /// and substituted for occurrences of `typing.Self`. Use [`Self::bind_self_with_receiver`] when
+    /// those types differ, as they do for classmethods.
     pub(crate) fn bind_self(
         self,
         db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        self.bind_self_with_receiver(db, self_type, self_type)
+    }
+
+    /// Binds the first (presumably `self`) parameter of this callable.
+    ///
+    /// `receiver_type` is used to select overloads with compatible explicit receiver
+    /// annotations, while `self_type` replaces occurrences of `typing.Self`. These types differ
+    /// for classmethods: the receiver is a class object, but `Self` resolves to its instance type.
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Option<Type<'db>>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
         }
 
-        let signatures = self.signatures(db);
-        // Mirror `BoundMethodType::bound_signatures`: when a promoted callable (such as an
-        // aliased method) carries multiple overloads with explicit `self` annotations, prune the
-        // overloads whose receiver annotation cannot accept the bound `self` before binding.
-        let bound = if let Some(self_type) = self_type
-            && signatures.overloads.len() > 1
-            && signatures
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-        {
-            CallableSignature::from_overloads(
-                signatures
-                    .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, self_type))
-                    .map(|signature| signature.bind_self(db, Some(self_type))),
-            )
-        } else {
-            signatures.bind_self(db, self_type)
-        };
-
-        CallableType::new(db, bound, self.kind(db), self.provenance(db))
+        CallableType::new(
+            db,
+            self.signatures(db)
+                .bind_self_with_receiver(db, receiver_type, self_type),
+            self.kind(db),
+            self.provenance(db),
+        )
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {

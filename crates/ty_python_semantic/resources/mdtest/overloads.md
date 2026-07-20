@@ -163,45 +163,90 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
-## Aliased overloaded methods
+## Class-level aliases
+
+### Bound method
 
 Accessing an overloaded method through a class-level alias (which is promoted to a `Callable`) must
-apply the same receiver-based overload pruning as accessing the original method. Here the overloads
-differ only in their `self` annotation, so an empty argument list cannot disambiguate them: without
-pruning, every call through the alias would incorrectly resolve to the first overload (`int`).
+apply the same receiver-based overload pruning as accessing the original method.
 
 ```py
-from typing import overload
+from typing import Awaitable, overload
+from typing_extensions import Literal, Protocol
 
-class Base:
+class SyncCommand(Protocol):
+    is_async: Literal[False]
+
+class AsyncCommand(Protocol):
+    is_async: Literal[True]
+
+class Command:
     @overload
-    def answer(self: "IntChild") -> int: ...
+    def execute(self: SyncCommand) -> int: ...
     @overload
-    def answer(self: "StrChild") -> str: ...
+    def execute(self: AsyncCommand) -> Awaitable[int]: ...
+    def execute(
+        self: SyncCommand | AsyncCommand,
+    ) -> int | Awaitable[int]:
+        raise NotImplementedError
+
+    alias = execute
+
+class ConcreteSyncCommand(Command):
+    is_async: Literal[False] = False
+
+class ConcreteAsyncCommand(Command):
+    is_async: Literal[True] = True
+
+reveal_type(ConcreteSyncCommand().alias())  # revealed: int
+reveal_type(ConcreteAsyncCommand().alias())  # revealed: Awaitable[int]
+```
+
+### `@classmethod`
+
+An aliased classmethod must use the owner class to filter explicit receiver annotations. This
+applies when the descriptor is accessed through either the class or an instance.
+
+```py
+from typing import Type, overload
+from typing_extensions import Self
+
+class Factory:
     @overload
-    def answer(self: "BoolChild") -> bool: ...
-    def answer(self) -> int | str | bool:
-        return 0
+    @classmethod
+    def create(cls: Type["Factory"], value: int) -> int: ...
+    @overload
+    @classmethod
+    def create(cls: Type["Factory"], value: str) -> str: ...
+    @classmethod
+    def create(cls, value: int | str) -> int | str:
+        return value
 
-    aliased = answer
+    aliased = create
 
-class IntChild(Base):
-    a: int = 0
+class ChildFactory(Factory): ...
 
-class StrChild(Base):
-    b: str = ""
+# Direct classmethod access already preserves receiver filtering.
+reveal_type(Factory.create(1))  # revealed: int
+reveal_type(ChildFactory.create(""))  # revealed: str
 
-class BoolChild(Base):
-    c: bytes = b""
+# Aliased classmethods must behave the same when accessed through a class or instance.
+reveal_type(Factory.aliased(1))  # revealed: int
+reveal_type(ChildFactory.aliased(""))  # revealed: str
+reveal_type(ChildFactory().aliased(1))  # revealed: int
 
-# Each receiver matches a single overload, so the alias prunes the other two.
-reveal_type(IntChild().aliased)  # revealed: () -> int
-reveal_type(StrChild().aliased)  # revealed: () -> str
-reveal_type(BoolChild().aliased)  # revealed: () -> bool
+class SelfFactory:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
 
-reveal_type(IntChild().aliased())  # revealed: int
-reveal_type(StrChild().aliased())  # revealed: str
-reveal_type(BoolChild().aliased())  # revealed: bool
+    aliased = create
+
+class ChildSelfFactory(SelfFactory): ...
+
+# Classmethod binding must continue to use the instance type to resolve `Self`.
+reveal_type(SelfFactory.aliased())  # revealed: SelfFactory
+reveal_type(ChildSelfFactory.aliased())  # revealed: ChildSelfFactory
 ```
 
 ## Specialized generic receivers
