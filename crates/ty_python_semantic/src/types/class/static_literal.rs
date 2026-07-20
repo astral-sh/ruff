@@ -1911,10 +1911,8 @@ impl<'db> StaticClassLiteral<'db> {
         )))
     }
 
-    /// Return the inherited frozen dataclass fields whose generated attribute mutator still
-    /// controls mutations on this class.
-    ///
-    /// Stops if an intermediate class overrides the relevant generated method.
+    /// Return the inherited frozen dataclass fields whose generated `__setattr__` or `__delattr__`
+    /// still controls mutations on this class.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
