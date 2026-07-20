@@ -2938,6 +2938,41 @@ class Foo(metaclass=Meta): ...
 reveal_type(Foo.x)  # revealed: int
 ```
 
+## Metaclasses with custom `__setattr__` methods
+
+A class is an instance of its metaclass. If an attribute is not defined on the class, assignments
+are checked against the metaclass's `__setattr__` method:
+
+```py
+class Meta(type):
+    def __setattr__(cls, name: str, value: int) -> None: ...
+
+class Foo(metaclass=Meta): ...
+
+Foo.whatever = 42
+```
+
+The same applies when the class object is annotated as `type[Foo]`:
+
+```py
+def set_on_subclass(cls: type[Foo]) -> None:
+    cls.whatever = 42
+```
+
+The type of the setter's `value` parameter determines which values can be assigned:
+
+```py
+Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+```
+
+A class without a custom metaclass still produces an error for an unknown attribute:
+
+```py
+class Regular: ...
+
+Regular.whatever = 42  # error: [unresolved-attribute]
+```
+
 ## Classes with custom `__setattr__` methods
 
 ### Basic

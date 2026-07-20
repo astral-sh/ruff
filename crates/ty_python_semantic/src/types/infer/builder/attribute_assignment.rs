@@ -409,15 +409,38 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ClassAttributeWriteMember::Unresolved {
                 has_instance_attribute,
             } => {
-                self.infer_value(TypeContext::default(), emit_diagnostics);
-                if emit_diagnostics {
-                    self.report(if *has_instance_attribute {
-                        AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
-                    } else {
-                        AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
-                    });
+                let db = self.builder.db();
+                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                match object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__setattr__",
+                    &mut CallArguments::positional([
+                        Type::string_literal(db, self.attribute),
+                        value_ty,
+                    ]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                ) {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
+                    Err(CallDunderError::CallError(..)) => {
+                        if emit_diagnostics {
+                            self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                                value_ty,
+                            });
+                        }
+                        false
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        if emit_diagnostics {
+                            self.report(if *has_instance_attribute {
+                                AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
+                            } else {
+                                AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
+                            });
+                        }
+                        false
+                    }
                 }
-                false
             }
         }
     }
