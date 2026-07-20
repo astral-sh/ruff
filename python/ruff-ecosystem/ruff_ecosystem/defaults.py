@@ -56,7 +56,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
     Project(repo=Repository(owner="ibis-project", name="ibis", ref="main")),
     Project(repo=Repository(owner="ing-bank", name="probatus", ref="main")),
-    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="develop")),
+    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="main")),
     Project(repo=Repository(owner="langchain-ai", name="langchain", ref="master")),
     Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
     Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),
