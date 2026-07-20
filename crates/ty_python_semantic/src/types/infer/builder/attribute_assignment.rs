@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use super::{MultiInferenceGuard, TypeInferenceBuilder};
+use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
@@ -19,11 +19,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
     ///
     /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
-    /// the name of the attribute being assigned, and `value_ty` is the type of the right-hand side of
-    /// the assignment. If the assignment is invalid, emit diagnostics.
+    /// the name of the attribute being assigned, `value` is the right-hand side, and `infer_value_ty`
+    /// infers its type with the supplied context. If the assignment is invalid, emit diagnostics.
     pub(super) fn validate_attribute_assignment(
         &mut self,
         target: &ast::ExprAttribute,
+        value: &ast::Expr,
         object_ty: Type<'db>,
         attribute: &str,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
@@ -33,6 +34,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut evaluator = AssignmentAttributeWriteEvaluator {
             builder: self,
             target,
+            value,
             object_ty,
             attribute,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
@@ -73,6 +75,7 @@ enum ContextualInference {
 struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
     target: &'a ast::ExprAttribute,
+    value: &'a ast::Expr,
     object_ty: Type<'db>,
     attribute: &'a str,
     infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
@@ -410,17 +413,29 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 has_instance_attribute,
             } => {
                 let db = self.builder.db();
-                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-                let setattr_result = object_ty.try_call_dunder_with_policy(
+                let name_ty = Type::string_literal(db, self.attribute);
+                let ast_arguments = [
+                    ast::ArgOrKeyword::Arg(self.target.value.as_ref()),
+                    ast::ArgOrKeyword::Arg(self.value),
+                ];
+                let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
+                let setattr_result = self.builder.infer_and_try_call_dunder(
                     db,
+                    object_ty,
                     "__setattr__",
-                    &mut CallArguments::positional([
-                        Type::string_literal(db, self.attribute),
-                        value_ty,
-                    ]),
-                    TypeContext::default(),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    ArgumentsIter::synthesized(&ast_arguments),
+                    &mut call_arguments,
+                    &mut |builder, (argument_index, _, tcx)| {
+                        if argument_index == 0 {
+                            name_ty
+                        } else {
+                            self.infer_value_ty.infer_silent(builder, tcx)
+                        }
+                    },
+                    TypeContext::default(),
                 );
+                let value_ty = self.infer_with_last_context(emit_diagnostics);
                 let setattr_returns_never = match &setattr_result {
                     Ok(bindings) => bindings.return_type(db).is_never(),
                     Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),

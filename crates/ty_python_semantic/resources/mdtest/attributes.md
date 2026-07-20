@@ -2965,6 +2965,42 @@ The type of the setter's `value` parameter determines which values can be assign
 Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
 ```
 
+The setter also provides the expected type when inferring the assigned value:
+
+```py
+from typing import Callable, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContextMeta(type):
+    def __setattr__(cls, name: str, value: Callable[[int], int] | Payload) -> None: ...
+
+class ContextClass(metaclass=ContextMeta): ...
+
+ContextClass.callback = lambda value: value.missing  # error: [unresolved-attribute]
+ContextClass.payload = {"value": 1}
+```
+
+Name-specific overloads provide the corresponding expected type:
+
+```py
+from typing import Any, Literal, overload
+
+class OverloadedMeta(type):
+    @overload
+    def __setattr__(cls, name: Literal["callback"], value: Callable[[int], int]) -> None: ...
+    @overload
+    def __setattr__(cls, name: Literal["payload"], value: Payload) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(cls, name: str, value: Any) -> None: ...
+
+class OverloadedClass(metaclass=OverloadedMeta): ...
+
+OverloadedClass.callback = lambda value: value.missing  # error: [unresolved-attribute]
+OverloadedClass.payload = {"value": 1}
+```
+
 A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
 
 ```py
