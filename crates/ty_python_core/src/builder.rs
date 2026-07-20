@@ -206,6 +206,15 @@ struct ConditionFlowSnapshots {
     falsy: FlowSnapshot,
 }
 
+impl ConditionFlowSnapshots {
+    fn into_short_circuit_and_continuation(self, op: ast::BoolOp) -> (FlowSnapshot, FlowSnapshot) {
+        match op {
+            ast::BoolOp::And => (self.falsy, self.truthy),
+            ast::BoolOp::Or => (self.truthy, self.falsy),
+        }
+    }
+}
+
 enum ConditionFlowSnapshot {
     Fallback,
     Branches(ConditionFlowSnapshots),
@@ -4572,6 +4581,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 let mut snapshots = vec![];
                 let mut reachability_constraints = vec![];
+                let mut last_condition_flow_snapshots = None;
 
                 for (index, value) in values.iter().enumerate() {
                     for id in &reachability_constraints {
@@ -4584,9 +4594,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .record_range_reachability(value.range(), in_type_checking_block);
                     self.visit_expr(value);
 
-                    // For the last value, we don't need to model control flow. There is no short-circuiting
-                    // anymore.
+                    // Only non-final values can short-circuit this boolean operation. The final
+                    // value can still have its own outcome-specific flow if it is nested.
                     if index < values.len() - 1 {
+                        let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
                         let predicate = self.build_predicate(value);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
@@ -4597,7 +4608,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
 
-                        let after_expr = self.flow_snapshot();
+                        let continuation =
+                            if let Some(condition_flow_snapshots) = condition_flow_snapshots {
+                                let (short_circuit, continuation) = condition_flow_snapshots
+                                    .into_short_circuit_and_continuation(*op);
+                                self.flow_restore(short_circuit);
+                                continuation
+                            } else {
+                                self.flow_snapshot()
+                            };
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
@@ -4610,17 +4629,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
-                        self.flow_restore(after_expr);
+                        self.flow_restore(continuation);
                         self.record_narrowing_constraint_id_for_places(
                             predicate_id,
                             &possibly_narrowed,
                         );
                         reachability_constraints.push(reachability_constraint);
+                    } else {
+                        last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
                     }
                 }
 
-                let no_short_circuit =
-                    any_over_expr(expr, &ast::Expr::is_named_expr).then(|| self.flow_snapshot());
+                let has_specialized_last = last_condition_flow_snapshots.is_some();
+                let (last_short_circuit, no_short_circuit) =
+                    if let Some(condition_flow_snapshots) = last_condition_flow_snapshots {
+                        let (short_circuit, no_short_circuit) =
+                            condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                        (Some(short_circuit), Some(no_short_circuit))
+                    } else {
+                        (
+                            None,
+                            any_over_expr(expr, &ast::Expr::is_named_expr)
+                                .then(|| self.flow_snapshot()),
+                        )
+                    };
+
+                if let Some(last_short_circuit) = last_short_circuit {
+                    self.flow_restore(last_short_circuit);
+                }
 
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
@@ -4629,10 +4665,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(no_short_circuit) = no_short_circuit {
                     let bool_op_key = ExpressionNodeKey::from(expr);
                     let maybe_short_circuit = self.flow_snapshot();
+
+                    if has_specialized_last {
+                        // Restore the merged post-expression flow after constructing the two
+                        // outcome-specific snapshots.
+                        self.flow_merge(no_short_circuit.clone());
+                    }
+
                     let (truthy, falsy) = match op {
                         ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
                         ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
                     };
+
                     self.condition_flow_snapshots_by_node
                         .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
                 }
