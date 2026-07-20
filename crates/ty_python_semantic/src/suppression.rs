@@ -358,25 +358,30 @@ impl Suppressions {
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.file
             .iter()
-            .chain(self.inline.intersecting_rev(range, id))
+            .chain(self.inline.intersecting_rev(
+                range,
+                SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask(),
+            ))
             .filter(move |suppression| suppression.matches(id) && suppression.applies_to(range))
     }
 
-    /// Returns the inline suppressions whose comments are on `line_range`.
-    fn inline_suppressions_on_line(
+    /// Returns applicable comments whose targets allow `--add-ignore` to append a code, in
+    /// reverse source order.
+    ///
+    /// The interval index filters out blanket suppressions. Comments with multiple codes can
+    /// appear more than once, and callers must still exclude comments with trailing reasons.
+    fn editable_inline_suppressions_rev(
         &self,
-        line_range: TextRange,
+        range: TextRange,
     ) -> impl Iterator<Item = &Suppression> + '_ {
-        // The interval index retains source order, so comment ranges are also ordered by start.
-        let start = self
-            .inline
-            .entries
-            .partition_point(|entry| entry.suppression.comment_range.start() < line_range.start());
-
-        self.inline.entries[start..]
-            .iter()
-            .map(|entry| &entry.suppression)
-            .take_while(move |suppression| suppression.comment_range.start() < line_range.end())
+        self.inline
+            .intersecting_rev(range, IntervalIndex::EDITABLE_MASK)
+            .filter(move |suppression| {
+                matches!(
+                    suppression.target,
+                    SuppressionTarget::Lint(_) | SuppressionTarget::Empty
+                ) && suppression.applies_to(range)
+            })
     }
 
     fn iter(&self) -> impl Iterator<Item = &Suppression> {
@@ -535,8 +540,9 @@ impl SuppressionTarget {
 
     /// Returns the conservative bit used to skip subtrees without this target.
     ///
-    /// Lints are hashed into 63 buckets, with one bucket reserved for blanket suppressions. The
-    /// interval index only traverses subtrees whose buckets overlap the queried lint.
+    /// Lints are hashed into 62 buckets, with one bucket reserved for blanket suppressions and
+    /// one for editable suppressions. The interval index only traverses subtrees whose buckets
+    /// overlap the queried lint.
     fn target_mask(self) -> u64 {
         match self {
             // Keep blanket suppressions separate so they are always considered.
@@ -545,7 +551,8 @@ impl SuppressionTarget {
             SuppressionTarget::Lint(id) => {
                 let mut hasher = FxHasher::default();
                 id.hash(&mut hasher);
-                1 << (1 + hasher.finish() % 63)
+                // The top bit is reserved for editable suppressions.
+                1 << (1 + hasher.finish() % 62)
             }
         }
     }
@@ -790,6 +797,9 @@ struct IntervalEntry {
 }
 
 impl IntervalIndex {
+    /// Marks lint-specific and empty suppressions that `--add-ignore` can consider extending.
+    const EDITABLE_MASK: u64 = 1 << 63;
+
     /// Builds an index from values sorted by interval start, retaining their input order.
     fn from_sorted(suppressions: Vec<Suppression>) -> Self {
         debug_assert!(
@@ -800,7 +810,15 @@ impl IntervalIndex {
             .into_iter()
             .map(|suppression| IntervalEntry {
                 subtree_max_end: suppression.suppressed_range.end(),
-                subtree_target_mask: suppression.target.target_mask(),
+                subtree_target_mask: suppression.target.target_mask()
+                    | if matches!(
+                        suppression.target,
+                        SuppressionTarget::Lint(_) | SuppressionTarget::Empty
+                    ) {
+                        Self::EDITABLE_MASK
+                    } else {
+                        0
+                    },
                 suppression,
             })
             .collect::<Box<[_]>>();
@@ -835,10 +853,12 @@ impl IntervalIndex {
     /// Interval endpoints are treated as inclusive so that an empty diagnostic range at an
     /// interval boundary remains a candidate. Callers can apply stricter containment rules to the
     /// returned values.
-    fn intersecting_rev(&self, query: TextRange, id: LintId) -> impl Iterator<Item = &Suppression> {
+    fn intersecting_rev(
+        &self,
+        query: TextRange,
+        wanted: u64,
+    ) -> impl Iterator<Item = &Suppression> {
         let mut pending: SmallVec<[&[IntervalEntry]; 16]> = smallvec![self.entries.as_ref()];
-        let wanted =
-            SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask();
 
         std::iter::from_fn(move || {
             while let Some(entries) = pending.pop() {
@@ -924,6 +944,33 @@ value = missing
         assert_eq!(
             suppressions
                 .lint_suppressions(missing_range, unresolved_reference)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn editable_index_skips_nested_blanket_suppressions() {
+        let source = r#"seen_code = True
+# ty: ignore
+# ty: ignore
+# ty: ignore
+# ty: ignore[]
+value = missing
+"#;
+        let db = TestDbBuilder::new()
+            .with_file("test.py", source)
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let missing_start = source.find("missing").unwrap().try_into().unwrap();
+        let missing_range = TextRange::at(missing_start, "missing".text_len());
+
+        let suppressions = suppressions(&db, file);
+        assert_eq!(suppressions.inline.len(), 4);
+        assert_eq!(
+            suppressions
+                .editable_inline_suppressions_rev(missing_range)
                 .count(),
             1
         );
