@@ -1,7 +1,12 @@
 use crate::{
     Db,
-    types::{ClassBase, IntersectionBuilder, KnownClass, Type, UnionBuilder},
+    types::{
+        ClassBase, IntersectionBuilder, KnownClass, Type, UnionBuilder,
+        equality::{equality_exclusion_constraint, equality_truthiness},
+    },
 };
+use ruff_python_ast as ast;
+use ty_python_core::Truthiness;
 
 enum ContainmentBehavior<'db> {
     /// Membership compares against the elements yielded by the wrapped type. Callers use
@@ -138,6 +143,89 @@ pub(super) fn elements_of<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'d
         ContainmentBehavior::ElementsOf(elements_of) => Some(elements_of),
         ContainmentBehavior::Custom | ContainmentBehavior::Unknown => None,
     }
+}
+
+/// Preserve the precise element types of an immediately consumed list or set literal.
+///
+/// These expressions cannot be mutated before membership is evaluated. Representing them as
+/// fixed-length tuples lets comparison inference and negative narrowing use the same elements.
+pub(super) fn inline_membership_rhs_type<'db>(
+    db: &'db dyn Db,
+    rhs: &ast::Expr,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Type<'db>> {
+    let elements = match rhs.expression_value() {
+        ast::Expr::List(list) => &list.elts,
+        ast::Expr::Set(set) => &set.elts,
+        _ => return None,
+    };
+
+    if elements.iter().any(ast::Expr::is_starred_expr) {
+        return None;
+    }
+
+    Some(Type::heterogeneous_tuple(
+        db,
+        elements.iter().map(&mut expression_type),
+    ))
+}
+
+/// Return a constraint excluding every value known to compare equal to a fixed container element.
+///
+/// `not in` negates equality with every element; it does not use `__ne__`. Only add an exclusion
+/// when every value represented by a slot is known to compare equal.
+pub(super) fn membership_exclusion_constraint<'db>(
+    db: &'db dyn Db,
+    elements: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let mut builder = IntersectionBuilder::new(db);
+    let mut constrained = false;
+
+    for element_ty in elements.iter().copied() {
+        if let Some(constraint) = equality_exclusion_constraint(db, element_ty) {
+            builder = builder.add_positive(constraint);
+            constrained = true;
+        }
+    }
+
+    constrained.then(|| builder.build())
+}
+
+/// Return the truthiness of an element-based membership check when its result is known.
+///
+/// A check is always false if no element can compare equal, and always true if applying the same
+/// exclusions used for negative narrowing leaves no possible value.
+pub(super) fn membership_truthiness<'db>(
+    db: &'db dyn Db,
+    lhs_ty: Type<'db>,
+    rhs_ty: Type<'db>,
+) -> Truthiness {
+    let Some(iterable) = elements_of(db, rhs_ty).and_then(|ty| ty.try_iterate(db).ok()) else {
+        return Truthiness::Ambiguous;
+    };
+    let Some(fixed_length) = iterable.as_fixed_length() else {
+        return Truthiness::Ambiguous;
+    };
+    let elements = fixed_length.all_elements();
+
+    if elements
+        .iter()
+        .all(|element| equality_truthiness(db, lhs_ty, *element).is_always_false())
+    {
+        return Truthiness::AlwaysFalse;
+    }
+
+    if let Some(exclusion) = membership_exclusion_constraint(db, elements)
+        && IntersectionBuilder::new(db)
+            .add_positive(lhs_ty)
+            .add_positive(exclusion)
+            .build()
+            .is_never()
+    {
+        return Truthiness::AlwaysTrue;
+    }
+
+    Truthiness::Ambiguous
 }
 
 /// Maximum haystack length for which we synthesize a negative type per character.

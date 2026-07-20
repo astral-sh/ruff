@@ -50,6 +50,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use crate::types::containment::inline_membership_rhs_type;
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -10565,6 +10566,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |builder, ((left, right), op), _peer_ty| {
                 let left_ty = builder.expression_type(left);
                 let right_ty = builder.infer_expression(right, TypeContext::default());
+                let comparison_right_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
+                    inline_membership_rhs_type(builder.db(), right, |element| {
+                        builder.expression_type(element)
+                    })
+                    .unwrap_or(right_ty)
+                } else {
+                    right_ty
+                };
 
                 let range = TextRange::new(left.start(), right.end());
 
@@ -10572,7 +10581,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &builder.context,
                     left_ty,
                     *op,
-                    right_ty,
+                    comparison_right_ty,
                     range,
                     &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
                 )

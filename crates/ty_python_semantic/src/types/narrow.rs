@@ -39,9 +39,13 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use super::UnionType;
 use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use super::containment::{
+    elements_of, inline_membership_rhs_type, membership_exclusion_constraint,
+    narrow_string_membership,
+};
 use super::equality::{
-    ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
-    evaluate_type_equality, evaluate_type_inequality,
+    ComparisonSoundnessPolicy, equality_truthiness, evaluate_type_equality,
+    evaluate_type_inequality,
 };
 use super::variance::TypeVarVariance;
 use itertools::Itertools;
@@ -49,10 +53,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
-
-mod containment;
-
-use self::containment::{elements_of, narrow_string_membership};
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -2992,46 +2992,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let membership_type = elements_of(self.db, rhs_ty)?;
         let iterable = membership_type.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
-        let mut builder = IntersectionBuilder::new(self.db);
-        let mut constrained = false;
-
-        // `not in` negates equality with every element; it does not use `__ne__`. Only add an
-        // exclusion when every value represented by a slot is known to compare equal.
-        for element_ty in fixed_length.all_elements().iter().copied() {
-            if let Some(constraint) = equality_exclusion_constraint(self.db, element_ty) {
-                builder = builder.add_positive(constraint);
-                constrained = true;
-            }
-        }
-
-        constrained.then(|| builder.build())
-    }
-
-    /// Preserve the precise element types of an immediately consumed list or set literal.
-    ///
-    /// These expressions cannot be mutated before membership is evaluated. Representing them as
-    /// fixed-length tuples also lets negative narrowing exclude values that are guaranteed present.
-    fn inline_membership_rhs_type(
-        &self,
-        rhs: &ast::Expr,
-        inference: &ExpressionInference<'db>,
-    ) -> Option<Type<'db>> {
-        let elements = match rhs.expression_value() {
-            ast::Expr::List(list) => &list.elts,
-            ast::Expr::Set(set) => &set.elts,
-            _ => return None,
-        };
-
-        if elements.iter().any(ast::Expr::is_starred_expr) {
-            return None;
-        }
-
-        Some(Type::heterogeneous_tuple(
-            self.db,
-            elements
-                .iter()
-                .map(|element| inference.expression_type(element)),
-        ))
+        membership_exclusion_constraint(self.db, fixed_length.all_elements())
     }
 
     fn evaluate_expr_compare_op(
@@ -3456,8 +3417,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
             let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
-                self.inline_membership_rhs_type(right, inference)
-                    .unwrap_or(rhs_ty)
+                inline_membership_rhs_type(self.db, right, |element| {
+                    inference.expression_type(element)
+                })
+                .unwrap_or(rhs_ty)
             } else {
                 rhs_ty
             };

@@ -5,6 +5,7 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::containment::{elements_of, membership_truthiness};
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{equality_truthiness, inequality_truthiness};
@@ -172,25 +173,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    let comparison_truthiness =
-        match op {
-            ast::CmpOp::Eq => equality_truthiness(db, left, right),
-            ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
-            ast::CmpOp::In | ast::CmpOp::NotIn => right
-                .exact_tuple_instance_spec(db)
-                .and_then(|tuple| {
-                    let tuple = tuple.as_fixed_length()?;
-                    Some(tuple.all_elements().iter().fold(
-                        Truthiness::AlwaysFalse,
-                        |truthiness, element| {
-                            truthiness.or(equality_truthiness(db, left, *element))
-                        },
-                    ))
-                })
-                .unwrap_or(Truthiness::Ambiguous)
-                .negate_if(op.is_not_in()),
-            _ => Truthiness::Ambiguous,
-        };
+    let comparison_truthiness = match op {
+        ast::CmpOp::Eq => equality_truthiness(db, left, right),
+        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+        ast::CmpOp::In | ast::CmpOp::NotIn => {
+            membership_truthiness(db, left, right).negate_if(op.is_not_in())
+        }
+        _ => Truthiness::Ambiguous,
+    };
     if comparison_truthiness != Truthiness::Ambiguous {
         return Ok(Type::from_truthiness(db, comparison_truthiness));
     }
@@ -638,6 +628,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     ast::CmpOp::Gt => tuple_rich_comparison(RichCompareOperator::Gt),
                     ast::CmpOp::GtE => tuple_rich_comparison(RichCompareOperator::Ge),
                     ast::CmpOp::In | ast::CmpOp::NotIn => {
+                        if elements_of(db, right).is_none() {
+                            return try_dunder(MemberLookupPolicy::default());
+                        }
+
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 

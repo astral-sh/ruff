@@ -122,6 +122,133 @@ reveal_type(42 in AlwaysFalse())  # revealed: Literal[False]
 reveal_type(42 not in AlwaysFalse())  # revealed: Literal[True]
 ```
 
+## Built-in containers with fixed contents
+
+Tuple membership compares the tested value against each element. Inline lists and sets cannot be
+changed before the membership check, so their literal elements can also determine the result:
+
+```py
+from typing import Literal
+
+def literal_membership(value: Literal["foo"]):
+    reveal_type(value in ("foo",))  # revealed: Literal[True]
+    reveal_type(value not in ("foo",))  # revealed: Literal[False]
+    reveal_type(value in ("bar",))  # revealed: Literal[False]
+    reveal_type(value not in ("bar",))  # revealed: Literal[True]
+
+    reveal_type(value in ["foo"])  # revealed: Literal[True]
+    reveal_type(value not in ["foo"])  # revealed: Literal[False]
+    reveal_type(value in {"bar"})  # revealed: Literal[False]
+    reveal_type(value not in {"bar"})  # revealed: Literal[True]
+```
+
+An exhaustive membership check proves that a function cannot implicitly return `None`, including
+when the tested value is a literal union:
+
+```py
+def tuple_membership(value: Literal["foo"]) -> int:
+    if value in ("foo",):
+        return 42
+
+def literal_union_membership(value: Literal["foo", "bar"]) -> int:
+    if value in ("foo", "bar"):
+        return 42
+
+def list_membership(value: Literal["foo"]) -> int:
+    if value in ["foo"]:
+        return 42
+
+def set_membership(value: Literal["foo"]) -> int:
+    if value in {"foo"}:
+        return 42
+```
+
+## Wrapped fixed-length tuples
+
+A tuple subclass without a custom `__contains__`, a `NewType` based on a tuple, and type variables
+restricted to tuples all use the containment behavior of the underlying tuple:
+
+```py
+from typing import Literal, NewType, TypeVar
+
+class InheritedTuple(tuple[Literal["foo"]]): ...
+
+WrappedTuple = NewType("WrappedTuple", tuple[Literal["foo"]])
+BoundTuple = TypeVar("BoundTuple", bound=tuple[Literal["foo"]])
+ConstrainedTuple = TypeVar(
+    "ConstrainedTuple",
+    tuple[Literal["foo"], Literal["bar"]],
+    tuple[Literal["foo"], Literal["baz"]],
+)
+
+def inherited_tuple(value: Literal["foo"], values: InheritedTuple) -> int:
+    if value in values:
+        return 42
+
+def wrapped_tuple(value: Literal["foo"], values: WrappedTuple) -> int:
+    if value in values:
+        return 42
+
+def bounded_tuple(value: Literal["foo"], values: BoundTuple) -> int:
+    if value in values:
+        return 42
+
+def constrained_tuple(value: Literal["foo"], values: ConstrainedTuple) -> int:
+    if value in values:
+        return 42
+```
+
+## Finite types
+
+Membership is also exhaustive when a tuple contains every possible value of `bool` or an enum with
+ordinary equality:
+
+```py
+from enum import Enum
+
+class Choice(Enum):
+    A = 1
+    B = 2
+
+def bool_membership(value: bool) -> int:
+    if value in (True, False):
+        return 42
+
+def enum_membership(value: Choice) -> int:
+    if value in (Choice.A, Choice.B):
+        return 42
+
+def finite_union_membership(value: Choice | bool) -> int:
+    if value in (Choice.A, Choice.B, True, False):
+        return 42
+```
+
+## Variable-length and custom containment
+
+A variable-length tuple can be empty, so its element type cannot make membership exhaustive:
+
+```py
+from typing import Literal
+
+def variable_tuple(value: Literal["foo"], values: tuple[Literal["foo"], ...]):
+    reveal_type(value in values)  # revealed: bool
+```
+
+A tuple subclass can override `__contains__`. Its return type determines membership instead of the
+tuple's elements, even when the tested value is itself a tuple:
+
+```py
+from typing import Literal
+
+class NeverContains(tuple[tuple[Literal["foo"]]]):
+    def __contains__(self, value: object) -> Literal[False]:
+        return False
+
+def custom_contains(value: tuple[Literal["foo"]], values: NeverContains):
+    reveal_type(value in values)  # revealed: Literal[False]
+    reveal_type(value not in values)  # revealed: Literal[True]
+```
+
 ## No Fallback for `__contains__`
 
 If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it

@@ -124,6 +124,7 @@ mod callable;
 mod class;
 mod class_base;
 mod constraints;
+mod containment;
 mod context;
 mod context_manager;
 mod cyclic;
