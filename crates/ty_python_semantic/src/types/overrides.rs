@@ -206,6 +206,19 @@ fn check_inherited_method_conflicts<'db>(
                     continue;
                 }
 
+                // `EnumType` can replace mixin dunders while constructing the enum, so the
+                // inherited definitions do not necessarily describe the resulting method. For
+                // example, `Status.__format__` is supplied during class creation here:
+                //
+                // ```python
+                // from enum import Enum
+                //
+                // class Status(int, Enum):
+                //     READY = 1
+                // ```
+                //
+                // Keep this check specific to the enum definition so conflicts between two
+                // ordinary mixins are still reported.
                 if enum_class_creation_manages_conflict(db, class, name, owner, contract_owner) {
                     continue;
                 }
