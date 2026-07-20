@@ -127,7 +127,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                         is_slice.range(),
                     );
                 }
-            } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
+            } else {
                 checker.report_diagnostic(
                     InvalidIndexType {
                         value_type: value_type.to_string(),
