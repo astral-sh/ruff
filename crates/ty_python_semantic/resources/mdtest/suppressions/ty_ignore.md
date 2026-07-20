@@ -81,6 +81,37 @@ values = [
 ]
 ```
 
+When nested same-line or own-line suppressions apply to the same diagnostic, the innermost
+suppression takes precedence. The outer suppression can still suppress diagnostics elsewhere in the
+logical line.
+
+```py
+seen_code = True
+
+# ty: ignore[unresolved-reference]
+values = [
+    # ty: ignore[unresolved-reference]
+    missing,
+    absent,
+]
+```
+
+If separate suppressions cover the opening and closing lines of a multiline diagnostic, the
+opening-line suppression takes precedence.
+
+```py
+# fmt: off
+def f(a: int, b: int) -> None:
+    pass
+
+def g(a: int, b: int) -> int:
+    return 0
+
+f(  # ty: ignore[missing-argument]
+    g(missing))  # ty: ignore[unresolved-reference, missing-argument]
+# fmt: on
+```
+
 ## Unused suppression
 
 ```py
