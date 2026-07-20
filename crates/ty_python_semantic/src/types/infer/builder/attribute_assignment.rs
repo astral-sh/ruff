@@ -411,7 +411,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             } => {
                 let db = self.builder.db();
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-                match object_ty.try_call_dunder_with_policy(
+                let setattr_result = object_ty.try_call_dunder_with_policy(
                     db,
                     "__setattr__",
                     &mut CallArguments::positional([
@@ -420,7 +420,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     ]),
                     TypeContext::default(),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                ) {
+                );
+                let setattr_returns_never = match &setattr_result {
+                    Ok(bindings) => bindings.return_type(db).is_never(),
+                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                };
+                if setattr_returns_never {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                            member_exists: false,
+                            is_setattr_synthesized: false,
+                        });
+                    }
+                    return false;
+                }
+
+                match setattr_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
                     Err(CallDunderError::CallError(..)) => {
                         if emit_diagnostics {

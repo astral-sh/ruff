@@ -2965,6 +2965,20 @@ The type of the setter's `value` parameter determines which values can be assign
 Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
 ```
 
+A metaclass `__setattr__` method that returns `Never` prevents assignments to unknown attributes:
+
+```py
+from typing_extensions import Never
+
+class FrozenMeta(type):
+    def __setattr__(cls, name: str, value: object) -> Never:
+        raise AttributeError("immutable")
+
+class Frozen(metaclass=FrozenMeta): ...
+
+Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attribute `new`"
+```
+
 A class without a custom metaclass still produces an error for an unknown attribute:
 
 ```py
