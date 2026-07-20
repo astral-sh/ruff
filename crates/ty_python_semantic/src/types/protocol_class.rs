@@ -2027,6 +2027,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let setattr_result = object_ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        if match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        } {
+            return self.never();
+        }
+
         match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
@@ -2046,20 +2060,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_fallback_property_write(db, fallback, value_ty)
             }
             ClassAttributeWriteMember::Unresolved { .. } => {
-                let setattr_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__setattr__",
-                    &mut CallArguments::positional([
-                        Type::string_literal(db, member_name),
-                        value_ty,
-                    ]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
-                if match &setattr_result {
-                    Ok(bindings) => bindings.return_type(db).is_never(),
-                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
-                } || !matches!(
+                if !matches!(
                     setattr_result,
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
                 ) {

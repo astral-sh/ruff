@@ -2487,7 +2487,8 @@ class MetaWithTerminalSetAttr(type):
     def __setattr__(cls, attr: str, value: int) -> Never:
         raise AttributeError("immutable")
 
-class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr): ...
+class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
+    x: int = 1
 
 terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr  # error: [invalid-assignment]
 ```
