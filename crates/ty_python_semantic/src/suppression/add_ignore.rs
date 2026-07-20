@@ -295,8 +295,9 @@ fn suppression_comment_fix(
 /// Adds an own-line `ty: ignore` before a diagnostic on an existing comment line.
 fn add_line_local_suppression(source: &str, codes: &[LintName], start: TextSize) -> Fix {
     let line_start = source.line_start(start);
-    let indentation = leading_indentation(&source[line_start.to_usize()..]);
-    let line_ending = find_newline(source).map_or("\n", |(_, ending)| ending.as_str());
+    let line = &source[line_start.to_usize()..];
+    let indentation = leading_indentation(line);
+    let line_ending = find_newline(line).map_or("\n", |(_, ending)| ending.as_str());
     let insertion = format!(
         "{indentation}# ty:ignore[{codes}]{line_ending}",
         codes = Codes(SuppressionKind::Ty, codes)

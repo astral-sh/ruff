@@ -580,6 +580,12 @@ struct SuppressionsBuilder<'a> {
     /// This offset tracks whether there has been any non-trivia token.
     first_non_trivia_token: Option<TextSize>,
 
+    /// The end of the most recently scanned run of comment-only lines.
+    comment_only_run_end: TextSize,
+
+    /// The suppression end shared by own-line comments in the most recent comment-only run.
+    own_line_suppression_end: TextSize,
+
     inline: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
     unknown: Vec<UnknownSuppression>,
@@ -592,6 +598,8 @@ impl<'a> SuppressionsBuilder<'a> {
             source,
             lint_registry,
             first_non_trivia_token: None,
+            comment_only_run_end: TextSize::default(),
+            own_line_suppression_end: TextSize::default(),
             inline: Vec::new(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
@@ -628,16 +636,33 @@ impl<'a> SuppressionsBuilder<'a> {
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = self.first_non_trivia_token.is_none();
-        let comment_token_start = tokens.token_range(comment.range().start()).start();
+        let comment_token_range = tokens.token_range(comment.range().start());
+        let comment_token_start = comment_token_range.start();
         let is_own_line_suppression = !comment.kind().is_type_ignore()
             && indentation_at_offset(comment_token_start, self.source).is_some();
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
         } else if is_own_line_suppression {
-            own_line_suppression_range(comment.range(), tokens)
+            if comment_token_range.end() <= self.comment_only_run_end {
+                TextRange::new(comment.range().start(), self.own_line_suppression_end)
+            } else {
+                let range = own_line_suppression_range(comment.range(), tokens);
+                self.own_line_suppression_end = range.end();
+                range
+            }
         } else {
             line_range
+        };
+
+        let suppression_comment_range = if !is_file_suppression && is_own_line_suppression {
+            own_line_suppression_comment_range(
+                comment.range(),
+                tokens,
+                &mut self.comment_only_run_end,
+            )
+        } else {
+            suppressed_range
         };
 
         let mut push_ignore_suppression = |suppression: Suppression| {
@@ -695,7 +720,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                 && lint.name() != UNUSED_IGNORE_COMMENT.name()
                                 && lint.name() != BLANKET_IGNORE_COMMENT.name()
                             {
-                                own_line_suppression_comment_range(comment.range(), tokens)
+                                suppression_comment_range
                             } else {
                                 suppressed_range
                             };
@@ -728,19 +753,28 @@ impl<'a> SuppressionsBuilder<'a> {
 ///
 /// Following comment-only lines are included so an own-line suppression can cover a diagnostic
 /// emitted on the next ignore comment, without also suppressing one on the next logical line.
-fn own_line_suppression_comment_range(range: TextRange, tokens: &Tokens) -> TextRange {
+fn own_line_suppression_comment_range(
+    range: TextRange,
+    tokens: &Tokens,
+    comment_only_run_end: &mut TextSize,
+) -> TextRange {
     let comment_token_range = tokens.token_range(range.start());
-    let mut end = comment_token_range.end();
+
+    if comment_token_range.end() <= *comment_only_run_end {
+        return TextRange::new(range.start(), *comment_only_run_end);
+    }
+
+    *comment_only_run_end = comment_token_range.end();
 
     for token in tokens.after(comment_token_range.end()) {
         match token.kind() {
-            TokenKind::Comment => end = token.end(),
+            TokenKind::Comment => *comment_only_run_end = token.end(),
             TokenKind::NonLogicalNewline => {}
             _ => break,
         }
     }
 
-    TextRange::new(range.start(), end)
+    TextRange::new(range.start(), *comment_only_run_end)
 }
 
 /// Returns the range covered by an own-line suppression comment.
