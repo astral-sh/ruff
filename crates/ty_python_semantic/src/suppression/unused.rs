@@ -1,6 +1,7 @@
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
@@ -222,6 +223,10 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
         }
 
         return Fix::safe_edit(edit);
+    }
+
+    if indentation_at_offset(comment_start, source).is_some() {
+        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
     }
 
     // Remove any leading whitespace before the comment

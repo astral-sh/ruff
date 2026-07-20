@@ -172,16 +172,20 @@ fn fix() -> anyhow::Result<()> {
         "unused_ignore.py",
         r#"
             x = 1  # ty: ignore[unresolved-reference]
+            values = [
+                # ty: ignore[]
+                1,
+            ]
             "#,
     )?;
 
     assert_cmd_snapshot!(
         case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Found 1 diagnostic (1 fixed, 0 remaining).
+    Found 2 diagnostics (2 fixed, 0 remaining).
 
     ----- stderr -----
     "
@@ -189,8 +193,12 @@ fn fix() -> anyhow::Result<()> {
 
     assert_snapshot!(
         fs::read_to_string(case.root().join("unused_ignore.py"))?,
-        @r"
+        @"
+
     x = 1
+    values = [
+        1,
+    ]
     "
     );
 
