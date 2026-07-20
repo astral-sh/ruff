@@ -153,7 +153,17 @@ impl From<&FormatType> for char {
 }
 
 impl FormatType {
-    fn parse(text: &str) -> (Result<Self, Option<char>>, &str) {
+    /// Attempt to parse the [conversion type] of the f-string.
+    ///
+    /// A conversion type is optional in an f-string.
+    /// If it is present, it is always the last character of the format specifier.
+    ///
+    /// If a valid conversion type was encountered, this function returns `Ok((Some(FormatType), remaining_text))`.
+    /// If an invalid conversion type was encountered, this function returns `Err(invalid_char)`.
+    /// If no conversion type was encountered, this function returns `Ok((None, remaining_text))`.
+    ///
+    /// [conversion type]: https://docs.python.org/3/library/string.html#format-specification-mini-language
+    fn parse(text: &str) -> Result<(Option<Self>, &str), char> {
         let mut chars = text.chars();
         let kind = match chars.next() {
             Some('s') => Self::String,
@@ -172,10 +182,10 @@ impl FormatType {
             Some('g') => Self::GeneralFormat(Case::Lower),
             Some('G') => Self::GeneralFormat(Case::Upper),
             Some('%') => Self::Percentage,
-            Some(invalid) => return (Err(Some(invalid)), chars.as_str()),
-            None => return (Err(None), text),
+            Some(invalid) => return Err(invalid),
+            None => return Ok((None, text)),
         };
-        (Ok(kind), chars.as_str())
+        Ok((Some(kind), chars.as_str()))
     }
 }
 
@@ -366,12 +376,8 @@ impl FormatSpec {
 
         // If there's any remaining text, we should yield a valid format type and consume it
         // all.
-        let (format_type, text) = FormatType::parse(text);
-        let format_type = match format_type {
-            Ok(format) => Some(format),
-            Err(Some(invalid)) => return Err(FormatSpecError::InvalidFormatType(invalid)),
-            Err(None) => None,
-        };
+        let (format_type, text) =
+            FormatType::parse(text).map_err(FormatSpecError::InvalidFormatType)?;
         if !text.is_empty() {
             return Err(FormatSpecError::InvalidFormatSpecifier);
         }
