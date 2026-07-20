@@ -88,21 +88,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
         return;
     };
 
-    if index_type.is_literal() {
-        // If the index is a literal, require an integer
-        if index_type != CheckableExprType::IntLiteral
-            && index_type != CheckableExprType::BooleanLiteral
-        {
-            checker.report_diagnostic(
-                InvalidIndexType {
-                    value_type: value_type.to_string(),
-                    index_type: index_type.to_string(),
-                    is_slice: false,
-                },
-                index.range(),
-            );
-        }
-    } else if let Expr::Slice(ExprSlice {
+    if let Expr::Slice(ExprSlice {
         lower, upper, step, ..
     }) = index.as_ref()
     {
@@ -110,24 +96,13 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
             let Some(is_slice_type) = CheckableExprType::try_from(is_slice) else {
                 continue;
             };
-            if is_slice_type.is_literal() {
-                // If the index is a slice, require integer or null bounds
-                if !matches!(
-                    is_slice_type,
-                    CheckableExprType::IntLiteral
-                        | CheckableExprType::NoneLiteral
-                        | CheckableExprType::BooleanLiteral
-                ) {
-                    checker.report_diagnostic(
-                        InvalidIndexType {
-                            value_type: value_type.to_string(),
-                            index_type: is_slice_type.to_string(),
-                            is_slice: true,
-                        },
-                        is_slice.range(),
-                    );
-                }
-            } else {
+            // A slice bound must be an integer, `None`, or a boolean.
+            if !matches!(
+                is_slice_type,
+                CheckableExprType::IntLiteral
+                    | CheckableExprType::NoneLiteral
+                    | CheckableExprType::BooleanLiteral
+            ) {
                 checker.report_diagnostic(
                     InvalidIndexType {
                         value_type: value_type.to_string(),
@@ -138,8 +113,11 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                 );
             }
         }
-    } else {
-        // If it's some other checkable data type, it's a violation
+    } else if !matches!(
+        index_type,
+        CheckableExprType::IntLiteral | CheckableExprType::BooleanLiteral
+    ) {
+        // A non-slice index must be an integer or a boolean.
         checker.report_diagnostic(
             InvalidIndexType {
                 value_type: value_type.to_string(),
@@ -234,19 +212,5 @@ impl CheckableExprType {
             Expr::Lambda(_) => Some(Self::Lambda),
             _ => None,
         }
-    }
-
-    fn is_literal(self) -> bool {
-        matches!(
-            self,
-            Self::StringLiteral
-                | Self::BytesLiteral
-                | Self::IntLiteral
-                | Self::FloatLiteral
-                | Self::ComplexLiteral
-                | Self::BooleanLiteral
-                | Self::NoneLiteral
-                | Self::EllipsisLiteral
-        )
     }
 }
