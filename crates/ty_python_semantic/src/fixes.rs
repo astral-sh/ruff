@@ -1158,6 +1158,10 @@ class B(A):
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Remove the unused suppression comment
+          |
+          - value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        1 + value = missing  # ty:ignore[unresolved-reference]
+          |
         "
         );
     }
