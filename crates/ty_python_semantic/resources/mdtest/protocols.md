@@ -2448,10 +2448,103 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+```
 
-# For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
-# This matches other type checkers and likely user intent, even though a custom `__setattr__`
-# intercepts every assignment at runtime.
+A class object should also satisfy a writable property protocol using `__getattr__` and
+`__setattr__` on its metaclass:
+
+```py
+class MetaWithGetAttrAndSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: int) -> None: ...
+
+class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
+
+ClassWithDynamicX.x = 1
+# TODO: this should pass once metaclass setters are considered for protocol writes.
+dynamic_x: HasMutableXProperty = ClassWithDynamicX  # error: [invalid-assignment]
+```
+
+Once metaclass setters are considered, one with an incompatible value type must still be rejected:
+
+```py
+class MetaWithUnsuitableSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: str) -> None: ...
+
+class ClassWithUnsuitableSetAttr(metaclass=MetaWithUnsuitableSetAttr): ...
+
+unsuitable_x: HasMutableXProperty = ClassWithUnsuitableSetAttr  # error: [invalid-assignment]
+```
+
+A terminal metaclass setter should prevent a class object from satisfying a writable property
+protocol even when the attribute is declared:
+
+```py
+class MetaWithTerminalSetAttr(type):
+    def __setattr__(cls, attr: str, value: int) -> Never:
+        raise AttributeError("immutable")
+
+class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
+    x: int = 1
+
+# TODO: terminal setters should prevent all writes.
+terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr
+```
+
+Once metaclass setters are considered, an overload for a different attribute must not make the class
+satisfy the protocol:
+
+```py
+from typing import Literal
+from ty_extensions._internal import TypeOf
+
+class MetaWithOverloadedSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    @overload
+    def __setattr__(cls, attr: Literal["x"], value: Any) -> None: ...
+    @overload
+    def __setattr__(cls, attr: Literal["y"], value: int) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(cls, attr: str, value: object) -> None: ...
+
+class ClassWithOverloadedSetAttr(metaclass=MetaWithOverloadedSetAttr): ...
+
+ClassWithOverloadedSetAttr.x = 1
+static_assert(not is_subtype_of(TypeOf[ClassWithOverloadedSetAttr], HasMutableXProperty))
+```
+
+A generic metaclass setter can satisfy a writable property protocol:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class MetaWithGenericSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: T) -> None: ...
+
+class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
+
+ClassWithGenericSetAttr.x = 1
+# TODO: this should pass once metaclass setters are considered for protocol writes.
+generic_x: HasMutableXProperty = ClassWithGenericSetAttr  # error: [invalid-assignment]
+```
+
+For static checking, an explicit attribute declaration takes precedence over `__setattr__`. This
+matches other type checkers and likely user intent, even though a custom `__setattr__` intercepts
+every assignment at runtime:
+
+```py
 class ExplicitXWithBroadSetAttr:
     x: int
 

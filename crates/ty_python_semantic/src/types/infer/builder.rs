@@ -3104,6 +3104,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     self.validate_attribute_assignment(
                         attr_expr,
+                        value,
                         object_ty,
                         attr.id(),
                         infer_assigned_ty,
@@ -4441,6 +4442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     target_type,
                     op.in_place_dunder(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
@@ -4982,13 +4984,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         db: &'db dyn Db,
         object: Type<'db>,
         name: &str,
+        lookup_policy: MemberLookupPolicy,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
-            .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(db, name, lookup_policy)
             .place
         {
             Place::Defined(DefinedPlace {
