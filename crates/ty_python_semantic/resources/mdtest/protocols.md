@@ -2493,6 +2493,29 @@ class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
 terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr  # error: [invalid-assignment]
 ```
 
+An overloaded metaclass setter must accept the protocol property's name, not just its value type:
+
+```py
+from typing import Any, Literal, overload
+from ty_extensions._internal import TypeOf
+
+class MetaWithOverloadedSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    @overload
+    def __setattr__(cls, attr: Literal["x"], value: Any) -> None: ...
+    @overload
+    def __setattr__(cls, attr: Literal["y"], value: int) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(cls, attr: str, value: object) -> None: ...
+
+class ClassWithOverloadedSetAttr(metaclass=MetaWithOverloadedSetAttr): ...
+
+ClassWithOverloadedSetAttr.x = 1
+static_assert(not is_subtype_of(TypeOf[ClassWithOverloadedSetAttr], HasMutableXProperty))
+```
+
 ```py
 # For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
 # This matches other type checkers and likely user intent, even though a custom `__setattr__`
