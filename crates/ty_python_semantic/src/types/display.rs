@@ -1226,6 +1226,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
+                    KnownBoundMethodType::ConstraintSetSolutionsFor(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions_for`");
+                    }
+                    KnownBoundMethodType::ConstraintSetSolutions(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions`");
+                    }
                     KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                         return f.write_str("bound method `ConstraintSet.with_detailed_display`");
                     }
@@ -3194,17 +3200,19 @@ impl Display for DisplayStringLiteralType<'_> {
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
     pub(crate) db: &'db dyn Db,
+    pub(crate) settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        _settings: DisplaySettings<'db>,
+        settings: DisplaySettings<'db>,
     ) -> DisplayKnownInstanceRepr<'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
             db,
+            settings,
         }
     }
 }
@@ -3289,6 +3297,21 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 } else {
                     f.write_str("[bool]")
                 }
+            }
+            KnownInstanceType::ConstraintSetSolution(solution) => {
+                f.set_invalid_type_annotation();
+                f.with_type(ty).write_str("Solution[")?;
+                for (index, binding) in solution.bindings(self.db).iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}=", binding.bound_typevar.name(self.db))?;
+                    binding
+                        .solution
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                }
+                f.write_char(']')
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty)

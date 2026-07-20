@@ -26,6 +26,7 @@ ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_site_packages = { workspace = true }
 ty_python_core = { workspace = true }
+ty_static = { workspace = true }
 
 bitflags = { workspace = true }
 char_str = { workspace = true }

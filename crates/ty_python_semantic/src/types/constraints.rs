@@ -92,7 +92,7 @@ use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use indexmap::map::Entry;
 use itertools::Itertools;
@@ -100,6 +100,7 @@ use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
+use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::generics::InferableTypeVars;
@@ -1337,7 +1338,45 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        builder.typevar_id(db, self).index() < builder.typevar_id(db, typevar).index()
+        wobble_index(builder.typevar_id(db, self).index())
+            < wobble_index(builder.typevar_id(db, typevar).index())
+    }
+}
+
+/// Optionally applies a transformation to a builder-local typevar or constraint ID, which lets us
+/// exercise different BDD variable orderings.
+///
+/// Under normal operation, the IDs won't be modified, and we will construct BDDs based on the
+/// (builder-local) source order that we encounter typevars and constraints.
+///
+/// Our results _shouldn't_ depend on the BDD variable ordering that we choose. You can use the
+/// `TY_CONSTRAINT_SET_ORDER` environment variable to artificially choose different permutations of
+/// the "natural" variable ordering, to ensure that results are consistent.
+fn wobble_index(index: usize) -> usize {
+    #[derive(Clone, Copy)]
+    enum Order {
+        Normal,
+        Reverse,
+        Xor(usize),
+    }
+
+    static ORDER: LazyLock<Order> = LazyLock::new(|| {
+        let Some(value) = std::env::var_os(EnvVars::TY_CONSTRAINT_SET_ORDER) else {
+            return Order::Normal;
+        };
+        if value == "reverse" {
+            return Order::Reverse;
+        }
+        value
+            .to_str()
+            .and_then(|value| value.parse::<usize>().ok())
+            .map_or(Order::Normal, Order::Xor)
+    });
+
+    match *ORDER {
+        Order::Normal => index,
+        Order::Reverse => !index,
+        Order::Xor(mask) => index ^ mask,
     }
 }
 
@@ -1964,7 +2003,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(self.index())
+        std::cmp::Reverse(wobble_index(self.index()))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -3754,8 +3793,8 @@ impl<'db> PathBounds<'db> {
         });
 
         let mut result = Vec::with_capacity(sorted_paths.len());
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
 
         for path in sorted_paths {
             mappings.clear();
@@ -3784,7 +3823,7 @@ impl<'db> PathBounds<'db> {
             }
 
             let path_bounds = mappings
-                .drain()
+                .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
             result.push(path_bounds);
@@ -3844,8 +3883,8 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
@@ -3858,7 +3897,7 @@ impl<'db> PathBounds<'db> {
         }
 
         let path = mappings
-            .drain()
+            .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
@@ -5106,8 +5145,8 @@ pub(crate) enum Solutions<'db> {
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct TypeVarSolution<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,
 }
@@ -7619,6 +7658,224 @@ mod tests {
                 Some(&false)
             );
         });
+    }
+
+    #[derive(Clone, Copy)]
+    struct PermutedConstraint<'db>(
+        BoundTypeVarInstance<'db>,
+        Option<Type<'db>>,
+        Option<Type<'db>>,
+    );
+
+    impl<'db> PermutedConstraint<'db> {
+        fn node(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> NodeId {
+            let PermutedConstraint(typevar, lower, upper) = self;
+            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
+        }
+    }
+
+    /// Tests that we get the same set of solutions for a constraint set, regardless of the
+    /// variable ordering that is chosen for its "atoms" (the raw constraints that the constraint
+    /// set is built from).
+    ///
+    /// TODO: We _don't_ currently get a consistent result for each permutation. Right now,
+    /// `expected` is a list of all of the different results that we get. Once we solve all of the
+    /// sources of nondeterminism, `expected` should become a single string, and we should verify
+    /// that we get that specific result for each permutation.
+    #[track_caller]
+    fn check_solutions_for_constraint_orderings<'db>(
+        db: &'db dyn Db,
+        typevars: &[BoundTypeVarInstance<'db>],
+        atoms: &[PermutedConstraint<'db>],
+        build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
+        expected: impl IntoIterator<Item = &'static str>,
+    ) {
+        let inferable = InferableTypeVars::from_typevars(
+            db,
+            typevars
+                .iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        );
+        let mut signatures = FxIndexSet::default();
+
+        for constraint_order in (0..atoms.len()).permutations(atoms.len()) {
+            let builder = ConstraintSetBuilder::new();
+            for typevar in typevars {
+                builder.intern_typevar(db, *typevar);
+            }
+            for index in constraint_order {
+                let PermutedConstraint(typevar, lower, upper) = atoms[index];
+                builder.intern_constraint(
+                    db,
+                    Constraint {
+                        typevar,
+                        bounds: ConstraintBounds::new(lower, upper),
+                    },
+                );
+            }
+
+            let set = ConstraintSet::from_node(&builder, build_bdd(&builder));
+            let solutions = set.solutions(db, &builder, inferable);
+            let mut merged = FxHashMap::default();
+            if let Solutions::Constrained(paths) = &solutions {
+                for path in paths {
+                    for binding in path {
+                        merged
+                            .entry(binding.bound_typevar)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(db, *existing, binding.solution);
+                            })
+                            .or_insert(binding.solution);
+                    }
+                }
+            }
+            let merged = typevars
+                .iter()
+                .filter_map(|typevar| {
+                    merged.get(typevar).map(|ty| {
+                        format!("{}={}", typevar.identity(db).display(db), ty.display(db))
+                    })
+                })
+                .join(", ");
+            let paths = match &solutions {
+                Solutions::Unsatisfiable => String::from("unsatisfiable"),
+                Solutions::Unconstrained => String::from("unconstrained"),
+                Solutions::Constrained(paths) => paths
+                    .iter()
+                    .map(|path| {
+                        path.iter()
+                            .map(|binding| {
+                                format!(
+                                    "{}={}",
+                                    binding.bound_typevar.identity(db).display(db),
+                                    binding.solution.display(db)
+                                )
+                            })
+                            .join(", ")
+                    })
+                    .join("; "),
+            };
+            signatures.insert(format!(
+                "never={} always={} merged=[{merged}] paths=[{paths}]",
+                set.is_never_satisfied(db),
+                set.is_always_satisfied(db),
+            ));
+        }
+
+        let expected: FxIndexSet<_> = expected.into_iter().map(String::from).collect();
+        assert_eq!(signatures, expected);
+    }
+
+    #[test]
+    fn constraint_ordering_changes_nested_transitive_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let int = KnownClass::Int.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let list_u = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(u)]);
+        let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+        let atoms = [
+            PermutedConstraint(t, None, Some(list_u)),
+            PermutedConstraint(u, None, Some(int)),
+            PermutedConstraint(t, Some(list_int), None),
+            PermutedConstraint(v, Some(bytes), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u, v],
+            &atoms,
+            |builder| {
+                let [t_list_u, u_int, list_int_t, bytes_v] =
+                    atoms.map(|atom| atom.node(&db, builder));
+                t_list_u
+                    .and_with_offset(builder, u_int)
+                    .and_with_offset(builder, list_int_t)
+                    .or_with_offset(builder, bytes_v)
+            },
+            // TODO: All permutations should produce the first result. TDD traversal currently
+            // leaks irrelevant positive constraints onto the `V = bytes` alternative.
+            [
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]",
+            ],
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_negated_alternative_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(u, Some(bytes), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, bytes_u] = atoms.map(|atom| atom.node(&db, builder));
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .negate(builder)
+                    .or_with_offset(builder, bytes_u)
+            },
+            // TODO: All permutations should produce the first result. A satisfied alternative
+            // should not infer `T` from unrelated positive decisions made earlier in a BDD path.
+            [
+                "never=false always=false merged=[U=bytes] paths=[; U=bytes]",
+                "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]",
+                "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]",
+            ],
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_derived_upper_bound_display() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(u, None, Some(int)),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, int_t, u_int] = atoms.map(|atom| atom.node(&db, builder));
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .and_with_offset(builder, int_t)
+                    .and_with_offset(builder, u_int)
+            },
+            // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not
+            // source order. That changes which equivalent upper-bound intersection is constructed
+            // first.
+            [
+                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
+                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
+            ],
+        );
     }
 
     #[track_caller]

@@ -9,7 +9,7 @@ use crate::{
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
-        constraints::OwnedConstraintSet,
+        constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
@@ -47,6 +47,16 @@ impl<'db> InternedConstraintSet<'db> {
         Self::new_internal(db, self.constraints(db), true)
     }
 }
+
+/// A Salsa-interned solution path exposed to mdtests as `ConstraintSetSolution`.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct InternedConstraintSetSolution<'db> {
+    #[returns(ref)]
+    pub(super) bindings: Box<[TypeVarSolution<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InternedConstraintSetSolution<'_> {}
 
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -98,6 +108,10 @@ pub enum KnownInstanceType<'db> {
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions._internal.ConstraintSet`.
     ConstraintSet(InternedConstraintSet<'db>),
+
+    /// A solution path, which is exposed in mdtests as an instance of
+    /// `ty_extensions._internal.ConstraintSetSolution`.
+    ConstraintSetSolution(InternedConstraintSetSolution<'db>),
 
     /// A generic context, which is exposed in mdtests as an instance of
     /// `ty_extensions._internal.GenericContext`.
@@ -170,6 +184,11 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownInstanceType::Specialization(_) => {
             // Nothing to visit
         }
+        KnownInstanceType::ConstraintSetSolution(solution) => {
+            for binding in solution.bindings(db) {
+                visitor.visit_type(db, binding.solution);
+            }
+        }
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
@@ -236,6 +255,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::Range { is_non_empty } => Some(Self::Range { is_non_empty }),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
+            Self::ConstraintSetSolution(solution) => Some(Self::ConstraintSetSolution(solution)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
@@ -296,6 +316,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
+            Self::ConstraintSetSolution(_) => KnownClass::ConstraintSetSolution,
             Self::GenericContext(_) => KnownClass::GenericContext,
             Self::Specialization(_) => KnownClass::Specialization,
             Self::UnionType(_) => KnownClass::UnionType,
@@ -449,6 +470,7 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Deprecated(_)
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
+            | KnownInstanceType::ConstraintSetSolution(_)
             | KnownInstanceType::GenericContext(_)
             | KnownInstanceType::Specialization(_)
             | KnownInstanceType::Literal(_)

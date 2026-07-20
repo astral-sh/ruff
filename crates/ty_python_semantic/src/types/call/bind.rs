@@ -51,7 +51,7 @@ use crate::types::generics::{
     TypeVarInference,
 };
 use crate::types::infer::original_class_type;
-use crate::types::known_instance::FieldInstance;
+use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
@@ -2812,6 +2812,78 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(db, tracked.constraints(db));
                         let result = set.satisfied_by_all_typevars(db, &constraints, inferable);
                         overload.set_return_type(Type::bool_literal(result));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutionsFor(
+                        tracked,
+                    )) => {
+                        let [Some(typevar), Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::TypeVar(typevar) = typevar.project_type_form(db) else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, &inferable) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(db, tracked.constraints(db));
+                        let result = match set.solutions(db, &constraints, inferable) {
+                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                                db,
+                                paths.into_iter().map(|path| {
+                                    let path: Box<[_]> = path
+                                        .into_iter()
+                                        .filter(|binding| binding.bound_typevar == typevar)
+                                        .collect();
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(db, path),
+                                    ))
+                                }),
+                            ),
+                            Solutions::Unsatisfiable => Type::none(db),
+                            Solutions::Unconstrained => Type::empty_tuple(db),
+                        };
+                        overload.set_return_type(result);
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
+                        tracked,
+                    )) => {
+                        let [Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, &inferable) else {
+                            continue;
+                        };
+
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(db, tracked.constraints(db));
+                        let result = match set.solutions(db, &constraints, inferable) {
+                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                                db,
+                                paths.into_iter().map(|path| {
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(
+                                            db,
+                                            path.into_boxed_slice(),
+                                        ),
+                                    ))
+                                }),
+                            ),
+                            Solutions::Unsatisfiable => Type::none(db),
+                            Solutions::Unconstrained => Type::empty_tuple(db),
+                        };
+                        overload.set_return_type(result);
                     }
 
                     Type::KnownBoundMethod(
