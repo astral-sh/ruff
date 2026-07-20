@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -93,8 +93,14 @@ struct DefinitionReferenceVisitor<'db> {
     found: Cell<bool>,
 }
 
+#[salsa::tracked]
 impl<'db> DefinitionReferenceVisitor<'db> {
     /// Returns whether the definition represented by `ty` references `target`.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| false,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
         let visitor = Self::new(target);
         visitor.visit_definition_body(db, ty);
@@ -200,7 +206,11 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
 
 impl<'db> TypeAliasType<'db> {
     fn is_recursive(self, db: &'db dyn Db) -> bool {
-        DefinitionReferenceVisitor::references(db, Type::TypeAlias(self), self.definition(db))
+        DefinitionReferenceVisitor::references(
+            db,
+            Type::TypeAlias(self.unspecialized(db)),
+            self.definition(db),
+        )
     }
 }
 
@@ -281,7 +291,7 @@ where
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
-    /// The active recursion stack and the identity of each item.
+    /// The active recursion stack and the lazily-computed identity of each item.
     /// Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
 
@@ -355,10 +365,19 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        let identity = item.to_identity(db);
-        if seen.iter().any(|active| active.identity == identity) {
-            return CycleDetectorVisit::Cycle(item);
-        }
+        let identity = if seen.is_empty() {
+            OnceCell::new()
+        } else {
+            // Deriving an identity can require a structural definition walk. Defer it until
+            // another active item could actually form a cycle.
+            let identity = item.to_identity(db);
+            if seen.iter().any(|active| {
+                active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
+            }) {
+                return CycleDetectorVisit::Cycle(item);
+            }
+            OnceCell::from(identity)
+        };
         drop(seen);
 
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
@@ -381,7 +400,7 @@ where
 
 struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
     item: T,
-    identity: T::Id,
+    identity: OnceCell<T::Id>,
 }
 
 impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
@@ -692,6 +711,17 @@ mod tests {
             1
         );
         assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn skips_identity_without_a_distinct_active_item() {
+        let db = setup_db();
+        IDENTITY_CALLS.store(0, Ordering::Relaxed);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+
+        assert_eq!(detector.visit(&db, CountingIdentityItem(1), || 1), 1);
+        assert_eq!(detector.visit(&db, CountingIdentityItem(1), || 2), 1);
+        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 0);
     }
 
     #[test]

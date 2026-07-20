@@ -262,6 +262,19 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns the alias without an applied specialization.
+    pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                None,
+            )),
+            TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
