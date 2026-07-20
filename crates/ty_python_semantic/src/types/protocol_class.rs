@@ -1964,7 +1964,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_instance_property_write(db, *object_ty, member, member_name, value_ty)
             }
             AttributeWriteRequirement::Class { object_ty, member } => {
-                self.check_class_property_write(db, *object_ty, member, value_ty)
+                self.check_class_property_write(db, *object_ty, member, member_name, value_ty)
             }
         }
     }
@@ -2024,6 +2024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         object_ty: Type<'db>,
         member: &ClassAttributeWriteMember<'db>,
+        member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match member {
@@ -2044,7 +2045,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ClassAttributeWriteMember::ClassAttribute(fallback) => {
                 self.check_fallback_property_write(db, fallback, value_ty)
             }
-            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+            ClassAttributeWriteMember::Unresolved { .. } => {
+                let setattr_result = object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__setattr__",
+                    &mut CallArguments::positional([
+                        Type::string_literal(db, member_name),
+                        value_ty,
+                    ]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+                if match &setattr_result {
+                    Ok(bindings) => bindings.return_type(db).is_never(),
+                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                } || !matches!(
+                    setattr_result,
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                ) {
+                    return self.never();
+                }
+                self.check_setattr_property_write(db, object_ty, value_ty)
+            }
         }
     }
 

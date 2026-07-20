@@ -2448,7 +2448,51 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+```
 
+A class object can also satisfy a writable property protocol using `__getattr__` and `__setattr__`
+on its metaclass:
+
+```py
+class MetaWithGetAttrAndSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: int) -> None: ...
+
+class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
+
+ClassWithDynamicX.x = 1
+dynamic_x: HasMutableXProperty = ClassWithDynamicX
+```
+
+A metaclass setter with an incompatible parameter type, or one that never returns, cannot satisfy
+the same protocol:
+
+```py
+class MetaWithUnsuitableSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: str) -> None: ...
+
+class ClassWithUnsuitableSetAttr(metaclass=MetaWithUnsuitableSetAttr): ...
+
+unsuitable_x: HasMutableXProperty = ClassWithUnsuitableSetAttr  # error: [invalid-assignment]
+
+class MetaWithTerminalSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: int) -> Never:
+        raise AttributeError("immutable")
+
+class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr): ...
+
+terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr  # error: [invalid-assignment]
+```
+
+```py
 # For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
 # This matches other type checkers and likely user intent, even though a custom `__setattr__`
 # intercepts every assignment at runtime.
