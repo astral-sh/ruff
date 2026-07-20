@@ -41,7 +41,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 ///
 /// def sum_less_than_four(a, b):
-///     logger.debug("Calling  sum_less_than_four")
+///     logger.debug("Calling sum_less_than_four")
 ///     return a + b < 4
 ///
 ///
