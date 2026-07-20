@@ -210,35 +210,9 @@ mod tests {
     }
 
     #[test]
-    fn add_ignore_does_not_append_to_reason_ending_in_bracket() {
-        let test = CodeActionTest::with_source(
-            r#"
-            seen_code = True
-            # ty:ignore[] tracked by [123]
-            values = [
-                <START>missing<END>,
-            ]
-        "#,
-        );
-
-        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
-        info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:5:5
-          |
-        5 |     missing,
-          |     ^^^^^^^
-          |
-          |
-        4 | values = [
-          -     missing,
-        5 +     missing,  # ty:ignore[unresolved-reference]
-        6 | ]
-          |
-        ");
-    }
-
-    #[test]
     fn add_ignore_matches_existing_suppression_against_diagnostic_range() {
+        // The first suppression is intentional: `not-a-rule` has no indexed suppression, and
+        // repeatedly extending the final suppression can't suppress a diagnostic before it.
         let test = CodeActionTest::with_source(
             r#"
             seen_code = True

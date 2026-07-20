@@ -1,3 +1,11 @@
+//! Helpers for adding suppression comments without changing which existing suppression is used.
+//!
+//! An applicable same-line or nested own-line suppression is extended first because it has the
+//! narrowest scope. For diagnostics spanning multiple lines, an opening-line suppression takes
+//! precedence over a separate closing-line suppression, matching normal suppression resolution.
+//! Comments with trailing reasons are never extended: preserving the reason requires adding a
+//! separate suppression instead.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Formatter;
 
@@ -14,8 +22,7 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::lint::LintId;
 use crate::suppression::{
-    SuppressionKind, Suppressions, editable_suppression_prefix, select_preferred_suppression,
-    suppressions,
+    SuppressionKind, Suppressions, select_preferred_suppression, suppressions,
 };
 
 /// Creates fixes to suppress all violations in `ids_with_range`.
@@ -262,8 +269,14 @@ fn find_existing_suppression(
     source: &str,
     range: TextRange,
 ) -> Option<ExistingSuppression> {
-    let suppression =
-        select_preferred_suppression(suppressions.editable_inline_suppressions_rev(range), range)?;
+    let suppression = select_preferred_suppression(
+        suppressions
+            .editable_inline_suppressions_rev(range)
+            .filter(|suppression| {
+                editable_suppression_prefix(&source[suppression.comment_range]).is_some()
+            }),
+        range,
+    )?;
     let prefix = editable_suppression_prefix(&source[suppression.comment_range])?;
     let separator = if prefix.ends_with('[') {
         ""
@@ -285,6 +298,23 @@ fn add_to_existing_suppression(existing: ExistingSuppression, codes: &[LintName]
     let insertion = format!("{separator}{codes}", codes = Codes(existing.kind, codes));
 
     Fix::safe_edit(Edit::insertion(insertion, existing.insertion_offset))
+}
+
+/// Returns the portion of an ignore comment before its closing bracket if another code can be
+/// appended to it.
+///
+/// ```python
+/// # ty: ignore[]         # Editable
+/// # ty: ignore[] reason  # Not editable
+/// ```
+fn editable_suppression_prefix(comment_text: &str) -> Option<&str> {
+    // The parser accepts a reason after the code list, but rule codes can't contain `]`, so the
+    // first `]` is the code list's closing bracket. Don't edit comments with trailing reasons.
+    let (before_closing_bracket, after_closing_bracket) = comment_text.split_once(']')?;
+    after_closing_bracket
+        .trim()
+        .is_empty()
+        .then(|| before_closing_bracket.trim_end())
 }
 
 #[derive(Copy, Clone)]

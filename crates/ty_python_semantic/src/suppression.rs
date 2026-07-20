@@ -365,17 +365,23 @@ impl Suppressions {
             .filter(move |suppression| suppression.matches(id) && suppression.applies_to(range))
     }
 
-    /// Returns applicable comments that `--add-ignore` can extend, in reverse source order.
+    /// Returns applicable comments whose targets allow `--add-ignore` to append a code, in
+    /// reverse source order.
     ///
-    /// The interval index marks one editable entry per comment, excluding comments with trailing
-    /// reasons and duplicate entries for a multi-code suppression.
+    /// The interval index filters out blanket suppressions. Comments with multiple codes can
+    /// appear more than once, and callers must still exclude comments with trailing reasons.
     fn editable_inline_suppressions_rev(
         &self,
         range: TextRange,
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.inline
             .intersecting_rev(range, IntervalIndex::EDITABLE_MASK)
-            .filter(move |suppression| suppression.editable && suppression.applies_to(range))
+            .filter(move |suppression| {
+                matches!(
+                    suppression.target,
+                    SuppressionTarget::Lint(_) | SuppressionTarget::Empty
+                ) && suppression.applies_to(range)
+            })
     }
 
     fn iter(&self) -> impl Iterator<Item = &Suppression> {
@@ -426,7 +432,6 @@ fn select_preferred_suppression<'a>(
 pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
-    editable: bool,
 
     /// The range of the code in this suppression.
     ///
@@ -507,23 +512,6 @@ impl fmt::Display for SuppressionKind {
     }
 }
 
-/// Returns the portion of an ignore comment before its closing bracket if another code can be
-/// appended to it.
-///
-/// ```python
-/// # ty: ignore[]         # Editable
-/// # ty: ignore[] reason  # Not editable
-/// ```
-fn editable_suppression_prefix(comment_text: &str) -> Option<&str> {
-    // The parser accepts a reason after the code list, but rule codes can't contain `]`, so the
-    // first `]` is the code list's closing bracket. Don't edit comments with trailing reasons.
-    let (before_closing_bracket, after_closing_bracket) = comment_text.split_once(']')?;
-    after_closing_bracket
-        .trim()
-        .is_empty()
-        .then(|| before_closing_bracket.trim_end())
-}
-
 /// Unique ID for a suppression in a file.
 ///
 /// ## Implementation
@@ -552,8 +540,9 @@ impl SuppressionTarget {
 
     /// Returns the conservative bit used to skip subtrees without this target.
     ///
-    /// Lints are hashed into 63 buckets, with one bucket reserved for blanket suppressions. The
-    /// interval index only traverses subtrees whose buckets overlap the queried lint.
+    /// Lints are hashed into 62 buckets, with one bucket reserved for blanket suppressions and
+    /// one for editable suppressions. The interval index only traverses subtrees whose buckets
+    /// overlap the queried lint.
     fn target_mask(self) -> u64 {
         match self {
             // Keep blanket suppressions separate so they are always considered.
@@ -634,24 +623,10 @@ impl<'a> SuppressionsBuilder<'a> {
             line_range
         };
 
-        let is_editable = comment.codes().is_some()
-            && editable_suppression_prefix(&self.source[comment.range()]).is_some();
-        let mut indexed_editable_comment = false;
-
-        let mut push_ignore_suppression = |mut suppression: Suppression| {
+        let mut push_ignore_suppression = |suppression: Suppression| {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
-                if is_editable
-                    && !indexed_editable_comment
-                    && matches!(
-                        suppression.target,
-                        SuppressionTarget::Lint(_) | SuppressionTarget::Empty
-                    )
-                {
-                    suppression.editable = true;
-                    indexed_editable_comment = true;
-                }
                 self.inline.push(suppression);
             }
         };
@@ -662,7 +637,6 @@ impl<'a> SuppressionsBuilder<'a> {
                 push_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind(),
-                    editable: false,
                     comment_range: comment.range(),
                     range: comment.range(),
                     suppressed_range,
@@ -674,7 +648,6 @@ impl<'a> SuppressionsBuilder<'a> {
                 push_ignore_suppression(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind(),
-                    editable: false,
                     range: comment.range(),
                     comment_range: comment.range(),
                     suppressed_range,
@@ -702,7 +675,6 @@ impl<'a> SuppressionsBuilder<'a> {
                             push_ignore_suppression(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind(),
-                                editable: false,
                                 range: code_range,
                                 comment_range: comment.range(),
                                 suppressed_range,
@@ -825,7 +797,7 @@ struct IntervalEntry {
 }
 
 impl IntervalIndex {
-    /// Marks the single editable entry for an inline suppression comment.
+    /// Marks lint-specific and empty suppressions that `--add-ignore` can consider extending.
     const EDITABLE_MASK: u64 = 1 << 63;
 
     /// Builds an index from values sorted by interval start, retaining their input order.
@@ -839,7 +811,10 @@ impl IntervalIndex {
             .map(|suppression| IntervalEntry {
                 subtree_max_end: suppression.suppressed_range.end(),
                 subtree_target_mask: suppression.target.target_mask()
-                    | if suppression.editable {
+                    | if matches!(
+                        suppression.target,
+                        SuppressionTarget::Lint(_) | SuppressionTarget::Empty
+                    ) {
                         Self::EDITABLE_MASK
                     } else {
                         0
@@ -975,11 +950,11 @@ value = missing
     }
 
     #[test]
-    fn editable_index_skips_nested_suppressions_with_reasons() {
+    fn editable_index_skips_nested_blanket_suppressions() {
         let source = r#"seen_code = True
-# ty: ignore[] reason
-# ty: ignore[] reason
-# ty: ignore[] reason
+# ty: ignore
+# ty: ignore
+# ty: ignore
 # ty: ignore[]
 value = missing
 "#;

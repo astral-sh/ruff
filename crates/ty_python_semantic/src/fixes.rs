@@ -1196,12 +1196,13 @@ class B(A):
     }
 
     #[test]
-    fn add_ignore_does_not_append_to_reason_ending_in_bracket() {
+    fn add_ignore_prefers_editable_outer_suppression_over_inner_with_reason() {
         assert_snapshot!(
             suppress_all_in(r#"
                 seen_code = True
-                # ty: ignore[] tracked by [123]
+                # ty: ignore[]
                 values = [
+                    # ty: ignore[] tracked by [123]
                     missing,
                 ]
                 "#),
@@ -1212,22 +1213,24 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[] tracked by [123]
+        # ty: ignore[unresolved-reference]
         values = [
-            missing,  # ty:ignore[unresolved-reference]
+            # ty: ignore[] tracked by [123]
+            missing,
         ]
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-ignore-comment]: Unused `ty: ignore` without a code
-         --> test.py:2:1
+         --> test.py:4:5
           |
-        1 | seen_code = True
-        2 | # ty: ignore[] tracked by [123]
-          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        2 | # ty: ignore[unresolved-reference]
         3 | values = [
-        4 |     missing,  # ty:ignore[unresolved-reference]
+        4 |     # ty: ignore[] tracked by [123]
+          |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        5 |     missing,
+        6 | ]
           |
         help: Remove the unused suppression comment
         "
@@ -1236,6 +1239,8 @@ class B(A):
 
     #[test]
     fn add_ignore_matches_existing_suppression_against_diagnostic_range() {
+        // The first suppression is intentional: `not-a-rule` has no indexed suppression, and
+        // repeatedly extending the final suppression can't suppress a diagnostic before it.
         assert_snapshot!(
             suppress_all_in(r#"
                 seen_code = True
