@@ -443,7 +443,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_always_satisfied(db, self.builder)
+        self.negate(db, self.builder).is_never_satisfied(db)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -2473,62 +2473,7 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
-            Node::Interior(interior) => {
-                let mut path = interior.path_assignments(builder);
-                self.is_always_satisfied_inner(db, builder, &mut path)
-            }
-        }
-    }
-
-    fn is_always_satisfied_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        path: &mut PathAssignments,
-    ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
-            Node::Interior(_) => {
-                // walk_edge will return None if this node's constraint (or anything we can derive
-                // from it) causes the if_true edge to become impossible. We want to ignore
-                // impossible paths, and so we treat them as passing the "always satisfied" check.
-                //
-                // Under TDD semantics, when the constraint holds the result is C ∨ U, and when it
-                // doesn't the result is D ∨ U. We fold the uncertain branch into both before
-                // checking, because "C ∨ U is always satisfied" cannot be decomposed into
-                // independent checks on C and U (it's a disjunction). This is zero-cost for binary
-                // BDDs since `C ∨ false = C`.
-                let interior = builder.interior_node_data(self);
-                let if_true_or_uncertain = interior.if_true.or(builder, interior.if_uncertain);
-                let true_always_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_true(),
-                        interior.source_order,
-                        |path, _| if_true_or_uncertain.is_always_satisfied_inner(db, builder, path),
-                    )
-                    .unwrap_or(true);
-                if !true_always_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_false branch
-                let if_false_or_uncertain = interior.if_false.or(builder, interior.if_uncertain);
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| if_false_or_uncertain.is_always_satisfied_inner(db, builder, path),
-                )
-                .unwrap_or(true)
-            }
-        }
+        self.negate(builder).is_never_satisfied(db, builder)
     }
 
     /// Returns whether this BDD represent the constant function `false`.
