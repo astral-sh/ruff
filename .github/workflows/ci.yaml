@@ -863,6 +863,7 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          maturin-version: v1.14.1
           args: --out dist
       - name: "Test wheel"
         run: |
