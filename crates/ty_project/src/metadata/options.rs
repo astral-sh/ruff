@@ -1529,6 +1529,34 @@ pub struct AnalysisOptions {
     )]
     pub strict_literal_narrowing: Option<bool>,
 
+    /// Whether narrowing should preserve intersections that can only be inhabited by unusual
+    /// subclasses of builtin types.
+    ///
+    /// By default, ty treats a builtin class and an unrelated typing interface as disjoint. For
+    /// example, `str` is considered disjoint from `Mapping[str, object]`, even though a subclass of
+    /// `str` could also inherit from `Mapping`:
+    ///
+    /// ```python
+    /// from collections.abc import Mapping
+    ///
+    /// class StringMapping(str, Mapping[str, object]): ...
+    /// ```
+    ///
+    /// This assumption avoids retaining intersections that require unusual multiple-inheritance
+    /// hierarchies, which generally produces simpler and more useful narrowing results. Enable
+    /// this option to account for those subclasses and preserve the intersections instead.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve intersections that could be inhabited by unusual builtin subclasses
+        strict-subclass-narrowing = true
+        "#
+    )]
+    pub strict_subclass_narrowing: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1606,6 +1634,7 @@ impl AnalysisOptions {
     ) -> AnalysisSettings {
         let Self {
             strict_literal_narrowing,
+            strict_subclass_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
@@ -1613,6 +1642,7 @@ impl AnalysisOptions {
 
         let AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing_default,
+            strict_subclass_narrowing: strict_subclass_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1643,6 +1673,8 @@ impl AnalysisOptions {
         AnalysisSettings {
             strict_literal_narrowing: strict_literal_narrowing
                 .unwrap_or(strict_literal_narrowing_default),
+            strict_subclass_narrowing: strict_subclass_narrowing
+                .unwrap_or(strict_subclass_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

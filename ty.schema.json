@@ -105,6 +105,13 @@
             "boolean",
             "null"
           ]
+        },
+        "strict-subclass-narrowing": {
+          "description": "Whether narrowing should preserve intersections that can only be inhabited by unusual\nsubclasses of builtin types.\n\nBy default, ty treats a builtin class and an unrelated typing interface as disjoint. For\nexample, `str` is considered disjoint from `Mapping[str, object]`, even though a subclass of\n`str` could also inherit from `Mapping`:\n\n```python\nfrom collections.abc import Mapping\n\nclass StringMapping(str, Mapping[str, object]): ...\n```\n\nThis assumption avoids retaining intersections that require unusual multiple-inheritance\nhierarchies, which generally produces simpler and more useful narrowing results. Enable\nthis option to account for those subclasses and preserve the intersections instead.\n\nDefaults to `false`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

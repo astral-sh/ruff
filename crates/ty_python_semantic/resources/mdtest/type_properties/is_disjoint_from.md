@@ -335,6 +335,44 @@ static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))
 ```
 
+## Builtin classes and typing ABCs
+
+Builtin classes are treated as disjoint from typing ABCs they do not already inherit from. This
+avoids retaining intersections that would require an unusual multiple-inheritance hierarchy. Typing
+protocols remain potentially compatible with builtin subclasses.
+
+```py
+from collections.abc import Mapping, Sequence
+from typing import Awaitable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+static_assert(is_disjoint_from(str, Mapping[str, object]))
+static_assert(not is_disjoint_from(str, Sequence[str]))
+static_assert(not is_disjoint_from(int, Awaitable[object]))
+```
+
+## Strict subclass narrowing
+
+Enabling `strict-subclass-narrowing` preserves intersections that could be inhabited by unusual
+subclasses of builtin types.
+
+```toml
+[analysis]
+strict-subclass-narrowing = true
+```
+
+```py
+from collections.abc import Mapping, Sequence
+from typing import Awaitable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+static_assert(not is_disjoint_from(str, Mapping[str, object]))
+static_assert(not is_disjoint_from(str, Sequence[str]))
+static_assert(not is_disjoint_from(int, Awaitable[object]))
+```
+
 ## Dataclasses
 
 ```py

@@ -241,6 +241,51 @@ Defaults to `false`.
 
 ---
 
+### `strict-subclass-narrowing`
+
+Whether narrowing should preserve intersections that can only be inhabited by unusual
+subclasses of builtin types.
+
+By default, ty treats a builtin class and an unrelated typing interface as disjoint. For
+example, `str` is considered disjoint from `Mapping[str, object]`, even though a subclass of
+`str` could also inherit from `Mapping`:
+
+```python
+from collections.abc import Mapping
+
+class StringMapping(str, Mapping[str, object]): ...
+```
+
+This assumption avoids retaining intersections that require unusual multiple-inheritance
+hierarchies, which generally produces simpler and more useful narrowing results. Enable
+this option to account for those subclasses and preserve the intersections instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve intersections that could be inhabited by unusual builtin subclasses
+    strict-subclass-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve intersections that could be inhabited by unusual builtin subclasses
+    strict-subclass-narrowing = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -812,6 +857,51 @@ Defaults to `false`.
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-literal-narrowing = true
+    ```
+
+---
+
+#### `strict-subclass-narrowing`
+
+Whether narrowing should preserve intersections that can only be inhabited by unusual
+subclasses of builtin types.
+
+By default, ty treats a builtin class and an unrelated typing interface as disjoint. For
+example, `str` is considered disjoint from `Mapping[str, object]`, even though a subclass of
+`str` could also inherit from `Mapping`:
+
+```python
+from collections.abc import Mapping
+
+class StringMapping(str, Mapping[str, object]): ...
+```
+
+This assumption avoids retaining intersections that require unusual multiple-inheritance
+hierarchies, which generally produces simpler and more useful narrowing results. Enable
+this option to account for those subclasses and preserve the intersections instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve intersections that could be inhabited by unusual builtin subclasses
+    strict-subclass-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve intersections that could be inhabited by unusual builtin subclasses
+    strict-subclass-narrowing = true
     ```
 
 ---

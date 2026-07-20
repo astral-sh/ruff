@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
-use ty_module_resolver::{ModuleName, file_to_module};
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
@@ -794,6 +794,36 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
+
+        let left_class = left.class(db);
+        let right_class = right.class(db);
+        let class_is_defined_in = |class: ClassType<'db>, module| {
+            file_to_module(db, class.class_literal(db).file(db))
+                .is_some_and(|resolved| resolved.is_known(db, module))
+        };
+        let class_inherits_from = |class: ClassType<'db>, base: ClassType<'db>| {
+            class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|mro_class| mro_class.class_literal(db) == base.class_literal(db))
+        };
+        let builtin_and_typing_abc_are_disjoint =
+            |builtin: ClassType<'db>, typing_abc: ClassType<'db>| {
+                class_is_defined_in(builtin, KnownModule::Builtins)
+                    && class_is_defined_in(typing_abc, KnownModule::Typing)
+                    && !typing_abc.is_protocol(db)
+                    && !class_inherits_from(builtin, typing_abc)
+                    && !class_inherits_from(typing_abc, builtin)
+            };
+        if !db
+            .analysis_settings(left_class.class_literal(db).file(db))
+            .strict_subclass_narrowing
+            && (builtin_and_typing_abc_are_disjoint(left_class, right_class)
+                || builtin_and_typing_abc_are_disjoint(right_class, left_class))
+        {
+            return self.always();
+        }
+
         if let Some(left_spec) = left.tuple_spec(db) {
             if let Some(right_spec) = right.tuple_spec(db) {
                 let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
