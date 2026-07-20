@@ -15,6 +15,7 @@
   "dependencies": {
     "@miniflare/kv": "^2.14.0",
     "@miniflare/storage-memory": "^2.14.0",
+    "cross-spawn": "^7.0.5",
     "uuid": "^14.0.0"
   }
 }
