@@ -24,8 +24,8 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::lint::LintId;
 use crate::suppression::{
-    SuppressionKind, Suppressions, is_suppression_comment_lint, select_preferred_suppression,
-    suppressions,
+    IGNORE_COMMENT_UNKNOWN_RULE, SuppressionKind, Suppressions, is_suppression_comment_lint,
+    select_preferred_suppression, suppressions,
 };
 
 /// Creates fixes to suppress all violations in `ids_with_range`.
@@ -249,12 +249,13 @@ enum SuppressionCommentFix {
 
 /// Classifies how to suppress a diagnostic emitted for an existing ignore comment.
 ///
-/// Own-line diagnostics get a preceding-line suppression, while inline and file-level diagnostics use an
-/// end-of-line suppression. Shebangs remain eligible for bulk fixes but not IDE quick fixes.
+/// Own-line diagnostics without an editable suppression get a preceding-line suppression, while
+/// inline and file-level diagnostics use an end-of-line suppression. Shebangs remain eligible for
+/// bulk fixes but not IDE quick fixes.
 ///
 /// ```python
 /// seen_code = True
-/// # ty: ignore[not-a-rule]  # receives a preceding-line suppression
+/// # ty: ignore[*-*]  # receives a preceding-line suppression
 /// ```
 fn suppression_comment_fix(
     db: &dyn Db,
@@ -380,7 +381,8 @@ fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextS
 ///
 /// When multiple comments apply, a same-line or otherwise nested comment takes precedence over an
 /// outer own-line suppression. Diagnostics about suppression comments never extend a
-/// `type: ignore`, since that would affect other type checkers.
+/// `type: ignore`, since that would affect other type checkers. A syntactically valid `ty: ignore`
+/// containing only unknown codes remains editable.
 ///
 /// ```python
 /// # ty: ignore[invalid-assignment]
@@ -392,7 +394,7 @@ fn find_existing_suppression(
     range: TextRange,
     id: LintName,
 ) -> Option<ExistingSuppression> {
-    let suppression = select_preferred_suppression(
+    let (comment_range, kind) = select_preferred_suppression(
         suppressions
             .editable_inline_suppressions_rev(range)
             .filter(|suppression| {
@@ -400,8 +402,26 @@ fn find_existing_suppression(
                     && editable_suppression_prefix(&source[suppression.comment_range]).is_some()
             }),
         range,
-    )?;
-    let prefix = editable_suppression_prefix(&source[suppression.comment_range])?;
+    )
+    .map(|suppression| (suppression.comment_range, suppression.kind))
+    .or_else(|| {
+        if id != IGNORE_COMMENT_UNKNOWN_RULE.name() {
+            return None;
+        }
+
+        let index = suppressions
+            .unknown
+            .binary_search_by_key(&range.start(), |unknown| unknown.range.start())
+            .ok()?;
+        let unknown = suppressions.unknown.get(index)?;
+        let line_start = source.line_start(unknown.comment_range.start());
+
+        (unknown.range == range
+            && unknown.kind == SuppressionKind::Ty
+            && !source[line_start.to_usize()..].starts_with("#!"))
+        .then_some((unknown.comment_range, unknown.kind))
+    })?;
+    let prefix = editable_suppression_prefix(&source[comment_range])?;
     let separator = if prefix.ends_with('[') {
         ""
     } else if prefix.ends_with(',') {
@@ -411,8 +431,8 @@ fn find_existing_suppression(
     };
 
     Some(ExistingSuppression {
-        insertion_offset: suppression.comment_range.start() + prefix.text_len(),
-        kind: suppression.kind,
+        insertion_offset: comment_range.start() + prefix.text_len(),
+        kind,
         separator,
     })
 }

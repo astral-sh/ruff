@@ -347,7 +347,7 @@ pub(crate) struct Suppressions {
     /// The outer suppression starts before the inner suppression but ends after it.
     inline: IntervalIndex,
 
-    /// Suppressions with lint codes that are unknown.
+    /// Suppressions with lint codes that are unknown, sorted by code range.
     unknown: Vec<UnknownSuppression>,
 
     /// Suppressions that are syntactically invalid.
@@ -734,6 +734,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         Err(error) => self.unknown.push(UnknownSuppression {
                             range: code_range,
                             comment_range: comment.range(),
+                            kind: comment.kind(),
                             reason: error,
                         }),
                     }
@@ -847,6 +848,8 @@ struct UnknownSuppression {
 
     /// The range of the suppression comment
     comment_range: TextRange,
+
+    kind: SuppressionKind,
 
     reason: GetLintError,
 }

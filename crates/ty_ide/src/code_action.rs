@@ -333,6 +333,32 @@ mod tests {
     }
 
     #[test]
+    fn add_code_editable_own_line_unknown_rule_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            # ty: ignore[<START>not-a-rule<END>]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:3:14
+          |
+        3 | # ty: ignore[not-a-rule]
+          |              ^^^^^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - # ty: ignore[not-a-rule]
+        3 + # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        4 | value = 1
+          |
+        ");
+    }
+
+    #[test]
     fn add_code_mixed_unknown_rule_ignore() {
         let test = CodeActionTest::with_source(
             r#"
@@ -373,7 +399,7 @@ mod tests {
           |
         1 |
           - items = []  # type: list[int]  # ty: ignore[not-a-rule]
-        2 + items = []  # type: list[int]  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        2 + items = []  # type: list[int]  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
           |
         ");
     }
@@ -396,7 +422,7 @@ mod tests {
           |
         1 |
           - value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
-        2 + value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        2 + value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
           |
         "#);
     }
@@ -420,8 +446,9 @@ mod tests {
           |
           |
         2 | seen_code = True
-        3 + # ty:ignore[ignore-comment-unknown-rule]
-        4 | # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+          - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+        3 + # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference]
+        4 | value = missing
           |
         ");
     }
@@ -520,7 +547,7 @@ mod tests {
           |
         1 |
           - # ty: ignore[not-a-rule]
-        2 + # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        2 + # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
         3 | value = 1
           |
         ");
@@ -557,7 +584,7 @@ mod tests {
           |
           |
           - value = 1  # ty: ignore[not-a-rule]
-        1 + value = 1  # ty: ignore[not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        1 + value = 1  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
           |
         ");
     }
