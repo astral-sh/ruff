@@ -279,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_stable() {
+    fn missing_file() {
         let mut env = TestEnvironment::new();
         env.format(DiagnosticFormat::Json);
         env.preview(false);
@@ -296,39 +296,6 @@ mod tests {
           {
             "cell": null,
             "code": "test-diagnostic",
-            "end_location": null,
-            "filename": null,
-            "fix": null,
-            "location": null,
-            "message": "main diagnostic message",
-            "name": "test-diagnostic",
-            "noqa_row": null,
-            "severity": "error",
-            "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
-          }
-        ]
-        "#,
-        );
-    }
-
-    #[test]
-    fn missing_file_preview() {
-        let mut env = TestEnvironment::new();
-        env.format(DiagnosticFormat::Json);
-        env.preview(true);
-
-        let diag = env
-            .err()
-            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
-            .build();
-
-        insta::assert_snapshot!(
-            env.render(&diag),
-            @r#"
-        [
-          {
-            "cell": null,
-            "code": null,
             "end_location": null,
             "filename": null,
             "fix": null,
