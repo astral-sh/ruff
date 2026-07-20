@@ -2450,8 +2450,8 @@ static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProper
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 ```
 
-A class object can also satisfy a writable property protocol using `__getattr__` and `__setattr__`
-on its metaclass:
+A class object should also satisfy a writable property protocol using `__getattr__` and
+`__setattr__` on its metaclass:
 
 ```py
 class MetaWithGetAttrAndSetAttr(type):
@@ -2463,11 +2463,11 @@ class MetaWithGetAttrAndSetAttr(type):
 class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
 
 ClassWithDynamicX.x = 1
-dynamic_x: HasMutableXProperty = ClassWithDynamicX
+# TODO: this should pass
+dynamic_x: HasMutableXProperty = ClassWithDynamicX  # error: [invalid-assignment]
 ```
 
-A metaclass setter with an incompatible parameter type, or one that never returns, cannot satisfy
-the same protocol:
+A metaclass setter with an incompatible parameter type cannot satisfy the same protocol:
 
 ```py
 class MetaWithUnsuitableSetAttr(type):
@@ -2479,7 +2479,12 @@ class MetaWithUnsuitableSetAttr(type):
 class ClassWithUnsuitableSetAttr(metaclass=MetaWithUnsuitableSetAttr): ...
 
 unsuitable_x: HasMutableXProperty = ClassWithUnsuitableSetAttr  # error: [invalid-assignment]
+```
 
+A terminal metaclass setter should prevent a class object from satisfying a writable property
+protocol even when the attribute is declared:
+
+```py
 class MetaWithTerminalSetAttr(type):
     def __getattr__(cls, attr: str) -> int:
         return 1
@@ -2490,7 +2495,8 @@ class MetaWithTerminalSetAttr(type):
 class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
     x: int = 1
 
-terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr  # error: [invalid-assignment]
+# TODO: this should be an error
+terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr
 ```
 
 An overloaded metaclass setter must accept the protocol property's name, not just its value type:
@@ -2532,7 +2538,8 @@ class MetaWithGenericSetAttr(type):
 class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
 
 ClassWithGenericSetAttr.x = 1
-generic_x: HasMutableXProperty = ClassWithGenericSetAttr
+# TODO: this should pass
+generic_x: HasMutableXProperty = ClassWithGenericSetAttr  # error: [invalid-assignment]
 ```
 
 ```py

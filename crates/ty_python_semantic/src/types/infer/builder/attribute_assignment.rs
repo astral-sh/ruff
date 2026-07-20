@@ -378,33 +378,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         member: &ClassAttributeWriteMember<'db>,
         emit_diagnostics: bool,
     ) -> bool {
-        let db = self.builder.db();
-        let setattr_value_ty = self.infer_value(TypeContext::default(), false);
-        let setattr_result = object_ty.try_call_dunder_with_policy(
-            db,
-            "__setattr__",
-            &mut CallArguments::positional([
-                Type::string_literal(db, self.attribute),
-                setattr_value_ty,
-            ]),
-            TypeContext::default(),
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        );
-        let setattr_returns_never = match &setattr_result {
-            Ok(bindings) => bindings.return_type(db).is_never(),
-            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
-        };
-        if setattr_returns_never {
-            self.infer_value(TypeContext::default(), emit_diagnostics);
-            if emit_diagnostics {
-                self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
-                    member_exists: !matches!(member, ClassAttributeWriteMember::Unresolved { .. }),
-                    is_setattr_synthesized: false,
-                });
-            }
-            return false;
-        }
-
         match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
@@ -436,7 +409,32 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ClassAttributeWriteMember::Unresolved {
                 has_instance_attribute,
             } => {
+                let db = self.builder.db();
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let setattr_result = object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__setattr__",
+                    &mut CallArguments::positional([
+                        Type::string_literal(db, self.attribute),
+                        value_ty,
+                    ]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+                let setattr_returns_never = match &setattr_result {
+                    Ok(bindings) => bindings.return_type(db).is_never(),
+                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                };
+                if setattr_returns_never {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                            member_exists: false,
+                            is_setattr_synthesized: false,
+                        });
+                    }
+                    return false;
+                }
+
                 match setattr_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
                     Err(CallDunderError::CallError(..)) => {
