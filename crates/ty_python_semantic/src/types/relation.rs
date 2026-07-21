@@ -15,6 +15,7 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -417,6 +418,51 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| Some(true),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn protocol_assignability_terminal<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> Option<bool> {
+            let constraints = ConstraintSetBuilder::new();
+            let result = types.first(db).has_relation_to(
+                db,
+                types.second(db),
+                &constraints,
+                InferableTypeVars::None,
+                TypeRelation::Assignability,
+            );
+
+            if result.is_always_satisfied(db) {
+                Some(true)
+            } else if result.is_never_satisfied(db) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+
+        // Protocol relations are expensive and frequently repeated, but caching every eager
+        // relation retains many one-off type pairs. Preserve conditional results because call
+        // binding needs to distinguish "not always" from "never" assignable.
+        if inferable == InferableTypeVars::None
+            && any_over_type(db, target.resolve_type_alias(db), false, |ty| {
+                matches!(ty, Type::ProtocolInstance(_))
+                    || matches!(
+                        ty,
+                        Type::SubclassOf(target)
+                            if matches!(target.subclass_of(), SubclassOfInner::Protocol(_))
+                    )
+            })
+            && let Some(result) =
+                protocol_assignability_terminal(db, TypePair::new(db, self, target))
+        {
+            return ConstraintSet::from_bool(constraints, result);
+        }
+
         self.has_relation_to(
             db,
             target,
