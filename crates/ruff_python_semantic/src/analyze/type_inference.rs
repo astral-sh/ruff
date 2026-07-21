@@ -553,6 +553,43 @@ mod tests {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
         );
 
+        // Floor division and exponentiation.
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 // 4").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 // -4").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** 4").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** -1").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** -True").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
+        );
+        // Consider UAdd.
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** +1").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+        );
+        // Consider nested USub x2.
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** -(-1)").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+        );
+        // Consider nextesed USub x3.
+        assert_eq!(
+            ResolvedPythonType::from(parse("2 ** -(-(-1))").expr()),
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
+        );
+
         // Conditional expressions.
         assert_eq!(
             ResolvedPythonType::from(parse("1 if True else 2").expr()),
