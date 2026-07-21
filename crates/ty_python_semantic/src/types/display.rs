@@ -719,9 +719,8 @@ pub(super) fn qualified_name_components_from_scope(
     file_scope_id: FileScopeId,
     skip_count: usize,
 ) -> Vec<String> {
-    let source_file = file.file(db);
     let module_ast = parsed_module(db, file).load(db);
-    let index = semantic_index(db, source_file);
+    let index = semantic_index(db, file);
 
     let mut name_parts = vec![];
 
@@ -746,7 +745,7 @@ pub(super) fn qualified_name_components_from_scope(
         }
     }
 
-    if let Some(module) = file_to_module(db, source_file) {
+    if let Some(module) = file_to_module(db, file) {
         let module_name = module.name(db);
         name_parts.push(module_name.as_str().to_string());
     }

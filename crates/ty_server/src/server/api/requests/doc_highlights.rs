@@ -4,8 +4,8 @@ use lsp_types::DocumentHighlightRequest;
 use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri};
 use ruff_db::PythonFile;
 use ty_ide::{ReferenceKind, document_highlights};
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{

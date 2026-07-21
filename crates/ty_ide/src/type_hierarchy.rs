@@ -70,7 +70,7 @@ pub fn type_hierarchy_subtypes(
         return vec![];
     };
 
-    ty_module_resolver::all_modules(db)
+    ty_module_resolver::all_modules(db, file.python_version(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
             ty_python_semantic::type_hierarchy_subtypes(db, ty, &[module])
@@ -98,14 +98,17 @@ fn resolve_type_at<'db>(
     goto_target.inferred_type(&model)
 }
 
-fn type_hierarchy_class_to_item(db: &dyn Db, class: TypeHierarchyClass) -> TypeHierarchyItem {
+fn type_hierarchy_class_to_item<'db>(
+    db: &'db dyn Db,
+    class: TypeHierarchyClass<'db>,
+) -> TypeHierarchyItem {
     let detail = ty_module_resolver::file_to_module(db, class.file)
         .map(|module| module.name(db).to_string());
 
     TypeHierarchyItem {
         name: class.name,
         detail,
-        file: class.file,
+        file: class.file.file(db),
         full_range: class.full_range,
         selection_range: class.selection_range,
     }

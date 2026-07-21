@@ -473,7 +473,7 @@ pub(crate) fn symbol<'db>(
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_symbol<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     symbol_impl(
@@ -498,9 +498,9 @@ pub(crate) fn global_symbol<'db>(
     file: File,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    explicit_global_symbol(db, file, name).or_fall_back_to(db, || {
-        module_type_implicit_global_symbol(db, PythonFile::new(db, file, db.python_version()), name)
-    })
+    let file = PythonFile::new(db, file, db.python_version());
+    explicit_global_symbol(db, file, name)
+        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, file, name))
 }
 
 /// Infers the public type of an imported symbol.
@@ -511,7 +511,7 @@ pub(crate) fn global_symbol<'db>(
 /// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    file: Option<File>,
+    file: Option<PythonFile<'db>>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
@@ -532,7 +532,7 @@ pub(crate) fn imported_symbol<'db>(
     // module we're dealing with.
     file.map(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-            if file.is_stub(db) {
+            if file.file(db).is_stub(db) {
                 RequiresExplicitReExport::Yes
             } else {
                 RequiresExplicitReExport::No
@@ -584,13 +584,16 @@ pub(crate) fn imported_symbol<'db>(
 /// Note that this function is only intended for use in the context of the builtins *namespace*
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
+pub(crate) fn builtins_symbol<'db>(
+    db: &'db dyn Db,
+    python_version: PythonVersion,
+    symbol: &str,
+) -> PlaceAndQualifiers<'db> {
     let resolver = |module: Module<'db>| {
         let python_file = module.python_file(db)?;
-        let file = python_file.file(db);
         let found_symbol = symbol_impl(
             db,
-            global_scope(db, file),
+            global_scope(db, python_file),
             symbol,
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
@@ -606,10 +609,17 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
             .ignore_possibly_undefined()
             .map(|_| found_symbol)
     };
-    resolve_module_confident(db, &ModuleName::new_static("__builtins__").unwrap())
-        .and_then(&resolver)
-        .or_else(|| resolve_module_confident(db, &KnownModule::Builtins.name()).and_then(resolver))
-        .unwrap_or_default()
+    resolve_module_confident(
+        db,
+        python_version,
+        &ModuleName::new_static("__builtins__").unwrap(),
+    )
+    .and_then(&resolver)
+    .or_else(|| {
+        resolve_module_confident(db, python_version, &KnownModule::Builtins.name())
+            .and_then(resolver)
+    })
+    .unwrap_or_default()
 }
 
 /// Lookup the type of `symbol` in a given known module.
@@ -620,12 +630,16 @@ pub(crate) fn known_module_symbol<'db>(
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    resolve_module_confident(db, &known_module.name())
-        .and_then(|module| {
-            let file = module.file(db)?;
-            Some(imported_symbol(db, Some(file), symbol, None))
-        })
-        .unwrap_or_default()
+    resolve_module_confident(
+        db,
+        Program::get(db).python_version(db),
+        &known_module.name(),
+    )
+    .and_then(|module| {
+        let file = module.python_file(db)?;
+        Some(imported_symbol(db, Some(file), symbol, None))
+    })
+    .unwrap_or_default()
 }
 
 /// Lookup the type of `symbol` in the `typing` module namespace.
@@ -651,16 +665,23 @@ pub(crate) fn typing_extensions_symbol<'db>(
 /// Get the `builtins` module scope.
 ///
 /// Can return `None` if a custom typeshed is used that is missing `builtins.pyi`.
-pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-    core_module_scope(db, KnownModule::Builtins)
+pub(crate) fn builtins_module_scope(
+    db: &dyn Db,
+    python_version: PythonVersion,
+) -> Option<ScopeId<'_>> {
+    core_module_scope(db, python_version, KnownModule::Builtins)
 }
 
 /// Get the scope of a core stdlib module.
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
-fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_>> {
-    let module = resolve_module_confident(db, &core_module.name())?;
-    Some(global_scope(db, module.file(db)?))
+fn core_module_scope(
+    db: &dyn Db,
+    python_version: PythonVersion,
+    core_module: KnownModule,
+) -> Option<ScopeId<'_>> {
+    let module = resolve_module_confident(db, python_version, &core_module.name())?;
+    Some(global_scope(db, module.python_file(db)?))
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
@@ -1283,7 +1304,8 @@ fn symbol_impl<'db>(
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     let is_known_module = |known_module| {
-        file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
+        file_to_module(db, scope.python_file(db))
+            .is_some_and(|module| module.is_known(db, known_module))
     };
 
     // Check the symbol name first to avoid a module-resolution query for every symbol lookup.
@@ -2459,7 +2481,10 @@ mod tests {
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(
+            &db,
+            builtins_symbol(&db, Program::get(&db).python_version(&db), "__name__").place,
+        );
     }
 
     #[test]

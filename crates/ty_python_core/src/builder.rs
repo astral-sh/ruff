@@ -3169,11 +3169,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if source_file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
-                        source_file,
+                        self.file,
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, source_file)
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
                 {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
@@ -3247,13 +3247,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
 
                         let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, source_file, node)
+                            ModuleName::from_import_statement(self.db, self.file, node)
                         else {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, source_file, &module_name)
-                        else {
+                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
                             continue;
                         };
 
@@ -3279,7 +3278,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
-                                source_file,
+                                self.file,
                                 symbol_id,
                                 referenced_parse_file,
                             );

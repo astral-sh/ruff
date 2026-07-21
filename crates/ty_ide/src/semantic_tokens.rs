@@ -4716,7 +4716,7 @@ from pathlib import Missing as Alias
                 PythonFile::new(
                     &self.db,
                     self.file,
-                    ty_module_resolver::Db::python_version(&self.db),
+                    ty_python_semantic::Db::python_version(&self.db),
                 ),
                 None,
             )
@@ -4729,7 +4729,7 @@ from pathlib import Missing as Alias
                 PythonFile::new(
                     &self.db,
                     self.file,
-                    ty_module_resolver::Db::python_version(&self.db),
+                    ty_python_semantic::Db::python_version(&self.db),
                 ),
                 Some(range),
             )

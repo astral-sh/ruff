@@ -61,7 +61,7 @@ impl<'db> StatementInner<'db> {
     }
 
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.python_file(db))
     }
 }
 

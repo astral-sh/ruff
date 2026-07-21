@@ -102,7 +102,7 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition_file)?;
+                        let module = file_to_module(db, definition.python_file(db))?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -882,7 +882,7 @@ mod tests {
                 PythonFile::new(
                     &self.db,
                     self.file,
-                    ty_module_resolver::Db::python_version(&self.db),
+                    ty_python_semantic::Db::python_version(&self.db),
                 ),
                 self.range,
                 settings,

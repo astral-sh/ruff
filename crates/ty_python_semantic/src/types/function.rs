@@ -441,7 +441,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.file(db));
+        let index = semantic_index(db, body_scope.python_file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
@@ -452,14 +452,15 @@ impl<'db> OverloadLiteral<'db> {
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
         let module = parsed_module(db, self.python_file(db)).load(db);
-        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let use_def =
+            semantic_index(db, scope.python_file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, self.file(db));
+            .scoped_use_id(db, self.python_file(db));
 
         let Place::Defined(DefinedPlace {
             ty: previous_type,
@@ -515,7 +516,7 @@ impl<'db> OverloadLiteral<'db> {
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.python_file(db)).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
-        let index = semantic_index(db, scope.file(db));
+        let index = semantic_index(db, scope.python_file(db));
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
@@ -614,7 +615,7 @@ impl<'db> OverloadLiteral<'db> {
         let module = parsed_module(db, self.python_file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
-        let index = semantic_index(db, scope.file(db));
+        let index = semantic_index(db, scope.python_file(db));
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
@@ -680,7 +681,7 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.file(db));
+                let index = semantic_index(db, scope_id.python_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
@@ -2327,7 +2328,7 @@ impl KnownFunction {
 
         let candidate = Self::from_str(name).ok()?;
         candidate
-            .check_module(file_to_module(db, definition.file(db))?.known(db)?)
+            .check_module(file_to_module(db, definition.python_file(db))?.known(db)?)
             .then_some(candidate)
     }
 
@@ -2404,7 +2405,6 @@ impl KnownFunction {
         overload: &mut Binding<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
-        file: File,
     ) {
         let db = context.db();
         let parameter_types = overload.parameter_types();
@@ -2610,7 +2610,7 @@ impl KnownFunction {
                                     let value_precedence = OperatorPrecedence::from_expr(value);
                                     OperatorPrecedence::from_expr_ref(parent) >= value_precedence
                                 });
-                            let value_text = &source_text(db, file)[value.range()];
+                            let value_text = &source_text(db, context.file())[value.range()];
                             let replacement = if needs_parens {
                                 format!("({value_text})")
                             } else {
@@ -2820,11 +2820,11 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, file, &module_name) else {
+                let Some(module) = resolve_module(db, context.python_file(), &module_name) else {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, file, module));
+                overload.set_return_type(Type::module_literal(db, context.python_file(), module));
             }
 
             KnownFunction::TotalOrdering => {

@@ -372,18 +372,19 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
                 let module = literal.module(db);
 
-                let Some(file) = module.file(db) else {
+                let Some(python_file) = module.python_file(db) else {
                     return;
                 };
+                let file = python_file.file(db);
 
-                let module_scope = global_scope(db, file);
+                let module_scope = global_scope(db, python_file);
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, Some(file), symbol_name, None).place
+                        imported_symbol(db, Some(python_file), symbol_name, None).place
                     else {
                         continue;
                     };
@@ -514,8 +515,7 @@ impl<'db> AllMembers<'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        let file = class_body_scope.file(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, class_body_scope.python_file(db));
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {

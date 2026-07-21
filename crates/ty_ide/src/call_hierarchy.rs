@@ -109,7 +109,7 @@ impl CallHierarchyItem {
         Some(CallHierarchyItem {
             name: Name::new(name),
             kind,
-            detail: module_detail(db, def_file),
+            detail: module_detail(db, def.python_file(db)),
             file: def_file,
             full_range: def.full_range(db, module).range(),
             selection_range: def.focus_range(db, module).range(),
@@ -117,7 +117,7 @@ impl CallHierarchyItem {
     }
 }
 
-fn module_detail(db: &dyn Db, file: File) -> Option<String> {
+fn module_detail(db: &dyn Db, file: PythonFile<'_>) -> Option<String> {
     ty_module_resolver::file_to_module(db, file).map(|module| module.name(db).to_string())
 }
 

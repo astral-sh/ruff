@@ -538,14 +538,14 @@ impl ty_module_resolver::Db for ProjectDatabase {
     fn search_paths(&self) -> &SearchPaths {
         Program::get(self).search_paths(self)
     }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
+    fn python_version(&self) -> ruff_python_ast::PythonVersion {
+        Program::get(self).python_version(self)
+    }
+
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         ProjectDatabase::check_file(self, file)
     }
@@ -766,10 +766,6 @@ pub(crate) mod testing {
         fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
             Program::get(self).search_paths(self)
         }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
@@ -781,6 +777,10 @@ pub(crate) mod testing {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             crate::check_file(self, file)
@@ -832,6 +832,7 @@ mod tests {
     use ruff_db::files::FileRootKind;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ty_module_resolver::list_modules;
+    use ty_python_core::program::Program;
 
     use crate::{ProjectDatabase, ProjectMetadata};
 
@@ -877,7 +878,7 @@ mod tests {
         let metadata = ProjectMetadata::discover(&project, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
 
-        let modules = list_modules(&db);
+        let modules = list_modules(&db, Program::get(&db).python_version(&db));
         assert!(
             modules
                 .iter()

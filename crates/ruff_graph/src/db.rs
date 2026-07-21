@@ -7,7 +7,6 @@ use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
@@ -24,7 +23,6 @@ pub struct ModuleDb {
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     search_paths: Arc<SearchPaths>,
-    python_version: PythonVersion,
 }
 
 impl ModuleDb {
@@ -32,7 +30,6 @@ impl ModuleDb {
     pub fn from_src_roots<S>(
         system: S,
         src_roots: Vec<SystemPathBuf>,
-        python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
     ) -> Result<Self>
     where
@@ -57,7 +54,6 @@ impl ModuleDb {
             files: Files::default(),
             system: Arc::new(system),
             search_paths: Arc::new(search_paths),
-            python_version,
         };
 
         // Register the static roots for salsa durability
@@ -86,10 +82,6 @@ impl SourceDb for ModuleDb {
 impl ty_module_resolver::Db for ModuleDb {
     fn search_paths(&self) -> &SearchPaths {
         &self.search_paths
-    }
-
-    fn python_version(&self) -> PythonVersion {
-        self.python_version
     }
 }
 
