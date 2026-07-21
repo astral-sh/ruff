@@ -18,6 +18,8 @@
 //! * [`format!`]: Formats a formattable object
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
 //! * [`write!`]: Writes a sequence of formattable objects into an output buffer.
+//!
+//! tmp delete this
 
 mod arguments;
 mod buffer;
