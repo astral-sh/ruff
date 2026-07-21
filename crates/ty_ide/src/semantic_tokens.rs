@@ -28,7 +28,7 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
@@ -183,9 +183,13 @@ impl Deref for SemanticTokens {
 
 /// Generates semantic tokens for a Python file within the specified range.
 /// Pass None to get tokens for the entire file.
-pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
+pub fn semantic_tokens(
+    db: &dyn Db,
+    file: PythonFile<'_>,
+    range: Option<TextRange>,
+) -> SemanticTokens {
     let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.expecting_docstring = true;
@@ -320,7 +324,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, file);
+                let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -364,7 +368,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 let value_ty = match kind {
                     DefinitionKind::Assignment(assignment) => {
-                        let parsed = parsed_module(db, file).load(db);
+                        let parsed =
+                            parsed_module(db, PythonFile::new(db, file, db.python_version()))
+                                .load(db);
                         assignment.value(&parsed).inferred_type(&model)
                     }
                     _ => None,
@@ -1284,7 +1290,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
-        files::system_path_to_file,
+        files::{File, system_path_to_file},
         system::{DbWithWritableSystem, SystemPath, SystemPathBuf},
     };
     use ty_project::ProjectMetadata;
@@ -4708,12 +4714,20 @@ from pathlib import Missing as Alias
 
         /// Get semantic tokens for the entire file
         fn highlight_file(&self) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, None)
+            semantic_tokens(
+                &self.db,
+                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                None,
+            )
         }
 
         /// Get semantic tokens for a specific range in the file
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, Some(range))
+            semantic_tokens(
+                &self.db,
+                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                Some(range),
+            )
         }
 
         /// Helper function to convert semantic tokens to a snapshot-friendly text format

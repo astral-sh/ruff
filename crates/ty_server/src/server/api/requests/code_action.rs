@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri};
 use ruff_db::files::File;
+use ruff_db::{Db as _, PythonFile};
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
@@ -41,6 +42,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
+        let python_file = PythonFile::new(db, file, db.python_version());
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
@@ -99,7 +101,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, file, range, &diagnostic_id) {
+                for action in code_actions(db, python_file, range, &diagnostic_id) {
                     actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QuickFix),

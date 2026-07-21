@@ -4,6 +4,7 @@ use rustc_hash::FxHashMap;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -288,17 +289,18 @@ pub struct InlayHintTextEdit {
 
 pub fn inlay_hints(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file).load(db);
+    let source_file = file.file(db);
 
-    let source = source_text(db, file);
+    let source = source_text(db, source_file);
     let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+    let importer = Importer::new(db, &stylist, source_file, source.as_str(), &ast);
 
-    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
+    let mut visitor = InlayHintVisitor::new(db, source_file, importer, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -875,7 +877,12 @@ mod tests {
 
         /// Returns the inlay hints for the given test case with custom settings.
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
-            let hints = inlay_hints(&self.db, self.file, self.range, settings);
+            let hints = inlay_hints(
+                &self.db,
+                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                self.range,
+                settings,
+            );
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();

@@ -1,5 +1,6 @@
 use lsp_types::CallHierarchyOutgoingCallsRequest;
 use lsp_types::{CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams};
+use ruff_db::{Db as _, PythonFile};
 
 use crate::document::{ToRangeExt as _, resolve_file_uri_range};
 use crate::server::api::requests::prepare_call_hierarchy::convert_to_lsp_item;
@@ -40,7 +41,9 @@ impl BackgroundRequestHandler for CallHierarchyOutgoingCallsRequestHandler {
                 continue;
             };
 
-            for call in ty_ide::outgoing_calls(db, file, offset) {
+            for call in
+                ty_ide::outgoing_calls(db, PythonFile::new(db, file, db.python_version()), offset)
+            {
                 let Some(to) = convert_to_lsp_item(db, call.to, encoding) else {
                     continue;
                 };

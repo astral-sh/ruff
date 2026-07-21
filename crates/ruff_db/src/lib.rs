@@ -3,9 +3,10 @@
     reason = "Prefer System trait methods over std methods"
 )]
 
-use crate::files::Files;
+use crate::files::{File, Files};
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
@@ -24,6 +25,22 @@ pub mod system;
 #[cfg(feature = "testing")]
 pub mod testing;
 pub mod vendored;
+
+/// A file paired with the Python version used to parse its contents.
+///
+/// This is the key for [`parsed::parsed_module`]. Including the Python version allows the same
+/// file to be parsed for different versions within a single Salsa revision without sharing an
+/// incompatible AST or syntax diagnostics.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+pub struct PythonFile<'db> {
+    #[returns(copy)]
+    pub file: File,
+    #[returns(copy)]
+    pub python_version: PythonVersion,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PythonFile<'_> {}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Instant, SystemTime, SystemTimeError};

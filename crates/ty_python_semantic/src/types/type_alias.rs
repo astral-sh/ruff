@@ -19,6 +19,8 @@ use ty_python_core::{
 };
 
 use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
@@ -75,7 +77,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
+        let module =
+            parsed_module(db, PythonFile::new(db, scope.file(db), db.python_version())).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -111,7 +114,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let file = scope.file(db);
-        let parsed = parsed_module(db, file).load(db);
+        let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -181,7 +184,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
         let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return Type::unknown();
         };

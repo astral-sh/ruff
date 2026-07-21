@@ -4,6 +4,7 @@ use std::time::Instant;
 use lsp_types::InlayHintRequest;
 use lsp_types::{InlayHintParams, Uri};
 use ruff_db::files::File;
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
 use ty_project::ProjectDatabase;
 
@@ -51,7 +52,12 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         };
 
-        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
+        let inlay_hints = inlay_hints(
+            db,
+            PythonFile::new(db, file, db.python_version()),
+            range,
+            workspace_settings.inlay_hints(),
+        );
 
         let inlay_hints: Vec<lsp_types::InlayHint> = inlay_hints
             .into_iter()

@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::Db;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -108,7 +109,7 @@ pub fn match_file(
         });
         (assertions, diagnostics)
     } else {
-        let parsed = parsed_module(db, file).load(db);
+        let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
         let assertions = InlineFileAssertions::from_file(
             source.as_str(),
             AssertionSource::Python(&parsed),

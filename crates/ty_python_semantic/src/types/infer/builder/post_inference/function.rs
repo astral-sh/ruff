@@ -17,6 +17,7 @@ use crate::{
 };
 use itertools::Itertools;
 use ruff_db::{
+    PythonFile,
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
@@ -277,9 +278,10 @@ fn check_legacy_typevar_defaults<'db>(
         if let Some(typevar_definition) = typevar.definition(db) {
             let file = typevar_definition.file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(typevar_definition.full_range(
+                    db,
+                    &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
+                )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
         }
@@ -421,9 +423,10 @@ fn check_legacy_typevar_ordering<'db>(
         };
         let file = definition.file(db);
         diagnostic.annotate(
-            Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
-            ))
+            Annotation::secondary(Span::from(definition.full_range(
+                db,
+                &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
+            )))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
     }

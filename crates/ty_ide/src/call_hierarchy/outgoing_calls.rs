@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::find_goto_target;
 use crate::{CallHierarchyItem, Db};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::token::Tokens;
@@ -29,9 +30,9 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// are reported when the nested callable is expanded separately. Declaration
 /// expressions attached to a nested callable are still included while
 /// traversing the containing item's body.
-pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<OutgoingCall> {
+pub fn outgoing_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<OutgoingCall> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
     };
@@ -52,7 +53,8 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
             continue;
         };
         let def_file = def.file(db);
-        let parsed = parsed_module(db, def_file).load(db);
+        let def_parse_file = PythonFile::new(db, def_file, db.python_version());
+        let parsed = parsed_module(db, def_parse_file).load(db);
 
         let model = SemanticModel::new(db, def_file);
         let mut finder = OutgoingCallsFinder {
@@ -152,7 +154,11 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
                 _ => continue,
             }
             let def_file = def.file(self.db);
-            let module_ref = parsed_module(self.db, def_file).load(self.db);
+            let module_ref = parsed_module(
+                self.db,
+                PythonFile::new(self.db, def_file, self.db.python_version()),
+            )
+            .load(self.db);
             let selection_range = def.focus_range(self.db, &module_ref).range();
 
             let key = CalleeKey {
@@ -304,7 +310,11 @@ mod tests {
             else {
                 return "No outgoing calls found".to_string();
             };
-            let calls = outgoing_calls(&self.db, target.file, target.selection_range.start());
+            let calls = outgoing_calls(
+                &self.db,
+                self.python_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No outgoing calls found".to_string();
             }

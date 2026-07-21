@@ -1,4 +1,4 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module};
+use ruff_db::{PythonFile, diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::TextRange;
 
@@ -200,7 +200,11 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let module = parsed_module(
+                db,
+                PythonFile::new(db, definition.file(db), db.python_version()),
+            )
+            .load(db);
 
             let value = definition
                 .kind(db)

@@ -13,6 +13,7 @@ pub(crate) mod outgoing_calls;
 
 use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, SymbolKind};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
@@ -32,11 +33,11 @@ use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticMode
 /// cursor on a specific `@overload def` yields just that one.
 pub fn prepare_call_hierarchy(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<CallHierarchyItem>> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definitions = goto_target
         .definitions(&model, ImportAliasResolution::ResolveAliases)?
@@ -48,7 +49,8 @@ pub fn prepare_call_hierarchy(
             continue;
         };
 
-        let module_ref = parsed_module(db, def.file(db)).load(db);
+        let module_ref =
+            parsed_module(db, PythonFile::new(db, def.file(db), db.python_version())).load(db);
 
         if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref) {
             items.push(item);
@@ -196,7 +198,11 @@ mod tests {
 
     impl CursorTest {
         pub(super) fn prepare_calls(&self) -> Option<Vec<CallHierarchyItem>> {
-            prepare_call_hierarchy(&self.db, self.cursor.file, self.cursor.offset)
+            prepare_call_hierarchy(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            )
         }
 
         fn prepare_call_hierarchy(&self) -> String {

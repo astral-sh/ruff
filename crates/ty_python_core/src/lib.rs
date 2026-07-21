@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
@@ -69,7 +70,7 @@ pub mod program;
 pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
 
     SemanticIndexBuilder::new(db, file, &module).build()
 }
@@ -1065,7 +1066,7 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::{files::system_path_to_file, parsed::ParsedModuleRef};
+    use ruff_db::{Db as _, files::system_path_to_file, parsed::ParsedModuleRef};
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -1262,7 +1263,7 @@ y = 2
 
         assert_eq!(names(global_table), vec!["C", "y"]);
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
 
         let [(class_scope_id, class_scope)] = index
@@ -1296,7 +1297,7 @@ def func():
 y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1444,7 +1445,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1505,7 +1506,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let syntax = module.syntax();
         let element = syntax.body[0]
             .as_expr_stmt()
@@ -1540,7 +1541,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1641,7 +1642,7 @@ def func():
     y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1689,7 +1690,7 @@ def func[T]():
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1733,7 +1734,7 @@ class C[T]:
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1774,7 +1775,7 @@ class C[T]:
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let scope = global_scope(&db, file);
         let ast = module.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
@@ -1807,7 +1808,7 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let ast = module.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
@@ -1850,7 +1851,7 @@ def x():
     pass",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
         let index = semantic_index(&db, file);
 
         let descendants = index.descendent_scopes(FileScopeId::global());

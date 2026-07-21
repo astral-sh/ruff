@@ -53,7 +53,7 @@ use crate::{
 };
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::{PythonFile, parsed::parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
@@ -85,7 +85,11 @@ fn dynamic_class_header_range<'db>(
     scope: ScopeId<'db>,
     anchor: DynamicClassHeaderAnchor<'db>,
 ) -> TextRange {
-    let module = parsed_module(db, scope.file(db)).load(db);
+    let module = parsed_module(
+        db,
+        PythonFile::new(db, scope.file(db), db.python_version()),
+    )
+    .load(db);
     match anchor {
         DynamicClassHeaderAnchor::Definition(definition) => definition
             .kind(db)
