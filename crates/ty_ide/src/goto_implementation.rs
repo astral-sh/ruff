@@ -58,12 +58,14 @@
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
 use ty_python_semantic::{
-    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticModel,
+    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticContext,
+    SemanticModel,
 };
 
 /// Returns the known implementations for the supported target at `offset`.
@@ -72,27 +74,31 @@ use ty_python_semantic::{
 /// identified.
 pub fn goto_implementation(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let finder = prepare_implementations_finder_for_goto_target(&model, &goto_target)?;
+    let source_file = file.file(db);
+    let python_version = file.python_version(db);
 
     let mut candidate_files: Vec<File> = db
         .project()
         .files(db)
         .iter()
         .copied()
-        .filter(|candidate| *candidate != file)
+        .filter(|candidate| *candidate != source_file)
         .collect();
-    candidate_files.push(file);
+    candidate_files.push(source_file);
 
     let batches = candidate_files
         .into_par_iter()
         .map_with_db(db, |db, file| {
-            let definitions = finder.implementations_for_file(db, file);
+            let file = PythonFile::new(db, file, python_version);
+            let ctx = SemanticContext::from_file(db, file);
+            let definitions = finder.implementations_for_file(&ctx, file);
             definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();
@@ -108,7 +114,7 @@ pub fn goto_implementation(
     let implementation_targets = implementation_targets.into_iter().collect();
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(source_file, goto_target.range()),
         value: implementation_targets,
     })
 }
@@ -118,6 +124,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
     model: &SemanticModel<'db>,
     goto_target: &GotoTarget<'_>,
 ) -> Option<ImplementationsFinder<'db>> {
+    let ctx = model.semantic_context();
     match goto_target {
         GotoTarget::Expression(expression)
         | GotoTarget::Call {
@@ -131,10 +138,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
             goto_target
                 .expression_definitions(model, ImportAliasResolution::ResolveAliases)
                 .and_then(|definitions| {
-                    ImplementationsFinder::for_class_reference(
-                        model.db(),
-                        definitions.iter().as_slice(),
-                    )
+                    ImplementationsFinder::for_class_reference(&ctx, definitions.iter().as_slice())
                 })
                 .or_else(|| match expression {
                     ruff_python_ast::ExprRef::Attribute(attribute) => {
@@ -146,10 +150,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
         GotoTarget::StringAnnotationSubexpr { .. } => goto_target
             .definitions(model, ImportAliasResolution::ResolveAliases)
             .and_then(|definitions| {
-                ImplementationsFinder::for_class_reference(
-                    model.db(),
-                    definitions.iter().as_slice(),
-                )
+                ImplementationsFinder::for_class_reference(&ctx, definitions.iter().as_slice())
             }),
         GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, function),
         GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, class),
@@ -832,8 +833,12 @@ mod tests {
             .build();
 
         let targets = salsa::attach(&test.db, || {
-            goto_implementation(&test.db, test.cursor.file, test.cursor.offset)
-                .expect("implementation targets")
+            goto_implementation(
+                &test.db,
+                test.python_file(test.cursor.file),
+                test.cursor.offset,
+            )
+            .expect("implementation targets")
         });
         let paths = targets
             .into_iter()
@@ -2134,7 +2139,11 @@ class MyClass:
     impl CursorTest {
         fn goto_implementation(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_implementation(&self.db, self.cursor.file, self.cursor.offset)
+                goto_implementation(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

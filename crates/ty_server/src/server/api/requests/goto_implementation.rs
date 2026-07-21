@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 
 use lsp_types::{ImplementationParams, ImplementationRequest, ImplementationResponse, Uri};
+use ruff_db::PythonFile;
 use ty_ide::goto_implementation;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};
@@ -48,7 +50,9 @@ impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_implementation(db, file, offset) else {
+        let Some(ranged) =
+            goto_implementation(db, PythonFile::new(db, file, db.python_version()), offset)
+        else {
             return Ok(None);
         };
 

@@ -6,8 +6,8 @@ use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::Db;
 use crate::types::{Type, TypeContext, infer_expression_types};
+use crate::{Db, SemanticContext};
 use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
@@ -26,7 +26,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHa
 
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
-    db: &'db dyn Db,
+    ctx: SemanticContext<'db>,
     file: PythonFile<'db>,
 
     /// The semantic index for the module.
@@ -46,7 +46,7 @@ struct DunderAllNamesCollector<'db> {
 impl<'db> DunderAllNamesCollector<'db> {
     fn new(db: &'db dyn Db, file: PythonFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
-            db,
+            ctx: SemanticContext::from_file(db, file),
             file,
             index,
             origin: None,
@@ -84,14 +84,15 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
+                let db = self.ctx.db();
                 let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
                 else {
                     return false;
                 };
                 let Some(module_dunder_all_names) = module_literal
-                    .module(self.db)
-                    .python_file(self.db)
-                    .and_then(|file| dunder_all_names(self.db, file))
+                    .module(db)
+                    .python_file(db)
+                    .and_then(|file| dunder_all_names(db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
@@ -157,10 +158,10 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
-        let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, self.file, &module_name)?;
-        dunder_all_names(self.db, module.python_file(self.db)?)
+        let db = self.ctx.db();
+        let module_name = ModuleName::from_import_statement(db, self.file, import_from).ok()?;
+        let module = resolve_module(db, self.file, &module_name)?;
+        dunder_all_names(db, module.python_file(db)?)
     }
 
     /// Infer the type of a standalone expression.
@@ -169,15 +170,21 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        infer_expression_types(self.db, self.index.expression(expr), TypeContext::default())
-            .expression_type(expr)
+        infer_expression_types(
+            self.ctx.db(),
+            self.index.expression(expr),
+            TypeContext::default(),
+        )
+        .expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        self.standalone_expression_type(expr).try_bool(self.db).ok()
+        self.standalone_expression_type(expr)
+            .try_bool(&self.ctx)
+            .ok()
     }
 
     /// Add valid names to the set.
@@ -201,10 +208,8 @@ impl<'db> DunderAllNamesCollector<'db> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
-            tracing::debug!(
-                "Invalid `__all__` in `{}`",
-                self.file.file(self.db).path(self.db)
-            );
+            let db = self.ctx.db();
+            tracing::debug!("Invalid `__all__` in `{}`", self.file.file(db).path(db));
             None
         } else {
             self.names.shrink_to_fit();

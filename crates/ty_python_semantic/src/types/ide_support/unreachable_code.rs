@@ -1,5 +1,5 @@
-use crate::Db;
 use crate::reachability::is_reachable;
+use crate::{Db, SemanticContext};
 use get_size2::GetSize;
 use itertools::Itertools;
 use ruff_db::PythonFile;
@@ -48,6 +48,7 @@ pub enum UnreachableKind {
 pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
+    let ctx = SemanticContext::from_file(db, file);
 
     for scope_id in index.scope_ids() {
         let use_def = index.use_def_map(scope_id.file_scope_id(db));
@@ -55,7 +56,7 @@ pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[Unreachable
             use_def
                 .range_reachability()
                 .filter_map(|(range, constraint)| {
-                    (!is_reachable(db, use_def, constraint)).then_some(UnreachableRange {
+                    (!is_reachable(&ctx, use_def, constraint)).then_some(UnreachableRange {
                         range,
                         kind: if constraint == ScopedReachabilityConstraintId::ALWAYS_FALSE {
                             UnreachableKind::Unconditional
@@ -93,8 +94,7 @@ fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[Unreachab
 #[cfg(test)]
 mod tests {
     use super::{UnreachableKind, unreachable_ranges};
-    use crate::Db as _;
-    use crate::db::tests::TestDbBuilder;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use insta::assert_snapshot;
     use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
@@ -147,7 +147,7 @@ mod tests {
         }
     }
 
-    fn render_unreachable_diagnostics(db: &crate::db::tests::TestDb, path: &str) -> String {
+    fn render_unreachable_diagnostics(db: &TestDb, path: &str) -> String {
         let file = system_path_to_file(db, path).unwrap();
         let diagnostics = unreachable_ranges(db, PythonFile::new(db, file, db.python_version()))
             .iter()

@@ -261,7 +261,7 @@ pub(crate) fn has_any_external_visible_definitions(
             ScopeKind::Comprehension => {
                 matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
                     && definition.place(db).as_symbol().is_some_and(|symbol_id| {
-                        ty_python_core::semantic_index(db, definition.file(db))
+                        ty_python_core::semantic_index(db, definition.python_file(db))
                             .symbol_resolves_to_global_scope(symbol_id, definition.file_scope(db))
                     })
             }

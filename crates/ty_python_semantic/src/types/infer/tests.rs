@@ -1,7 +1,7 @@
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
-use crate::place::{ConsideredDefinitions, Place, global_symbol};
+use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
@@ -16,6 +16,10 @@ use super::*;
 
 fn python_file(db: &TestDb, file: File) -> PythonFile<'_> {
     PythonFile::new(db, file, db.python_version())
+}
+
+fn global_symbol<'db>(db: &'db TestDb, file: File, name: &str) -> PlaceAndQualifiers<'db> {
+    crate::place::global_symbol(db, python_file(db, file), name)
 }
 
 #[track_caller]
@@ -289,17 +293,18 @@ fn pep695_type_params() {
     )
     .unwrap();
 
+    let ctx = db.semantic_context();
     let check_typevar = |var: &'static str,
                          display: &'static str,
                          upper_bound: Option<&'static str>,
                          constraints: Option<&[&'static str]>,
                          default: Option<&'static str>| {
         let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-        assert_eq!(var_ty.display(&db).to_string(), display);
+        assert_eq!(var_ty.display(&ctx).to_string(), display);
 
         let expected_name_ty = format!(r#"Literal["{var}"]"#);
-        let name_ty = var_ty.member(&db, "__name__").place.expect_type();
-        assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
+        let name_ty = var_ty.member(&ctx, "__name__").place.expect_type();
+        assert_eq!(name_ty.display(&ctx).to_string(), expected_name_ty);
 
         let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
             panic!("expected TypeVar");
@@ -307,14 +312,14 @@ fn pep695_type_params() {
 
         assert_eq!(
             typevar
-                .upper_bound(&db)
-                .map(|ty| ty.display(&db).to_string()),
+                .upper_bound(&ctx)
+                .map(|ty| ty.display(&ctx).to_string()),
             upper_bound.map(std::borrow::ToOwned::to_owned)
         );
         assert_eq!(
-            typevar.constraints(&db).map(|tys| tys
+            typevar.constraints(&ctx).map(|tys| tys
                 .iter()
-                .map(|ty| ty.display(&db).to_string())
+                .map(|ty| ty.display(&ctx).to_string())
                 .collect::<Vec<_>>()),
             constraints.map(|strings| strings
                 .iter()
@@ -323,8 +328,8 @@ fn pep695_type_params() {
         );
         assert_eq!(
             typevar
-                .default_type(&db)
-                .map(|ty| ty.display(&db).to_string()),
+                .default_type(&ctx)
+                .map(|ty| ty.display(&ctx).to_string()),
             default.map(std::borrow::ToOwned::to_owned)
         );
     };
@@ -611,7 +616,7 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db.semantic_context()).to_string(), "int");
 
     // Change `x` to a different value
     db.write_file("/src/foo.py", "x: bool = True\ndef foo(): ...")?;
@@ -620,7 +625,7 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "bool");
+    assert_eq!(x_ty_2.display(&db.semantic_context()).to_string(), "bool");
 
     Ok(())
 }
@@ -637,7 +642,7 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db.semantic_context()).to_string(), "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ndef foo(): pass")?;
 
@@ -647,7 +652,7 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
+    assert_eq!(x_ty_2.display(&db.semantic_context()).to_string(), "int");
 
     let events = db.take_salsa_events();
 
@@ -673,7 +678,7 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db.semantic_context()).to_string(), "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ny: bool = False")?;
 
@@ -683,7 +688,7 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 
     let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
+    assert_eq!(x_ty_2.display(&db.semantic_context()).to_string(), "int");
 
     let events = db.take_salsa_events();
 
@@ -730,7 +735,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_eq!(
+        attr_ty.display(&db.semantic_context()).to_string(),
+        "int | None"
+    );
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -745,7 +753,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(
+            attr_ty.display(&db.semantic_context()).to_string(),
+            "str | None"
+        );
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -769,7 +780,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(
+            attr_ty.display(&db.semantic_context()).to_string(),
+            "str | None"
+        );
         db.take_salsa_events()
     };
 
@@ -821,7 +835,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_eq!(
+        attr_ty.display(&db.semantic_context()).to_string(),
+        "int | None"
+    );
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -838,7 +855,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(
+            attr_ty.display(&db.semantic_context()).to_string(),
+            "str | None"
+        );
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -864,7 +884,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
+        assert_eq!(
+            attr_ty.display(&db.semantic_context()).to_string(),
+            "str | None"
+        );
         db.take_salsa_events()
     };
 
@@ -917,7 +940,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
     let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int");
+    assert_eq!(attr_ty.display(&db.semantic_context()).to_string(), "int");
 
     // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -936,7 +959,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
+        assert_eq!(attr_ty.display(&db.semantic_context()).to_string(), "str");
         db.take_salsa_events()
     };
     assert_function_query_was_run(
@@ -964,7 +987,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     let events = {
         db.clear_salsa_events();
         let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
+        assert_eq!(attr_ty.display(&db.semantic_context()).to_string(), "str");
         db.take_salsa_events()
     };
 
@@ -1004,7 +1027,10 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let bar = system_path_to_file(&db, "src/bar.py")?;
     let a = global_symbol(&db, bar, "a").place;
 
-    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+    assert_eq!(
+        a.expect_type(),
+        KnownClass::Int.to_instance(&db.semantic_context())
+    );
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, python_file(&db, bar)).load(&db);
@@ -1032,7 +1058,10 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
 
     let a = global_symbol(&db, bar, "a").place;
 
-    assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+    assert_eq!(
+        a.expect_type(),
+        KnownClass::Int.to_instance(&db.semantic_context())
+    );
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, python_file(&db, bar)).load(&db);

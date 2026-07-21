@@ -2,15 +2,11 @@ use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-use ruff_python_ast::PythonVersion;
 use ty_python_core::Db as PythonCoreDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
-    /// Returns the Python version for files in the primary environment.
-    fn python_version(&self) -> PythonVersion;
-
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
 
     /// Resolves the rule selection for a given file.
@@ -40,13 +36,13 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{check_file_unwrap, default_lint_registry};
-    use ruff_db::Db as SourceDb;
+    use crate::{SemanticContext, check_file_unwrap, default_lint_registry};
     use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::{Db as SourceDb, PythonFile};
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
@@ -87,6 +83,14 @@ pub(crate) mod tests {
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
             }
+        }
+
+        pub(crate) fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
+        pub(crate) fn semantic_context(&self) -> SemanticContext<'_> {
+            SemanticContext::from_version(self, self.python_version())
         }
 
         /// Marks `file` as open in the editor.
@@ -146,16 +150,12 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
-        }
-
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             if !self.should_check_file(file) {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {

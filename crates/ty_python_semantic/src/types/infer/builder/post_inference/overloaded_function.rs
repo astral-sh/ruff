@@ -46,6 +46,7 @@ pub(crate) fn check_overloaded_function<'db>(
     };
 
     let db = context.db();
+    let ctx = context.semantic_context();
 
     if function.file(db) != context.file() {
         // If the function is not in this file, we don't need to check it.
@@ -66,7 +67,7 @@ pub(crate) fn check_overloaded_function<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = place_from_bindings(
-        db,
+        &ctx,
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
     )
     .place
@@ -149,11 +150,12 @@ pub(crate) fn check_overloaded_function<'db>(
             )
         {
             if class.is_protocol(db)
-                || (Type::ClassLiteral(class)
-                    .is_subtype_of(db, KnownClass::ABCMeta.to_instance(db))
-                    && overloads.iter().all(|overload| {
-                        overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
-                    }))
+                || ({
+                    Type::ClassLiteral(class)
+                        .is_subtype_of(&ctx, KnownClass::ABCMeta.to_instance(&ctx))
+                } && overloads.iter().all(|overload| {
+                    overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }))
             {
                 implementation_required = false;
             }
@@ -290,6 +292,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     implementation_callables: &[CallableType<'db>],
 ) {
     let db = context.db();
+    let ctx = context.semantic_context();
     if implementation_callables.is_empty()
         || implementation_callables
             .iter()
@@ -316,7 +319,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads.iter().flat_map(|overload| {
         overload
-            .decorated_signatures(db)
+            .decorated_signatures(&ctx)
             .map(move |signature| (overload, signature))
     });
 
@@ -335,12 +338,12 @@ fn check_non_generic_overload_implementation_consistency<'db>(
                 for implementation_signature in &callable.signatures(db).overloads {
                     let parameter_consistency = implementation_signature
                         .non_generic_implementation_parameters_consistency_with(
-                            db,
+                            &ctx,
                             &overload_signature,
                         );
                     let return_type_consistency = implementation_signature
                         .non_generic_implementation_return_type_consistency_with(
-                            db,
+                            &ctx,
                             &overload_signature,
                         );
                     if matches!(
@@ -400,18 +403,18 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(db),
-                overload_signature.display(db),
+                implementation_signature.display(&ctx),
+                overload_signature.display(&ctx),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(&ctx, &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(db),
-                implementation_signature.return_ty.display(db),
+                overload_signature.return_ty.display(&ctx),
+                implementation_signature.return_ty.display(&ctx),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(&ctx, &mut diagnostic);
         }
         diagnostic.annotate(
             context

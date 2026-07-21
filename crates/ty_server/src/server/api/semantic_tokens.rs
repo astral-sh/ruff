@@ -4,8 +4,8 @@ use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 use crate::document::{PositionEncoding, ToRangeExt};
 

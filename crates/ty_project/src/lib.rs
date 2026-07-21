@@ -899,7 +899,6 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
 
     #[test]

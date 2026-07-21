@@ -7,9 +7,9 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
-use ty_python_semantic::SemanticModel;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
+use ty_python_semantic::{SemanticContext, SemanticModel};
 
 /// Represents a type hierarchy item returned by the LSP type hierarchy requests.
 #[derive(Debug, Clone)]
@@ -39,7 +39,8 @@ pub fn prepare_type_hierarchy(
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
 
-    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, ty)?;
+    let ctx = model.semantic_context();
+    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(&ctx, ty)?;
     Some(type_hierarchy_class_to_item(db, hierarchy_class))
 }
 
@@ -52,7 +53,8 @@ pub fn type_hierarchy_supertypes(
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_supertypes(db, ty)
+    let ctx = SemanticContext::from_file(db, file);
+    ty_python_semantic::type_hierarchy_supertypes(&ctx, ty)
         .into_iter()
         .map(|c| type_hierarchy_class_to_item(db, c))
         .collect()
@@ -73,7 +75,8 @@ pub fn type_hierarchy_subtypes(
     ty_module_resolver::all_modules(db, file.python_version(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
-            ty_python_semantic::type_hierarchy_subtypes(db, ty, &[module])
+            let ctx = SemanticContext::from_file(db, file);
+            ty_python_semantic::type_hierarchy_subtypes(&ctx, ty, &[module])
                 .into_iter()
                 .map(|class| type_hierarchy_class_to_item(db, class))
                 .collect::<Vec<_>>()

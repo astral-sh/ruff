@@ -19,8 +19,8 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
-    inferred_declaration,
+    CycleDetector, SemanticContext, SpecialFormType, Type, TypeQualifiers, binding_type,
+    infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
@@ -68,6 +68,10 @@ impl<'db> SemanticModel<'db> {
         self.file
     }
 
+    pub fn semantic_context(&self) -> SemanticContext<'db> {
+        SemanticContext::from_file(self.db, self.python_file())
+    }
+
     pub fn file_path(&self) -> &FilePath {
         self.file().path(self.db)
     }
@@ -86,10 +90,12 @@ impl<'db> SemanticModel<'db> {
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let mut members = FxHashMap::default();
-        let index = semantic_index(self.db, self.python_file());
+        let python_file = self.python_file();
+        let index = semantic_index(self.db, python_file);
         let Some(file_scope) = self.scope(node) else {
             return members;
         };
+        let ctx = self.semantic_context();
 
         for (file_scope, _) in index
             .visible_ancestor_scopes(file_scope)
@@ -98,7 +104,7 @@ impl<'db> SemanticModel<'db> {
             .rev()
         {
             for memberdef in
-                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.python_file()))
+                all_reachable_members(&ctx, file_scope.to_scope_id(self.db, python_file))
             {
                 members.insert(
                     memberdef.member.name,
@@ -197,7 +203,7 @@ impl<'db> SemanticModel<'db> {
             clippy::iter_over_hash_type,
             reason = "completion order is determined later by relevance ranking"
         )]
-        for Member { name, ty } in all_members(self.db, ty) {
+        for Member { name, ty } in all_members(&self.semantic_context(), ty) {
             completions.push(Completion {
                 name: CompactString::new(name),
                 ty: Some(ty),
@@ -231,7 +237,7 @@ impl<'db> SemanticModel<'db> {
             return Vec::new();
         };
 
-        all_members(self.db, ty)
+        all_members(&self.semantic_context(), ty)
             .into_iter()
             .map(|member| Completion {
                 name: CompactString::new(member.name),
@@ -247,19 +253,22 @@ impl<'db> SemanticModel<'db> {
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
-        let index = semantic_index(self.db, self.python_file());
+        let python_file = self.python_file();
+        let index = semantic_index(self.db, python_file);
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
+        let ctx = self.semantic_context();
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.python_file()))
-                    .map(|memberdef| Completion {
+                all_reachable_members(&ctx, file_scope.to_scope_id(self.db, python_file)).map(
+                    |memberdef| Completion {
                         name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
-                    }),
+                    },
+                ),
             );
         }
 
@@ -524,7 +533,7 @@ impl<'db> SemanticModel<'db> {
                 };
                 value_ty
                     .member_lookup_with_policy(
-                        self.db,
+                        &self.semantic_context(),
                         &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
@@ -549,10 +558,11 @@ impl<'db> SemanticModel<'db> {
         >;
 
         fn collect<'db>(
-            db: &'db dyn Db,
+            ctx: &SemanticContext<'db>,
             ty: Type<'db>,
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
+            let db = ctx.db();
             match ty {
                 Type::LiteralValue(literal) => literal
                     .as_string()
@@ -567,15 +577,15 @@ impl<'db> SemanticModel<'db> {
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
-                    .flat_map(|element| collect(db, *element, visitor))
+                    .flat_map(|element| collect(ctx, *element, visitor))
                     .collect(),
                 Type::Intersection(intersection) => intersection
                     .positive(db)
                     .iter()
-                    .flat_map(|element| collect(db, *element, visitor))
+                    .flat_map(|element| collect(ctx, *element, visitor))
                     .collect(),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
+                    visitor.visit(ctx, ty, || collect(ctx, alias.value_type(ctx), visitor))
                 }
                 _ => Vec::new(),
             }
@@ -586,7 +596,7 @@ impl<'db> SemanticModel<'db> {
         };
 
         let mut candidates = collect(
-            self.db,
+            &self.semantic_context(),
             expected_ty,
             &StringLiteralCandidatesVisitor::default(),
         );
@@ -857,7 +867,6 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 
 #[cfg(test)]
 mod tests {
-    use crate::Db as _;
     use crate::db::tests::TestDbBuilder;
     use crate::{HasType, SemanticModel};
     use ruff_db::PythonFile;

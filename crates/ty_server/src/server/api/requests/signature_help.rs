@@ -13,8 +13,8 @@ use lsp_types::{
 };
 use ruff_db::PythonFile;
 use ty_ide::signature_help;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 pub(crate) struct SignatureHelpRequestHandler;
 

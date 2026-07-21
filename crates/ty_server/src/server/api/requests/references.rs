@@ -4,8 +4,8 @@ use lsp_types::ReferencesRequest;
 use lsp_types::{Location, ReferenceParams, Uri};
 use ruff_db::PythonFile;
 use ty_ide::find_references;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{

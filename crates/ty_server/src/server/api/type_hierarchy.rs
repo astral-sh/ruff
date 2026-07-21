@@ -1,7 +1,7 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
 use ruff_db::PythonFile;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 use crate::PositionEncoding;
 use crate::document::{ToRangeExt, resolve_file_uri_range};
