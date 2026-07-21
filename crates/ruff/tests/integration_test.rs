@@ -999,7 +999,10 @@ preview = true
 
 #[test]
 fn full_output_format() {
-    let mut cmd = RuffCheck::default().output_format("full").build();
+    let mut cmd = RuffCheck::default()
+        .output_format("full")
+        .args(["--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -2607,7 +2610,7 @@ fn pyproject_toml_stdin_schema_error() {
 #[test]
 fn pyproject_toml_stdin_no_applicable_rules_selected() {
     let mut cmd = RuffCheck::default()
-        .args(["--stdin-filename", "pyproject.toml"])
+        .args(["--stdin-filename", "pyproject.toml", "--ignore=RUF200"])
         .build();
 
     assert_cmd_snapshot!(
@@ -2649,7 +2652,7 @@ fn pyproject_toml_stdin_no_errors() {
         .build();
 
     assert_cmd_snapshot!(
-        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        cmd.pass_stdin("[project]\nname = 'ruff'\nversion = '0.0.0'"),
         @"
     success: true
     exit_code: 0

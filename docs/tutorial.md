@@ -201,13 +201,13 @@ Ruff supports [over 900 lint rules](rules.md) split across over 50 built-in plug
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that overlap with the use of a formatter, like `ruff format` or
+By default, Ruff enables rules from the `F`, `E`, `B`, `UP`, and `RUF` categories, as well as many
+more, omitting any stylistic rules that overlap with the use of a formatter, like `ruff format` or
 [Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
-start**: it's narrow and focused while catching a wide variety of common errors (like unused
-imports) with zero configuration.
+start**: it catches a wide variety of common errors (like unused imports) with zero configuration.
+See [_Default Rules_](default-rules.md) for the complete list.
 
 If you're migrating to Ruff from another linter, you can enable rules that are equivalent to
 those enforced in your previous configuration. For example, if we want to enforce the pyupgrade

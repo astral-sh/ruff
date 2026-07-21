@@ -9,12 +9,11 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use types::CompiledPerFileTargetVersionList;
 
-use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
 
 use crate::line_width::LineLength;
-use crate::registry::{Linter, Rule};
+use crate::registry::Rule;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
@@ -23,7 +22,7 @@ use crate::rules::{
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
-use crate::{RuleSelector, codes, fs};
+use crate::{RuleSelector, fs};
 
 use super::line_width::IndentWidth;
 
@@ -354,25 +353,8 @@ impl Display for LinterSettings {
     }
 }
 
-pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
-    RuleSelector::Linter(Linter::Pyflakes),
-    // Only include pycodestyle rules that do not overlap with the formatter
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E4),
-        redirected_from: None,
-    },
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E7),
-        redirected_from: None,
-    },
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
-        redirected_from: None,
-    },
-];
-
 #[rustfmt::skip]
-pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
+pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CancelScopeNoCheckpoint), // ASYNC100
     RuleSelector::rule(Rule::TrioSyncCall), // ASYNC105
     RuleSelector::rule(Rule::AsyncZeroSleep), // ASYNC115
