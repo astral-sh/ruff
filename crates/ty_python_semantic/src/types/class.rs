@@ -26,7 +26,7 @@ use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintSetBuilder, IteratorRelationConstraintsExtension, RelationConstraintSet,
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
@@ -1649,6 +1649,7 @@ impl<'db> ClassType<'db> {
                     .check_type_pair(db, this, other)
                     .is_always_satisfied(db, env)
             },
+            |this, other| checker.check_type_pair(db, this, other).is_always_true(db),
         )
     }
 
@@ -2493,7 +2494,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: ClassType<'db>,
         target: ClassType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
         match (source, target) {
@@ -2512,56 +2513,61 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             _ => {}
         }
 
-        source.iter_mro(db).when_any(db, self.constraints, |base| {
-            match base {
-                ClassBase::Any => ConstraintSet::from_bool(
-                    self.constraints,
-                    self.relation.is_assignability() || target.is_object(db),
-                ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => {
-                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
-                    }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                },
+        source
+            .iter_mro(db)
+            .when_any_relation(db, self.constraints, |base| {
+                match base {
+                    ClassBase::Any => RelationConstraintSet::from_bool(
+                        self.constraints,
+                        self.relation.is_assignability() || target.is_object(db),
+                    ),
+                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                        TypeRelation::Subtyping
+                        | TypeRelation::Redundancy { .. }
+                        | TypeRelation::SubtypingAssuming => {
+                            RelationConstraintSet::from_bool(self.constraints, target.is_object(db))
+                        }
+                        TypeRelation::Assignability => {
+                            RelationConstraintSet::from_bool(self.constraints, !target.is_final(db))
+                        }
+                    },
 
-                // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
-
-                ClassBase::Class(source) => match (source, target) {
-                    // Two non-generic classes match if they have the same class literal.
-                    (
-                        ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
-                    ) => {
-                        ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
+                    // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
+                    ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => {
+                        self.never()
                     }
 
-                    // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target)) => {
-                        ConstraintSet::from_bool(
+                    ClassBase::Class(source) => match (source, target) {
+                        // Two non-generic classes match if they have the same class literal.
+                        (
+                            ClassType::NonGeneric(source_literal),
+                            ClassType::NonGeneric(target_literal),
+                        ) => RelationConstraintSet::from_bool(
                             self.constraints,
-                            source.origin(db) == target.origin(db),
-                        )
-                        .and(db, self.constraints, || {
-                            self.check_specialization_pair(
-                                db,
-                                source.specialization(db),
-                                target.specialization(db),
-                            )
-                        })
-                    }
+                            source_literal == target_literal,
+                        ),
 
-                    // Generic and non-generic classes don't match.
-                    (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
-                },
-            }
-        })
+                        // Two generic classes match if they have the same origin and compatible specializations.
+                        (ClassType::Generic(source), ClassType::Generic(target)) => {
+                            RelationConstraintSet::from_bool(
+                                self.constraints,
+                                source.origin(db) == target.origin(db),
+                            )
+                            .and(db, self.constraints, || {
+                                self.check_specialization_pair(
+                                    db,
+                                    source.specialization(db),
+                                    target.specialization(db),
+                                )
+                            })
+                        }
+
+                        // Generic and non-generic classes don't match.
+                        (ClassType::Generic(_), ClassType::NonGeneric(_))
+                        | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
+                    },
+                }
+            })
     }
 }
 

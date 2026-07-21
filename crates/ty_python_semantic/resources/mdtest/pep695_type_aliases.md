@@ -930,6 +930,51 @@ type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
+### A recursive alias does not lose alternatives after repeated unfolding
+
+Every type argument eventually becomes the first element of this rotating recursive alias. The `str`
+alternative must therefore remain part of the alias even though it only appears after many unfolding
+steps. Giving up on the relation also cannot prove its negation: both TypedDicts below can contain
+`{"item": 1}`, so they are not disjoint.
+
+```py
+from typing import TypedDict
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+type Delayed13[
+    T1,
+    T2,
+    T3,
+    T4,
+    T5,
+    T6,
+    T7,
+    T8,
+    T9,
+    T10,
+    T11,
+    T12,
+    T13,
+] = T1 | Delayed13[T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T1]
+
+def cannot_discard_delayed_str(
+    value: Delayed13[int, int, int, int, int, int, int, int, int, int, int, int, str],
+) -> int:
+    return value  # error: [invalid-return-type]
+
+type DelayedIntOrStr = Delayed13[int, int, int, int, int, int, int, int, int, int, int, int, str]
+
+class DelayedField(TypedDict):
+    item: DelayedIntOrStr
+
+class IntField(TypedDict):
+    item: int
+
+static_assert(not is_disjoint_from(DelayedField, IntField))
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.

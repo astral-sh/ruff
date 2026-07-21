@@ -10,7 +10,7 @@ use crate::{
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{IteratorRelationConstraintsExtension, RelationConstraintSet},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -803,7 +803,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: CallableType<'db>,
         target: CallableType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
@@ -815,9 +815,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &CallableTypes<'db>,
         target: CallableType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        source.iter().when_all(db, self.constraints, |element| {
-            self.check_callable_pair(db, *element, target)
-        })
+    ) -> RelationConstraintSet<'db, 'c> {
+        source
+            .iter()
+            .when_all_relation(db, self.constraints, |element| {
+                self.check_callable_pair(db, *element, target)
+            })
     }
 }

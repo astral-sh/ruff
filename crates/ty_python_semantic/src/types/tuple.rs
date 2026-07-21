@@ -28,7 +28,7 @@ use crate::subscript::{
     Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError, py_slice_with_step,
 };
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{IteratorRelationConstraintsExtension, RelationConstraintSet};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
@@ -340,7 +340,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: TupleType<'db>,
         target: TupleType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
     }
 
@@ -349,7 +349,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &TupleSpec<'db>,
         target: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match source {
             Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
             Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
@@ -361,7 +361,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_tuple: &FixedLengthTuple<Type<'db>>,
         target_tuple: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match target_tuple {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
@@ -377,11 +377,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let mut n = 1;
-                ConstraintSet::from_bool(self.constraints, equal_length).and(
+                RelationConstraintSet::from_bool(self.constraints, equal_length).and(
                     db,
                     self.constraints,
                     || {
-                        (source_tuple.0.iter().zip(&target.0)).when_all(
+                        (source_tuple.0.iter().zip(&target.0)).when_all_relation(
                             db,
                             self.constraints,
                             |(&source, &target)| {
@@ -447,7 +447,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // In addition, any remaining elements in this tuple must satisfy the
                         // variable-length portion of the other tuple.
                         result.and(db, self.constraints, || {
-                            source_iter.when_all(db, self.constraints, |&source_ty| {
+                            source_iter.when_all_relation(db, self.constraints, |&source_ty| {
                                 self.check_type_pair(db, source_ty, target_ty)
                             })
                         })
@@ -462,7 +462,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
         target: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match target {
             Tuple::Fixed(target) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -545,7 +545,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .zip(target.suffix_elements()),
                         )
-                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
+                        .when_all_relation(db, self.constraints, |(&source_ty, &target_ty)| {
                             self.check_type_pair(db, source_ty, target_ty)
                         });
                 }
@@ -574,7 +574,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .zip(target_suffix),
                         )
-                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
+                        .when_all_relation(db, self.constraints, |(&source_ty, &target_ty)| {
                             self.check_type_pair(db, source_ty, target_ty)
                         });
 
@@ -699,7 +699,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: TupleType<'db>,
         right: TupleType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
     }
 
@@ -708,7 +708,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: &TupleSpec<'db>,
         right: &TupleSpec<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = left.len().size_hint();
         let (other_min, other_max) = right.len().size_hint();
@@ -722,15 +722,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
             if rev {
-                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
+                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any_relation(
                     db,
                     self.constraints,
                     |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
                 )
             } else {
-                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
-                    self.check_type_pair(db, left_elem, right_elem)
-                })
+                std::iter::zip(a, b).when_any_relation(
+                    db,
+                    self.constraints,
+                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
+                )
             }
         };
 

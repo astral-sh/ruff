@@ -3,7 +3,7 @@ use crate::FxOrderSet;
 use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::RelationConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
@@ -389,7 +389,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: SubclassOfType<'db>,
         target: SubclassOfType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if let SubclassOfInner::Protocol(target_protocol) = target.subclass_of {
             return self.check_meta_type_satisfies_protocol(
                 db,
@@ -407,10 +407,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         match (source.subclass_of, target.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
+                RelationConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
-                ConstraintSet::from_bool(
+                RelationConstraintSet::from_bool(
                     self.constraints,
                     target_class.is_object(db) || self.relation.is_assignability(),
                 )
@@ -445,21 +445,21 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: SubclassOfType<'db>,
         right: SubclassOfType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if matches!(left.subclass_of, SubclassOfInner::Protocol(_))
             || matches!(right.subclass_of, SubclassOfInner::Protocol(_))
         {
             // Protocols are open structural types, so their meta-types can generally overlap with
             // concrete class-object types and with other protocol meta-types.
-            return ConstraintSet::from_bool(self.constraints, false);
+            return RelationConstraintSet::never(self.constraints);
         }
 
         match (left.subclass_of, right.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, false)
+                RelationConstraintSet::never(self.constraints)
             }
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
-                ConstraintSet::from_bool(
+                RelationConstraintSet::from_bool(
                     self.constraints,
                     !left.could_coexist_in_mro_with_disjointness_checker(db, self.env, right, self),
                 )

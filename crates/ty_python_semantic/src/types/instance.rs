@@ -683,7 +683,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
         nominal_instance: NominalInstanceType<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
+    ) -> Option<RelationConstraintSet<'db, 'c>> {
         if self.typevar_evaluation != TypeVarEvaluation::Lazy
             || self.is_context_collection_enabled()
         {
@@ -773,7 +773,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: NominalInstanceType<'db>,
         target: NominalInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match (source.0, target.0) {
             (_, NominalInstanceInner::Object) => self.always(),
             (
@@ -907,7 +907,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         _db: &'db dyn Db,
         _left: ProtocolInstanceType<'db>,
         _right: ProtocolInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.never()
     }
 
@@ -916,7 +916,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: NominalInstanceType<'db>,
         right: NominalInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let mut result = self.never();
         if left.is_object() || right.is_object() {
             return result;
@@ -935,7 +935,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         }
 
         result.or(db, self.constraints, || {
-            ConstraintSet::from_bool(
+            RelationConstraintSet::from_bool(
                 self.constraints,
                 !left
                     .class(db, env)

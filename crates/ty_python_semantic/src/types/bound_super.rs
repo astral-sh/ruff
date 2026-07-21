@@ -12,7 +12,7 @@ use crate::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
         SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
-        constraints::ConstraintSet,
+        constraints::RelationConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::EquivalenceChecker,
@@ -1027,7 +1027,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: BoundSuperType<'db>,
         right: BoundSuperType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let mut class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
             (ClassBase::Class(left), ClassBase::Class(right)) => {
                 self.check_type_pair(db, Type::from(left), Type::from(right))
@@ -1037,7 +1037,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 
             // A `Divergent` type is only equivalent to itself
             (ClassBase::Divergent(l), ClassBase::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
+                RelationConstraintSet::from_bool(self.constraints, l == r)
             }
             (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
             (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
@@ -1052,7 +1052,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Protocol, _) => self.never(),
 
             (ClassBase::TypedDict(left), ClassBase::TypedDict(right)) => {
-                ConstraintSet::from_bool(self.constraints, left == right)
+                RelationConstraintSet::from_bool(self.constraints, left == right)
             }
             (ClassBase::TypedDict(_), _) => self.never(),
         };
@@ -1070,13 +1070,16 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                     )
                 })
                 .and(db, self.constraints, || {
-                    ConstraintSet::from_bool(self.constraints, left.receiver == right.receiver)
+                    RelationConstraintSet::from_bool(
+                        self.constraints,
+                        left.receiver == right.receiver,
+                    )
                 }),
             (SuperOwnerKind::Resolved(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
             (SuperOwnerKind::Divergent(l), SuperOwnerKind::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
+                RelationConstraintSet::from_bool(self.constraints, l == r)
             }
             (SuperOwnerKind::Divergent(_), _) | (_, SuperOwnerKind::Divergent(_)) => self.never(),
             (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),

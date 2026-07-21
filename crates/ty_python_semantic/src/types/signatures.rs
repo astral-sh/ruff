@@ -559,7 +559,9 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker
+            .check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+            .positive_evidence()
     }
 }
 
@@ -1873,7 +1875,9 @@ impl<'db> Signature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_signature_pair(db, self, other)
+        checker
+            .check_signature_pair(db, self, other)
+            .positive_evidence()
     }
 
     /// Create a new signature with the given definition.
@@ -1962,7 +1966,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
+    ) -> Option<RelationConstraintSet<'db, 'c>> {
         // Aggregation summarizes visible parameters and return types, but receiver bindings are
         // additional per-signature obligations. Leave those signatures to the ordinary relation,
         // which checks each receiver binding before comparing the visible signature.
@@ -2060,7 +2064,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
     }
 
@@ -2071,7 +2075,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
@@ -2118,12 +2122,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |target_return| {
+                                .when_any_relation(db, self.constraints, |target_return| {
                                     self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
-                    return param_spec_matches.and(db, self.constraints, return_types_match);
+                    return RelationConstraintSet::from_constraint_set(
+                        db,
+                        self.constraints,
+                        param_spec_matches,
+                    )
+                    .and(db, self.constraints, return_types_match);
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
@@ -2173,12 +2182,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             source_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |source_return| {
+                                .when_any_relation(db, self.constraints, |source_return| {
                                     self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
-                    return param_spec_matches.and(db, self.constraints, return_types_match);
+                    return RelationConstraintSet::from_constraint_set(
+                        db,
+                        self.constraints,
+                        param_spec_matches,
+                    )
+                    .and(db, self.constraints, return_types_match);
                 }
 
                 _ => {}
@@ -2217,41 +2231,45 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
                 self.without_context_collection(|| {
-                    source_overloads
-                        .iter()
-                        .when_any(db, self.constraints, |self_signature| {
+                    source_overloads.iter().when_any_relation(
+                        db,
+                        self.constraints,
+                        |self_signature| {
                             self.check_callable_signature_pair_inner(
                                 db,
                                 std::slice::from_ref(self_signature),
                                 target_overloads,
                             )
-                        })
+                        },
+                    )
                 })
             }
 
             // source is definitely not overloaded while target is possibly overloaded.
-            ([_], _) => {
-                target_overloads
-                    .iter()
-                    .when_all(db, self.constraints, |target_signature| {
-                        self.check_callable_signature_pair_inner(
-                            db,
-                            source_overloads,
-                            std::slice::from_ref(target_signature),
-                        )
-                    })
-            }
-
-            // source is definitely overloaded while target is possibly overloaded.
-            (_, _) => target_overloads
-                .iter()
-                .when_all(db, self.constraints, |target_signature| {
+            ([_], _) => target_overloads.iter().when_all_relation(
+                db,
+                self.constraints,
+                |target_signature| {
                     self.check_callable_signature_pair_inner(
                         db,
                         source_overloads,
                         std::slice::from_ref(target_signature),
                     )
-                }),
+                },
+            ),
+
+            // source is definitely overloaded while target is possibly overloaded.
+            (_, _) => target_overloads.iter().when_all_relation(
+                db,
+                self.constraints,
+                |target_signature| {
+                    self.check_callable_signature_pair_inner(
+                        db,
+                        source_overloads,
+                        std::slice::from_ref(target_signature),
+                    )
+                },
+            ),
         }
     }
 
@@ -2352,8 +2370,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         source: &Signature<'db>,
         target: &Signature<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        work: impl FnOnce() -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         let Some(key) = SignatureRelationKey::from_signatures(
             source,
             target,
@@ -2378,7 +2396,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -2571,7 +2589,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
 
-        let check_types = |result: &mut ConstraintSet<'db, 'c>,
+        let check_types = |result: &mut RelationConstraintSet<'db, 'c>,
                            target_ty: Type<'db>,
                            source_ty: Type<'db>,
                            target_name: Option<&Name>,

@@ -11,8 +11,8 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solutions,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorRelationConstraintsExtension,
+    PathBound, PathBounds, RelationConstraintSet, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1729,7 +1729,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: Specialization<'db>,
         target: Specialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1808,7 +1808,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target.types(db)
         );
 
-        types.when_all(
+        types.when_all_relation(
             db,
             self.constraints,
             |(bound_typevar, source_type, target_type)| {
@@ -1965,7 +1965,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_materialization: Option<MaterializationKind>,
         target_type: Type<'db>,
         target_materialization: Option<MaterializationKind>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match (
             source_materialization,
             target_materialization,
@@ -2088,7 +2088,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_materialization: MaterializationKind,
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let source_top =
             source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
         let source_bottom = source_type.materialize(
@@ -2184,7 +2184,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: Specialization<'db>,
         right: Specialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();
@@ -2201,7 +2201,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        types.when_any(
+        types.when_any_relation(
             db,
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {

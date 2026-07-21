@@ -8,7 +8,7 @@ use crate::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, TypeFormType, UnionType,
         callable::{CallableFunctionProvenance, CallableTypeKind},
-        constraints::ConstraintSet,
+        constraints::RelationConstraintSet,
         function::FunctionType,
         known_instance::InternedConstraintSet,
         relation::TypeRelationChecker,
@@ -184,7 +184,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: BoundMethodType<'db>,
         target: BoundMethodType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
@@ -602,7 +602,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: KnownBoundMethodType<'db>,
         target: KnownBoundMethodType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match (source, target) {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(source_function),
@@ -628,7 +628,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ) => self.check_property_instance_pair(db, source_property, target_property),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(self.constraints, source == target)
+                RelationConstraintSet::from_bool(self.constraints, source == target)
             }
 
             (

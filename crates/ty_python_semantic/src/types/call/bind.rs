@@ -2158,6 +2158,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2179,6 +2180,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2220,6 +2222,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2899,6 +2902,7 @@ impl<'db> Bindings<'db> {
                                 constraints,
                                 TypeVarSet::None,
                             )
+                            .positive_evidence()
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(

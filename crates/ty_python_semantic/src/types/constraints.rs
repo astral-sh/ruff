@@ -121,49 +121,41 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 mod support;
 
-/// An extension trait for building constraint sets from [`Option`] values.
-pub(crate) trait OptionConstraintsExtension<T> {
-    /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
-    /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db, 'c>(
+/// An extension trait for building relation results from [`Option`] values.
+pub(crate) trait OptionRelationConstraintsExtension<T> {
+    fn when_none_or_relation<'db, 'c>(
         self,
-        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c>;
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
 
-    /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
-    /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db, 'c>(
+    fn when_some_and_relation<'db, 'c>(
         self,
-        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c>;
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
 }
 
-impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db, 'c>(
+impl<T> OptionRelationConstraintsExtension<T> for Option<T> {
+    fn when_none_or_relation<'db, 'c>(
         self,
-        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(builder),
+            None => RelationConstraintSet::always(builder),
         }
     }
 
-    fn when_some_and<'db, 'c>(
+    fn when_some_and_relation<'db, 'c>(
         self,
-        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(builder),
+            None => RelationConstraintSet::never(builder),
         }
     }
 }
@@ -234,6 +226,52 @@ where
     }
 }
 
+/// An extension trait for combining relation results from an [`Iterator`].
+pub(crate) trait IteratorRelationConstraintsExtension<T> {
+    /// Returns the relation result obtained by disjoining every element.
+    fn when_any_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
+
+    /// Returns the relation result obtained by conjoining every element.
+    fn when_all_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
+}
+
+impl<I, T> IteratorRelationConstraintsExtension<T> for I
+where
+    I: Iterator<Item = T>,
+{
+    fn when_any_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        self.fold(RelationConstraintSet::never(builder), |result, element| {
+            result.or(db, builder, || f(element))
+        })
+    }
+
+    fn when_all_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        self.fold(RelationConstraintSet::always(builder), |result, element| {
+            result.and(db, builder, || f(element))
+        })
+    }
+}
+
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
 /// arenas that hold its BDD.
 ///
@@ -250,6 +288,13 @@ pub struct OwnedConstraintSet<'db> {
     node: NodeId,
     source_order: Option<SourceOrderId>,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
+}
+
+/// An owned copy of a [`RelationConstraintSet`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct OwnedRelationConstraintSet<'db> {
+    positive_evidence: OwnedConstraintSet<'db>,
+    negative_evidence: OwnedConstraintSet<'db>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -328,6 +373,47 @@ impl<'db> OwnedConstraintSet<'db> {
     }
 }
 
+impl Default for OwnedRelationConstraintSet<'_> {
+    /// Returns an indeterminate relation result.
+    fn default() -> Self {
+        Self {
+            positive_evidence: OwnedConstraintSet::default(),
+            negative_evidence: OwnedConstraintSet::default(),
+        }
+    }
+}
+
+impl<'db> OwnedRelationConstraintSet<'db> {
+    pub(crate) fn always() -> Self {
+        Self {
+            positive_evidence: OwnedConstraintSet::always(),
+            negative_evidence: OwnedConstraintSet::default(),
+        }
+    }
+
+    pub(crate) fn positive_evidence(&self) -> &OwnedConstraintSet<'db> {
+        &self.positive_evidence
+    }
+
+    pub(crate) fn query<F, R>(&self, f: F) -> R
+    where
+        F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, RelationConstraintSet<'db, 'c>) -> R,
+    {
+        let storage = ConstraintSetStorage {
+            compacted: self.positive_evidence.inner.clone(),
+            ..ConstraintSetStorage::default()
+        };
+        let builder = ConstraintSetBuilder {
+            storage: RefCell::new(storage),
+        };
+        let relation = RelationConstraintSet {
+            positive_evidence: ConstraintSet::from_node(&builder, self.positive_evidence.node),
+            negative_evidence: ConstraintSet::from_node(&builder, self.negative_evidence.node),
+        };
+        f(&builder, relation)
+    }
+}
+
 impl OwnedConstraintSetInner<'_> {
     fn retained_node_index(&self, id: NodeId) -> usize {
         let index = id.index();
@@ -371,7 +457,7 @@ impl OwnedConstraintSetInner<'_> {
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Copy)]
-pub struct ConstraintSet<'db, 'c> {
+pub(crate) struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
@@ -384,6 +470,194 @@ pub struct ConstraintSet<'db, 'c> {
 
     /// Ensures that the `'c` lifetime is invariant
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
+}
+
+/// Positive and negative evidence for a type relation.
+///
+/// The two constraint sets are independent. `(always, never)` is true, `(never, always)` is
+/// false, `(never, never)` is indeterminate, and `(always, always)` is inconsistent.
+#[derive(Clone, Copy)]
+pub(crate) struct RelationConstraintSet<'db, 'c> {
+    positive_evidence: ConstraintSet<'db, 'c>,
+    negative_evidence: ConstraintSet<'db, 'c>,
+}
+
+pub(crate) trait IntoRelationConstraintSet<'db, 'c> {
+    fn into_relation_constraint_set(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> RelationConstraintSet<'db, 'c>;
+}
+
+impl<'db, 'c> IntoRelationConstraintSet<'db, 'c> for RelationConstraintSet<'db, 'c> {
+    fn into_relation_constraint_set(
+        self,
+        _db: &'db dyn Db,
+        _builder: &'c ConstraintSetBuilder<'db>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        self
+    }
+}
+
+impl<'db, 'c> IntoRelationConstraintSet<'db, 'c> for ConstraintSet<'db, 'c> {
+    fn into_relation_constraint_set(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        RelationConstraintSet::from_constraint_set(db, builder, self)
+    }
+}
+
+impl<'db, 'c> RelationConstraintSet<'db, 'c> {
+    pub(crate) fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            positive_evidence: ConstraintSet::always(builder),
+            negative_evidence: ConstraintSet::never(builder),
+        }
+    }
+
+    pub(crate) fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            positive_evidence: ConstraintSet::never(builder),
+            negative_evidence: ConstraintSet::always(builder),
+        }
+    }
+
+    pub(crate) fn indeterminate(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            positive_evidence: ConstraintSet::never(builder),
+            negative_evidence: ConstraintSet::never(builder),
+        }
+    }
+
+    pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, value: bool) -> Self {
+        if value {
+            Self::always(builder)
+        } else {
+            Self::never(builder)
+        }
+    }
+
+    /// Lifts a fully decided Boolean constraint set into a relation result.
+    pub(crate) fn from_constraint_set(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        positive_evidence: ConstraintSet<'db, 'c>,
+    ) -> Self {
+        Self {
+            positive_evidence,
+            negative_evidence: positive_evidence.negate(db, builder),
+        }
+    }
+
+    /// Returns the valuations for which the relation is proven true.
+    ///
+    /// This deliberately discards negative evidence for compatibility with constraint-solving
+    /// APIs whose output is a set of successful valuations rather than a relation result.
+    pub(crate) fn positive_evidence(self) -> ConstraintSet<'db, 'c> {
+        self.positive_evidence
+    }
+
+    pub(crate) fn is_always_true(self, db: &'db dyn Db) -> bool {
+        self.positive_evidence.is_always_satisfied(db)
+            && self.negative_evidence.is_never_satisfied(db)
+    }
+
+    pub(crate) fn is_always_false(self, db: &'db dyn Db) -> bool {
+        self.positive_evidence.is_never_satisfied(db)
+            && self.negative_evidence.is_always_satisfied(db)
+    }
+
+    pub(crate) fn union<T>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: T,
+    ) -> Self
+    where
+        T: IntoRelationConstraintSet<'db, 'c>,
+    {
+        let other = other.into_relation_constraint_set(db, builder);
+        self.positive_evidence
+            .union(db, builder, other.positive_evidence);
+        self.negative_evidence
+            .intersect(db, builder, other.negative_evidence);
+        *self
+    }
+
+    pub(crate) fn intersect<T>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: T,
+    ) -> Self
+    where
+        T: IntoRelationConstraintSet<'db, 'c>,
+    {
+        let other = other.into_relation_constraint_set(db, builder);
+        self.positive_evidence
+            .intersect(db, builder, other.positive_evidence);
+        self.negative_evidence
+            .union(db, builder, other.negative_evidence);
+        *self
+    }
+
+    pub(crate) fn negate(self, _db: &'db dyn Db, _builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            positive_evidence: self.negative_evidence,
+            negative_evidence: self.positive_evidence,
+        }
+    }
+
+    pub(crate) fn and<T>(
+        mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> T,
+    ) -> Self
+    where
+        T: IntoRelationConstraintSet<'db, 'c>,
+    {
+        if !self.is_always_false(db) {
+            self.intersect(db, builder, other());
+        }
+        self
+    }
+
+    pub(crate) fn or<T>(
+        mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> T,
+    ) -> Self
+    where
+        T: IntoRelationConstraintSet<'db, 'c>,
+    {
+        if !self.is_always_true(db) {
+            self.union(db, builder, other());
+        }
+        self
+    }
+
+    /// Removes inferable type variables from an existential relation.
+    ///
+    /// A specialization proves the relation if any valuation has positive evidence. It disproves
+    /// the relation only if every valuation has negative evidence.
+    pub(crate) fn reduce_inferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: InferableTypeVars<'db>,
+    ) -> Self {
+        Self {
+            positive_evidence: self
+                .positive_evidence
+                .reduce_inferable(db, builder, to_remove),
+            negative_evidence: self.negative_evidence.for_all(db, builder, to_remove),
+        }
+    }
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
