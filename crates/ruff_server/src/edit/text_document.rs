@@ -86,7 +86,7 @@ impl TextDocument {
         changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
-    ) {
+    ) -> crate::Result<()> {
         if let [
             TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
                 TextDocumentContentChangeWholeDocument { text },
@@ -98,7 +98,7 @@ impl TextDocument {
                 contents.clone_from(text);
                 *version = new_version;
             });
-            return;
+            return Ok(());
         }
 
         let mut new_contents = self.contents().to_string();
@@ -109,7 +109,7 @@ impl TextDocument {
                 TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
                     TextDocumentContentChangePartial { range, text, .. },
                 ) => {
-                    let range = range.to_text_range(&new_contents, &active_index, encoding);
+                    let range = range.to_text_range(&new_contents, &active_index, encoding)?;
 
                     new_contents
                         .replace_range(usize::from(range.start())..usize::from(range.end()), &text);
@@ -129,6 +129,8 @@ impl TextDocument {
             *contents = new_contents;
             *version = new_version;
         });
+
+        Ok(())
     }
 
     pub fn update_version(&mut self, new_version: DocumentVersion) {
@@ -180,33 +182,35 @@ def interface():
         );
 
         // Add an `s`, remove it again (back to the original code), and then re-add the `s`
-        document.apply_changes(
-            vec![
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
-                        text: "s".to_string(),
-                        ..Default::default()
-                    },
-                ),
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
-                        text: String::new(),
-                        ..Default::default()
-                    },
-                ),
-                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
-                    TextDocumentContentChangePartial {
-                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
-                        text: "s".to_string(),
-                        ..Default::default()
-                    },
-                ),
-            ],
-            1,
-            PositionEncoding::UTF16,
-        );
+        document
+            .apply_changes(
+                vec![
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                            text: "s".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
+                            text: String::new(),
+                            ..Default::default()
+                        },
+                    ),
+                    TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                        TextDocumentContentChangePartial {
+                            range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                            text: "s".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                ],
+                1,
+                PositionEncoding::UTF16,
+            )
+            .unwrap();
 
         assert_eq!(
             &document.contents,

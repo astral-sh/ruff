@@ -119,7 +119,7 @@ impl Index {
             return Ok(());
         }
 
-        document.apply_changes(content_changes, new_version, encoding);
+        document.apply_changes(content_changes, new_version, encoding)?;
 
         Ok(())
     }

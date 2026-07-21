@@ -62,6 +62,9 @@ pub(crate) fn hover(
         .line
         .try_into()
         .expect("line number should fit within a usize");
+    if line_number >= document.index().line_count() {
+        return None;
+    }
     let line_range = document.index().line_range(
         OneIndexed::from_zero_indexed(line_number),
         document.contents(),
@@ -74,6 +77,7 @@ pub(crate) fn hover(
 
     let cursor = types::Range::new(position.position, position.position)
         .to_text_range(document.contents(), document.index(), snapshot.encoding())
+        .ok()?
         .start();
     let parsed = parse_unchecked_source(document.contents(), source_type);
     let comment = parsed
