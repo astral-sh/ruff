@@ -67,6 +67,25 @@ impl ResolvedPythonType {
     }
 }
 
+/// Return `true` if the expression is a negated numeric expression, accounting for
+/// nested `+`/`-` unary operators (e.g. `-(-1)` is not negative).
+/// Doesn't account for constant arithmetic, like `2 - 3`, which is assumed to be positive.
+fn is_negative(expr: &Expr) -> bool {
+    match expr {
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: UnaryOp::USub,
+            operand,
+            ..
+        }) => !is_negative(operand),
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: UnaryOp::UAdd,
+            operand,
+            ..
+        }) => is_negative(operand),
+        _ => false,
+    }
+}
+
 impl From<&Expr> for ResolvedPythonType {
     fn from(expr: &Expr) -> Self {
         match expr {
@@ -269,13 +288,23 @@ impl From<&Expr> for ResolvedPythonType {
                         ResolvedPythonType::from(left.as_ref()),
                         ResolvedPythonType::from(right.as_ref()),
                     ) {
-                        // Ex) `2 ** 4`
+                        // Ex) `2 // 4` or `2 ** 4`
                         (
-                            ResolvedPythonType::Atom(PythonType::Number(left)),
-                            ResolvedPythonType::Atom(PythonType::Number(right)),
+                            ResolvedPythonType::Atom(PythonType::Number(left_type)),
+                            ResolvedPythonType::Atom(PythonType::Number(right_type)),
                         ) => {
+                            // Ex) `2 ** -1` is a `float`, unlike `2 ** 1`.
+                            if matches!(op, Operator::Pow)
+                                && left_type == NumberLike::Integer
+                                && right_type == NumberLike::Integer
+                                && is_negative(right.as_ref())
+                            {
+                                return ResolvedPythonType::Atom(PythonType::Number(
+                                    NumberLike::Float,
+                                ));
+                            }
                             return ResolvedPythonType::Atom(PythonType::Number(
-                                left.coerce(right),
+                                left_type.coerce(right_type),
                             ));
                         }
                         (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
