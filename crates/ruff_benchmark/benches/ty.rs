@@ -1415,25 +1415,47 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3986>.
 ///
-/// Each statement-level call creates a reachability predicate. Repeatedly scanning every preceding
-/// predicate while checking later expressions makes this pattern quadratic.
+/// Non-terminal-call predicates must gate later narrowing. Keeping these scope-wide constraints in
+/// an append-only tree avoids eagerly rewriting every live place state after each call. Exercise
+/// unnarrowed, already-narrowed, and fixed-reachability bindings because each takes a different
+/// path through reachability and narrowing evaluation.
 fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     setup_rayon();
 
-    let mut code = String::from("def f() -> None:\n    value = 'abc'\n");
-    code.push_str(&"    value.upper()\n".repeat(1_500));
+    let cases = [
+        (
+            "ty_micro[repeated_statement_calls]",
+            String::from("def f() -> None:\n    value = 'abc'\n"),
+            "    value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_pre_narrowed]",
+            String::from(
+                "def f(value: str | None) -> None:\n    if value is None:\n        return\n",
+            ),
+            "    value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_fixed_reachability]",
+            String::from("def f(value: str, flag: bool) -> None:\n    if flag:\n"),
+            "        value.upper()\n",
+        ),
+    ];
 
-    criterion.bench_function("ty_micro[repeated_statement_calls]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    for (name, mut code, statement) in cases {
+        code.push_str(&statement.repeat(1_500));
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
