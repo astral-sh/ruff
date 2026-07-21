@@ -358,6 +358,68 @@ def union_receiver(reader: Reader[int | str]):
     reveal_type(reader.get)  # revealed: Overload[]
 ```
 
+## Constrained `TypeVar` receivers
+
+A `TypeVar` constrained to several types stands for exactly one of those constraints, but never for
+a single one on its own. Receiver-based overload pruning must not discard every overload just
+because the unresolved `TypeVar` matches no individual concrete receiver; each constraint here
+supports subscription, so `value["x"]` stays callable.
+
+```py
+from typing import TypedDict, TypeVar
+
+class A(TypedDict):
+    x: int
+
+class B(TypedDict):
+    x: str
+
+T = TypeVar("T", A, B)
+
+def get_x(value: T) -> int | str:
+    return value["x"]
+```
+
+## Aliased overloads through a union receiver
+
+Accessing an overloaded method through a class-level alias (promoted to a `Callable`) prunes
+overloads by receiver just like direct access. When the receiver is a union that still carries a
+type variable, no single overload's explicit `self` annotation accepts the whole union, but pruning
+must not collapse the overload set to an empty (non-callable) `Overload[]`. The overloads are
+retained and normal overload resolution runs, so the unsupported `_sync` keyword is reported as
+`no-matching-overload` rather than `call-non-callable`.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+T = TypeVar("T")
+
+class State(Generic[T]):
+    @overload
+    def _result(self: "State[T]", flag: Literal[True] = True) -> T: ...
+    @overload
+    def _result(self: "State[T]", flag: Literal[False]) -> T | Exception: ...
+    def _result(self, flag: bool = True) -> T | Exception:
+        raise NotImplementedError
+    result = _result
+
+class Future(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.state: State[T] | None = None
+        self.value = value
+
+    def get_result(self) -> T:
+        if not self.state:
+            value = self.value
+            if isinstance(value, State):
+                self.state = value
+            else:
+                return value
+        # error: [no-matching-overload]
+        # error: [no-matching-overload]
+        return self.state.result(_sync=True)
+```
+
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
