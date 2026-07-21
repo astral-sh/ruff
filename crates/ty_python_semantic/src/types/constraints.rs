@@ -100,6 +100,7 @@ use std::sync::{Arc, LazyLock};
 use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
+use ruff_python_ast::PythonVersion;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
@@ -3548,23 +3549,26 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> &'db PathBounds<'db> {
+        let db = ctx.db();
+        let python_version = ctx.python_version();
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _| PathBounds::Unsatisfiable,
+            cycle_initial=|_, _, _, _, _, _| PathBounds::Unsatisfiable,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn assignable_solutions_impl<'db>(
             db: &'db dyn Db,
+            python_version: PythonVersion,
             source: Type<'db>,
             target: Type<'db>,
             inferable: InferableTypeVars<'db>,
         ) -> PathBounds<'db> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             let when = source.when_constraint_set_assignable_to_owned(ctx, target);
             when.query(|builder, when| PathBounds::compute(ctx, builder, when.node, inferable))
         }
 
-        assignable_solutions_impl(ctx.db(), self, target, inferable)
+        assignable_solutions_impl(db, python_version, self, target, inferable)
     }
 }
 
@@ -3574,7 +3578,8 @@ impl<'db> Type<'db> {
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-    let ctx = &SemanticContext::from_primary(db);
+    let python_version = types.python_version(db);
+    let ctx = &SemanticContext::from_version(db, python_version);
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(ctx, types.second(db))
@@ -3880,7 +3885,7 @@ impl<'db> PathBounds<'db> {
 
                     if !is_possibly_constraint_set_assignable(
                         db,
-                        TypePair::new(db, lower, declared_upper),
+                        TypePair::new(db, ctx.python_version(), lower, declared_upper),
                     ) {
                         // This path does not satisfy the typevar's declared upper bound, and is
                         // therefore not a valid specialization.
@@ -7095,6 +7100,7 @@ impl PathAssignments {
         source_order: usize,
         fuel: AssignmentFuel,
     ) -> Result<(), PathAssignmentConflict> {
+        let db = ctx.db();
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
             // already any assignment for this constraint (positive, negative, or unconstrained),

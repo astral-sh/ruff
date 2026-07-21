@@ -12,6 +12,7 @@ use crate::types::{
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::KnownModule;
@@ -137,10 +138,11 @@ enum ParamKind {
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
+    python_version: PythonVersion,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let ctx = SemanticContext::from_primary(db);
+    let ctx = SemanticContext::from_version(db, python_version);
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
@@ -252,7 +254,7 @@ impl Ty {
                 let builtins_class = builtins_symbol(ctx, class).place.expect_type();
                 let function = builtins_class.member(ctx, method).place.expect_type();
 
-                create_bound_method(db, function, builtins_class)
+                create_bound_method(db, ctx.python_version(), function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,

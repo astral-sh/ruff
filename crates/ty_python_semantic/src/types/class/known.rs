@@ -1045,7 +1045,7 @@ impl KnownClass {
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
         ) -> Type<'db> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, argument.python_version(db));
             argument
                 .class(db)
                 .to_class_literal(ctx)
@@ -1055,7 +1055,7 @@ impl KnownClass {
         }
 
         let db = ctx.db();
-        known_class_to_instance(db, KnownClassArgument::new(db, self))
+        known_class_to_instance(db, KnownClassArgument::new(db, self, ctx.python_version()))
     }
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
@@ -1163,8 +1163,8 @@ impl KnownClass {
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
         ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-            let ctx = &SemanticContext::from_primary(db);
-            let python_version = ctx.python_version();
+            let python_version = argument.python_version(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             let class = argument.class(db);
             let module = class.canonical_module(python_version);
             let third_party = module.is_third_party();
@@ -1210,7 +1210,7 @@ impl KnownClass {
         }
 
         let db = ctx.db();
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self, ctx.python_version()))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -2031,6 +2031,9 @@ impl KnownClass {
 struct KnownClassArgument {
     #[returns(copy)]
     class: KnownClass,
+
+    #[returns(copy)]
+    python_version: PythonVersion,
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.

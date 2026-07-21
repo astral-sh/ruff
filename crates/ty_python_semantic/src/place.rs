@@ -2205,11 +2205,15 @@ pub(crate) mod implicit_globals {
     fn module_type_symbols<'db>(ctx: &SemanticContext<'db>) -> &'db [ast::name::Name] {
         #[salsa::tracked(
             returns(deref),
-            cycle_initial=|_, _| smallvec::SmallVec::default(),
+            cycle_initial=|_, _, _, ()| smallvec::SmallVec::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn module_type_symbols_inner(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-            let ctx = SemanticContext::from_primary(db);
+        fn module_type_symbols_inner(
+            db: &dyn Db,
+            python_version: PythonVersion,
+            _: (), // TODO: Remove once this is a query over `Program`.
+        ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+            let ctx = SemanticContext::from_version(db, python_version);
             let Some(module_type) = KnownClass::ModuleType
                 .to_class_literal(&ctx)
                 .as_class_literal()
@@ -2238,7 +2242,7 @@ pub(crate) mod implicit_globals {
                 .collect()
         }
 
-        module_type_symbols_inner(ctx.db())
+        module_type_symbols_inner(ctx.db(), ctx.python_version(), ())
     }
 
     /// Returns an iterator over all implicit module global symbols and their types.
