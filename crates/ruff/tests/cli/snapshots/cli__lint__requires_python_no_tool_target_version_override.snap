@@ -65,6 +65,7 @@ file_resolver.include = [
 	"**/pyproject.toml",
 	"**/ruff.toml",
 	"**/.ruff.toml",
+	"*.md",
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
