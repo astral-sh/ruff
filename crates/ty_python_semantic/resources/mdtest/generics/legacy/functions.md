@@ -379,7 +379,7 @@ A heterogeneous collection can infer a union of tuple types. If every member of 
 compatible with `tuple[Any, ...]`, a constrained type variable can use that constraint.
 
 ```py
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any, TypeVar
 
 Row = TypeVar("Row", list[Any], tuple[Any, ...])
@@ -387,9 +387,16 @@ Row = TypeVar("Row", list[Any], tuple[Any, ...])
 class Dense: ...
 class Sparse: ...
 
-def consume(rows: Iterable[Row]) -> None: ...
+def consume(rows: Iterable[Row]) -> Row:
+    raise NotImplementedError
 
-consume([(1.0, Dense()), (0.0, Sparse())])
+reveal_type(consume([(1.0, Dense()), (0.0, Sparse())]))  # revealed: tuple[Any, ...]
+
+def callback(row: tuple[int, ...]) -> None: ...
+def consume_callback(callback: Callable[[Row], None]) -> Row:
+    raise NotImplementedError
+
+reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
 ## Typevar inference is a unification problem
