@@ -80,7 +80,7 @@ fn split_truthiness_guarded_intersection<'db>(
 
     let mut core = IntersectionBuilder::new(ctx);
     for positive in intersection.positive(db) {
-        core = core.add_positive(*positive);
+        core.add_positive_in_place(*positive);
     }
     for negative in negative {
         if (guard == falsy && *negative == Type::AlwaysTruthy)
@@ -88,7 +88,7 @@ fn split_truthiness_guarded_intersection<'db>(
         {
             continue;
         }
-        core = core.add_negative(*negative);
+        core.add_negative_in_place(*negative);
     }
     Some((core.build(), guard))
 }
@@ -1291,7 +1291,8 @@ impl<'db> IntersectionBuilder<'db> {
                 }
             }
             Type::EnumComplement(complement) => {
-                self.add_positive_impl(complement.to_intersection(&self.ctx), seen_aliases);
+                let intersection = complement.to_intersection(&self.ctx);
+                self.add_positive_impl(intersection, seen_aliases);
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
@@ -1356,7 +1357,8 @@ impl<'db> IntersectionBuilder<'db> {
                 self.intersections = distributed.intersections;
             }
             Type::EnumComplement(complement) => {
-                self.add_negative_impl(complement.to_intersection(&self.ctx), seen_aliases);
+                let intersection = complement.to_intersection(&self.ctx);
+                self.add_negative_impl(intersection, seen_aliases);
             }
             _ => {
                 for inner in &mut self.intersections {
