@@ -35,7 +35,7 @@ pub fn prepare_type_hierarchy(
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
 
@@ -92,7 +92,7 @@ fn resolve_type_at<'db>(
     offset: TextSize,
 ) -> Option<Type<'db>> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
 
     let goto_target = find_goto_target(&model, &module, offset)?;
     goto_target.inferred_type(&model)

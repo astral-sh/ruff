@@ -2,7 +2,6 @@ use crate::Db;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
@@ -64,11 +63,7 @@ impl<'db> NewType<'db> {
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
         let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
         let definition = self.definition(db);
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return object_fallback;
         };

@@ -131,10 +131,6 @@ pub(crate) mod tests {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
@@ -183,6 +179,10 @@ pub(crate) mod tests {
     impl ModuleResolverDb for TestDb {
         fn search_paths(&self) -> &SearchPaths {
             Program::get(self).search_paths(self)
+        }
+
+        fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
         }
     }
 

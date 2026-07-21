@@ -1,5 +1,4 @@
 use compact_str::ToCompactString;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1171,7 +1170,7 @@ pub(crate) fn enum_metadata<'db>(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(assignment)
                                 if assignment
-                                    .value(&parsed_module(db, PythonFile::new(db, declaration.file(db), db.python_version())).load(db))
+                                    .value(&parsed_module(db, declaration.python_file(db)).load(db))
                                     .is_some()
                         )
                     })

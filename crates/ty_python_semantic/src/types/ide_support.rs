@@ -1969,9 +1969,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         let parameter_label_offset = param.definition().map(|definition| {
-            let param_file = definition.file(db);
-            let module =
-                parsed_module(db, PythonFile::new(db, param_file, db.python_version())).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             definition.focus_range(db, &module)
         });
 
@@ -2031,7 +2029,7 @@ mod resolve_definition {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
         /// The import resolved to an entire module
-        Module(File),
+        Module(PythonFile<'db>),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -2040,15 +2038,13 @@ mod resolve_definition {
         pub fn focus_range(&self, db: &dyn Db) -> FileRange {
             match self {
                 ResolvedDefinition::Definition(definition) => {
-                    let parsed = parsed_module(
-                        db,
-                        PythonFile::new(db, definition.file(db), db.python_version()),
-                    )
-                    .load(db);
+                    let parsed = parsed_module(db, definition.python_file(db)).load(db);
                     definition.focus_range(db, &parsed)
                 }
                 // For modules, navigate to the start of the file
-                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::Module(module) => {
+                    FileRange::new(module.file(db), TextRange::default())
+                }
                 ResolvedDefinition::FileWithRange(file_range) => *file_range,
             }
         }
@@ -2057,8 +2053,7 @@ mod resolve_definition {
             match self {
                 ResolvedDefinition::Definition(definition) => {
                     let file = definition.file(db);
-                    let parsed =
-                        parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                    let parsed = parsed_module(db, definition.python_file(db)).load(db);
                     definition.kind(db).category(file.is_stub(db), &parsed)
                 }
                 ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
@@ -2078,7 +2073,7 @@ mod resolve_definition {
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),
-                ResolvedDefinition::Module(file) => *file,
+                ResolvedDefinition::Module(file) => file.file(db),
                 ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
             }
         }
@@ -2187,8 +2182,7 @@ mod resolve_definition {
         match kind {
             DefinitionKind::Import(import_def) => {
                 let file = definition.file(db);
-                let module =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 let alias = import_def.alias(&module);
 
                 if alias.asname.is_some()
@@ -2207,7 +2201,7 @@ mod resolve_definition {
                     return Vec::new(); // Module not found, return empty list
                 };
 
-                let Some(module_file) = resolved_module.file(db) else {
+                let Some(module_file) = resolved_module.python_file(db) else {
                     return Vec::new(); // No file for module, return empty list
                 };
 
@@ -2218,8 +2212,7 @@ mod resolve_definition {
 
             DefinitionKind::ImportFrom(import_from_def) => {
                 let file = definition.file(db);
-                let module =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
 
@@ -2244,8 +2237,7 @@ mod resolve_definition {
             // For star imports, try to resolve to the specific symbol being accessed
             DefinitionKind::StarImport(star_import_def) => {
                 let file = definition.file(db);
-                let module =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 let import_node = star_import_def.import(&module);
 
                 // If we have a symbol name, use the helper to resolve it in the target module
@@ -2354,7 +2346,7 @@ mod resolve_definition {
         let mut full_submodule_name = module_name;
         full_submodule_name.extend(&submodule_name);
         let module = resolve_module(db, file, &full_submodule_name)?;
-        let file = module.file(db)?;
+        let file = module.python_file(db)?;
 
         Some(ResolvedDefinition::Module(file))
     }
@@ -2445,13 +2437,14 @@ mod resolve_definition {
         // into the interpreter. In which case, all we have are stubs.
         // `resolve_real_module` will always return `None` for this case, but
         // it will emit false positive logs. And this saves us some work.
-        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
+        if is_builtin_module(stub_module.python_version(db)?.minor, stub_module.name(db)) {
             return None;
         }
         let real_module =
             resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
-        let real_file = real_module.file(db)?;
+        let real_parse_file = real_module.python_file(db)?;
+        let real_file = real_parse_file.file(db);
         trace!("Found real file: {}", real_file.path(db));
 
         // A definition has a "Definition Path" in a file made of nested definitions (~scopes):
@@ -2472,8 +2465,7 @@ mod resolve_definition {
         let stub_ref;
         match *def {
             ResolvedDefinition::Definition(definition) => {
-                stub_parsed =
-                    parsed_module(db, PythonFile::new(db, stub_file, db.python_version()));
+                stub_parsed = parsed_module(db, definition.python_file(db));
                 stub_ref = stub_parsed.load(db);
 
                 // Get the leaf of the path (the definition itself)
@@ -2505,7 +2497,7 @@ mod resolve_definition {
                     stub_file.path(db),
                     real_file.path(db)
                 );
-                return Some(vec![ResolvedDefinition::Module(real_file)]);
+                return Some(vec![ResolvedDefinition::Module(real_parse_file)]);
             }
             ResolvedDefinition::FileWithRange(_) => {
                 // Not yet implemented -- in this case we want to recover something like a Definition
@@ -2518,10 +2510,11 @@ mod resolve_definition {
         // Walk down the Definition Path in the real file
         let mut definitions = Vec::new();
         let index = semantic_index(db, real_file);
-        let real_parsed = parsed_module(db, PythonFile::new(db, real_file, db.python_version()));
+        let global_scope = global_scope(db, real_file);
+        let real_parsed = parsed_module(db, global_scope.python_file(db));
         let real_ref = real_parsed.load(db);
         // Start our search in the module (global) scope
-        let mut scopes = vec![global_scope(db, real_file)];
+        let mut scopes = vec![global_scope];
         while let Some(component) = path.pop() {
             trace!("Traversing definition path component: {}", component);
             // We're doing essentially a breadth-first traversal of the definitions.
@@ -2875,7 +2868,7 @@ fn class_literal_to_hierarchy_info(
 
     let (full_range, selection_range) = match class_literal {
         ClassLiteral::Static(static_class) => {
-            let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+            let parsed = parsed_module(db, static_class.python_file(db)).load(db);
             let header_range = static_class.header_range(db);
             let body_scope = static_class.body_scope(db);
 
@@ -2903,8 +2896,7 @@ fn class_literal_to_hierarchy_info(
         // (likely incorrectly) return the type hierarchy for `type` itself.
         ClassLiteral::Dynamic(dynamic_class) => {
             if let DynamicClassAnchor::Definition(definition) = dynamic_class.anchor(db) {
-                let parsed =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2916,8 +2908,7 @@ fn class_literal_to_hierarchy_info(
             if let DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
             | DynamicNamedTupleAnchor::TypingDefinition(definition) = namedtuple.anchor(db)
             {
-                let parsed =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2931,8 +2922,7 @@ fn class_literal_to_hierarchy_info(
         }
         ClassLiteral::DynamicEnum(dynamic_enum) => {
             if let DynamicEnumAnchor::Definition { definition, .. } = dynamic_enum.anchor(db) {
-                let parsed =
-                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -3001,10 +2991,10 @@ mod tests {
     use super::{CallArgumentForm, call_argument_forms, contains_identifier};
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
-    use ruff_db::Db as _;
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ty_module_resolver::Db as _;
 
     #[test]
     fn source_candidate_prefilters_use_identifier_boundaries() {
@@ -3031,7 +3021,8 @@ cast(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3071,7 +3062,8 @@ f(y="", x=1)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3107,7 +3099,8 @@ f(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3144,7 +3137,8 @@ f("", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3184,7 +3178,8 @@ f(int, x)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3228,7 +3223,8 @@ TypeAliasType("Alias", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let calls: Vec<_> = parsed
             .suite()
             .iter()
@@ -3273,7 +3269,8 @@ cast(*args)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let file = PythonFile::new(&db, file, db.python_version());
+        let parsed = parsed_module(&db, file).load(&db);
         let call = parsed
             .suite()
             .last()

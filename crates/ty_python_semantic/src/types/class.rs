@@ -53,7 +53,7 @@ use crate::{
 };
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
-use ruff_db::{PythonFile, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
@@ -85,11 +85,7 @@ fn dynamic_class_header_range<'db>(
     scope: ScopeId<'db>,
     anchor: DynamicClassHeaderAnchor<'db>,
 ) -> TextRange {
-    let module = parsed_module(
-        db,
-        PythonFile::new(db, scope.file(db), db.python_version()),
-    )
-    .load(db);
+    let module = parsed_module(db, scope.python_file(db)).load(db);
     match anchor {
         DynamicClassHeaderAnchor::Definition(definition) => definition
             .kind(db)
@@ -2860,7 +2856,7 @@ impl<'db> QualifiedClassName<'db> {
                 let body_scope = class.body_scope(self.db);
                 // Skip the class body scope itself.
                 (
-                    body_scope.file(self.db),
+                    body_scope.python_file(self.db),
                     body_scope.file_scope_id(self.db),
                     1,
                 )
@@ -2868,20 +2864,20 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::Dynamic(class) => {
                 // Dynamic classes don't have a body scope; start from the enclosing scope.
                 let scope = class.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicNamedTuple(namedtuple) => {
                 // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
                 let scope = namedtuple.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicTypedDict(typeddict) => {
                 let scope = typeddict.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicEnum(enum_lit) => {
                 let scope = enum_lit.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
         };
 

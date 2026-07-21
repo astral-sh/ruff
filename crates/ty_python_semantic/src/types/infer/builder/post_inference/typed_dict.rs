@@ -1,5 +1,4 @@
 use ruff_db::{
-    PythonFile,
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
@@ -512,7 +511,7 @@ fn add_definition_subdiagnostic<'db>(
     };
 
     let file = definition.file(db);
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let module = parsed_module(db, definition.python_file(db)).load(db);
     let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field declaration");
     sub.annotate(
         Annotation::secondary(

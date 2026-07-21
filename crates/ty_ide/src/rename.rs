@@ -15,7 +15,7 @@ pub fn can_rename(
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
     let source_file = file.file(db);
-    let model = SemanticModel::new(db, source_file);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&model, &module, offset)?;
@@ -62,7 +62,7 @@ pub fn rename(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&model, &module, offset)?;

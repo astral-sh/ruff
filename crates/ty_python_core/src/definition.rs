@@ -84,6 +84,10 @@ impl<'db> Definition<'db> {
         self.scope_id(db).file(db)
     }
 
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
         self.scope_id(db).file_scope_id(db)
     }
@@ -106,8 +110,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -143,8 +146,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {

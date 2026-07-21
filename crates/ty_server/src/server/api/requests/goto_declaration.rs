@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
 use lsp_types::{DeclarationParams, DeclarationRequest, DeclarationResponse, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::goto_declaration;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};

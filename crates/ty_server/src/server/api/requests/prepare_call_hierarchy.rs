@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use lsp_types::CallHierarchyPrepareRequest;
 use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;

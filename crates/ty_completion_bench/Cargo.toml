@@ -15,6 +15,7 @@ ruff_db = { workspace = true, features = ["os"] }
 ruff_text_size = { workspace = true }
 
 ty_ide = { workspace = true }
+ty_module_resolver = { workspace = true }
 ty_project = { workspace = true }
 
 anyhow = { workspace = true }

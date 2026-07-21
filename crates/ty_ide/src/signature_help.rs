@@ -80,7 +80,6 @@ pub fn signature_help<'db>(
     offset: TextSize,
 ) -> Option<SignatureHelpInfo<'db>> {
     let parsed = parsed_module(db, file).load(db);
-    let file = file.file(db);
 
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;

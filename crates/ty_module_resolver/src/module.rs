@@ -2,9 +2,11 @@ use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
+use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
@@ -29,7 +31,7 @@ impl<'db> Module<'db> {
         name: Cow<'_, ModuleName>,
         kind: ModuleKind,
         search_path: SearchPath,
-        file: File,
+        file: PythonFile<'db>,
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
 
@@ -53,7 +55,27 @@ impl<'db> Module<'db> {
     /// This is `None` for namespace packages.
     pub fn file(self, db: &'db dyn Database) -> Option<File> {
         match self {
-            Module::File(module) => Some(module.file(db)),
+            Module::File(module) => Some(module.python_file(db).file(db)),
+            Module::Namespace(_) => None,
+        }
+    }
+
+    /// The versioned file used to parse this module.
+    ///
+    /// This is `None` for namespace packages.
+    pub fn python_file(self, db: &'db dyn Database) -> Option<PythonFile<'db>> {
+        match self {
+            Module::File(module) => Some(module.python_file(db)),
+            Module::Namespace(_) => None,
+        }
+    }
+
+    /// The Python version used to resolve this module.
+    ///
+    /// This is `None` for namespace packages.
+    pub fn python_version(self, db: &'db dyn Database) -> Option<PythonVersion> {
+        match self {
+            Module::File(module) => Some(module.python_file(db).python_version(db)),
             Module::Namespace(_) => None,
         }
     }
@@ -163,7 +185,8 @@ fn all_submodule_names_for_package<'db>(
         return None;
     }
 
-    let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
+    let python_file = module.python_file(db);
+    let path = SystemOrVendoredPathRef::try_from_file(db, python_file.file(db))?;
     debug_assert!(
         matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
         "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
@@ -208,7 +231,7 @@ fn all_submodule_names_for_package<'db>(
                         Cow::Owned(name),
                         kind,
                         module.search_path(db).clone(),
-                        file,
+                        PythonFile::new(db, file, python_file.python_version(db)),
                     ))
                 })
                 .collect()
@@ -245,14 +268,14 @@ fn all_submodule_names_for_package<'db>(
                     Cow::Owned(name),
                     kind,
                     module.search_path(db).clone(),
-                    file,
+                    PythonFile::new(db, file, python_file.python_version(db)),
                 ))
             })
             .collect(),
     })
 }
 
-/// A module that resolves to a file (`lib.py` or `package/__init__.py`)
+/// A module that resolves to a file (`lib.py` or `package/__init__.py`).
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
@@ -262,7 +285,7 @@ pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) search_path: SearchPath,
     #[returns(copy)]
-    pub(super) file: File,
+    pub(super) python_file: PythonFile<'db>,
     #[returns(copy)]
     pub(super) known: Option<KnownModule>,
 }

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ruff_db::{files::File, parsed::ParsedModuleRef};
+use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
@@ -13,7 +13,7 @@ use crate::{
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     #[returns(copy)]
-    pub file: File,
+    pub python_file: PythonFile<'db>,
 
     #[returns(copy)]
     pub file_scope_id: FileScopeId,
@@ -23,6 +23,10 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
+    pub fn file(self, db: &dyn Db) -> File {
+        self.python_file(db).file(db)
+    }
+
     pub fn is_annotation(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_annotation()
     }

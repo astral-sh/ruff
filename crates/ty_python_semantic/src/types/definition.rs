@@ -1,5 +1,4 @@
 use crate::Db;
-use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -34,11 +33,7 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(
-                    db,
-                    PythonFile::new(db, definition.file(db), db.python_version()),
-                )
-                .load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
         }
@@ -59,11 +54,7 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(
-                    db,
-                    PythonFile::new(db, definition.file(db), db.python_version()),
-                )
-                .load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
         }

@@ -2,11 +2,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
-use ruff_db::{Db as _, PythonFile};
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 use types::CodeActionKind;
 

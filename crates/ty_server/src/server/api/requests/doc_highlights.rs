@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::DocumentHighlightRequest;
 use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::{ReferenceKind, document_highlights};
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};

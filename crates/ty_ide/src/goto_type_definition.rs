@@ -12,7 +12,7 @@ pub fn goto_type_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;

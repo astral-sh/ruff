@@ -3,8 +3,9 @@ use std::borrow::Cow;
 use lsp_types::{
     SelectionRange as LspSelectionRange, SelectionRangeParams, SelectionRangeRequest, Uri,
 };
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::selection_range;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};

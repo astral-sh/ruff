@@ -166,8 +166,8 @@ pub(crate) fn attribute_declarations<'db, 's>(
 }
 
 /// Get the module-level docstring for the given file.
-pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<String> {
+    let module = parsed_module(db, file).load(db);
     docstring_from_body(module.suite())
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
@@ -209,7 +209,7 @@ pub fn check_file(db: &dyn Db, file: PythonFile<'_>) -> Result<Box<[Diagnostic]>
         error
     }));
 
-    diagnostics.extend(check_types(db, source_file));
+    diagnostics.extend(check_types(db, file));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

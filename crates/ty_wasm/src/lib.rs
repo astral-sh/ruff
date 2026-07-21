@@ -24,6 +24,7 @@ use ty_ide::{
     goto_type_definition, hover, inlay_hints, rename,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
+use ty_module_resolver::Db as _;
 use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
@@ -276,10 +277,13 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "hints")]
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
-        Ok(hints(&self.db, file_id.file)
-            .into_iter()
-            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
-            .collect())
+        Ok(hints(
+            &self.db,
+            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+        )
+        .into_iter()
+        .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+        .collect())
     }
 
     /// Checks all open files

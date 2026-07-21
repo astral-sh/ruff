@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
+use ruff_db::PythonFile;
 use ruff_db::files::directory_listing;
 use ruff_python_ast::PythonVersion;
 
@@ -118,6 +119,7 @@ impl get_size2::GetSize for ListedModule<'_> {}
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
+    python_version: PythonVersion,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
 
@@ -128,6 +130,7 @@ impl<'db> Lister<'db> {
         Lister {
             db,
             search_path,
+            python_version: db.python_version(),
             modules: BTreeMap::new(),
         }
     }
@@ -182,7 +185,7 @@ impl<'db> Lister<'db> {
                             Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
-                            file,
+                            PythonFile::new(self.db, file, self.python_version),
                         ),
                     );
                     return;
@@ -254,7 +257,7 @@ impl<'db> Lister<'db> {
                 Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
-                file,
+                PythonFile::new(self.db, file, self.python_version),
             ),
         );
     }
@@ -317,20 +320,14 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::Typing.is_non_shadowable(self.python_version().minor, name.as_str())
-    }
-
-    /// Returns the Python version we want to perform module resolution
-    /// with.
-    fn python_version(&self) -> PythonVersion {
-        self.db.python_version()
+        ModuleResolveMode::Typing.is_non_shadowable(self.python_version.minor, name.as_str())
     }
 
     /// Constructs a resolver context for use with some APIs that require it.
     fn context(&self) -> ResolverContext<'db> {
         ResolverContext {
             db: self.db,
-            python_version: self.python_version(),
+            python_version: self.python_version,
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
             mode: ModuleResolveMode::Typing,
@@ -423,11 +420,14 @@ mod tests {
                 Module::File(module) => {
                     // For snapshots, just normalize all paths to using
                     // Unix slashes for simplicity.
-                    let path_components = match module.file(self.db).path(self.db) {
-                        FilePath::System(path) => path.components(),
-                        FilePath::Vendored(path) => path.components(),
-                        FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
-                    };
+                    let path_components =
+                        match module.python_file(self.db).file(self.db).path(self.db) {
+                            FilePath::System(path) => path.components(),
+                            FilePath::Vendored(path) => path.components(),
+                            FilePath::SystemVirtual(path) => {
+                                Utf8Path::new(path.as_str()).components()
+                            }
+                        };
                     let nice_path = path_components
                         // Avoid including a root component, since that
                         // results in a platform dependent separator.

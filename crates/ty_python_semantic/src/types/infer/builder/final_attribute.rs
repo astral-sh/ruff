@@ -1,4 +1,3 @@
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -27,7 +26,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let file = declaration.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, declaration.python_file(db)).load(db);
         let range = match declaration.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => {
                 assignment.annotation(&module).range()

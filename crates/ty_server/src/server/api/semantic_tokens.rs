@@ -1,9 +1,10 @@
 use lsp_types::SemanticToken;
+use ruff_db::PythonFile;
 use ruff_db::source::{line_index, source_text};
-use ruff_db::{Db as _, PythonFile};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionEncoding, ToRangeExt};

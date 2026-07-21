@@ -3,8 +3,6 @@ use std::rc::Rc;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
-
-use ruff_db::PythonFile;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
@@ -515,11 +513,7 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -558,11 +552,7 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let constraints = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -660,11 +650,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {

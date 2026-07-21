@@ -538,6 +538,10 @@ impl ty_module_resolver::Db for ProjectDatabase {
     fn search_paths(&self) -> &SearchPaths {
         Program::get(self).search_paths(self)
     }
+
+    fn python_version(&self) -> ruff_python_ast::PythonVersion {
+        Program::get(self).python_version(self)
+    }
 }
 
 #[salsa::db]
@@ -598,10 +602,6 @@ impl SourceDb for ProjectDatabase {
 
     fn files(&self) -> &Files {
         &self.files
-    }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
     }
 }
 
@@ -759,16 +759,16 @@ pub(crate) mod testing {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
     impl ty_module_resolver::Db for TestDb {
         fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
             Program::get(self).search_paths(self)
+        }
+
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            Program::get(self).python_version(self)
         }
     }
 

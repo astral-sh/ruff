@@ -7,7 +7,6 @@ use crate::files::{File, Files};
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
@@ -78,7 +77,6 @@ pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
-    fn python_version(&self) -> PythonVersion;
 }
 
 /// Returns the maximum number of tasks that ty is allowed
@@ -196,10 +194,6 @@ mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
         }
     }
 

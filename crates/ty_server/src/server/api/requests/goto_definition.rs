@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::DefinitionRequest;
 use lsp_types::{DefinitionParams, DefinitionResponse, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::goto_definition;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};
