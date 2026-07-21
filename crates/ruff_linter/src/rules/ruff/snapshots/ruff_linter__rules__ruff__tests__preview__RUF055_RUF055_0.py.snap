@@ -257,3 +257,37 @@ help: Replace with `s.replace(r'''abc''', "")`
 100 + s.replace(r'''abc''', "")
 101 |
     |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:110:8
+    |
+108 | # RUF055 should not offer a *safe* fix for bytes patterns against buffer objects:
+109 | # re.search accepts memoryview, but `in` does not do a byte-subsequence search (#27024).
+110 | assert re.search(b"ab", memoryview(b"abc"))
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+111 | assert re.search(b"ab", memoryview(b"abc")) is not None
+    |
+help: Replace with `b"ab" in memoryview(b"abc")`
+    |
+109 | # re.search accepts memoryview, but `in` does not do a byte-subsequence search (#27024).
+    - assert re.search(b"ab", memoryview(b"abc"))
+110 + assert b"ab" in memoryview(b"abc")
+111 | assert re.search(b"ab", memoryview(b"abc")) is not None
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:111:8
+    |
+109 | # re.search accepts memoryview, but `in` does not do a byte-subsequence search (#27024).
+110 | assert re.search(b"ab", memoryview(b"abc"))
+111 | assert re.search(b"ab", memoryview(b"abc")) is not None
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with `b"ab" in memoryview(b"abc")`
+    |
+110 | assert re.search(b"ab", memoryview(b"abc"))
+    - assert re.search(b"ab", memoryview(b"abc")) is not None
+111 + assert b"ab" in memoryview(b"abc")
+    |
+note: This is an unsafe fix and may change runtime behavior

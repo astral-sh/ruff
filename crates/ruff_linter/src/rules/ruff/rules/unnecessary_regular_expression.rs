@@ -49,8 +49,15 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
-/// the fix can be applied safely.
+/// This rule's fix is marked as unsafe if the affected expression contains comments, or if the
+/// pattern is a **bytes** literal. Bytes patterns are unsafe to rewrite because `re` accepts any
+/// bytes-like object (including `memoryview`), while the equivalent `str`/`bytes` methods and
+/// membership tests do not behave the same for all buffer objects.
+///
+/// For example, `re.search(b"ab", memoryview(b"abc"))` is true, but
+/// `b"ab" in memoryview(b"abc")` is false.
+///
+/// Otherwise, the fix can be applied safely.
 ///
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
@@ -137,9 +144,12 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     );
 
     if let Some(repl) = repl {
+        // Bytes patterns are unsafe: `re` accepts buffer-protocol objects (e.g. memoryview)
+        // where membership / str methods do not (#27024).
+        let bytes_pattern = matches!(literal, Literal::Bytes(_));
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if checker.comment_ranges().intersects(re_func.range) {
+            if bytes_pattern || checker.comment_ranges().intersects(re_func.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

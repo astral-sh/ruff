@@ -103,3 +103,9 @@ re.sub(r'''abc''', "", s)
 # str.split("") raises ValueError while re.split("", s) succeeds
 re.split("", s)
 re.split(r"", s)
+
+
+# RUF055 should not offer a *safe* fix for bytes patterns against buffer objects:
+# re.search accepts memoryview, but `in` does not do a byte-subsequence search (#27024).
+assert re.search(b"ab", memoryview(b"abc"))
+assert re.search(b"ab", memoryview(b"abc")) is not None
