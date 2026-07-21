@@ -1681,3 +1681,63 @@ class MaybeEqWhile:
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
 ```
+
+## Overloaded generic receivers remain visible to override checks
+
+An override must still be checked against every applicable receiver-specialized overload when the
+subclass retains a covariant type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any, Generic, Never, TypeVar, overload
+
+ScalarCo = TypeVar("ScalarCo", covariant=True)
+ShapeCo = TypeVar("ShapeCo", covariant=True)
+
+class Poly(Generic[ScalarCo, ShapeCo]):
+    @overload
+    def extend(self: "Poly[float, Any]", value: float) -> None: ...
+    @overload
+    def extend(self: "Poly[complex, Any]", value: complex) -> None: ...
+
+class Akima(Poly[float, ShapeCo], Generic[ShapeCo]):
+    def extend(self, value: Never) -> Never: ...  # error: [invalid-method-override]
+
+class Index(Generic[ScalarCo, ShapeCo]):
+    @overload
+    def set(self: "Index[Any, tuple[int]]", key: int, value: int) -> None: ...
+    @overload
+    def set(self: "Index[Any, tuple[int, int]]", key: str, value: int) -> None: ...
+
+class Matrix(Index[ScalarCo, tuple[int, int]], Generic[ScalarCo]):
+    def set(self, key: Never, value: Any) -> Never: ...  # error: [invalid-method-override]
+```
+
+## Equivalent overloaded protocol receivers are valid overrides
+
+A generic implementation can restate a protocol's receiver-specialized overload set using its own
+receiver type without changing the method contract.
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+TContra = TypeVar("TContra", contravariant=True)
+
+class TaskStatus(Protocol[TContra]):
+    @overload
+    def started(self: "TaskStatus[None]") -> None: ...
+    @overload
+    def started(self, value: TContra) -> None: ...
+
+class ConcreteStatus(Generic[T], TaskStatus[T]):
+    @overload
+    def started(self: "ConcreteStatus[None]") -> None: ...
+    @overload
+    def started(self: "ConcreteStatus[T]", value: T) -> None: ...
+    def started(self, value: T | None = None) -> None: ...
+```

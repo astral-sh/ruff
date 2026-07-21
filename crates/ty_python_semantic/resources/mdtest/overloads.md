@@ -1385,3 +1385,41 @@ def baz(x, y, z=None) -> bytes | list[str]:
 # revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
 reveal_type(baz)
 ```
+
+## Generic overloaded protocol members preserve receiver relationships
+
+An overloaded method used to satisfy a protocol receiver can relate a method-scoped type variable to
+a concrete generic receiver. Binding that member must retain the scalar return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any, Generic, Protocol, TypeVar, assert_type, overload
+
+class ScalarBase: ...
+class Scalar(ScalarBase): ...
+
+ScalarCo = TypeVar("ScalarCo", bound=ScalarBase, covariant=True, default=ScalarBase)
+ShapeCo = TypeVar("ShapeCo", bound=tuple[int, ...], covariant=True, default=tuple[Any, ...])
+
+class HasPhantom[T](Protocol):
+    def phantom(self) -> T: ...
+
+class Phantom(Generic[ShapeCo, ScalarCo]):
+    @overload
+    def phantom[T: ScalarBase](self: "Phantom[tuple[()], T]") -> T: ...
+    @overload
+    def phantom[Shape: tuple[int, *tuple[int, ...]], T: ScalarBase](
+        self: "Phantom[Shape, T]",
+    ) -> list[T]: ...
+
+class Normal(Phantom[ShapeCo, ScalarCo], Generic[ShapeCo, ScalarCo]):
+    @property
+    def value[T](self: "HasPhantom[T]") -> T: ...
+
+normal: Normal[tuple[()], Scalar]
+assert_type(normal.value, Scalar)
+```
