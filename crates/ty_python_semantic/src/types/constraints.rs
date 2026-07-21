@@ -391,6 +391,9 @@ impl<'db> OwnedRelationConstraintSet<'db> {
         }
     }
 
+    // TODO: Remove this projection after cached constraint-set consumers can carry an
+    // `OwnedRelationConstraintSet`; it preserves the old solver API by discarding negative
+    // evidence.
     pub(crate) fn positive_evidence(&self) -> &OwnedConstraintSet<'db> {
         &self.positive_evidence
     }
@@ -556,15 +559,23 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     ///
     /// This deliberately discards negative evidence for compatibility with constraint-solving
     /// APIs whose output is a set of successful valuations rather than a relation result.
+    // TODO: Migrate those APIs to `RelationConstraintSet` and remove this compatibility
+    // projection.
     pub(crate) fn positive_evidence(self) -> ConstraintSet<'db, 'c> {
         self.positive_evidence
     }
 
+    /// Returns `true` only if the relation is unconditionally true.
+    ///
+    /// In particular, both indeterminate and inconsistent results return `false`.
     pub(crate) fn is_always_true(self, db: &'db dyn Db) -> bool {
         self.positive_evidence.is_always_satisfied(db)
             && self.negative_evidence.is_never_satisfied(db)
     }
 
+    /// Returns `true` only if the relation is unconditionally false.
+    ///
+    /// In particular, both indeterminate and inconsistent results return `false`.
     pub(crate) fn is_always_false(self, db: &'db dyn Db) -> bool {
         self.positive_evidence.is_never_satisfied(db)
             && self.negative_evidence.is_always_satisfied(db)

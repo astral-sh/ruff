@@ -692,6 +692,8 @@ impl<'db> Type<'db> {
         other: Type<'db>,
         materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
+        // TODO: Preserve the relation result for callers that interpret `false` as proof of
+        // inequivalence instead of merely requiring proof of equivalence.
         self.when_equivalent_to_with_materialization_visitor(
             db,
             other,

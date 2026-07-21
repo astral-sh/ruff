@@ -3947,6 +3947,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            // TODO: Preserve `RelationConstraintSet` through protocol inference. The old solver
+            // accepts only successful valuations, so these arms currently discard negative
+            // evidence.
+            //
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.

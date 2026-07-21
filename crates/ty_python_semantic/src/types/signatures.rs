@@ -547,6 +547,8 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after callable constraint inference can propagate
+        // negative evidence instead of retaining only successful valuations.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -1810,6 +1812,8 @@ impl<'db> Signature<'db> {
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after ParamSpec inference can combine positive and
+        // negative evidence from each candidate return type.
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
             && other.is_single_paramspec().is_none()
@@ -1863,6 +1867,8 @@ impl<'db> Signature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after signature inference no longer requires the
+        // legacy successful-valuation-only representation.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();

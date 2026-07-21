@@ -2130,6 +2130,10 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                        // TODO: Give relation intrinsics a four-valued result type. Their current
+                        // `ConstraintSet` return type can expose only positive evidence, preserving
+                        // the legacy behavior that cannot distinguish false from indeterminate or
+                        // true from inconsistent when their positive evidence is equal.
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let ty_a = ty_a.project_type_form(db, env);
@@ -2870,6 +2874,9 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
                     ) => {
+                        // TODO: Return a relation result once constraint-set intrinsics can expose
+                        // negative evidence; the current `ConstraintSet` result preserves only
+                        // valuations that prove the implication.
                         let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
                             continue;
                         };
