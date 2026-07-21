@@ -1867,16 +1867,14 @@ fn check_enum_member_against_constructor_method<'db>(
     // The enum metaclass unpacks tuple values as positional args:
     //   MEMBER = (a, b, c)  →  __new__(cls, a, b, c) / __init__(self, a, b, c)
     //   MEMBER = x          →  __new__(cls, x) / __init__(self, x)
-    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
-        if let Some(spec) = instance.tuple_spec(db) {
-            if let Tuple::Fixed(fixed) = &*spec {
-                fixed.all_elements().to_vec()
-            } else {
-                // Variable-length tuples: can't determine exact args, skip validation.
-                return;
-            }
+    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type
+        && let Some(spec) = instance.tuple_spec(db)
+    {
+        if let Tuple::Fixed(fixed) = &*spec {
+            fixed.all_elements().to_vec()
         } else {
-            vec![member_value_type]
+            // Variable-length tuples: can't determine exact args, skip validation.
+            return;
         }
     } else {
         vec![member_value_type]

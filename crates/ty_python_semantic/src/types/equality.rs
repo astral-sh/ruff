@@ -768,13 +768,12 @@ fn add_equal_enum_literals<'db>(
                 builder = builder.add(Type::LiteralValue(literal));
             }
         }
-        ty => {
-            if let Some(alternatives) = finite_alternatives(db, ty, operator) {
-                for alternative in alternatives {
-                    builder = add_equal_enum_literals(db, alternative, right, operator, builder);
-                }
+        ty if let Some(alternatives) = finite_alternatives(db, ty, operator) => {
+            for alternative in alternatives {
+                builder = add_equal_enum_literals(db, alternative, right, operator, builder);
             }
         }
+        _ => {}
     }
     builder
 }
@@ -1383,14 +1382,13 @@ impl KnownComparisonSemantics {
                 complement.enum_class(db).to_non_generic_instance(db),
                 operator,
             ),
+            Type::Intersection(intersection)
+                if let Some(complement) = intersection.enum_complement(db) =>
+            {
+                let instance = complement.enum_class(db).to_non_generic_instance(db);
+                Self::of_instance(db, instance, operator)
+            }
             Type::Intersection(intersection) => {
-                if let Some(complement) = intersection.enum_complement(db) {
-                    return Self::of_instance(
-                        db,
-                        complement.enum_class(db).to_non_generic_instance(db),
-                        operator,
-                    );
-                }
                 let mut semantics = intersection
                     .positive(db)
                     .iter()

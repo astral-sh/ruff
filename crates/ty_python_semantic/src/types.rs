@@ -5944,13 +5944,10 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => {
                 instance.class(db).iter_mro(db).find_map(from_class_base)
             }
-            Type::ProtocolInstance(instance) => {
-                if let Protocol::FromClass(class) = instance.inner {
-                    class.iter_mro(db).find_map(from_class_base)
-                } else {
-                    None
-                }
-            }
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(class),
+                ..
+            }) => class.iter_mro(db).find_map(from_class_base),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db));
                 let mut send_builder = Some(UnionBuilder::new(db));
@@ -7500,12 +7497,10 @@ impl<'db> Type<'db> {
     pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<StaticClassLiteral<'db>> {
         match self {
             Type::GenericAlias(generic) => Some(generic.origin(db)),
-            Type::NominalInstance(instance) => {
-                if let ClassType::Generic(generic) = instance.class(db) {
-                    Some(generic.origin(db))
-                } else {
-                    None
-                }
+            Type::NominalInstance(instance)
+                if let ClassType::Generic(generic) = instance.class(db) =>
+            {
+                Some(generic.origin(db))
             }
             _ => None,
         }

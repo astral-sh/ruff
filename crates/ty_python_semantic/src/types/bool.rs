@@ -97,53 +97,51 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
-                Err(CallDunderError::MethodNotAvailable) => {
-                    // We only consider `__len__` for tuples and `@final` types,
-                    // since `__bool__` takes precedence
-                    // and a subclass could add a `__bool__` method.
-                    //
-                    // TODO: with regards to tuple types, we intend to emit a diagnostic
-                    // if a tuple subclass defines a `__bool__` method with a return type
-                    // that is inconsistent with the tuple's length. Otherwise, the special
-                    // handling for tuples here isn't sound.
-                    if let Some(instance) = self.as_nominal_instance() {
-                        if let Some(tuple_spec) = instance.tuple_spec(db) {
-                            Ok(tuple_spec.truthiness())
-                        } else if instance.class(db).is_final(db) {
-                            match self.try_call_dunder(
-                                db,
-                                "__len__",
-                                CallArguments::none(),
-                                TypeContext::default(),
-                            ) {
-                                Ok(outcome) => {
-                                    let return_type = outcome.return_type(db);
-                                    if return_type.is_assignable_to(
-                                        db,
-                                        KnownClass::SupportsIndex.to_instance(db),
-                                    ) {
-                                        Ok(type_to_truthiness(return_type))
-                                    } else {
-                                        // TODO: should report a diagnostic similar to if return type of `__bool__`
-                                        // is not assignable to `bool`
-                                        Ok(Truthiness::Ambiguous)
-                                    }
-                                }
-                                // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
-                                Err(CallDunderError::MethodNotAvailable) => {
-                                    Ok(Truthiness::AlwaysTrue)
-                                }
-                                // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
-                                // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
-                                Err(_) => Ok(Truthiness::Ambiguous),
+                // TODO: with regards to tuple types, we intend to emit a diagnostic
+                // if a tuple subclass defines a `__bool__` method with a return type
+                // that is inconsistent with the tuple's length. Otherwise, the special
+                // handling for tuples here isn't sound.
+                Err(CallDunderError::MethodNotAvailable)
+                    if let Type::NominalInstance(instance) = self
+                        && let Some(tuple_spec) = instance.tuple_spec(db) =>
+                {
+                    Ok(tuple_spec.truthiness())
+                }
+
+                // We only consider `__len__` for tuples and `@final` types,
+                // since `__bool__` takes precedence
+                // and a subclass could add a `__bool__` method.
+                Err(CallDunderError::MethodNotAvailable)
+                    if let Type::NominalInstance(instance) = self
+                        && instance.class(db).is_final(db) =>
+                {
+                    match self.try_call_dunder(
+                        db,
+                        "__len__",
+                        CallArguments::none(),
+                        TypeContext::default(),
+                    ) {
+                        Ok(outcome) => {
+                            let return_type = outcome.return_type(db);
+                            if return_type
+                                .is_assignable_to(db, KnownClass::SupportsIndex.to_instance(db))
+                            {
+                                Ok(type_to_truthiness(return_type))
+                            } else {
+                                // TODO: should report a diagnostic similar to if return type of `__bool__`
+                                // is not assignable to `bool`
+                                Ok(Truthiness::Ambiguous)
                             }
-                        } else {
-                            Ok(Truthiness::Ambiguous)
                         }
-                    } else {
-                        Ok(Truthiness::Ambiguous)
+                        // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
+                        Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::AlwaysTrue),
+                        // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
+                        // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
+                        Err(_) => Ok(Truthiness::Ambiguous),
                     }
                 }
+
+                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
 
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                     Err(BoolError::IncorrectArguments {

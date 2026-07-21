@@ -794,15 +794,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
-        if let Some(left_spec) = left.tuple_spec(db) {
-            if let Some(right_spec) = right.tuple_spec(db) {
-                let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
-                if result
-                    .union(db, self.constraints, compatible)
-                    .is_always_satisfied(db)
-                {
-                    return result;
-                }
+        if let Some(left_spec) = left.tuple_spec(db)
+            && let Some(right_spec) = right.tuple_spec(db)
+        {
+            let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
+            if result
+                .union(db, self.constraints, compatible)
+                .is_always_satisfied(db)
+            {
+                return result;
             }
         }
 

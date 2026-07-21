@@ -1627,25 +1627,24 @@ fn check_classinfo_in_isinstance<'db>(
                 classinfo_expr,
             );
         }
-        Type::NominalInstance(nominal) => {
-            if let Some(tuple_spec) = nominal.tuple_spec(db) {
-                let element_exprs = match classinfo_expr {
-                    Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
-                    _ => None,
-                };
-                for (index, element) in tuple_spec.iter_element_types(db).enumerate() {
-                    let element_expr = element_exprs.and_then(|elts| elts.get(index));
-                    check_classinfo_in_isinstance(
-                        db,
-                        context,
-                        call_expression,
-                        function,
-                        element,
-                        element_expr,
-                    );
-                }
+        Type::NominalInstance(nominal) if let Some(tuple_spec) = nominal.tuple_spec(db) => {
+            let element_exprs = match classinfo_expr {
+                Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
+                _ => None,
+            };
+            for (index, element) in tuple_spec.iter_element_types(db).enumerate() {
+                let element_expr = element_exprs.and_then(|elts| elts.get(index));
+                check_classinfo_in_isinstance(
+                    db,
+                    context,
+                    call_expression,
+                    function,
+                    element,
+                    element_expr,
+                );
             }
         }
+
         _ => {}
     }
 }
@@ -1901,10 +1900,7 @@ fn is_instance_truthiness<'db>(
 ///         return True
 /// ```
 fn is_instance_tuple_exhaustive<'db>(db: &'db dyn Db, ty: Type<'db>, classinfo: Type<'db>) -> bool {
-    let Some(tuple) = classinfo
-        .as_nominal_instance()
-        .and_then(|nominal| nominal.tuple_spec(db))
-    else {
+    let Some(tuple) = classinfo.tuple_instance_spec(db) else {
         return false;
     };
     if tuple.is_variadic() {

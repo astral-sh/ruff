@@ -266,7 +266,8 @@ impl<'db> SubscriptErrorKind<'db> {
                 CallErrorKind::NotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` is not callable on object of type `{}`",
+                            "Method `{method}` of type `{}` is not callable \
+                            on object of type `{}`",
                             bindings.callable_type().display(db),
                             value_ty.display(db),
                         ));
@@ -287,7 +288,8 @@ impl<'db> SubscriptErrorKind<'db> {
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` cannot be called with key of type `{}` on object of type `{}`",
+                            "Method `{method}` of type `{}` cannot be called \
+                            with key of type `{}` on object of type `{}`",
                             bindings.callable_type().display(db),
                             slice_ty.display(db),
                             value_ty.display(db),
@@ -297,7 +299,8 @@ impl<'db> SubscriptErrorKind<'db> {
                 CallErrorKind::PossiblyNotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` may not be callable on object of type `{}`",
+                            "Method `{method}` of type `{}` may not be callable \
+                            on object of type `{}`",
                             bindings.callable_type().display(db),
                             value_ty.display(db),
                         ));
@@ -356,7 +359,8 @@ impl<'db> SubscriptErrorKind<'db> {
             Self::MultipleTypeVarTuples { origin } => {
                 if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Only one `TypeVarTuple` parameter is allowed in a `{origin}` subscription",
+                        "Only one `TypeVarTuple` parameter is allowed \
+                        in a `{origin}` subscription",
                     ));
                 }
             }
@@ -567,9 +571,11 @@ impl<'db> Type<'db> {
                 value_ty.subscript(db, element, expr_context)
             })),
 
-            (Type::EnumComplement(complement), _) => {
-                Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
-            }
+            (Type::EnumComplement(complement), _) => Some(
+                complement
+                    .remaining_literal_union(db)
+                    .subscript(db, slice_ty, expr_context),
+            ),
 
             (_, Type::EnumComplement(complement)) => {
                 Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
@@ -606,10 +612,8 @@ impl<'db> Type<'db> {
                         | KnownClass::Range
                         | KnownClass::Memoryview
                 )
-            )
-                && maybe_slice_nominal
-                    .slice_literal(db)
-                    .is_some_and(|slice| slice.step == Some(0)) =>
+            ) && let Some(SliceLiteral { step: Some(0), .. }) =
+                maybe_slice_nominal.slice_literal(db) =>
             {
                 Some(Err(SubscriptError::new(
                     value_ty,
@@ -619,85 +623,88 @@ impl<'db> Type<'db> {
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
-                if let Some(i64_int) = literal.as_int() =>
+                if let Some(i64_int) = literal.as_int()
+                    && let Some(tuple) = nominal.tuple_spec(db)
+                    && let Ok(i32_int) = i32::try_from(i64_int) =>
             {
-                nominal
-                    .tuple_spec(db)
-                    .and_then(|tuple| Some((tuple, i32::try_from(i64_int).ok()?)))
-                    .map(|(tuple, i32_int)| match tuple.py_index(db, i32_int) {
-                        Ok(result) => Ok(result),
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::IndexOutOfBounds {
-                                kind: SubscriptKind::Tuple,
-                                tuple_ty: value_ty,
-                                length: tuple.len().display_minimum().into(),
-                                index: i64_int,
-                            },
-                        )),
-                    })
+                let result = tuple.py_index(db, i32_int).map_err(|_| {
+                    SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::IndexOutOfBounds {
+                            kind: SubscriptKind::Tuple,
+                            tuple_ty: value_ty,
+                            length: tuple.len().display_minimum().into(),
+                            index: i64_int,
+                        },
+                    )
+                });
+
+                Some(result)
             }
 
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (
                 Type::NominalInstance(maybe_tuple_nominal),
                 Type::NominalInstance(maybe_slice_nominal),
-            ) => maybe_tuple_nominal
-                .tuple_spec(db)
-                .as_deref()
-                .and_then(|tuple_spec| Some((tuple_spec, maybe_slice_nominal.slice_literal(db)?)))
-                .map(|(tuple, SliceLiteral { start, stop, step })| {
-                    tuple.py_slice_type(db, start, stop, step).map_err(|_| {
-                        SubscriptError::new(Type::unknown(), SubscriptErrorKind::SliceStepSizeZero)
-                    })
-                }),
+            ) if let Some(tuple) = maybe_tuple_nominal.tuple_spec(db)
+                && let Some(SliceLiteral { start, stop, step }) =
+                    maybe_slice_nominal.slice_literal(db) =>
+            {
+                Some(tuple.py_slice_type(db, start, stop, step).map_err(|_| {
+                    SubscriptError::new(Type::unknown(), SubscriptErrorKind::SliceStepSizeZero)
+                }))
+            }
 
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal))
                 if let Some(literal_ty) = lhs_literal.as_string()
-                    && let Some(i64_int) = rhs_literal.as_int() =>
+                    && let Some(i64_int) = rhs_literal.as_int()
+                    && let Ok(i32_int) = i32::try_from(i64_int) =>
             {
-                i32::try_from(i64_int).ok().map(|i32_int| {
-                    let literal_value = literal_ty.value(db);
-                    match (&mut literal_value.chars()).py_index(db, i32_int) {
-                        Ok(ch) => Ok(Type::string_literal(db, ch.to_compact_string())),
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::IndexOutOfBounds {
-                                kind: SubscriptKind::String,
-                                tuple_ty: value_ty,
-                                length: literal_value.chars().count().to_string().into(),
-                                index: i64_int,
-                            },
-                        )),
-                    }
-                })
+                let literal_value = literal_ty.value(db);
+
+                let result = match (&mut literal_value.chars()).py_index(db, i32_int) {
+                    Ok(ch) => Ok(Type::string_literal(db, ch.to_compact_string())),
+                    Err(_) => Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::IndexOutOfBounds {
+                            kind: SubscriptKind::String,
+                            tuple_ty: value_ty,
+                            length: literal_value.chars().count().to_string().into(),
+                            index: i64_int,
+                        },
+                    )),
+                };
+
+                Some(result)
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
             (Type::LiteralValue(literal), Type::NominalInstance(nominal))
-                if let Some(literal_ty) = literal.as_string() =>
+                if let Some(literal_ty) = literal.as_string()
+                    && let Some(SliceLiteral { start, stop, step }) = nominal.slice_literal(db) =>
             {
-                nominal
-                .slice_literal(db)
-                .map(|SliceLiteral { start, stop, step }| {
-                    let literal_value = literal_ty.value(db);
-                    let chars: Vec<_> = literal_value.chars().collect();
+                let literal_value = literal_ty.value(db);
+                let chars: Vec<_> = literal_value.chars().collect();
 
-                    match chars.py_slice(db, start, stop, step) {
-                        Ok(new_chars) => {
-                            let literal = new_chars.collect::<CompactString>();
-                            Ok(Type::string_literal(db, literal))
-                        }
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::SliceStepSizeZero,
-                        )),
+                let result = match chars.py_slice(db, start, stop, step) {
+                    Ok(new_chars) => {
+                        let literal = new_chars.collect::<CompactString>();
+                        Ok(Type::string_literal(db, literal))
                     }
-                })
-            },
+                    Err(_) => Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::SliceStepSizeZero,
+                    )),
+                };
 
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_literal_string() && (rhs_literal.is_int() || rhs_literal.is_bool()) => {
+                Some(result)
+            }
+
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal))
+                if lhs_literal.is_literal_string()
+                    && (rhs_literal.is_int() || rhs_literal.is_bool()) =>
+            {
                 Some(Ok(Type::literal_string()))
             }
 
@@ -710,46 +717,47 @@ impl<'db> Type<'db> {
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
             (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal))
                 if let Some(literal_ty) = lhs_literal.as_bytes()
-                    && let Some(i64_int) = rhs_literal.as_int() =>
+                    && let Some(i64_int) = rhs_literal.as_int()
+                    && let Ok(i32_int) = i32::try_from(i64_int) =>
             {
-                i32::try_from(i64_int).ok().map(|i32_int| {
-                    let literal_value = literal_ty.value(db);
-                    match literal_value.py_index(db, i32_int) {
-                        Ok(byte) => Ok(Type::int_literal((*byte).into())),
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::IndexOutOfBounds {
-                                kind: SubscriptKind::BytesLiteral,
-                                tuple_ty: value_ty,
-                                length: literal_value.len().to_string().into(),
-                                index: i64_int,
-                            },
-                        )),
-                    }
-                })
+                let literal_value = literal_ty.value(db);
+
+                let result = match literal_value.py_index(db, i32_int) {
+                    Ok(byte) => Ok(Type::int_literal((*byte).into())),
+                    Err(_) => Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::IndexOutOfBounds {
+                            kind: SubscriptKind::BytesLiteral,
+                            tuple_ty: value_ty,
+                            length: literal_value.len().to_string().into(),
+                            index: i64_int,
+                        },
+                    )),
+                };
+
+                Some(result)
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
             (Type::LiteralValue(literal), Type::NominalInstance(nominal))
-                if let Some(literal_ty) = literal.as_bytes() =>
+                if let Some(literal_ty) = literal.as_bytes()
+                    && let Some(SliceLiteral { start, stop, step }) = nominal.slice_literal(db) =>
             {
-                nominal
-                .slice_literal(db)
-                .map(|SliceLiteral { start, stop, step }| {
-                    let literal_value = literal_ty.value(db);
+                let literal_value = literal_ty.value(db);
 
-                    match literal_value.py_slice(db, start, stop, step) {
-                        Ok(new_bytes) => {
-                            let new_bytes = new_bytes.collect::<Vec<u8>>();
-                            Ok(Type::bytes_literal(db, &new_bytes))
-                        }
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::SliceStepSizeZero,
-                        )),
+                let result = match literal_value.py_slice(db, start, stop, step) {
+                    Ok(new_bytes) => {
+                        let new_bytes = new_bytes.collect::<Vec<u8>>();
+                        Ok(Type::bytes_literal(db, &new_bytes))
                     }
-                })
-            },
+                    Err(_) => Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::SliceStepSizeZero,
+                    )),
+                };
+
+                Some(result)
+            }
 
             // Ex) Given `"value"[True]`, return `"a"`
             (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal))
@@ -805,10 +813,13 @@ impl<'db> Type<'db> {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 
-            (Type::KnownInstance(known_instance), _) if known_instance.class(db).is_special_form() => {
+            (Type::KnownInstance(known_instance), _)
+                if known_instance.class(db).is_special_form() =>
+            {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 
+            // TODO: more complex logic required for the `Type::TypeVar(_) branch!
             (
                 Type::FunctionLiteral(_)
                 | Type::WrapperDescriptor(_)
@@ -834,7 +845,7 @@ impl<'db> Type<'db> {
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::LiteralValue(_)
-                | Type::TypeVar(_)  // TODO: more complex logic required here!
+                | Type::TypeVar(_)
                 | Type::KnownBoundMethod(_),
                 _,
             ) => None,

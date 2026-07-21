@@ -813,30 +813,28 @@ impl<'db> StaticClassLiteral<'db> {
                 });
 
         // Dataclass transformer flags can be overwritten using class arguments.
-        if let Some(transformer_params) = transformer_params.as_mut() {
-            if let Some(class_def) = self.definition(db).kind(db).as_class() {
-                let module = parsed_module(db, self.file(db)).load(db);
+        if let Some(transformer_params) = transformer_params.as_mut()
+            && let Some(class_def) = self.definition(db).kind(db).as_class()
+        {
+            let module = parsed_module(db, self.file(db)).load(db);
 
-                if let Some(arguments) = &class_def.node(&module).arguments {
-                    let mut flags = transformer_params.flags(db);
+            if let Some(arguments) = &class_def.node(&module).arguments {
+                let mut flags = transformer_params.flags(db);
 
-                    for keyword in &arguments.keywords {
-                        if let Some(arg_name) = &keyword.arg {
-                            if let Some(is_set) =
-                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
-                            {
-                                for (flag_name, flag) in DATACLASS_FLAGS {
-                                    if arg_name.as_str() == *flag_name {
-                                        flags.set(*flag, is_set);
-                                    }
-                                }
+                for ast::Keyword { arg, value, .. } in &arguments.keywords {
+                    if let Some(arg_name) = arg
+                        && let ast::Expr::BooleanLiteral(is_set) = value
+                    {
+                        for (flag_name, flag) in DATACLASS_FLAGS {
+                            if arg_name == *flag_name {
+                                flags.set(*flag, is_set.value);
                             }
                         }
                     }
-
-                    *transformer_params =
-                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
                 }
+
+                *transformer_params =
+                    DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
             }
         }
 
@@ -1305,12 +1303,11 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.raw_type() {
-            if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
-                if is_enum_class_by_inheritance(db, self) {
-                    return Member::definitely_declared(value_ty);
-                }
-            }
+        if let Some(ty) = member.inner.place.raw_type()
+            && let Some(value_ty) = try_unwrap_nonmember_value(db, ty)
+            && is_enum_class_by_inheritance(db, self)
+        {
+            return Member::definitely_declared(value_ty);
         }
 
         member
@@ -3158,8 +3155,7 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
     };
 
     let starred_ty = definition_expression_type(db, class_definition, &starred.value);
-    let tuple_spec = starred_ty.tuple_instance_spec(db)?;
-    let Tuple::Fixed(tuple) = tuple_spec.into_owned() else {
+    let Tuple::Fixed(tuple) = starred_ty.tuple_instance_spec(db)?.into_owned() else {
         return None;
     };
     Some(tuple)

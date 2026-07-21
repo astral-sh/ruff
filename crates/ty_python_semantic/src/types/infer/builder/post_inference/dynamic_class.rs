@@ -56,10 +56,10 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 
         for (idx, base_type) in dynamic_class.explicit_bases(db).iter().enumerate() {
             // Convert to ClassType to access nearest_disjoint_base.
-            if let Some(class_type) = base_type.to_class_type(db) {
-                if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
-                    disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
-                }
+            if let Some(class_type) = base_type.to_class_type(db)
+                && let Some(disjoint_base) = class_type.nearest_disjoint_base(db)
+            {
+                disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
             }
         }
 
