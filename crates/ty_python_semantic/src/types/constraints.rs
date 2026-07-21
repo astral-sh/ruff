@@ -4053,14 +4053,26 @@ impl<'db> PathBounds<'db> {
                     // Lower-bound evidence asks for the narrowest compatible declared constraint
                     // above the lower bound. With only upper-bound evidence, ask for the widest
                     // compatible declared constraint below the upper bound. If the candidates are
-                    // equivalent or incomparable, keep the current best to preserve the TypeVar's
+                    // assignable in both directions, prefer a fully static constraint over a
+                    // gradual one. Otherwise, keep the current best to preserve the TypeVar's
                     // declared constraint order.
-                    if path_bound.lower.is_some() {
-                        candidate.is_subtype_of(db, current_best)
-                            && !current_best.is_subtype_of(db, candidate)
+                    let candidate_assignable_to_best = candidate.is_assignable_to(db, current_best);
+                    let best_assignable_to_candidate = current_best.is_assignable_to(db, candidate);
+
+                    if candidate_assignable_to_best != best_assignable_to_candidate {
+                        if path_bound.lower.is_some() {
+                            candidate_assignable_to_best
+                        } else {
+                            best_assignable_to_candidate
+                        }
+                    } else if candidate_assignable_to_best {
+                        let candidate_is_static = candidate.bottom_materialization(db)
+                            == candidate.top_materialization(db);
+                        let best_is_static = current_best.bottom_materialization(db)
+                            == current_best.top_materialization(db);
+                        candidate_is_static && !best_is_static
                     } else {
-                        current_best.is_subtype_of(db, candidate)
-                            && !candidate.is_subtype_of(db, current_best)
+                        false
                     }
                 };
 

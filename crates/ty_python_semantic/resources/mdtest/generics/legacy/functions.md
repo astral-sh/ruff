@@ -440,10 +440,10 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
-## Gradual constraints can obscure a more specific constraint
+## Prefer specific compatible constraints over gradual constraints
 
-A gradual constraint that is compatible with a concrete argument can be selected before a more
-specific constraint. This makes inference depend on the order in which the constraints are declared.
+A gradual constraint can be compatible with a concrete argument and a more specific declared
+constraint. We prefer the more specific constraint regardless of declaration order.
 
 ```py
 from typing import Any, TypeVar
@@ -454,6 +454,8 @@ class Row(tuple[Any, ...]):
 
 GradualFirst = TypeVar("GradualFirst", list[Any], tuple[Any, ...], Row)
 RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...], list[Any])
+AnyFirst = TypeVar("AnyFirst", Any, int)
+IntFirst = TypeVar("IntFirst", int, Any)
 
 def gradual_first(row: GradualFirst) -> GradualFirst:
     return row
@@ -461,15 +463,22 @@ def gradual_first(row: GradualFirst) -> GradualFirst:
 def row_first(row: RowFirst) -> RowFirst:
     return row
 
+def any_first(value: AnyFirst) -> AnyFirst:
+    return value
+
+def int_first(value: IntFirst) -> IntFirst:
+    return value
+
 gradual = gradual_first(Row())
-# TODO: revealed: Row
-reveal_type(gradual)  # revealed: tuple[Any, ...]
-# error: [unresolved-attribute] "Object of type `tuple[Any, ...]` has no attribute `asDict`"
+reveal_type(gradual)  # revealed: Row
 gradual.asDict()
 
 specific = row_first(Row())
 reveal_type(specific)  # revealed: Row
 specific.asDict()
+
+reveal_type(any_first(1))  # revealed: int
+reveal_type(int_first(1))  # revealed: int
 ```
 
 ## Typevar inference is a unification problem
@@ -1078,7 +1087,7 @@ When inference provides only an upper bound, we prefer the most general compatib
 constraint. This also does not depend on declaration order.
 
 ```py
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 NarrowFirst = TypeVar("NarrowFirst", int, object)
 BroadFirst = TypeVar("BroadFirst", object, int)
@@ -1093,6 +1102,33 @@ def accepts_object(value: object) -> None: ...
 
 reveal_type(narrow_first(accepts_object))  # revealed: object
 reveal_type(broad_first(accepts_object))  # revealed: object
+
+class Row(tuple[Any, ...]): ...
+
+GradualFirst = TypeVar("GradualFirst", tuple[Any, ...], Row)
+RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...])
+AnyFirst = TypeVar("AnyFirst", Any, int)
+IntFirst = TypeVar("IntFirst", int, Any)
+
+def gradual_first(callback: Callable[[GradualFirst], None]) -> GradualFirst:
+    raise NotImplementedError
+
+def row_first(callback: Callable[[RowFirst], None]) -> RowFirst:
+    raise NotImplementedError
+
+def any_first(callback: Callable[[AnyFirst], None]) -> AnyFirst:
+    raise NotImplementedError
+
+def int_first(callback: Callable[[IntFirst], None]) -> IntFirst:
+    raise NotImplementedError
+
+def accepts_tuple(value: tuple[object, ...]) -> None: ...
+def accepts_int(value: int) -> None: ...
+
+reveal_type(gradual_first(accepts_tuple))  # revealed: tuple[Any, ...]
+reveal_type(row_first(accepts_tuple))  # revealed: tuple[Any, ...]
+reveal_type(any_first(accepts_int))  # revealed: int
+reveal_type(int_first(accepts_int))  # revealed: int
 ```
 
 ## Ambiguous constrained TypeVar inference from `Any`
