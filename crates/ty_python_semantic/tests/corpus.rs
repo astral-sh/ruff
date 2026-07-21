@@ -239,16 +239,16 @@ impl ruff_db::Db for CorpusDb {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
 impl ty_module_resolver::Db for CorpusDb {
     fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
         Program::get(self).search_paths(self)
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
     }
 }
 

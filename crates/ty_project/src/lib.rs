@@ -14,7 +14,6 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
-use ruff_db::Db as _;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
@@ -29,6 +28,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use ty_module_resolver::Db as _;
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -894,12 +894,12 @@ mod tests {
     use crate::db::Db as _;
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
-    use ruff_db::Db as _;
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ty_module_resolver::Db as _;
     use ty_python_semantic::types::check_types;
 
     #[test]
@@ -927,7 +927,12 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, file, &events);
+        assert_function_query_was_not_run(
+            &db,
+            check_types,
+            PythonFile::new(&db, file, db.python_version()),
+            &events,
+        );
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.

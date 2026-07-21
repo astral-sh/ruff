@@ -36,9 +36,9 @@ use crate::Db;
     cycle_initial=|_, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size)
 ]
-pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
-    let mut finder = ExportFinder::new(db, file);
+pub(super) fn exported_names(db: &dyn Db, file: PythonFile<'_>) -> Box<[Name]> {
+    let module = parsed_module(db, file).load(db);
+    let mut finder = ExportFinder::new(db, file.file(db));
     finder.visit_body(module.suite());
 
     let mut exports = finder.resolve_exports();
@@ -257,7 +257,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .iter()
                                     .flat_map(|module| {
                                         module
-                                            .file(self.db)
+                                            .python_file(self.db)
                                             .map(|file| exported_names(self.db, file))
                                             .unwrap_or_default()
                                     })

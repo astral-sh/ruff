@@ -70,9 +70,10 @@ pub mod program;
 pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let python_file = PythonFile::new(db, file, db.python_version());
+    let module = parsed_module(db, python_file).load(db);
 
-    SemanticIndexBuilder::new(db, file, &module).build()
+    SemanticIndexBuilder::new(db, python_file, &module).build()
 }
 
 /// Returns the place table for a specific `scope`.
@@ -1070,9 +1071,10 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::{Db as _, files::system_path_to_file, parsed::ParsedModuleRef};
+    use ruff_db::{files::system_path_to_file, parsed::ParsedModuleRef};
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
+    use ty_module_resolver::Db as _;
 
     use super::*;
 

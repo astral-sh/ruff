@@ -15,7 +15,7 @@ pub fn find_references(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the cursor position
     let goto_target = find_goto_target(&model, &module, offset)?;

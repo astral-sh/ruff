@@ -1521,9 +1521,8 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
-            let referenced_file = star_import.referenced_file(db);
-
-            let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
+            let python_file = star_import.referenced_parse_file(db);
+            let requires_explicit_reexport = match dunder_all_names(db, python_file) {
                 Some(all_names) => {
                     if all_names.contains(symbol.name()) {
                         Some(RequiresExplicitReExport::No)
@@ -1531,7 +1530,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                         tracing::trace!(
                             "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                             symbol.name(),
-                            referenced_file.path(db)
+                            python_file.file(db).path(db)
                         );
                         return Truthiness::AlwaysFalse;
                     }
@@ -1539,6 +1538,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 None => None,
             };
 
+            let referenced_file = python_file.file(db);
             match imported_symbol(
                 db,
                 Some(referenced_file),

@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use itertools::Either;
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -873,8 +872,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Returns the range of the `TypedDict` call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, scope.python_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {

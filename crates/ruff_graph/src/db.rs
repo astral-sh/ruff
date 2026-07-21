@@ -80,16 +80,16 @@ impl SourceDb for ModuleDb {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> PythonVersion {
-        self.python_version
-    }
 }
 
 #[salsa::db]
 impl ty_module_resolver::Db for ModuleDb {
     fn search_paths(&self) -> &SearchPaths {
         &self.search_paths
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.python_version
     }
 }
 

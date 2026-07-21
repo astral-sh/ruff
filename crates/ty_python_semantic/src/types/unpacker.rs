@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
 use ruff_db::parsed::ParsedModuleRef;
+
+use ruff_db::PythonFile;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
@@ -39,10 +41,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
         target_scope: ScopeId<'db>,
+        python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
-            context: InferContext::new(db, target_scope, module),
+            context: InferContext::new(db, target_scope, python_file, module),
             targets: FxHashMap::default(),
         }
     }

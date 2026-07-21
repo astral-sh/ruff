@@ -14,12 +14,13 @@ use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
-    let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
+pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHashSet<Name>> {
+    let source_file = file.file(db);
+    let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
-    let index = semantic_index(db, file);
-    let mut collector = DunderAllNamesCollector::new(db, file, index);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, source_file);
+    let mut collector = DunderAllNamesCollector::new(db, source_file, index);
     collector.visit_body(module.suite());
     collector.into_names()
 }
@@ -90,7 +91,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                 };
                 let Some(module_dunder_all_names) = module_literal
                     .module(self.db)
-                    .file(self.db)
+                    .python_file(self.db)
                     .and_then(|file| dunder_all_names(self.db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
@@ -160,7 +161,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
-        dunder_all_names(self.db, module.file(self.db)?)
+        dunder_all_names(self.db, module.python_file(self.db)?)
     }
 
     /// Infer the type of a standalone expression.

@@ -535,12 +535,12 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 mod tests {
     use super::*;
     use crate::tests::TestDb;
-    use ruff_db::Db;
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
 
@@ -548,7 +548,8 @@ mod tests {
         let mut db = TestDb::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version())).load(&db);
+        let parsed =
+            parsed_module(&db, PythonFile::new(&db, file, PythonVersion::latest_ty())).load(&db);
         InlineFileAssertions::from_file(
             source,
             AssertionSource::Python(&parsed),

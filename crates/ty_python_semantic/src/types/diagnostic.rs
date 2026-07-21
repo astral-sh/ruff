@@ -35,7 +35,6 @@ use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    PythonFile,
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
@@ -2627,8 +2626,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
             if it has non-method members",
         );
         if let Some(definition) = single_member.definition() {
-            let file = definition.file(db);
-            let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             let span = Span::from(definition.focus_range(db, &module));
             sub.annotate(Annotation::primary(span).message(format_args!(
                 "Non-method member `{}` declared here",
@@ -2652,8 +2650,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
             .iter()
             .find_map(|member| Some((member.name(), member.definition()?)))
         {
-            let file = definition.file(db);
-            let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             let span = Span::from(definition.focus_range(db, &module));
             sub.annotate(
                 Annotation::primary(span)
@@ -2801,7 +2798,7 @@ pub(super) fn abstract_method_span<'db>(
     };
 
     let file = function.file(db);
-    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let module = parsed_module(db, function.python_file(db)).load(db);
     let node = implementation.node(db, file, &module);
     let source_text = source_text(db, file);
 
@@ -3410,7 +3407,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         && let Some(declaration) = field.first_declaration()
     {
         let file = declaration.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, declaration.python_file(db)).load(db);
 
         let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
         for message in [
@@ -3519,12 +3516,10 @@ pub(crate) fn report_invalid_type_param_order<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
-            Annotation::secondary(Span::from(definition.full_range(
-                db,
-                &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
-            )))
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
+            ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
     }
@@ -3567,12 +3562,10 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
-            Annotation::secondary(Span::from(definition.full_range(
-                db,
-                &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
-            )))
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
+            ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
     }
@@ -3860,16 +3853,10 @@ pub(super) fn report_invalid_method_override<'db>(
                     .next()
                 && let Some(definition) = binding.binding.definition()
             {
-                let definition_span = Span::from(
-                    definition.full_range(
-                        db,
-                        &parsed_module(
-                            db,
-                            PythonFile::new(db, superclass_scope.file(db), db.python_version()),
-                        )
-                        .load(db),
-                    ),
-                );
+                let definition_span = Span::from(definition.full_range(
+                    db,
+                    &parsed_module(db, superclass_scope.python_file(db)).load(db),
+                ));
 
                 let superclass_function_span = match superclass_type {
                     Type::FunctionLiteral(function) => Some(signature_span(function)),
@@ -4085,20 +4072,10 @@ pub(super) fn report_overridden_final_method<'db>(
     };
 
     sub.annotate(
-        Annotation::secondary(Span::from(
-            superclass_function_literal.focus_range(
-                db,
-                &parsed_module(
-                    db,
-                    PythonFile::new(
-                        db,
-                        first_final_superclass_definition.file(db),
-                        db.python_version(),
-                    ),
-                )
-                .load(db),
-            ),
-        ))
+        Annotation::secondary(Span::from(superclass_function_literal.focus_range(
+            db,
+            &parsed_module(db, first_final_superclass_definition.python_file(db)).load(db),
+        )))
         .message(format_args!("`{superclass_name}.{member}` defined here")),
     );
 
@@ -4248,16 +4225,10 @@ pub(super) fn report_overridden_final_variable<'db>(
             ),
         );
         sub.annotate(
-            Annotation::secondary(Span::from(
-                superclass_def.focus_range(
-                    db,
-                    &parsed_module(
-                        db,
-                        PythonFile::new(db, superclass_def.file(db), db.python_version()),
-                    )
-                    .load(db),
-                ),
-            ))
+            Annotation::secondary(Span::from(superclass_def.focus_range(
+                db,
+                &parsed_module(db, superclass_def.python_file(db)).load(db),
+            )))
             .message(format_args!("`{superclass_name}.{member}` defined here")),
         );
         diagnostic.sub(sub);
@@ -4544,11 +4515,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         );
 
         let base_class_file = base_class.file(db);
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, base_class_file, db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, base_class.python_file(db)).load(db);
 
         let decorator_range = base_class
             .body_scope(db)
@@ -4773,10 +4740,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                 diagnostic.set_primary_message(format_args!(
                     "Superclass `{superclass_name}` cannot be subclassed",
                 ));
-                let definition_module = parsed_module(
-                    db,
-                    PythonFile::new(db, definition.file(db), db.python_version()),
-                );
+                let definition_module = parsed_module(db, definition.python_file(db));
                 let mut annotation = Annotation::secondary(Span::from(
                     definition.focus_range(db, &definition_module.load(db)),
                 ));

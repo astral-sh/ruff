@@ -6,10 +6,11 @@ use lsp_types::{
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};

@@ -22,7 +22,6 @@ use crate::{
     },
 };
 use ruff_db::{
-    PythonFile,
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
@@ -241,15 +240,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Annotate the diagnostic with the definition span of the default TypeVar.
             let annotate_default_definition = |diagnostic: &mut LintDiagnosticGuard<'_, '_>| {
                 if let Some(definition) = default_typevar.definition(db) {
-                    let file = definition.file(db);
                     diagnostic.annotate(
-                        Annotation::secondary(Span::from(
-                            definition.full_range(
-                                db,
-                                &parsed_module(db, PythonFile::new(db, file, db.python_version()))
-                                    .load(db),
-                            ),
-                        ))
+                        Annotation::secondary(Span::from(definition.full_range(
+                            db,
+                            &parsed_module(db, definition.python_file(db)).load(db),
+                        )))
                         .message(format_args!("`{default_name}` defined here")),
                     );
                 }
@@ -523,12 +518,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 outer-scope type parameter `{outer_name}` as its default"
         ));
         if let Some(definition) = outer_typevar.definition(db) {
-            let file = definition.file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(definition.full_range(
-                    db,
-                    &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
-                )))
+                Annotation::secondary(Span::from(
+                    definition
+                        .full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
+                ))
                 .message(format_args!("`{outer_name}` defined here")),
             );
         }

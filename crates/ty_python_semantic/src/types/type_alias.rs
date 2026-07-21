@@ -19,8 +19,6 @@ use ty_python_core::{
 };
 
 use ruff_db::parsed::parsed_module;
-
-use ruff_db::PythonFile;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
@@ -77,8 +75,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module =
-            parsed_module(db, PythonFile::new(db, scope.file(db), db.python_version())).load(db);
+        let module = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -113,8 +110,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let file = scope.file(db);
-        let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let parsed = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -183,8 +179,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     )]
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let file = definition.file(db);
-        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return Type::unknown();
         };
@@ -457,7 +452,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
         let definition = self.type_alias.definition(self.db);
-        let file = definition.file(self.db);
+        let file = definition.python_file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
         // Type aliases are defined directly in their enclosing scope (no body scope like classes),

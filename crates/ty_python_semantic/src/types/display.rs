@@ -717,12 +717,13 @@ fn fmt_file_location<'db>(
 /// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
 pub(super) fn qualified_name_components_from_scope(
     db: &dyn Db,
-    file: ruff_db::files::File,
+    file: PythonFile<'_>,
     file_scope_id: FileScopeId,
     skip_count: usize,
 ) -> Vec<String> {
-    let module_ast = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
-    let index = semantic_index(db, file);
+    let source_file = file.file(db);
+    let module_ast = parsed_module(db, file).load(db);
+    let index = semantic_index(db, source_file);
 
     let mut name_parts = vec![];
 
@@ -747,7 +748,7 @@ pub(super) fn qualified_name_components_from_scope(
         }
     }
 
-    if let Some(module) = file_to_module(db, file) {
+    if let Some(module) = file_to_module(db, source_file) {
         let module_name = module.name(db);
         name_parts.push(module_name.as_str().to_string());
     }
@@ -854,11 +855,7 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
             let offset = definition
                 .focus_range(
                     self.db,
-                    &parsed_module(
-                        self.db,
-                        PythonFile::new(self.db, file, self.db.python_version()),
-                    )
-                    .load(self.db),
+                    &parsed_module(self.db, definition.python_file(self.db)).load(self.db),
                 )
                 .range()
                 .start();

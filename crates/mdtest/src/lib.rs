@@ -775,10 +775,6 @@ pub(crate) mod tests {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
-        }
     }
 
     impl DbWithTestSystem for TestDb {

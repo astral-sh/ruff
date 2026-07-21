@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
 use lsp_types::{PrepareRenameParams, PrepareRenameRequest, PrepareRenameResult, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::can_rename;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};

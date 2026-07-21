@@ -1,5 +1,4 @@
 use char_str::CharStr;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
 use rustc_hash::FxHashSet;
@@ -141,11 +140,7 @@ impl<'db> FieldMetadata<'db> {
         definition: Definition<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
             return;
         };
@@ -170,7 +165,7 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.file(db));
+        let model = SemanticModel::new(db, definition.python_file(db));
         let Some(alias_definition) = definitions_for_name(
             &model,
             name.id.as_str(),
@@ -182,11 +177,7 @@ impl<'db> FieldMetadata<'db> {
             return;
         };
 
-        let module = parsed_module(
-            db,
-            PythonFile::new(db, alias_definition.file(db), db.python_version()),
-        )
-        .load(db);
+        let module = parsed_module(db, alias_definition.python_file(db)).load(db);
         let kind = alias_definition.kind(db);
         let value = match &kind {
             DefinitionKind::Assignment(assignment) => assignment.value(&module),
@@ -651,8 +642,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         };
     };
 
-    let module =
-        parsed_module(db, PythonFile::new(db, class.file(db), db.python_version())).load(db);
+    let module = parsed_module(db, class.python_file(db)).load(db);
     let kind = definition.kind(db);
     let value = match &kind {
         DefinitionKind::Assignment(assignment) => assignment.value(&module),
@@ -770,8 +760,7 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
 
 fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
     let definition = class.definition(db);
-    let module =
-        parsed_module(db, PythonFile::new(db, class.file(db), db.python_version())).load(db);
+    let module = parsed_module(db, class.python_file(db)).load(db);
     let kind = definition.kind(db);
     let Some(class) = kind.as_class() else {
         return ModelConfig::default();
@@ -893,11 +882,7 @@ fn function_has_before_or_plain_field_validator<'db>(
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return false;
     };
-    let module = parsed_module(
-        db,
-        PythonFile::new(db, definition.file(db), db.python_version()),
-    )
-    .load(db);
+    let module = parsed_module(db, definition.python_file(db)).load(db);
     let function_node = function.node(&module);
     if function_node.decorator_list.is_empty() {
         return false;

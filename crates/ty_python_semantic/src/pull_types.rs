@@ -10,9 +10,10 @@ use ruff_python_ast::{
 };
 
 pub fn pull_types(db: &dyn Db, file: File) {
+    let file = PythonFile::new(db, file, db.python_version());
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 }
@@ -22,7 +23,7 @@ struct PullTypesVisitor<'db> {
 }
 
 impl<'db> PullTypesVisitor<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             model: SemanticModel::new(db, file),
         }
