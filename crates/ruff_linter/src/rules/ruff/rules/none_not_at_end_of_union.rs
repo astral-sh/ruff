@@ -11,7 +11,7 @@ use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for type annotations where `None` is not at the end of an union.
+/// Checks for type annotations where `None` is not at the end of a union.
 ///
 /// ## Why is this bad?
 /// Type annotation unions are commutative, meaning that the order of the elements
@@ -33,7 +33,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.4")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
