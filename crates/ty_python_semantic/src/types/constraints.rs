@@ -92,7 +92,7 @@ use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
-use std::ops::Range;
+use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
 use indexmap::map::Entry;
@@ -2478,6 +2478,42 @@ impl NodeId {
 
     /// Returns whether this BDD represent the constant function `false`.
     fn is_never_satisfied<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> bool {
+        /// A [`PathVisitor`] that breaks early if we ever encounter a satisfied path.
+        struct IsNeverSatisfiedVisitor;
+
+        impl PathVisitor for IsNeverSatisfiedVisitor {
+            type Continue = ();
+            type Break = ();
+
+            fn visit_satisfied(
+                &mut self,
+                _path: Option<&PathAssignments>,
+            ) -> ControlFlow<Self::Break, Self::Continue> {
+                ControlFlow::Break(())
+            }
+
+            fn visit_unsatisfied(
+                &mut self,
+                _path: Option<&PathAssignments>,
+            ) -> ControlFlow<Self::Break, Self::Continue> {
+                ControlFlow::Continue(())
+            }
+
+            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Continue> {
+                ControlFlow::Continue(())
+            }
+
+            fn combine(
+                &mut self,
+                _path: &PathAssignments,
+                _if_true: Self::Continue,
+                _if_uncertain: Self::Continue,
+                _if_false: Self::Continue,
+            ) -> ControlFlow<Self::Break, Self::Continue> {
+                ControlFlow::Continue(())
+            }
+        }
+
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -2487,79 +2523,15 @@ impl NodeId {
                 }
 
                 let mut path = interior.path_assignments(builder);
-                let result = self.is_never_satisfied_inner(db, builder, &mut path);
+                let result = path
+                    .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                    .is_continue();
                 builder
                     .storage
                     .borrow_mut()
                     .never_satisfied_cache
                     .insert(self, result);
                 result
-            }
-        }
-    }
-
-    fn is_never_satisfied_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        path: &mut PathAssignments,
-    ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => false,
-            Node::AlwaysFalse => true,
-            Node::Interior(_) => {
-                // walk_edge will return None if this node's constraint (or anything we can derive
-                // from it) causes the if_true edge to become impossible. We want to ignore
-                // impossible paths, and so we treat them as passing the "never satisfied" check.
-                //
-                // Note that unlike `is_always_satisfied`, here we don't have to fold the uncertain
-                // branch into the true and false branches, since C ∨ U is only false when C and U
-                // are each independently false. That lets us check each branch in isolation.
-                let interior = builder.interior_node_data(self);
-                let true_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_true(),
-                        interior.source_order,
-                        |path, _| interior.if_true.is_never_satisfied_inner(db, builder, path),
-                    )
-                    .unwrap_or(true);
-                if !true_never_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_uncertain branch
-                let uncertain_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_unconstrained(),
-                        interior.source_order,
-                        |path, _| {
-                            interior
-                                .if_uncertain
-                                .is_never_satisfied_inner(db, builder, path)
-                        },
-                    )
-                    .unwrap_or(true);
-                if !uncertain_never_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_false
-                            .is_never_satisfied_inner(db, builder, path)
-                    },
-                )
-                .unwrap_or(true)
             }
         }
     }
@@ -6433,6 +6405,61 @@ impl SequentMap {
     }
 }
 
+/// A visitor for walking the paths of a BDD.
+///
+/// You can use this in one of two ways: bottom-up or top-down.
+///
+/// You'll use a bottom-up visitor when you are doing something "fold-like" — generating a single
+/// value (of your `Continue` type) that summarizes all of the paths. You implement
+/// `visit_satisfied`, `visit_unsatisfied`, and `visit_impossible` to define the "base" value for
+/// each path in the BDD. Your `combine` method will be called once for each BDD interior node as
+/// we unwind the path walk stack; it is given the values computed for each subtree, and must
+/// figure out how to combine them into the summary value for the subtree rooted at that node.
+///
+/// You'll use a top-down visitor when you are doing something "map-like" — generating a separate
+/// value for each path. You implement `visit_satisfied`, `visit_unsatisfied`, and
+/// `visit_impossible`, which will be called for each path, and process the corresponding
+/// [`PathAssignments`]. If you produce some data representing the path, you are responsible for
+/// storing that data somewhere. (You could use a collection like [`Vec`] as your `Continue`, and
+/// concatenate subtree vecs in your `combine` method; but it will typically be more efficient to
+/// maintain an accumulator yourself, and append into it directly in your leaf methods.)
+///
+/// In either case, all of your methods can return [`ControlFlow::Break`] to abort the path walk.
+trait PathVisitor {
+    type Continue;
+    type Break;
+
+    /// Called once for each satisfied path in the BDD. `path` will contain all of the assignments
+    /// on this path.
+    fn visit_satisfied(
+        &mut self,
+        path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Continue>;
+
+    /// Called once for each unsatisfied path in the BDD. `path` will contain all of the
+    /// assignments on this path.
+    fn visit_unsatisfied(
+        &mut self,
+        path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Continue>;
+
+    /// Called once for each impossible path in the BDD.
+    ///
+    /// TODO: Provide a path, and make sure it includes all of the assignments that led to a
+    /// contradiction.
+    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Continue>;
+
+    /// Called once for each interior node in the BDD. Combines [`Continue`][Self::Continue] values
+    /// for each of the interior node's subtrees.
+    fn combine(
+        &mut self,
+        path: &PathAssignments,
+        if_true: Self::Continue,
+        if_uncertain: Self::Continue,
+        if_false: Self::Continue,
+    ) -> ControlFlow<Self::Break, Self::Continue>;
+}
+
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
 ///
@@ -6555,6 +6582,72 @@ impl PathAssignments {
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
         }
+    }
+
+    fn visit<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+    ) -> ControlFlow<V::Break, V::Continue>
+    where
+        V: PathVisitor,
+    {
+        fn visit_paths_inner<'db, V>(
+            db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            node: NodeId,
+            path: &mut PathAssignments,
+            visitor: &mut V,
+        ) -> ControlFlow<V::Break, V::Continue>
+        where
+            V: PathVisitor,
+        {
+            match node.node() {
+                Node::AlwaysTrue => visitor.visit_satisfied(Some(path)),
+                Node::AlwaysFalse => visitor.visit_unsatisfied(Some(path)),
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(node);
+                    let if_true = path
+                        .walk_edge(
+                            db,
+                            builder,
+                            interior.constraint.when_true(),
+                            interior.source_order,
+                            |path, _| {
+                                visit_paths_inner(db, builder, interior.if_true, path, visitor)
+                            },
+                        )
+                        .unwrap_or_else(|| visitor.visit_impossible())?;
+                    let if_uncertain = path
+                        .walk_edge(
+                            db,
+                            builder,
+                            interior.constraint.when_unconstrained(),
+                            interior.source_order,
+                            |path, _| {
+                                visit_paths_inner(db, builder, interior.if_uncertain, path, visitor)
+                            },
+                        )
+                        .unwrap_or_else(|| visitor.visit_impossible())?;
+                    let if_false = path
+                        .walk_edge(
+                            db,
+                            builder,
+                            interior.constraint.when_false(),
+                            interior.source_order,
+                            |path, _| {
+                                visit_paths_inner(db, builder, interior.if_false, path, visitor)
+                            },
+                        )
+                        .unwrap_or_else(|| visitor.visit_impossible())?;
+                    visitor.combine(path, if_true, if_uncertain, if_false)
+                }
+            }
+        }
+
+        visit_paths_inner(db, builder, node, self, visitor)
     }
 
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
