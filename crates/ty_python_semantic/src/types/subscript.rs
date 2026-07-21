@@ -242,7 +242,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         diagnostic.annotate(context.secondary(&*subscript.value).message(
                             format_args!(
                                 "Alias to `{}`, which is already specialized",
-                                value_type.display(&ctx)
+                                value_type.display(ctx)
                             ),
                         ));
                     }
@@ -262,7 +262,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(&ctx),
+                        value_ty.display(ctx),
                     ));
                 }
             }
@@ -278,8 +278,8 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(&ctx),
-                            value_ty.display(&ctx),
+                            bindings.callable_type().display(ctx),
+                            value_ty.display(ctx),
                         ));
                     }
                 }
@@ -300,9 +300,9 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(&ctx),
-                            slice_ty.display(&ctx),
-                            value_ty.display(&ctx),
+                            bindings.callable_type().display(ctx),
+                            slice_ty.display(ctx),
+                            value_ty.display(ctx),
                         ));
                     }
                 }
@@ -311,8 +311,8 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(&ctx),
-                            value_ty.display(&ctx),
+                            bindings.callable_type().display(ctx),
+                            value_ty.display(ctx),
                         ));
                     }
                 }
@@ -343,7 +343,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, value_node) {
                     builder.into_diagnostic(format_args!(
                         "`{}` is not a valid argument to `{origin}`",
-                        argument_ty.display(&ctx),
+                        argument_ty.display(ctx),
                     ));
                 }
             }

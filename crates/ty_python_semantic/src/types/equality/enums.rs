@@ -29,7 +29,7 @@ pub(super) fn evaluate_enum_comparison<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     evaluate_enum_domains(&ctx, target, other, branch, operator).or_else(|| {
         PartitionedEnumComparison::new(&ctx, target, other, branch, operator).map(|comparison| {
             match comparison.evaluate(evaluator, branch, operator) {
@@ -176,7 +176,7 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
-        let ctx = evaluator.ctx;
+        let ctx = evaluator.ctx.clone();
         if matches!(target.resolve_type_alias(&ctx), Type::Dynamic(_)) {
             return evaluator.evaluate(target, self.other_type, branch, operator);
         }
@@ -215,7 +215,7 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
-        let ctx = evaluator.ctx;
+        let ctx = evaluator.ctx.clone();
         let mut narrowed_enum = None;
         let result = evaluate_target_union(&ctx, &self.target.alternatives, branch, |target| {
             let result = self.evaluate_against_other(evaluator, target, branch, operator);

@@ -115,7 +115,7 @@ fn validate_typed_dict_field_overrides<'db>(
             };
 
             let Some(reason) =
-                TypedDictFieldOverrideReason::from_fields(&ctx, child_field, base_field)
+                TypedDictFieldOverrideReason::from_fields(ctx, child_field, base_field)
             else {
                 continue;
             };
@@ -136,7 +136,7 @@ fn validate_typed_dict_field_overrides<'db>(
                 context,
                 class,
                 field_name.as_str(),
-                reason,
+                &reason,
                 base.name(db),
                 base_field.first_declaration(),
                 own_field_definition,
@@ -222,15 +222,15 @@ fn validate_typed_dict_openness<'db>(
                     TypedDictOpenness::Extra(child_extra_items) => {
                         if !child_extra_items
                             .declared_ty
-                            .is_assignable_to(&ctx, base_extra_items.declared_ty)
+                            .is_assignable_to(ctx, base_extra_items.declared_ty)
                         {
                             report_invalid_typed_dict_openness(
                                 context,
                                 class,
                                 format_args!(
                                     "Extra items type `{}` is not assignable to `{}` from base `{}`",
-                                    child_extra_items.declared_ty.display(&ctx),
-                                    base_extra_items.declared_ty.display(&ctx),
+                                    child_extra_items.declared_ty.display(ctx),
+                                    base_extra_items.declared_ty.display(ctx),
                                     base.name(db),
                                 ),
                             );
@@ -243,15 +243,15 @@ fn validate_typed_dict_openness<'db>(
                     !base_items.contains_key(*field_name)
                         && !field
                             .declared_ty
-                            .is_assignable_to(&ctx, base_extra_items.declared_ty)
+                            .is_assignable_to(ctx, base_extra_items.declared_ty)
                 }) {
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` of type `{}` is not assignable to extra items type `{}` from base `{}`",
-                            field.declared_ty.display(&ctx),
-                            base_extra_items.declared_ty.display(&ctx),
+                            field.declared_ty.display(ctx),
+                            base_extra_items.declared_ty.display(ctx),
                             base.name(db),
                         ),
                     );
@@ -274,10 +274,10 @@ fn validate_typed_dict_openness<'db>(
                 if child_extra_items.is_read_only()
                     || !child_extra_items
                         .declared_ty
-                        .is_assignable_to(&ctx, base_extra_items.declared_ty)
+                        .is_assignable_to(ctx, base_extra_items.declared_ty)
                     || !base_extra_items
                         .declared_ty
-                        .is_assignable_to(&ctx, child_extra_items.declared_ty)
+                        .is_assignable_to(ctx, child_extra_items.declared_ty)
                 {
                     report_invalid_typed_dict_openness(
                         context,
@@ -285,7 +285,7 @@ fn validate_typed_dict_openness<'db>(
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items type `{}` from base `{}`",
                             class.name(db),
-                            base_extra_items.declared_ty.display(&ctx),
+                            base_extra_items.declared_ty.display(ctx),
                             base.name(db),
                         ),
                     );
@@ -298,17 +298,17 @@ fn validate_typed_dict_openness<'db>(
                             || field.is_read_only()
                             || !field
                                 .declared_ty
-                                .is_assignable_to(&ctx, base_extra_items.declared_ty)
+                                .is_assignable_to(ctx, base_extra_items.declared_ty)
                             || !base_extra_items
                                 .declared_ty
-                                .is_assignable_to(&ctx, field.declared_ty))
+                                .is_assignable_to(ctx, field.declared_ty))
                 }) {
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` must be mutable, not required, and consistent with extra items type `{}` from base `{}`",
-                            base_extra_items.declared_ty.display(&ctx),
+                            base_extra_items.declared_ty.display(ctx),
                             base.name(db),
                         ),
                     );
@@ -330,7 +330,7 @@ fn report_invalid_typed_dict_openness(
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum TypedDictFieldOverrideReason<'db> {
     /// A required inherited field was relaxed to `NotRequired`.
     RequiredFieldMadeNotRequired,
@@ -436,13 +436,13 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
 
         Some(if base_field.is_read_only() {
             Self::ReadOnlyTypeNotAssignable {
-                ctx: *ctx,
+                ctx: ctx.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }
         } else {
             Self::MutableTypeIncompatible {
-                ctx: *ctx,
+                ctx: ctx.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }
@@ -455,7 +455,7 @@ fn report_typed_dict_field_override<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     field_name: &str,
-    reason: TypedDictFieldOverrideReason<'db>,
+    reason: &TypedDictFieldOverrideReason<'db>,
     base_name: &str,
     base_definition: Option<Definition<'db>>,
     own_field_definition: Option<Definition<'db>>,

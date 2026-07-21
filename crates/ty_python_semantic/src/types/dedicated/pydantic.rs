@@ -1316,7 +1316,7 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     else {
         return;
     };
-    if !model_init_discards_extra(&context.semantic_context(), class, metadata) {
+    if !model_init_discards_extra(context.semantic_context(), class, metadata) {
         return;
     }
 

@@ -2723,7 +2723,10 @@ impl<'db> TupleUnpacker<'db> {
                 new_builders(suffix),
             ),
         };
-        Self { ctx: *ctx, targets }
+        Self {
+            ctx: ctx.clone(),
+            targets,
+        }
     }
 
     /// Unpacks a single rhs tuple into the target tuple that we are building. If you want to
@@ -2752,8 +2755,8 @@ impl<'db> TupleUnpacker<'db> {
     /// union of the type unpacked into that target from each of the rhs tuples. If there is a
     /// starred target, we will each unpacked type in `list`.
     pub(crate) fn into_types(self) -> impl Iterator<Item = Type<'db>> {
-        let ctx = self.ctx;
-        self.targets
+        let Self { ctx, targets } = self;
+        targets
             .into_all_elements_with_kind()
             .map(move |builder| match builder {
                 TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {

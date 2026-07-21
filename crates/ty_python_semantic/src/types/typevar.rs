@@ -409,7 +409,7 @@ impl<'db> TypeVarInstance<'db> {
 
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
-            ctx: SemanticContext<'db>,
+            ctx: &'a SemanticContext<'db>,
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
             seen_type_aliases: &'a RefCell<SeenTypeAliases<'db>>,
@@ -430,7 +430,7 @@ impl<'db> TypeVarInstance<'db> {
             }
 
             typevar
-                .default_type_impl(&state.ctx, state.visitor)
+                .default_type_impl(state.ctx, state.visitor)
                 .is_some_and(|default_ty| {
                     type_is_self_referential_impl(state, default_ty, self_identity)
                 })
@@ -461,7 +461,7 @@ impl<'db> TypeVarInstance<'db> {
                 {
                     return true;
                 }
-                type_alias.value_type(&state.ctx)
+                type_alias.value_type(state.ctx)
             } else if let Some(generic_context) = type_alias.generic_context(db)
                 && generic_context.variables(db).any(|typevar| {
                     typevar_default_is_self_referential(state, typevar.typevar(db), self_identity)
@@ -480,7 +480,7 @@ impl<'db> TypeVarInstance<'db> {
             ty: Type<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            any_over_type(&state.ctx, ty, false, |inner_ty| match inner_ty {
+            any_over_type(state.ctx, ty, false, |inner_ty| match inner_ty {
                 Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
                     state,
                     bound_typevar.typevar(state.ctx.db()),
@@ -503,7 +503,7 @@ impl<'db> TypeVarInstance<'db> {
         let seen_type_aliases = RefCell::new(SeenTypeAliases::new());
 
         let state = State {
-            ctx: *ctx,
+            ctx,
             visitor,
             seen_typevars: &seen_typevars,
             seen_type_aliases: &seen_type_aliases,

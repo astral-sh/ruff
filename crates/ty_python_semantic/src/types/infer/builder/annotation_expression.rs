@@ -176,6 +176,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
+        let ctx = self.semantic_context();
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let inferred = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -239,12 +240,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                             let in_type_expression = inferred
                                 .inner_type()
-                                .in_type_expression(
-                                    &self.semantic_context(),
-                                    self.scope(),
-                                    None,
-                                    self.inference_flags(),
-                                )
+                                .in_type_expression(ctx, self.scope(), None, self.inference_flags())
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
@@ -296,9 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
 
                                 if qualifier == TypeQualifier::ClassVar
-                                    && type_and_qualifiers
-                                        .inner_type()
-                                        .has_non_self_typevar(&self.semantic_context())
+                                    && type_and_qualifiers.inner_type().has_non_self_typevar(ctx)
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                 {

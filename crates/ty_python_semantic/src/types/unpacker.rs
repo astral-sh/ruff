@@ -40,13 +40,20 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
 
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
-        db: &'db dyn Db,
+        ctx: &'ast SemanticContext<'db>,
         target_scope: ScopeId<'db>,
         python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
+        let db = ctx.db();
         Self {
-            context: InferContext::new(db, target_scope, python_file.file(db), python_file, module),
+            context: InferContext::new(
+                ctx,
+                target_scope,
+                python_file.file(db),
+                python_file,
+                module,
+            ),
             targets: FxHashMap::default(),
         }
     }
@@ -89,28 +96,28 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             UnpackKind::Iterable { mode } => {
                 let ctx = self.context.semantic_context();
                 value_type
-                    .try_iterate_with_mode(&ctx, mode)
-                    .map(|tuple| tuple.homogeneous_element_type(&ctx))
+                    .try_iterate_with_mode(ctx, mode)
+                    .map(|tuple| tuple.homogeneous_element_type(ctx))
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(
                             &self.context,
                             value_type,
                             value.as_any_node_ref(self.db(), self.module()),
                         );
-                        err.fallback_element_type(&ctx)
+                        err.fallback_element_type(ctx)
                     })
             }
             UnpackKind::ContextManager { mode } => {
                 let ctx = self.context.semantic_context();
                 value_type
-                    .try_enter_with_mode(&ctx, mode)
+                    .try_enter_with_mode(ctx, mode)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(
                             &self.context,
                             value_type,
                             value.as_any_node_ref(self.db(), self.module()),
                         );
-                        err.fallback_enter_type(&ctx)
+                        err.fallback_enter_type(ctx)
                     })
             }
         };
@@ -213,7 +220,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     None => TupleLength::Fixed(elts.len()),
                 };
                 let ctx = self.context.semantic_context();
-                let mut unpacker = TupleUnpacker::new(&ctx, target_len);
+                let mut unpacker = TupleUnpacker::new(ctx, target_len);
 
                 // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
                 // For our purposes here, we get better error messages and more precise inference
@@ -226,9 +233,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(&ctx).unwrap_or_else(|err| {
+                    let tuple = ty.try_iterate(ctx).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(&ctx)))
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(ctx)))
                     });
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {

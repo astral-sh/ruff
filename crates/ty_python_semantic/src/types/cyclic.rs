@@ -689,7 +689,7 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 mod tests {
     use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
     use crate::SemanticContext;
-    use crate::db::tests::{TestDb, setup_db};
+    use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::Type;
     use ruff_db::PythonFile;
@@ -761,14 +761,14 @@ mod tests {
         fn to_identity(&self, _ctx: &SemanticContext<'db>) -> Self::Id {}
     }
 
-    fn global_instance_type<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+    fn global_instance_type<'db>(ctx: &SemanticContext<'db>, name: &str) -> Type<'db> {
+        let db = ctx.db();
         let file = system_path_to_file(db, "/src/a.py").unwrap();
-        let file = PythonFile::new(db, file, db.python_version());
-        let ctx = db.semantic_context();
+        let file = PythonFile::new(db, file, ctx.python_version());
         global_symbol(db, file, name)
             .place
             .expect_type()
-            .to_instance_approximation(&ctx)
+            .to_instance_approximation(ctx)
             .unwrap()
     }
 
@@ -802,15 +802,15 @@ class RecursivePropertySetter[T](Protocol):
 
         let ctx = db.semantic_context();
         assert_eq!(
-            global_instance_type(&db, "GenericProperty").recursive_identity(&ctx),
+            global_instance_type(&ctx, "GenericProperty").recursive_identity(&ctx),
             None
         );
         assert!(matches!(
-            global_instance_type(&db, "RecursiveProperty").recursive_identity(&ctx),
+            global_instance_type(&ctx, "RecursiveProperty").recursive_identity(&ctx),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
         assert!(matches!(
-            global_instance_type(&db, "RecursivePropertySetter").recursive_identity(&ctx),
+            global_instance_type(&ctx, "RecursivePropertySetter").recursive_identity(&ctx),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
     }

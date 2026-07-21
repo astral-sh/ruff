@@ -84,6 +84,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         class_node: &ast::StmtClassDef,
         definition: Definition<'db>,
     ) {
+        let ctx = self.semantic_context();
         let ast::StmtClassDef {
             range: _,
             node_index: _,
@@ -183,7 +184,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default_params(&self.semantic_context()));
+                dataclass_params = Some(DataclassParams::default_params(ctx));
                 continue;
             }
 
@@ -275,22 +276,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 dataclass_transformer_params,
                 total_ordering,
             );
-            let ctx = self.semantic_context();
-            let decorator_result = apply_class_decorator(&ctx, decorator_ty, original_class_ty);
+            let decorator_result = apply_class_decorator(ctx, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(&self.semantic_context()),
+                Err(error) => error.return_type(ctx),
             };
-            if is_unknown_decorator_result(&ctx, decorated_ty) {
+            if is_unknown_decorator_result(ctx, decorated_ty) {
                 if !preserve_binding_for_unknown_result(
-                    &ctx,
+                    ctx,
                     decorator_ty,
                     decorator_call_ty(decorator),
                     decorated_ty,
                 ) {
                     metadata_applies_to_original_class = false;
                 }
-            } else if !type_retains_original_class(&ctx, original_class_ty, decorated_ty) {
+            } else if !type_retains_original_class(ctx, original_class_ty, decorated_ty) {
                 metadata_applies_to_original_class = false;
             }
 
@@ -316,7 +316,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
-            let ctx = self.semantic_context();
             let decorator_result = match precomputed_result {
                 // The metadata pass already called this decorator with the same input. If an inner
                 // decorator changed the binding, apply this decorator to the new public binding.
@@ -325,13 +324,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     decorator_result
                 }
-                _ => apply_class_decorator(&ctx, decorator_ty, inferred_ty),
+                _ => apply_class_decorator(ctx, decorator_ty, inferred_ty),
             };
             let decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
-                    bindings.return_type(&self.semantic_context())
+                    bindings.return_type(ctx)
                 }
             };
             let decorated_ty = match decorated_ty {
@@ -340,19 +339,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding for decorators known to preserve unknown results.
-            let should_preserve_binding = is_unknown_decorator_result(&ctx, decorated_ty)
+            let should_preserve_binding = is_unknown_decorator_result(ctx, decorated_ty)
                 && preserve_binding_for_unknown_result(
-                    &ctx,
+                    ctx,
                     decorator_ty,
                     decorator_call_ty(decorator_node),
                     decorated_ty,
                 );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
-            } else if class_decorator_preserves_class_binding(&ctx, original_class_ty, decorated_ty)
+            } else if class_decorator_preserves_class_binding(ctx, original_class_ty, decorated_ty)
             {
                 merge_class_preserving_decorator_result(
-                    &ctx,
+                    ctx,
                     original_class_ty,
                     inferred_ty,
                     decorated_ty,

@@ -614,14 +614,14 @@ impl<'db> IterationError<'db> {
 
         /// A little helper type for emitting a diagnostic
         /// based on the variant of iteration error.
-        struct Reporter<'a> {
-            ctx: SemanticContext<'a>,
+        struct Reporter<'ctx, 'a> {
+            ctx: &'ctx SemanticContext<'a>,
             builder: LintDiagnosticGuardBuilder<'a, 'a>,
             iterable_type: Type<'a>,
             mode: EvaluationMode,
         }
 
-        impl<'a> Reporter<'a> {
+        impl<'a> Reporter<'_, 'a> {
             /// Emit a diagnostic that is certain that `iterable_type` is not iterable.
             ///
             /// `because` should explain why `iterable_type` is not iterable.
@@ -633,20 +633,20 @@ impl<'db> IterationError<'db> {
             ) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` is not {maybe_async}iterable",
-                    iterable_type = self.iterable_type.display(&self.ctx),
+                    iterable_type = self.iterable_type.display(self.ctx),
                     maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
 
                 if let ErrorContext::Enabled = error_context {
                     let target = if self.mode.is_async() {
-                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(&self.ctx)
+                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(self.ctx)
                     } else {
-                        KnownClass::TyExtensionsIterable.to_instance_unknown(&self.ctx)
+                        KnownClass::TyExtensionsIterable.to_instance_unknown(self.ctx)
                     };
                     self.iterable_type
-                        .assignability_error_context(&self.ctx, target)
-                        .attach_to(&self.ctx, &mut diag);
+                        .assignability_error_context(self.ctx, target)
+                        .attach_to(self.ctx, &mut diag);
                 }
 
                 diag
@@ -662,20 +662,20 @@ impl<'db> IterationError<'db> {
             ) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` may not be {maybe_async}iterable",
-                    iterable_type = self.iterable_type.display(&self.ctx),
+                    iterable_type = self.iterable_type.display(self.ctx),
                     maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
 
                 if let ErrorContext::Enabled = error_context {
                     let target = if self.mode.is_async() {
-                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(&self.ctx)
+                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(self.ctx)
                     } else {
-                        KnownClass::TyExtensionsIterable.to_instance_unknown(&self.ctx)
+                        KnownClass::TyExtensionsIterable.to_instance_unknown(self.ctx)
                     };
                     self.iterable_type
-                        .assignability_error_context(&self.ctx, target)
-                        .attach_to(&self.ctx, &mut diag);
+                        .assignability_error_context(self.ctx, target)
+                        .attach_to(self.ctx, &mut diag);
                 }
 
                 diag
@@ -713,7 +713,7 @@ impl<'db> IterationError<'db> {
                     CallErrorKind::NotCallable => {
                         reporter.is_not(format_args!(
                         "Its `{method}` attribute has type `{dunder_iter_type}`, which is not callable",
-                        dunder_iter_type = bindings.callable_type().display(&ctx),
+                        dunder_iter_type = bindings.callable_type().display(ctx),
                     ), ErrorContext::Disabled);
                     }
                     CallErrorKind::PossiblyNotCallable => {
@@ -721,7 +721,7 @@ impl<'db> IterationError<'db> {
                             format_args!(
                                 "Its `{method}` attribute (with type `{dunder_iter_type}`) \
                                  may not be callable",
-                                dunder_iter_type = bindings.callable_type().display(&ctx),
+                                dunder_iter_type = bindings.callable_type().display(ctx),
                             ),
                             ErrorContext::Disabled,
                         );
@@ -741,7 +741,7 @@ impl<'db> IterationError<'db> {
                             );
                             diag.info(format_args!(
                                 "Type of `{method}` is `{dunder_iter_type}`",
-                                dunder_iter_type = bindings.callable_type().display(&ctx),
+                                dunder_iter_type = bindings.callable_type().display(ctx),
                             ));
                             diag.info(format_args!(
                                 "Expected signature for `{method}` is `def {method}(self): ...`",
@@ -771,28 +771,28 @@ impl<'db> IterationError<'db> {
                         reporter.is_not(format_args!(
                         "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                          which has no `{dunder_next_name}` method",
-                        iterator_type = iterator.display(&ctx),
+                        iterator_type = iterator.display(ctx),
                     ), ErrorContext::Disabled);
                     }
                     CallDunderError::PossiblyUnbound { .. } => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which may not have a `{dunder_next_name}` method",
-                            iterator_type = iterator.display(&ctx),
+                            iterator_type = iterator.display(ctx),
                         ), ErrorContext::Enabled);
                     }
                     CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                         reporter.is_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which has a `{dunder_next_name}` attribute that is not callable",
-                            iterator_type = iterator.display(&ctx),
+                            iterator_type = iterator.display(ctx),
                         ), ErrorContext::Disabled);
                     }
                     CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which has a `{dunder_next_name}` attribute that may not be callable",
-                            iterator_type = iterator.display(&ctx),
+                            iterator_type = iterator.display(ctx),
                         ), ErrorContext::Enabled);
                     }
                     CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
@@ -802,7 +802,7 @@ impl<'db> IterationError<'db> {
                             .is_not(format_args!(
                                 "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                                 which has an invalid `{dunder_next_name}` method",
-                                iterator_type = iterator.display(&ctx),
+                                iterator_type = iterator.display(ctx),
                             ), ErrorContext::Enabled)
                             .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
                     }
@@ -811,7 +811,7 @@ impl<'db> IterationError<'db> {
                             .may_not(format_args!(
                                 "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                                 which may have an invalid `{dunder_next_name}` method",
-                                iterator_type = iterator.display(&ctx),
+                                iterator_type = iterator.display(ctx),
                             ), ErrorContext::Enabled)
                             .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
                     }
@@ -839,7 +839,7 @@ impl<'db> IterationError<'db> {
                                 "It may not have an `__iter__` method \
                                 and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                                 which is not callable",
-                                dunder_getitem_type = bindings.callable_type().display(&ctx),
+                                dunder_getitem_type = bindings.callable_type().display(ctx),
                             ),
                             ErrorContext::Disabled,
                         ),
@@ -858,7 +858,7 @@ impl<'db> IterationError<'db> {
                                 "It may not have an `__iter__` method \
                              and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
                              may not be callable",
-                                dunder_getitem_type = bindings.callable_type().display(&ctx),
+                                dunder_getitem_type = bindings.callable_type().display(ctx),
                             ),
                             ErrorContext::Disabled,
                         )
@@ -885,7 +885,7 @@ impl<'db> IterationError<'db> {
                                 "It may not have an `__iter__` method \
                              and its `__getitem__` method (with type `{dunder_getitem_type}`) \
                              may have an incorrect signature for the old-style iteration protocol",
-                                dunder_getitem_type = bindings.callable_type().display(&ctx),
+                                dunder_getitem_type = bindings.callable_type().display(ctx),
                             ),
                             ErrorContext::Disabled,
                         );
@@ -901,7 +901,7 @@ impl<'db> IterationError<'db> {
                     for ty in unbound_on.iter().copied() {
                         diag.info(format_args!(
                             "`{}` does not implement `__iter__`",
-                            ty.display(&ctx)
+                            ty.display(ctx)
                         ));
                     }
                 }
@@ -928,7 +928,7 @@ impl<'db> IterationError<'db> {
                             "It has no `__iter__` method and \
                          its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                          which is not callable",
-                            dunder_getitem_type = bindings.callable_type().display(&ctx),
+                            dunder_getitem_type = bindings.callable_type().display(ctx),
                         ),
                         ErrorContext::Disabled,
                     );
@@ -948,7 +948,7 @@ impl<'db> IterationError<'db> {
                         ErrorContext::Disabled,
                     ).info(format_args!(
                         "`__getitem__` has type `{dunder_getitem_type}`, which is not callable",
-                        dunder_getitem_type = bindings.callable_type().display(&ctx),
+                        dunder_getitem_type = bindings.callable_type().display(ctx),
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
@@ -974,7 +974,7 @@ impl<'db> IterationError<'db> {
                                 "It has no `__iter__` method and \
                                 its `__getitem__` method (with type `{dunder_getitem_type}`) \
                                 may have an incorrect signature for the old-style iteration protocol",
-                                dunder_getitem_type = bindings.callable_type().display(&ctx),
+                                dunder_getitem_type = bindings.callable_type().display(ctx),
                             ),
                             ErrorContext::Disabled,
                         )

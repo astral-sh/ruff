@@ -30,7 +30,7 @@ pub(crate) fn check_final_without_value<'db>(
     let ctx = context.semantic_context();
 
     for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-        let result = place_from_declarations(&ctx, declarations);
+        let result = place_from_declarations(ctx, declarations);
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
@@ -47,7 +47,7 @@ pub(crate) fn check_final_without_value<'db>(
 
         // Check if the symbol has any bindings in the current scope.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(&ctx, bindings);
+        let binding_place = place_from_bindings(ctx, bindings);
 
         if !binding_place.place.is_undefined() {
             continue;

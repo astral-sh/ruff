@@ -411,7 +411,7 @@ struct ComparisonEvaluator<'db> {
 impl<'db> ComparisonEvaluator<'db> {
     fn new(ctx: &SemanticContext<'db>, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             active: FxHashSet::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
@@ -423,7 +423,7 @@ impl<'db> ComparisonEvaluator<'db> {
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
@@ -521,7 +521,7 @@ fn evaluate_dynamic_comparison<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     match (left, right) {
         (Type::Dynamic(_), other)
             if !operator.condition_expects_equality(branch)
@@ -557,7 +557,7 @@ fn evaluate_finite_comparison<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     finite_alternatives(&ctx, left, operator)
         .map(|alternatives| evaluate_union_left(evaluator, &alternatives, right, branch, operator))
         .or_else(|| {
@@ -575,7 +575,7 @@ fn evaluate_structural_comparison<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     let ctx = &ctx;
     let db = ctx.db();
     match (left, right) {
@@ -992,7 +992,7 @@ fn evaluate_union_left<'db>(
         );
     }
 
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     evaluate_target_union(&ctx, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
     })
@@ -1093,7 +1093,7 @@ fn evaluate_union_right<'db>(
         );
     }
 
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     evaluate_against_results(
         &ctx,
         left,
@@ -1356,7 +1356,7 @@ fn compare_literal_to_other<'db>(
     operator: ComparisonOperator,
     literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     let ctx = &ctx;
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {

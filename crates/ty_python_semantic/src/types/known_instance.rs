@@ -401,7 +401,10 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the repr of the symbol at runtime
-    pub(super) fn repr(self, ctx: &SemanticContext<'db>) -> impl std::fmt::Display + 'db {
+    pub(super) fn repr<'ctx>(
+        self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> impl std::fmt::Display + 'ctx {
         self.display_with(ctx, DisplaySettings::default())
     }
 
@@ -712,7 +715,7 @@ impl<'db> UnionTypeInstance<'db> {
         ctx: &SemanticContext<'db>,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
         let db = ctx.db();
-        let ctx = *ctx;
+        let ctx = ctx.clone();
         let to_class_literal = move |ty: Type<'db>| {
             ty.as_nominal_instance()
                 .and_then(|instance| {

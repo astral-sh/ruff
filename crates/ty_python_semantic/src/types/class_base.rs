@@ -463,25 +463,25 @@ impl<'db> ClassBase<'db> {
         self.display_with(ctx, DisplaySettings::default())
     }
 
-    pub(super) fn display_with(
+    pub(super) fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         display_settings: DisplaySettings<'db>,
-    ) -> impl std::fmt::Display {
-        struct ClassBaseDisplay<'db> {
-            ctx: SemanticContext<'db>,
+    ) -> impl std::fmt::Display + 'ctx {
+        struct ClassBaseDisplay<'ctx, 'db> {
+            ctx: &'ctx SemanticContext<'db>,
             base: ClassBase<'db>,
             settings: DisplaySettings<'db>,
         }
 
-        impl std::fmt::Display for ClassBaseDisplay<'_> {
+        impl std::fmt::Display for ClassBaseDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Any => f.write_str("Any"),
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Divergent(_) => f.write_str("Divergent"),
                     ClassBase::Class(class) => Type::from(class)
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
@@ -491,7 +491,7 @@ impl<'db> ClassBase<'db> {
         }
 
         ClassBaseDisplay {
-            ctx: *ctx,
+            ctx,
             base: self,
             settings: display_settings,
         }

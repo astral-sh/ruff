@@ -312,13 +312,13 @@ pub enum HoverContent<'db> {
 }
 
 impl<'db> HoverContent<'db> {
-    fn display(
-        &self,
-        ctx: &SemanticContext<'db>,
+    fn display<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
         kind: MarkupKind,
-    ) -> DisplayHoverContent<'_, 'db> {
+    ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
-            ctx: *ctx,
+            ctx,
             content: self,
             kind,
         }
@@ -326,7 +326,7 @@ impl<'db> HoverContent<'db> {
 }
 
 pub(crate) struct DisplayHoverContent<'a, 'db> {
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
 }
@@ -336,7 +336,7 @@ impl<'db> DisplayHoverContent<'_, 'db> {
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
         let ty_string = ty
-            .display_with(&self.ctx, DisplaySettings::default().multiline())
+            .display_with(self.ctx, DisplaySettings::default().multiline())
             .to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
@@ -391,7 +391,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             }
             HoverContent::TypeAlias { alias, qualifiers } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(&self.ctx);
+                let declaration = alias.display_declaration(self.ctx);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")

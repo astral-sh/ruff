@@ -18,12 +18,12 @@ pub(crate) fn check_type_guard_definition<'db>(
     let ctx = context.semantic_context();
 
     let overload = function.literal(db).last_definition;
-    let signature = overload.signature(&ctx);
+    let signature = overload.signature(ctx);
     let return_ty = signature.return_ty;
 
     // Check if this is a `TypeIs` or `TypeGuard` return type.
     let (type_guard_form_name, narrowed_type) = match return_ty {
-        Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(&ctx))),
+        Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(ctx))),
         Type::TypeGuard(_) => ("TypeGuard", None),
         _ => return,
     };
@@ -53,14 +53,14 @@ pub(crate) fn check_type_guard_definition<'db>(
     // For `TypeIs`, check that the narrowed type is assignable to the parameter type.
     if let Some(narrowed_ty) = narrowed_type {
         let param_ty = first_narrowed_param.annotated_type();
-        if !narrowed_ty.is_assignable_to(&ctx, param_ty)
+        if !narrowed_ty.is_assignable_to(ctx, param_ty)
             && let Some(builder) = context.report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
         {
             builder.into_diagnostic(format_args!(
                 "Narrowed type `{narrowed}` is not assignable \
                     to the declared parameter type `{param}`",
-                narrowed = narrowed_ty.display(&ctx),
-                param = param_ty.display(&ctx)
+                narrowed = narrowed_ty.display(ctx),
+                param = param_ty.display(ctx)
             ));
         }
     }

@@ -1145,7 +1145,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             module,
             predicate,
             is_positive,
@@ -1477,7 +1477,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
 impl<'db> PatternSuccessAnalyzer<'db> {
     fn new(ctx: &SemanticContext<'db>, scope: ScopeId<'db>) -> Self {
-        Self { ctx: *ctx, scope }
+        Self {
+            ctx: ctx.clone(),
+            scope,
+        }
     }
 
     fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
@@ -4195,7 +4198,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let inference = infer_expression_types(self.ctx.db(), expression, TypeContext::default());
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         let sub_constraints = expr_bool_op
             .values
             .iter()

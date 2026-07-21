@@ -374,7 +374,7 @@ impl<'db> ContextManagerError<'db> {
 
         let mut diag = builder.into_diagnostic(format_args!(
             "Object of type `{}` cannot be used with `{}` because {}",
-            context_expression_type.display(&ctx),
+            context_expression_type.display(ctx),
             with_kw,
             formatted_errors,
         ));
@@ -385,7 +385,7 @@ impl<'db> ContextManagerError<'db> {
                 for ty in &exit_unbound_on {
                     diag.info(format_args!(
                         "`{}` does not implement `{exit_method}`",
-                        ty.display(&ctx)
+                        ty.display(ctx)
                     ));
                 }
             }
@@ -394,7 +394,7 @@ impl<'db> ContextManagerError<'db> {
                 for ty in &enter_unbound_on {
                     diag.info(format_args!(
                         "`{}` does not implement `{enter_method}`",
-                        ty.display(&ctx)
+                        ty.display(ctx)
                     ));
                 }
             }
@@ -410,12 +410,12 @@ impl<'db> ContextManagerError<'db> {
                     if exit_unbound_on.contains(ty) {
                         diag.info(format_args!(
                             "`{}` does not implement `{enter_method}` or `{exit_method}`",
-                            ty.display(&ctx)
+                            ty.display(ctx)
                         ));
                     } else {
                         diag.info(format_args!(
                             "`{}` does not implement `{enter_method}`",
-                            ty.display(&ctx)
+                            ty.display(ctx)
                         ));
                     }
                 }
@@ -424,7 +424,7 @@ impl<'db> ContextManagerError<'db> {
                     if !enter_unbound_on.contains(ty) {
                         diag.info(format_args!(
                             "`{}` does not implement `{exit_method}`",
-                            ty.display(&ctx)
+                            ty.display(ctx)
                         ));
                     }
                 }
@@ -492,13 +492,13 @@ impl<'db> ContextManagerError<'db> {
         };
 
         let alt_enter = context_expression_type.try_call_dunder(
-            &ctx,
+            ctx,
             alt_enter_method,
             CallArguments::none(),
             TypeContext::default(),
         );
         let alt_exit = context_expression_type.try_call_dunder(
-            &ctx,
+            ctx,
             alt_exit_method,
             CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
             TypeContext::default(),
@@ -509,7 +509,7 @@ impl<'db> ContextManagerError<'db> {
         {
             diag.info(format_args!(
                 "Objects of type `{}` can be used as {} context managers",
-                context_expression_type.display(&ctx),
+                context_expression_type.display(ctx),
                 alt_mode
             ));
             diag.info(format!("Consider using `{alt_with_kw}` here"));
