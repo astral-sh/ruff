@@ -13,7 +13,7 @@ use crate::{
         known_instance::DeprecatedInstance,
     },
 };
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashSet;
@@ -1634,7 +1634,7 @@ impl KnownClass {
 
     pub(crate) fn try_from_file_and_name(
         db: &dyn Db,
-        file: File,
+        file: PythonFile<'_>,
         class_name: &str,
     ) -> Option<Self> {
         // We assert that this match is exhaustive over the right-hand side in the unit test
@@ -1710,12 +1710,8 @@ impl KnownClass {
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
-            "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
-                &[Self::EnumType]
-            }
-            "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
-                &[Self::StrEnum]
-            }
+            "EnumType" if file.python_version(db) >= PythonVersion::PY311 => &[Self::EnumType],
+            "StrEnum" if file.python_version(db) >= PythonVersion::PY311 => &[Self::StrEnum],
             "IntEnum" => &[Self::IntEnum],
             "Flag" => &[Self::Flag],
             "IntFlag" => &[Self::IntFlag],
@@ -2115,13 +2111,17 @@ mod tests {
                 continue;
             }
             let class_name = class.name(&db);
-            let class_module =
-                resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
+            let class_module = resolve_module_confident(
+                &db,
+                Program::get(&db).python_version(&db),
+                &class.canonical_module(&db).name(),
+            )
+            .unwrap();
 
             assert_eq!(
                 KnownClass::try_from_file_and_name(
                     &db,
-                    class_module.file(&db).unwrap(),
+                    class_module.python_file(&db).unwrap(),
                     class_name
                 ),
                 Some(class),

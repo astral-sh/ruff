@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use compact_str::{CompactString, ToCompactString};
 
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_python_ast as ast;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -305,13 +305,13 @@ impl ModuleName {
     /// Extracts a module name from the AST of a `from <module> import ...`
     /// statement.
     ///
-    /// `importing_file` must be the [`File`] that contains the import
+    /// `importing_file` must be the [`PythonFile`] that contains the import
     /// statement.
     ///
     /// This handles relative import statements.
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'db>,
         node: &'db ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
@@ -326,9 +326,9 @@ impl ModuleName {
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`
-    pub fn from_identifier_parts(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn from_identifier_parts<'db>(
+        db: &'db dyn Db,
+        importing_file: PythonFile<'db>,
         module: Option<&str>,
         level: u32,
     ) -> Result<Self, ModuleNameResolutionError> {
@@ -344,9 +344,9 @@ impl ModuleName {
     /// Computes the absolute module name for the package this file belongs to.
     ///
     /// i.e. this resolves `.`
-    pub fn package_for_file(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn package_for_file<'db>(
+        db: &'db dyn Db,
+        importing_file: PythonFile<'db>,
     ) -> Result<Self, ModuleNameResolutionError> {
         Self::from_identifier_parts(db, importing_file, None, 1)
     }
@@ -478,9 +478,9 @@ impl std::fmt::Display for ModuleName {
 /// - `tail` is the relative module name stripped of all leading dots:
 ///   - `from .foo import bar` => `tail == "foo"`
 ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-fn relative_module_name(
-    db: &dyn Db,
-    importing_file: File,
+fn relative_module_name<'db>(
+    db: &'db dyn Db,
+    importing_file: PythonFile<'db>,
     tail: Option<&str>,
     level: NonZeroU32,
 ) -> Result<ModuleName, ModuleNameResolutionError> {

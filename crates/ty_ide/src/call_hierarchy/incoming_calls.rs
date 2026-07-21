@@ -387,7 +387,8 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// method's AST node. Comprehension and annotation scopes have no callable
     /// hierarchy item of their own, so walk outward until reaching one that does.
     fn enclosing_scope_item(&self, scope_node: AnyNodeRef<'_>) -> CallHierarchyItem {
-        let file = self.model.file();
+        let python_file = self.model.python_file();
+        let file = python_file.file(self.db);
         let mut ancestors = self.model.ancestor_scopes(scope_node);
         let Some((_, enclosing)) = ancestors.find(|(_, ancestor)| {
             matches!(
@@ -395,11 +396,11 @@ impl<'a> CallSitesFinder<'a, '_> {
                 ScopeKind::Module | ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda
             )
         }) else {
-            return module_item(self.db, file);
+            return module_item(self.db, python_file);
         };
 
         match enclosing.node() {
-            NodeWithScopeKind::Module => module_item(self.db, file),
+            NodeWithScopeKind::Module => module_item(self.db, python_file),
             NodeWithScopeKind::Function(func) => {
                 let func = func.node(self.module);
                 let is_method = ancestors
@@ -418,7 +419,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     } else {
                         SymbolKind::Function
                     },
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, python_file),
                     file,
                     full_range: func.range(),
                     selection_range: func.name.range(),
@@ -429,7 +430,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: class.name.id.clone(),
                     kind: SymbolKind::Class,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, python_file),
                     file,
                     full_range: class.range(),
                     selection_range: class.name.range(),
@@ -446,13 +447,13 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new_static("(lambda)"),
                     kind: SymbolKind::Function,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, python_file),
                     file,
                     full_range: lambda.range(),
                     selection_range: TextRange::new(lambda.start(), end),
                 }
             }
-            _ => module_item(self.db, file),
+            _ => module_item(self.db, python_file),
         }
     }
 }
@@ -463,7 +464,7 @@ struct RawCallSite {
 }
 
 /// Build an item for the module-level enclosing scope (no enclosing function).
-fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
+fn module_item(db: &dyn Db, file: PythonFile<'_>) -> CallHierarchyItem {
     let name = ty_module_resolver::file_to_module(db, file)
         .map(|module| Name::new(module.name(db).last_component()))
         .unwrap_or_else(|| Name::new_static("<module>"));
@@ -471,7 +472,7 @@ fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
         name,
         kind: SymbolKind::Module,
         detail: None,
-        file,
+        file: file.file(db),
         full_range: TextRange::default(),
         selection_range: TextRange::default(),
     }

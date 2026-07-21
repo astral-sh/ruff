@@ -805,9 +805,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::hash_map::Entry;
-    use std::hash::{DefaultHasher, Hash, Hasher};
-
     use insta::assert_snapshot;
     use ruff_db::PythonFile;
     use ruff_db::cancellation::CancellationTokenSource;
@@ -822,7 +819,8 @@ mod tests {
     use ruff_diagnostics::{Applicability, Edit, Fix};
     use ruff_text_size::{TextLen as _, TextRange, TextSize};
     use rustc_hash::FxHashMap;
-    use ty_module_resolver::Db as _;
+    use std::collections::hash_map::Entry;
+    use std::hash::{DefaultHasher, Hash, Hasher};
 
     use super::suppress_all_diagnostics;
     use crate::Db;

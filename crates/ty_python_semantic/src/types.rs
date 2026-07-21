@@ -15,7 +15,6 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -181,7 +180,7 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
 
     let start = Instant::now();
 
-    let index = semantic_index(db, source_file);
+    let index = semantic_index(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
@@ -244,7 +243,7 @@ fn definition_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.file(db);
+    let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -271,7 +270,7 @@ fn definition_expression_annotation<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeAndQualifiers<'db> {
-    let file = definition.file(db);
+    let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -1750,7 +1749,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn module_literal(
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'db>,
         submodule: Module<'db>,
     ) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
@@ -6208,7 +6207,7 @@ impl<'db> Type<'db> {
                             fallback_type: Type::unknown(),
                         });
                     }
-                    let index = semantic_index(db, scope_id.file(db));
+                    let index = semantic_index(db, scope_id.python_file(db));
                     Ok(bind_typevar(
                         db,
                         index,
@@ -8585,8 +8584,8 @@ impl<'db> InvalidTypeExpression<'db> {
             && function_body_scope
                 .scope(db)
                 .parent()
-                .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
-                == builtins_module_scope(db)
+                .map(|parent| parent.to_scope_id(db, function_body_scope.python_file(db)))
+                == builtins_module_scope(db, function_body_scope.python_file(db).python_version(db))
         {
             diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
         } else if matches!(self, InvalidTypeExpression::InvalidBareParamSpec(_)) {
@@ -8724,14 +8723,14 @@ pub struct ModuleLiteralType<'db> {
     /// the same underlying single-file module are understood by ty as being equivalent types
     /// in all situations.
     #[returns(copy)]
-    _importing_file: Option<File>,
+    _importing_file: Option<PythonFile<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn importing_file(self, db: &'db dyn Db) -> Option<File> {
+    fn importing_file(self, db: &'db dyn Db) -> Option<PythonFile<'db>> {
         debug_assert_eq!(
             self._importing_file(db).is_some(),
             self.module(db).kind(db).is_package()
@@ -8810,7 +8809,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn try_module_getattr(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
-        if let Some(file) = self.module(db).file(db) {
+        if let Some(file) = self.module(db).python_file(db) {
             let getattr_symbol = imported_symbol(db, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
             if let Place::Defined(place) = getattr_symbol.place
@@ -8858,7 +8857,7 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
+        let place_and_qualifiers = imported_symbol(db, self.module(db).python_file(db), name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {

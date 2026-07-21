@@ -1,5 +1,4 @@
 use ruff_db::PythonFile;
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -19,8 +18,8 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHa
     let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
     let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, source_file);
-    let mut collector = DunderAllNamesCollector::new(db, source_file, index);
+    let index = semantic_index(db, file);
+    let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
     collector.into_names()
 }
@@ -28,7 +27,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHa
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
 
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
@@ -45,7 +44,7 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: File, index: &'db SemanticIndex<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: PythonFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
             db,
             file,
@@ -202,7 +201,10 @@ impl<'db> DunderAllNamesCollector<'db> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+            tracing::debug!(
+                "Invalid `__all__` in `{}`",
+                self.file.file(self.db).path(self.db)
+            );
             None
         } else {
             self.names.shrink_to_fit();

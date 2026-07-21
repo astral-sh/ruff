@@ -5,8 +5,8 @@ use lsp_types::RenameRequest;
 use lsp_types::{RenameParams, TextEdit, Uri, WorkspaceEdit};
 use ruff_db::PythonFile;
 use ty_ide::rename;
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{

@@ -2,11 +2,15 @@ use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_python_ast::PythonVersion;
 use ty_python_core::Db as PythonCoreDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
+    /// Returns the Python version for files in the primary environment.
+    fn python_version(&self) -> PythonVersion;
+
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
 
     /// Resolves the rule selection for a given file.
@@ -142,6 +146,10 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
+        fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             if !self.should_check_file(file) {
                 return Vec::new();
@@ -179,10 +187,6 @@ pub(crate) mod tests {
     impl ModuleResolverDb for TestDb {
         fn search_paths(&self) -> &SearchPaths {
             Program::get(self).search_paths(self)
-        }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
         }
     }
 

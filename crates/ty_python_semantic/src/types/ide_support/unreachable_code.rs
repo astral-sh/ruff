@@ -2,7 +2,7 @@ use crate::Db;
 use crate::reachability::is_reachable;
 use get_size2::GetSize;
 use itertools::Itertools;
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_text_size::TextRange;
 use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::semantic_index;
@@ -45,7 +45,7 @@ pub enum UnreachableKind {
 /// `ALWAYS_FALSE` constraints are classified as unconditional; all others are
 /// unreachable only under the current analysis.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unreachable_ranges(db: &dyn Db, file: File) -> Box<[UnreachableRange]> {
+pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
 
@@ -93,8 +93,10 @@ fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[Unreachab
 #[cfg(test)]
 mod tests {
     use super::{UnreachableKind, unreachable_ranges};
+    use crate::Db as _;
     use crate::db::tests::TestDbBuilder;
     use insta::assert_snapshot;
+    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
     };
@@ -147,7 +149,7 @@ mod tests {
 
     fn render_unreachable_diagnostics(db: &crate::db::tests::TestDb, path: &str) -> String {
         let file = system_path_to_file(db, path).unwrap();
-        let diagnostics = unreachable_ranges(db, file)
+        let diagnostics = unreachable_ranges(db, PythonFile::new(db, file, db.python_version()))
             .iter()
             .map(|range| {
                 let mut diagnostic = Diagnostic::new(

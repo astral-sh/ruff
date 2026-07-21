@@ -38,8 +38,12 @@ impl<'db> Module<'db> {
         Self::File(FileModule::new(db, name, kind, search_path, file, known))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: Cow<'_, ModuleName>) -> Self {
-        Self::Namespace(NamespacePackage::new(db, name))
+    pub(crate) fn namespace_package(
+        db: &'db dyn Db,
+        name: Cow<'_, ModuleName>,
+        python_version: PythonVersion,
+    ) -> Self {
+        Self::Namespace(NamespacePackage::new(db, name, python_version))
     }
 
     /// The absolute name of the module (e.g. `foo.bar`)
@@ -71,12 +75,10 @@ impl<'db> Module<'db> {
     }
 
     /// The Python version used to resolve this module.
-    ///
-    /// This is `None` for namespace packages.
-    pub fn python_version(self, db: &'db dyn Database) -> Option<PythonVersion> {
+    pub fn python_version(self, db: &'db dyn Database) -> PythonVersion {
         match self {
-            Module::File(module) => Some(module.python_file(db).python_version(db)),
-            Module::Namespace(_) => None,
+            Module::File(module) => module.python_file(db).python_version(db),
+            Module::Namespace(module) => module.python_version(db),
         }
     }
 
@@ -298,6 +300,8 @@ pub struct FileModule<'db> {
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
+    pub(super) python_version: PythonVersion,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]

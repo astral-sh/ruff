@@ -69,7 +69,7 @@ fn function_signature_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.file(db);
+    let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -87,7 +87,7 @@ fn function_signature_type_expression_flags<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeExpressionFlags {
-    let file = definition.file(db);
+    let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -4825,7 +4825,7 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let index = semantic_index(db, function_definition.file(db));
+        let index = semantic_index(db, function_definition.python_file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =

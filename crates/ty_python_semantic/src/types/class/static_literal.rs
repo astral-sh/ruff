@@ -311,7 +311,7 @@ impl<'db> StaticClassLiteral<'db> {
         let parsed = parsed_module(db, scope.python_file(db)).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
+            let index = semantic_index(db, scope.python_file(db));
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(db, index, definition, type_params)
         })
@@ -427,7 +427,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.file(db));
+        let index = semantic_index(db, body_scope.python_file(db));
         index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
@@ -522,7 +522,7 @@ impl<'db> StaticClassLiteral<'db> {
             let class_stmt = class.node(db, &module);
 
             let class_definition =
-                semantic_index(db, class.file(db)).expect_single_definition(class_stmt);
+                semantic_index(db, class.python_file(db)).expect_single_definition(class_stmt);
 
             expanded_class_base_entries(db, class.known(db), class_stmt, class_definition)
                 .into_iter()
@@ -616,7 +616,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .decorator_list
@@ -643,7 +643,7 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, self.python_file(db)).load(db);
         let class_stmt = self.node(db, &module);
         let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
 
         class_stmt.decorator_list.iter().position(|decorator| {
             let decorator_callable = decorator
@@ -2413,9 +2413,8 @@ impl<'db> StaticClassLiteral<'db> {
         let mut is_attribute_bound = false;
         let mut provenance = Provenance::Unknown;
 
-        let file = class_body_scope.file(db);
         let module = parsed_module(db, class_body_scope.python_file(db)).load(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, class_body_scope.python_file(db));
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
@@ -3184,8 +3183,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         }
         let class_body_scope = self.body_scope(db);
 
-        let file = class_body_scope.file(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, class_body_scope.python_file(db));
 
         let explicit_bases_variances = self
             .explicit_bases(db)
@@ -3377,7 +3375,7 @@ impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.file(db));
+    let index = semantic_index(db, class_body_scope.python_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {

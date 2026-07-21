@@ -104,11 +104,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.file());
+            .to_scope_id(db, self.python_file());
 
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
+        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.python_file(), name);
 
-        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
+        let known_module =
+            || file_to_module(db, self.python_file()).and_then(|module| module.known(db));
         let in_typing_module = || {
             matches!(
                 known_module(),

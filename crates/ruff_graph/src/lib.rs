@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_python_ast::PySourceType;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_parser::{ParseOptions, parse};
 
@@ -26,14 +25,15 @@ impl ModuleImports {
     pub fn detect(
         db: &ModuleDb,
         source: &str,
-        source_type: PySourceType,
+        parse_options: ParseOptions,
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: StringImports,
         type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
-        let parsed = parse(source, ParseOptions::from(source_type))?;
+        let python_version = parse_options.target_version();
+        let parsed = parse(source, parse_options)?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
@@ -48,8 +48,9 @@ impl ModuleImports {
 
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
+        let resolver = Resolver::new(db, path, python_version);
         for import in imports {
-            for resolved in Resolver::new(db, path).resolve(import) {
+            for resolved in resolver.resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
                 }

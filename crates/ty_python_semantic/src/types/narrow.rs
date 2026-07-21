@@ -1102,8 +1102,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
             ast::Expr::Name(_) => {
-                let file = expression.file(self.db);
-                let index = semantic_index(self.db, file);
+                let index = semantic_index(self.db, expression.python_file(self.db));
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
                     let aliased_constraints =

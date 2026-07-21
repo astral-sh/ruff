@@ -77,7 +77,7 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
     let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
     let is_stub_file = source_file.is_stub(db);
-    let index = semantic_index(db, source_file);
+    let index = semantic_index(db, file);
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -189,13 +189,13 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
 #[cfg(test)]
 mod tests {
     use super::{UnusedBinding, unused_bindings};
+    use crate::Db as _;
     use crate::db::tests::TestDbBuilder;
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
-    use ty_module_resolver::Db as _;
 
     fn collect_unused_bindings_in_file(
         path: &str,

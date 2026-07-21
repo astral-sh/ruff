@@ -50,7 +50,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
+        semantic_index(db, scope.python_file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
@@ -118,7 +118,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.file(db));
+                let index = semantic_index(db, scope.python_file(db));
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })

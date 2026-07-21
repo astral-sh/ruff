@@ -24,7 +24,7 @@ use ty_ide::{
     goto_type_definition, hover, inlay_hints, rename,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
-use ty_module_resolver::Db as _;
+use ty_project::SemanticDb as _;
 use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
@@ -305,11 +305,7 @@ impl Workspace {
     }
 
     pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
-        formatted_file(
-            &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
-        )
-        .map_err(into_error)
+        formatted_file(&self.db, file_id.file).map_err(into_error)
     }
 
     /// Returns the token stream for `path` serialized as a string.

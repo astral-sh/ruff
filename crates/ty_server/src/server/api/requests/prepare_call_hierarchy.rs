@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use lsp_types::CallHierarchyPrepareRequest;
 use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Uri};
 use ruff_db::PythonFile;
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 use crate::PositionEncoding;
 use crate::document::{PositionExt, ToRangeExt as _};

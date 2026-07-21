@@ -2017,7 +2017,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .as_nominal_instance()
                                 .and_then(|instance| instance.class(db).static_class_literal(db))
                                 .and_then(|(class_literal, _)| {
-                                    file_to_module(db, class_literal.file(db))
+                                    file_to_module(db, class_literal.python_file(db))
                                 })
                                 .and_then(|module| module.search_path(db))
                                 .is_some_and(ty_module_resolver::SearchPath::is_first_party)

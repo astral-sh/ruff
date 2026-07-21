@@ -2,6 +2,7 @@
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
 use super::{ClassType, Type, TypeFormType, class::KnownClass};
+use crate::Program;
 use crate::db::Db;
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
@@ -10,7 +11,7 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use ty_python_core::{
@@ -267,7 +268,7 @@ impl SpecialFormType {
 
     pub(super) fn try_from_file_and_name(
         db: &dyn Db,
-        file: File,
+        file: PythonFile<'_>,
         symbol_name: &str,
     ) -> Option<Self> {
         Self::candidates_from_name(symbol_name)
@@ -794,7 +795,12 @@ impl SpecialFormType {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module_confident(db, &module.name())?.file(db)?;
+                let file = resolve_module_confident(
+                    db,
+                    Program::get(db).python_version(db),
+                    &module.name(),
+                )?
+                .python_file(db)?;
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
@@ -847,7 +853,7 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
-                let index = semantic_index(db, scope_id.file(db));
+                let index = semantic_index(db, scope_id.python_file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),

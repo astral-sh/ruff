@@ -1466,7 +1466,7 @@ pub(super) fn note_numbers_module_not_supported<'db>(
         [KnownClass::Int, KnownClass::Float, KnownClass::Complex];
 
     if let Type::NominalInstance(target_instance) = target_ty {
-        let file = target_instance.class(db).class_literal(db).file(db);
+        let file = target_instance.class(db).class_literal(db).python_file(db);
         if let Some(module) = file_to_module(db, file)
             && module.is_known(db, KnownModule::Numbers)
         {
@@ -4651,7 +4651,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
         return;
     };
     let module = module_ty.module(db);
-    let Some(file) = module.file(db) else {
+    let Some(file) = module.python_file(db) else {
         return;
     };
     let Some(search_path) = module.search_path(db) else {

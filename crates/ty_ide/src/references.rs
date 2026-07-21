@@ -729,7 +729,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let file = self.model.file();
         let class_range = class.range();
         let module = ruff_db::parsed::parsed_module(db, self.model.python_file()).load(db);
-        let index = ty_python_core::semantic_index(db, file);
+        let index = ty_python_core::semantic_index(db, self.model.python_file());
 
         // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
         // class scopes for name resolution, so we walk the lexical parents directly to stop at the

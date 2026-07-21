@@ -303,12 +303,12 @@ pub(super) fn attribute_write_requirement<'db>(
         }
 
         Type::ModuleLiteral(module) => {
-            let symbol = if module
-                .module(db)
+            let resolved_module = module.module(db);
+            let symbol = if resolved_module
                 .known(db)
                 .is_some_and(KnownModule::is_builtins)
             {
-                builtins_symbol(db, attribute)
+                builtins_symbol(db, resolved_module.python_version(db), attribute)
             } else {
                 module.static_member(db, attribute)
             };

@@ -421,7 +421,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Function(function))
-            .to_scope_id(db, self.file());
+            .to_scope_id(db, self.python_file());
 
         let overload_literal = OverloadLiteral::new(
             db,
@@ -566,7 +566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let type_params_scope = self
                     .index
                     .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
-                    .to_scope_id(db, self.file());
+                    .to_scope_id(db, self.python_file());
                 let type_params_inference =
                     infer_scope_types(db, type_params_scope, TypeContext::default());
 
@@ -975,7 +975,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter: &ast::Parameter,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let file = self.file();
+        let file = self.python_file();
 
         let function_scope_id = self.scope();
         let function_scope = function_scope_id.scope(db);

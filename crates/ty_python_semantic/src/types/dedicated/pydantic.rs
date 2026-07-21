@@ -1141,7 +1141,7 @@ fn instance_symbol<'db>(
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
     let class = ty.nominal_class(db)?.class_literal(db).as_static()?;
-    let module = file_to_module(db, class.file(db))?.known(db)?;
+    let module = file_to_module(db, class.python_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 

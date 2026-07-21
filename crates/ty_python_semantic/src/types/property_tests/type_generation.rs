@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::db::tests::TestDb;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
@@ -9,6 +8,7 @@ use crate::types::{
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
+use crate::{Db, Program};
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
@@ -179,7 +179,7 @@ impl Ty {
                 );
                 ty
             }
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
+            Ty::BuiltinInstance(s) => builtins_symbol(db, Program::get(db).python_version(db), s)
                 .place
                 .expect_type()
                 .to_instance_approximation(db)
@@ -200,7 +200,11 @@ impl Ty {
                 .to_instance_approximation(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
+            Ty::BuiltinClassLiteral(s) => {
+                builtins_symbol(db, Program::get(db).python_version(db), s)
+                    .place
+                    .expect_type()
+            }
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -228,7 +232,7 @@ impl Ty {
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
-                builtins_symbol(db, s)
+                builtins_symbol(db, Program::get(db).python_version(db), s)
                     .place
                     .expect_type()
                     .expect_class_literal()
@@ -244,9 +248,16 @@ impl Ty {
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
+            Ty::BuiltinsFunction(name) => {
+                builtins_symbol(db, Program::get(db).python_version(db), name)
+                    .place
+                    .expect_type()
+            }
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).place.expect_type();
+                let builtins_class =
+                    builtins_symbol(db, Program::get(db).python_version(db), class)
+                        .place
+                        .expect_type();
                 let function = builtins_class.member(db, method).place.expect_type();
 
                 create_bound_method(db, function, builtins_class)

@@ -3,7 +3,6 @@ use std::collections::{BinaryHeap, binary_heap};
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::PythonFile;
-use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
@@ -42,7 +41,7 @@ pub fn completion<'db>(
     let file = file.file(db);
     let source = source_text(db, file);
 
-    let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
+    let Some(context) = Context::new(db, python_file, &parsed, &source, offset) else {
         return vec![];
     };
     let model = SemanticModel::new(db, python_file);
@@ -737,7 +736,7 @@ impl<'m> Context<'m> {
     /// Create a new context for finding completions.
     fn new(
         db: &'_ dyn Db,
-        file: File,
+        file: PythonFile<'_>,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
@@ -2232,7 +2231,7 @@ fn add_unimported_completions<'db>(
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, source_file, &completions.query.pattern) {
+    for symbol in all_symbols(db, file, &completions.query.pattern) {
         if symbol.file() == source_file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
@@ -2247,7 +2246,7 @@ fn add_unimported_completions<'db>(
             });
 
         // Don't suggest symbols that are already imported.
-        if members.satisfies(db, source_file, &request) {
+        if members.satisfies(db, file, &request) {
             continue;
         }
 
@@ -2512,7 +2511,7 @@ impl<'a> ImportStatement<'a> {
     /// `tokens`.
     fn detect(
         db: &'_ dyn Db,
-        file: File,
+        file: PythonFile<'_>,
         cursor: &ContextCursor<'a>,
     ) -> Option<ImportStatement<'a>> {
         use TokenKind as TK;

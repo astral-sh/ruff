@@ -14,6 +14,7 @@ use crate::types::{
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
+use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -62,7 +63,7 @@ pub fn definitions_for_name<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let file = model.file();
+    let file = model.python_file();
     let index = semantic_index(db, file);
 
     // Get the scope for this name expression
@@ -151,7 +152,8 @@ pub fn definitions_for_name<'db>(
 
     // If we didn't find any definitions in scopes, fallback to builtins
     if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(db)
+        && let Some(builtins_scope) =
+            builtins_module_scope(db, model.python_file().python_version(db))
     {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
@@ -252,7 +254,7 @@ pub fn definitions_for_attribute<'db>(
     for ty in expanded_tys {
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
-            if let Some(module_file) = module_literal.module(db).file(db) {
+            if let Some(module_file) = module_literal.module(db).python_file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
                     resolved.extend(resolve_definition(
@@ -373,8 +375,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         }
 
         // Look for instance attributes in method scopes (e.g., self.x = 1)
-        let file = class_scope.file(db);
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, class_scope.python_file(db));
 
         for function_scope_id in attribute_scopes(db, class_scope) {
             if let Some(place_id) = index
@@ -530,7 +531,7 @@ pub fn definitions_for_imported_symbol<'db>(
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
         model.db(),
-        model.file(),
+        model.python_file(),
         import_node,
         symbol_name,
         &mut visited,
@@ -1289,7 +1290,7 @@ mod resolve_definition {
 
     use indexmap::IndexSet;
     use ruff_db::PythonFile;
-    use ruff_db::files::{File, FileRange, vendored_path_to_file};
+    use ruff_db::files::{FileRange, vendored_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
@@ -1358,11 +1359,11 @@ mod resolve_definition {
             }
         }
 
-        fn file(&self, db: &'db dyn Db) -> File {
-            match self {
-                ResolvedDefinition::Definition(definition) => definition.file(db),
-                ResolvedDefinition::Module(file) => file.file(db),
-                ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+        fn python_file(&self, db: &'db dyn Db) -> Option<PythonFile<'db>> {
+            match *self {
+                ResolvedDefinition::Definition(definition) => Some(definition.python_file(db)),
+                ResolvedDefinition::Module(file) => Some(file),
+                ResolvedDefinition::FileWithRange(_) => None,
             }
         }
 
@@ -1469,8 +1470,8 @@ mod resolve_definition {
 
         match kind {
             DefinitionKind::Import(import_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, definition.python_file(db)).load(db);
+                let file = definition.python_file(db);
+                let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
                 if alias.asname.is_some()
@@ -1499,8 +1500,8 @@ mod resolve_definition {
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, definition.python_file(db)).load(db);
+                let file = definition.python_file(db);
+                let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
 
@@ -1524,8 +1525,8 @@ mod resolve_definition {
 
             // For star imports, try to resolve to the specific symbol being accessed
             DefinitionKind::StarImport(star_import_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, definition.python_file(db)).load(db);
+                let file = definition.python_file(db);
+                let module = parsed_module(db, file).load(db);
                 let import_node = star_import_def.import(&module);
 
                 // If we have a symbol name, use the helper to resolve it in the target module
@@ -1552,7 +1553,7 @@ mod resolve_definition {
     /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
     pub(crate) fn resolve_from_import_definitions<'db>(
         db: &'db dyn Db,
-        file: File,
+        file: PythonFile<'db>,
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
@@ -1563,7 +1564,7 @@ mod resolve_definition {
                 if let Some(asname) = &alias.asname {
                     if asname.as_str() == symbol_name {
                         return vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                            file,
+                            file.file(db),
                             asname.range,
                         ))];
                     }
@@ -1581,7 +1582,7 @@ mod resolve_definition {
         };
 
         // Resolve the target module file
-        let module_file = resolved_module.file(db);
+        let module_file = resolved_module.python_file(db);
 
         let Some(module_file) = module_file else {
             // No file means this is a namespace package, try to import the submodule
@@ -1626,7 +1627,7 @@ mod resolve_definition {
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
     fn resolve_from_import_submodule_definitions<'db>(
         db: &'db dyn Db,
-        file: File,
+        file: PythonFile<'db>,
         symbol_name: &str,
         module_name: ModuleName,
     ) -> Option<ResolvedDefinition<'db>> {
@@ -1679,8 +1680,13 @@ mod resolve_definition {
         def: &ResolvedDefinition<'db>,
         cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        let Some(stub_parse_file) = def.python_file(db) else {
+            trace!("Found arbitrary FileWithRange while stub mapping, giving up");
+            return None;
+        };
+
         // If the file isn't a stub, this is presumably the real definition
-        let stub_file = def.file(db);
+        let stub_file = stub_parse_file.file(db);
         trace!("Stub mapping definition in: {}", stub_file.path(db));
         if !stub_file.is_stub(db) {
             trace!("File isn't a stub, no stub mapping to do");
@@ -1697,7 +1703,7 @@ mod resolve_definition {
         // we're in typeshed to successfully stub-map to the Real Stdlib. So here we attempt
         // to do just that. The resulting file must not be used for anything other than
         // this module lookup, as the `ResolvedDefinition` we're handling isn't for that file.
-        let mut stub_file_for_module_lookup = stub_file;
+        let mut stub_file_for_module_lookup = stub_parse_file;
         if let Some(vendored_typeshed) = cached_vendored_typeshed
             && let Some(stub_path) = stub_file.path(db).as_system_path()
             && let Ok(rel_path) = stub_path.strip_prefix(vendored_typeshed)
@@ -1708,7 +1714,8 @@ mod resolve_definition {
                 "Stub is cached vendored typeshed: {}",
                 typeshed_file.path(db)
             );
-            stub_file_for_module_lookup = typeshed_file;
+            stub_file_for_module_lookup =
+                PythonFile::new(db, typeshed_file, stub_parse_file.python_version(db));
         }
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
@@ -1723,7 +1730,7 @@ mod resolve_definition {
         // into the interpreter. In which case, all we have are stubs.
         // `resolve_real_module` will always return `None` for this case, but
         // it will emit false positive logs. And this saves us some work.
-        if is_builtin_module(stub_module.python_version(db)?.minor, stub_module.name(db)) {
+        if is_builtin_module(stub_module.python_version(db).minor, stub_module.name(db)) {
             return None;
         }
         let real_module =
@@ -1763,7 +1770,7 @@ mod resolve_definition {
                 path.push(leaf);
 
                 // Get the ancestors of the path (all the definitions we're nested under)
-                let index = semantic_index(db, stub_file);
+                let index = semantic_index(db, definition.python_file(db));
                 for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
                     let node = scope.node();
                     let component = definition_path_component_for_node(&stub_ref, node)
@@ -1795,8 +1802,8 @@ mod resolve_definition {
 
         // Walk down the Definition Path in the real file
         let mut definitions = Vec::new();
-        let index = semantic_index(db, real_file);
-        let global_scope = global_scope(db, real_file);
+        let index = semantic_index(db, real_parse_file);
+        let global_scope = global_scope(db, real_parse_file);
         let real_parsed = parsed_module(db, global_scope.python_file(db));
         let real_ref = real_parsed.load(db);
         // Start our search in the module (global) scope
@@ -1831,7 +1838,7 @@ mod resolve_definition {
                             definition_path_component_for_node(&real_ref, scope_node)
                         {
                             if real_component == component {
-                                scopes.push(child_scope_id.to_scope_id(db, real_file));
+                                scopes.push(child_scope_id.to_scope_id(db, real_parse_file));
                             }
                         }
                         scope.node(db);
@@ -1927,11 +1934,11 @@ mod resolve_definition {
 
 /// Information about a class in the type hierarchy.
 #[derive(Debug, Clone)]
-pub struct TypeHierarchyClass {
+pub struct TypeHierarchyClass<'db> {
     /// The name of the class.
     pub name: Name,
     /// The file containing the class definition.
-    pub file: ruff_db::files::File,
+    pub file: PythonFile<'db>,
     /// The range covering the full class definition header.
     pub full_range: TextRange,
     /// The range of the class name (for selection/focus).
@@ -1946,7 +1953,10 @@ pub struct TypeHierarchyClass {
 /// This is meant to be used to "prepare" for a subtype or supertype request.
 /// That is, this effectively validates whether the given type can be used in
 /// subsequent requests for supertypes or subtypes.
-pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchyClass> {
+pub fn type_hierarchy_prepare<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<TypeHierarchyClass<'db>> {
     let class_literal = extract_class_literal(db, ty)?;
     Some(class_literal_to_hierarchy_info(db, class_literal))
 }
@@ -1957,7 +1967,10 @@ pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchy
 /// returns an empty sequence.
 ///
 /// This includes `object` when the given class has no direct base classes.
-pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
+pub fn type_hierarchy_supertypes<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Vec<TypeHierarchyClass<'db>> {
     let Some(class_literal) = extract_class_literal(db, ty) else {
         return vec![];
     };
@@ -1965,7 +1978,7 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
         return vec![];
     }
 
-    let mut supertypes: Vec<TypeHierarchyClass> = class_literal
+    let mut supertypes: Vec<TypeHierarchyClass<'db>> = class_literal
         .explicit_bases(db)
         .into_iter()
         .filter_map(|base| extract_class_literal(db, base))
@@ -1986,11 +1999,11 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
 ///
 /// When the type given doesn't correspond to a class literal, then this always
 /// returns an empty sequence.
-pub fn type_hierarchy_subtypes(
-    db: &dyn Db,
-    ty: Type<'_>,
-    modules: &[Module<'_>],
-) -> Vec<TypeHierarchyClass> {
+pub fn type_hierarchy_subtypes<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    modules: &[Module<'db>],
+) -> Vec<TypeHierarchyClass<'db>> {
     let Some(target_class) = extract_class_literal(db, ty) else {
         return vec![];
     };
@@ -1999,9 +2012,10 @@ pub fn type_hierarchy_subtypes(
     let mut subtypes = vec![];
 
     for &module in modules {
-        let Some(file) = module.file(db) else {
+        let Some(python_file) = module.python_file(db) else {
             continue;
         };
+        let file = python_file.file(db);
 
         // Note that this will always consider namespace
         // packages to be "not firsty party." This isn't
@@ -2023,7 +2037,7 @@ pub fn type_hierarchy_subtypes(
             continue;
         }
 
-        let index = semantic_index(db, file);
+        let index = semantic_index(db, python_file);
         for scope_id in index.scope_ids() {
             let scope = scope_id.node(db);
             let Some(class_node) = scope.as_class() else {
@@ -2096,12 +2110,12 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
 ///
 /// For the most part, this is about extracting the right
 /// text ranges.
-fn class_literal_to_hierarchy_info(
-    db: &dyn Db,
-    class_literal: ClassLiteral<'_>,
-) -> TypeHierarchyClass {
+fn class_literal_to_hierarchy_info<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+) -> TypeHierarchyClass<'db> {
     let name = class_literal.name(db).clone();
-    let file = class_literal.file(db);
+    let file = class_literal.python_file(db);
 
     let (full_range, selection_range) = match class_literal {
         ClassLiteral::Static(static_class) => {
@@ -2226,12 +2240,12 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 #[cfg(test)]
 mod tests {
     use super::{CallArgumentForm, call_argument_forms};
+    use crate::Db as _;
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ty_module_resolver::Db as _;
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
