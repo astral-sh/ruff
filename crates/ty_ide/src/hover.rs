@@ -19,7 +19,7 @@ pub fn hover<'db>(
     offset: TextSize,
 ) -> Option<RangedValue<Hover<'db>>> {
     let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {

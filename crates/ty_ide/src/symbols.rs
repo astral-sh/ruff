@@ -389,11 +389,12 @@ impl SymbolKind {
 /// The flattened list includes parent/child information and can be
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
-    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
+pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
+    let source_file = file.file(db);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::tree(db, file);
+    let mut visitor = SymbolVisitor::tree(db, source_file);
     visitor.visit_body(&module.syntax().body);
     visitor.into_flat_symbols()
 }
@@ -408,14 +409,15 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
-    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
+pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
+    let source_file = file.file(db);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, file);
+    let mut visitor = SymbolVisitor::globals(db, source_file);
     visitor.visit_body(&module.syntax().body);
 
-    if file
+    if source_file
         .path(db)
         .as_system_path()
         .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
@@ -601,7 +603,7 @@ impl<'db> Imports<'db> {
             }
         };
         let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.file(db)?))
+        Some(symbols_for_file_global_only(db, module.python_file(db)?))
     }
 }
 
@@ -1113,7 +1115,10 @@ impl<'db> SymbolVisitor<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
-        Some(symbols_for_file_global_only(self.db, module.file(self.db)?))
+        Some(symbols_for_file_global_only(
+            self.db,
+            module.python_file(self.db)?,
+        ))
     }
 
     /// Add valid names from `__all__` to the set of existing `__all__`
@@ -1490,10 +1495,12 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
+    use ruff_db::PythonFile;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+    use ty_module_resolver::Db as _;
     use ty_project::{ProjectMetadata, TestDb};
 
     use super::symbols_for_file_global_only;
@@ -2938,7 +2945,10 @@ class C: ...
         /// The path given must have been written to this test's salsa DB.
         fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
             let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            symbols_for_file_global_only(&self.db, file)
+            symbols_for_file_global_only(
+                &self.db,
+                PythonFile::new(&self.db, file, self.db.python_version()),
+            )
         }
 
         /// Returns the exports from the module at the given path.

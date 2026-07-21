@@ -189,7 +189,7 @@ pub fn semantic_tokens(
     range: Option<TextRange>,
 ) -> SemanticTokens {
     let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.expecting_docstring = true;
@@ -303,8 +303,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let file = definition.file(db);
-        let model = SemanticModel::new(db, file);
+        let model = SemanticModel::new(db, definition.python_file(db));
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -324,7 +323,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
+                let parsed = parsed_module(db, definition.python_file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -368,9 +367,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                 let value_ty = match kind {
                     DefinitionKind::Assignment(assignment) => {
-                        let parsed =
-                            parsed_module(db, PythonFile::new(db, file, db.python_version()))
-                                .load(db);
+                        let parsed = parsed_module(db, definition.python_file(db)).load(db);
                         assignment.value(&parsed).inferred_type(&model)
                     }
                     _ => None,
@@ -4716,7 +4713,11 @@ from pathlib import Missing as Alias
         fn highlight_file(&self) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                PythonFile::new(
+                    &self.db,
+                    self.file,
+                    ty_module_resolver::Db::python_version(&self.db),
+                ),
                 None,
             )
         }
@@ -4725,7 +4726,11 @@ from pathlib import Missing as Alias
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                PythonFile::new(
+                    &self.db,
+                    self.file,
+                    ty_module_resolver::Db::python_version(&self.db),
+                ),
                 Some(range),
             )
         }

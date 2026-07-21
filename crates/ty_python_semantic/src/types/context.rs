@@ -1,6 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
@@ -41,6 +42,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     file: File,
+    python_file: PythonFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     diagnostics_suppressed: bool,
@@ -50,12 +52,20 @@ pub(crate) struct InferContext<'db, 'ast> {
 }
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>, module: &'ast ParsedModuleRef) -> Self {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        python_file: PythonFile<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
+        debug_assert_eq!(scope.python_file(db), python_file);
+
         Self {
             db,
             scope,
             module,
-            file: scope.file(db),
+            file: python_file.file(db),
+            python_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
@@ -68,6 +78,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The file for which the types are inferred.
     pub(crate) fn file(&self) -> File {
         self.file
+    }
+
+    pub(crate) fn python_file(&self) -> PythonFile<'db> {
+        self.python_file
     }
 
     /// The module for which the types are inferred.
@@ -246,10 +260,14 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
 impl fmt::Debug for InferContext<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("TyContext")
+        f.debug_struct("InferContext")
+            .field("db", &"<dyn Db>")
+            .field("scope", &self.scope)
             .field("file", &self.file)
+            .field("python_file", &self.python_file)
             .field("diagnostics", &self.diagnostics)
-            .field("defused", &self.bomb)
+            .field("diagnostics_suppressed", &self.diagnostics_suppressed)
+            .field("inference_flags", &self.inference_flags)
             .finish()
     }
 }
@@ -476,7 +494,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
-        let suppressions = suppressions(ctx.db(), ctx.file());
+        let suppressions = suppressions(ctx.db(), ctx.python_file());
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;

@@ -1,4 +1,5 @@
 use ruff_db::Db as SourceDb;
+use ruff_python_ast::PythonVersion;
 
 use crate::resolve::SearchPaths;
 
@@ -6,6 +7,9 @@ use crate::resolve::SearchPaths;
 pub trait Db: SourceDb {
     /// Returns the search paths for module resolution.
     fn search_paths(&self) -> &SearchPaths;
+
+    /// Returns the Python version for module resolution.
+    fn python_version(&self) -> PythonVersion;
 }
 
 #[cfg(test)]
@@ -106,16 +110,16 @@ pub(crate) mod tests {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> PythonVersion {
-            self.python_version
-        }
     }
 
     #[salsa::db]
     impl Db for TestDb {
         fn search_paths(&self) -> &SearchPaths {
             &self.search_paths
+        }
+
+        fn python_version(&self) -> PythonVersion {
+            self.python_version
         }
     }
 

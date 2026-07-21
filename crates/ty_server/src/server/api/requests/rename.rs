@@ -3,8 +3,9 @@ use std::collections::HashMap;
 
 use lsp_types::RenameRequest;
 use lsp_types::{RenameParams, TextEdit, Uri, WorkspaceEdit};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::rename;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};

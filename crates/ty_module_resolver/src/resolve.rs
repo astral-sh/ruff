@@ -37,6 +37,7 @@ use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -222,7 +223,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name))
+        .map(|candidate| candidate.into_module(db, name, db.python_version()))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -262,7 +263,7 @@ fn desperately_resolve_module<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name))
+        .map(|candidate| candidate.into_module(db, name, db.python_version()))
 }
 
 /// Resolves the module for the given path.
@@ -1167,7 +1168,12 @@ impl ModuleResolutionCandidate {
     }
 
     // This is the module we were actually interested in resolving, complete the resolution
-    fn into_module<'db>(self, db: &'db dyn Db, name: &ModuleName) -> Module<'db> {
+    fn into_module<'db>(
+        self,
+        db: &'db dyn Db,
+        name: &ModuleName,
+        python_version: PythonVersion,
+    ) -> Module<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
@@ -1185,7 +1191,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
             ResolvedModule::RegularPackage(file) => {
@@ -1198,7 +1204,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
             ResolvedModule::Module(file) => {
@@ -1208,7 +1214,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Module,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
         }

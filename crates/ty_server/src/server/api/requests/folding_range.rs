@@ -2,10 +2,11 @@ use std::borrow::Cow;
 
 use lsp_types::FoldingRangeRequest;
 use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
+use ruff_db::PythonFile;
 use ruff_db::source::source_text;
-use ruff_db::{Db as _, PythonFile};
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::db::Db;

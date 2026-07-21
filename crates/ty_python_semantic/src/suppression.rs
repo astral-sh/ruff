@@ -75,11 +75,14 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
-    let source = source_text(db, file);
+pub(crate) fn suppressions(db: &dyn Db, file: PythonFile<'_>) -> Suppressions {
+    let source_file = file.file(db);
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, source_file);
 
-    let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;
+    let respect_type_ignore = db
+        .analysis_settings(source_file)
+        .respect_type_ignore_comments;
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();
@@ -136,7 +139,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
 
 pub(crate) fn check_suppressions(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     diagnostics: TypeCheckDiagnostics,
 ) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
@@ -215,11 +218,11 @@ struct CheckSuppressionsContext<'a> {
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
-            file,
+            file: file.file(db),
             suppressions,
             diagnostics: diagnostics.into(),
         }

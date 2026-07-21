@@ -25,7 +25,6 @@ pub fn code_actions(
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
-    let source_file = file.file(db);
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -45,7 +44,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, source_file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 
@@ -974,7 +973,11 @@ mod tests {
 
             for mut action in code_actions(
                 &self.db,
-                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                PythonFile::new(
+                    &self.db,
+                    self.file,
+                    ty_module_resolver::Db::python_version(&self.db),
+                ),
                 self.diagnostic_range,
                 &lint.name,
             ) {

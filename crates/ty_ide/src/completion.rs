@@ -45,7 +45,7 @@ pub fn completion<'db>(
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
         return vec![];
     };
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, python_file);
 
     if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
         let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
@@ -79,7 +79,7 @@ pub fn completion<'db>(
             }
         }
         ContextKind::Import(ref import) => {
-            import.add_completions(db, file, &mut completions);
+            import.add_completions(db, python_file, &mut completions);
         }
         ContextKind::NonImport(ref non_import) => match non_import.target {
             CompletionTargetAst::ObjectDot { expr } => {
@@ -108,7 +108,7 @@ pub fn completion<'db>(
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
-                        file,
+                        python_file,
                         &parsed,
                         scoped,
                         |module_name: &ModuleName, symbol: &str| {
@@ -2078,7 +2078,6 @@ pub(crate) fn unresolved_fixes<'db>(
     symbol: &str,
     node: AnyNodeRef,
 ) -> Vec<ImportEdit> {
-    let file = file.file(db);
     let mut results = Vec::new();
     let scoped = ScopedTarget { node };
     let query = UserQuery::exactly(symbol);
@@ -2213,7 +2212,7 @@ fn add_string_literal_completions<'db>(
 /// when selected into `File`.
 fn add_unimported_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     create_import_request: impl for<'a> Fn(&'a ModuleName, &'a str) -> ImportRequest<'a>,
@@ -2227,13 +2226,14 @@ fn add_unimported_completions<'db>(
         return;
     }
 
-    let source = source_text(db, file);
+    let source_file = file.file(db);
+    let source = source_text(db, source_file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, file, &completions.query.pattern) {
-        if symbol.file() == file || symbol.module().is_known(db, KnownModule::Builtins) {
+    for symbol in all_symbols(db, source_file, &completions.query.pattern) {
+        if symbol.file() == source_file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
 
@@ -2247,7 +2247,7 @@ fn add_unimported_completions<'db>(
             });
 
         // Don't suggest symbols that are already imported.
-        if members.satisfies(db, file, &request) {
+        if members.satisfies(db, source_file, &request) {
             continue;
         }
 
@@ -2910,7 +2910,7 @@ impl<'a> ImportStatement<'a> {
     fn add_completions<'db>(
         &self,
         db: &'db dyn Db,
-        file: File,
+        file: PythonFile<'db>,
         completions: &mut Completions<'db>,
     ) {
         let model = SemanticModel::new(db, file);

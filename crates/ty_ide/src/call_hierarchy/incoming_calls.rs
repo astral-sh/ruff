@@ -30,7 +30,7 @@ const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<IncomingCall> {
     let module = parsed_module(db, file).load(db);
     let source_file = file.file(db);
-    let model = SemanticModel::new(db, source_file);
+    let model = SemanticModel::new(db, file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
     };
@@ -175,7 +175,7 @@ fn call_sites_for_file(
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file.file(db));
+    let model = SemanticModel::new(db, file);
     let mut sites = Vec::new();
 
     let mut finder = CallSitesFinder {

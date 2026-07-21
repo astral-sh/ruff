@@ -1,4 +1,5 @@
 use itertools::Either;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
@@ -500,8 +501,9 @@ pub(crate) fn global_symbol<'db>(
     file: File,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    explicit_global_symbol(db, file, name)
-        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, file, name))
+    explicit_global_symbol(db, file, name).or_fall_back_to(db, || {
+        module_type_implicit_global_symbol(db, PythonFile::new(db, file, db.python_version()), name)
+    })
 }
 
 /// Infers the public type of an imported symbol.
@@ -586,8 +588,9 @@ pub(crate) fn imported_symbol<'db>(
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
-    let resolver = |module: Module<'_>| {
-        let file = module.file(db)?;
+    let resolver = |module: Module<'db>| {
+        let python_file = module.python_file(db)?;
+        let file = python_file.file(db);
         let found_symbol = symbol_impl(
             db,
             global_scope(db, file),
@@ -599,7 +602,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
-            module_type_implicit_global_symbol(db, file, symbol)
+            module_type_implicit_global_symbol(db, python_file, symbol)
         });
         // If this symbol is not present in project-level builtins, search in the default ones.
         found_symbol
@@ -1978,7 +1981,7 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     // At this point, the definition should either be an `import` or `from ... import` statement.
     // This is because the default value of `is_reexported` is `true` for any other kind of
     // definition.
-    let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
+    let Some(all_names) = dunder_all_names(db, definition.python_file(db)) else {
         return false;
     };
     let table = place_table(db, definition.scope(db));
@@ -1988,11 +1991,10 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 }
 
 pub(crate) mod implicit_globals {
-    use ruff_db::files::File;
+    use ruff_db::PythonFile;
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
 
-    use crate::Program;
     use crate::db::Db;
     use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
@@ -2050,7 +2052,7 @@ pub(crate) mod implicit_globals {
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
-        file: File,
+        file: PythonFile<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match name {
@@ -2088,7 +2090,7 @@ pub(crate) mod implicit_globals {
 
             // Marked as possibly-unbound as it is only present in the module namespace
             // if at least one global symbol is annotated in the module.
-            "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+            "__annotate__" if file.python_version(db) >= PythonVersion::PY314 => {
                 let signature = Signature::new(
                     Parameters::standard([Parameter::positional_only(Some(Name::new_static(
                         "format",
@@ -2180,10 +2182,10 @@ pub(crate) mod implicit_globals {
     /// This is used for completions in the global scope of a module. It returns
     /// the correct types for special-cased symbols like `__file__` (which is `str`
     /// for the current module, not `str | None`).
-    pub(crate) fn all_implicit_module_globals(
-        db: &dyn Db,
-        file: File,
-    ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
+    pub(crate) fn all_implicit_module_globals<'db>(
+        db: &'db dyn Db,
+        file: PythonFile<'db>,
+    ) -> impl Iterator<Item = (Name, Type<'db>)> + 'db {
         // Special-cased implicit globals that are not in `module_type_symbols`
         let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
             .into_iter()

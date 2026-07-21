@@ -8,8 +8,9 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::HoverRequest;
 use lsp_types::{HoverParams, MarkupContent, Uri};
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::{MarkupKind, hover};
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 pub(crate) struct HoverRequestHandler;

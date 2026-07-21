@@ -12,7 +12,6 @@ use std::fmt::Formatter;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::LintName;
 use ruff_db::display::FormatterJoinExtension;
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -34,12 +33,12 @@ use crate::suppression::{
 /// how many diagnostics its edit accounts for.
 pub fn suppress_all(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     ids_with_range: &[(LintName, TextRange)],
 ) -> Vec<SuppressFix> {
     let suppressions = suppressions(db, file);
-    let source = source_text(db, file);
-    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let source = source_text(db, file.file(db));
+    let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
     // Compute the full suppression ranges for each diagnostic, while retaining the original
@@ -167,11 +166,11 @@ pub struct SuppressFix {
 }
 
 /// Creates a fix to suppress a single lint.
-pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
+pub fn suppress_single(db: &dyn Db, file: PythonFile<'_>, id: LintId, range: TextRange) -> Fix {
     let suppression_range = suppression_range(db, file, range);
 
     let suppressions = suppressions(db, file);
-    let source = source_text(db, file);
+    let source = source_text(db, file.file(db));
     let codes = &[id.name()];
 
     if let Some(existing) = find_existing_suppression(suppressions, &source, range) {
@@ -194,10 +193,10 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
 /// * If `range` is within a single-line interpolated expression, then the start and end are extended to the start and end of the enclosing interpolated string.
 /// * If there's a line continuation, then the suppression range is extended to include the following line too.
 /// * If there's a multiline string, then the suppression range is extended to cover the starting and ending line of the multiline string.
-fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> TextRange {
+fn suppression_range(db: &dyn Db, file: PythonFile<'_>, range: TextRange) -> TextRange {
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
     // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
-    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
+    let parsed = parsed_module(db, file).load(db);
     let line_start = line_start(parsed.tokens(), range.start());
 
     let after_token_range = match parsed.tokens().at_offset(range.end()) {

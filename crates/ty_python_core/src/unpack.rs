@@ -1,3 +1,4 @@
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -30,7 +31,7 @@ use crate::scope::{FileScopeId, ScopeId};
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Unpack<'db> {
     #[returns(copy)]
-    pub file: File,
+    pub python_file: PythonFile<'db>,
 
     #[returns(copy)]
     pub(crate) value_file_scope: FileScopeId,
@@ -55,6 +56,10 @@ pub struct Unpack<'db> {
 impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.python_file(db).file(db)
+    }
+
     pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self._target(db).node(parsed)
     }

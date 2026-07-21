@@ -11,8 +11,9 @@ use lsp_types::{
     Documentation, ParameterInformation, ParameterInformationLabel, SignatureHelp,
     SignatureHelpParams, SignatureInformation, Uri,
 };
-use ruff_db::{Db as _, PythonFile};
+use ruff_db::PythonFile;
 use ty_ide::signature_help;
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 pub(crate) struct SignatureHelpRequestHandler;

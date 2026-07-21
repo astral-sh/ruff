@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -453,12 +454,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn new(
         db: &'db dyn Db,
         region: InferenceRegion<'db>,
+        python_file: PythonFile<'db>,
         index: &'db SemanticIndex<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let scope = region.scope(db);
         Self {
-            context: InferContext::new(db, scope, module),
+            context: InferContext::new(db, scope, python_file, module),
             index,
             region,
             scope,
@@ -756,6 +758,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn file(&self) -> File {
         self.context.file()
+    }
+
+    fn python_file(&self) -> PythonFile<'db> {
+        self.context.python_file()
     }
 
     fn module(&self) -> &'ast ParsedModuleRef {
@@ -1607,7 +1613,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceExprRef::Symbol(symbol) = &place
                 && scope.is_global()
             {
-                module_type_implicit_global_symbol(self.db(), self.file(), symbol.name())
+                module_type_implicit_global_symbol(self.db(), self.python_file(), symbol.name())
             } else {
                 Place::Undefined.into()
             }
@@ -1661,11 +1667,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if file_scope_id.is_global() {
                     let place_table = self.index.place_table(file_scope_id);
                     let place = place_table.place(definition.place(self.db()));
-                    let file = self.file();
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
                         .map(|symbol| {
-                            module_type_implicit_global_symbol(self.db(), file, symbol.name())
+                            module_type_implicit_global_symbol(
+                                self.db(),
+                                self.python_file(),
+                                symbol.name(),
+                            )
                         })
                         .and_then(|place| place.place.ignore_possibly_undefined())
                     {
@@ -4793,7 +4802,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(self.db(), self.file(), name)
+            if !module_type_implicit_global_symbol(self.db(), self.python_file(), name)
                 .place
                 .is_undefined()
             {
@@ -9208,13 +9217,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
-                module_type_implicit_global_symbol(db, self.file(), symbol_name).map_type(|ty| {
-                    self.narrow_place_with_applicable_constraints(
-                        PlaceExprRef::from(&expr),
-                        ty,
-                        &constraint_keys,
-                    )
-                })
+                module_type_implicit_global_symbol(db, self.python_file(), symbol_name).map_type(
+                    |ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            PlaceExprRef::from(&expr),
+                            ty,
+                            &constraint_keys,
+                        )
+                    },
+                )
             })
             // Not found in globals? Fallback to builtins
             // (without infinite recursion if we're already in builtins.)
@@ -11085,7 +11096,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags: _,
         } = *self;
 
-        let mut builder = TypeInferenceBuilder::new(self.db(), region, index, self.module());
+        let mut builder =
+            TypeInferenceBuilder::new(self.db(), region, self.python_file(), index, self.module());
 
         // Speculated builders are often discarded immediately.
         builder.context.defuse();

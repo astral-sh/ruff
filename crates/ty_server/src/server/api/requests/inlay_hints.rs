@@ -3,9 +3,10 @@ use std::time::Instant;
 
 use lsp_types::InlayHintRequest;
 use lsp_types::{InlayHintParams, Uri};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
-use ruff_db::{Db as _, PythonFile};
 use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
+use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
