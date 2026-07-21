@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::DefinitionRequest;
 use lsp_types::{DefinitionParams, DefinitionResponse, Uri};
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::goto_definition;
 use ty_project::ProjectDatabase;
 
@@ -49,7 +50,9 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_definition(db, file, offset) else {
+        let Some(ranged) =
+            goto_definition(db, PythonFile::new(db, file, db.python_version()), offset)
+        else {
             return Ok(None);
         };
 

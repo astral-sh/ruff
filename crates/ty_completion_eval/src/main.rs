@@ -10,6 +10,8 @@ use anyhow::{Context, anyhow};
 use clap::Parser;
 use regex::bytes::Regex;
 
+use ruff_db::Db as _;
+use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::{Completion, CompletionCapabilities};
@@ -330,7 +332,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            file,
+            PythonFile::new(&self.db, file, self.db.python_version()),
             offset,
         );
         Ok(completions)

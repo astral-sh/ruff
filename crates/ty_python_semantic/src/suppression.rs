@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
-use ruff_db::{files::File, parsed::parsed_module, source::source_text};
+use ruff_db::{PythonFile, files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -76,7 +76,7 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let source = source_text(db, file);
 
     let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;

@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use lsp_types::{
     SelectionRange as LspSelectionRange, SelectionRangeParams, SelectionRangeRequest, Uri,
 };
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::selection_range;
 use ty_project::ProjectDatabase;
 
@@ -40,6 +41,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
+        let python_file = PythonFile::new(db, file, db.python_version());
 
         let mut results = Vec::new();
 
@@ -49,7 +51,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
                 continue;
             };
 
-            let ranges = selection_range(db, file, offset);
+            let ranges = selection_range(db, python_file, offset);
             if !ranges.is_empty() {
                 // Convert ranges to nested LSP SelectionRange structure
                 let mut lsp_range = None;

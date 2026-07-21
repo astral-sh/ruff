@@ -13,7 +13,8 @@
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
-use ruff_db::files::File;
+use ruff_db::PythonFile;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -84,11 +85,12 @@ impl ReferencesMode {
 /// Search for references across all files in the project.
 pub(crate) fn references(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
-    let model = SemanticModel::new(db, file);
+    let source_file = file.file(db);
+    let model = SemanticModel::new(db, source_file);
     let target_definitions = goto_target.definitions(&model, mode.to_import_alias_resolution())?;
     let is_externally_visible_symbol =
         has_any_external_visible_definitions(db, &target_definitions);
@@ -115,10 +117,11 @@ pub(crate) fn references(
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
         let files = db.project().files(db);
+        let python_version = file.python_version(db);
         let files: Vec<_> = files
             .iter()
             .copied()
-            .filter(|other| *other != file)
+            .filter(|other| *other != source_file)
             .collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         let other_references = files
@@ -129,6 +132,8 @@ pub(crate) fn references(
                 if !contains_identifier(&source, &target_text) {
                     return Vec::new();
                 }
+
+                let other_file = PythonFile::new(db, other_file, python_version);
 
                 if is_externally_visible_symbol {
                     references_for_file(db, other_file, &target_definitions, &target_text, mode)
@@ -157,7 +162,7 @@ pub(crate) fn references(
 
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
@@ -169,9 +174,9 @@ fn references_for_keyword_arguments_in_file(
         "keyword-label cross-file scan should not run in DocumentHighlights mode"
     );
 
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let mut references = Vec::new();
 
     let mut finder = KeywordArgumentReferencesFinder(LocalReferencesFinder {
@@ -248,14 +253,14 @@ fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
 /// The behavior depends on the provided mode.
 fn references_for_file(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let mut references = Vec::new();
 
     let mut finder = LocalReferencesFinder {
@@ -310,7 +315,7 @@ fn parameter_owner_is_externally_visible_for_target(
 ) -> bool {
     let target = definition.focus_range(db);
     let file = target.file();
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
     let module = parsed.load(db);
 
     let covering = covering_node(module.syntax().into(), target.range());
@@ -721,7 +726,9 @@ impl<'a> LocalReferencesFinder<'a> {
         let db = self.model.db();
         let file = self.model.file();
         let class_range = class.range();
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let module =
+            ruff_db::parsed::parsed_module(db, PythonFile::new(db, file, db.python_version()))
+                .load(db);
         let index = ty_python_core::semantic_index(db, file);
 
         // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
@@ -779,7 +786,9 @@ impl<'a> LocalReferencesFinder<'a> {
         };
 
         let file = local_definition.file(db);
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let module =
+            ruff_db::parsed::parsed_module(db, PythonFile::new(db, file, db.python_version()))
+                .load(db);
         let kind = local_definition.kind(db);
         let category = kind.category(file.is_stub(db), &module);
 

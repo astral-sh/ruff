@@ -353,7 +353,11 @@ impl<'db> Definitions<'db> {
             .map(|definition| match definition {
                 ResolvedDefinition::Definition(definition) => {
                     let file = definition.file(db);
-                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+                    let module = ruff_db::parsed::parsed_module(
+                        db,
+                        ruff_db::PythonFile::new(db, file, db.python_version()),
+                    )
+                    .load(db);
 
                     let focus_range = definition.focus_range(db, &module);
                     let full_range = definition.full_range(db, &module);

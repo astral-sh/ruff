@@ -1,4 +1,4 @@
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -7,7 +7,7 @@ use crate::Db;
 
 /// Returns a list of nested selection ranges, where each range contains the next one.
 /// The first range in the list is the largest range containing the cursor position.
-pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRange> {
+pub fn selection_range(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<TextRange> {
     let parsed = parsed_module(db, file).load(db);
     let range = TextRange::empty(offset);
 
@@ -469,7 +469,11 @@ b"123a𝐁<CURSOR>c"
 
     impl CursorTest {
         fn selection_range(&self) -> String {
-            let ranges = selection_range(&self.db, self.cursor.file, self.cursor.offset);
+            let ranges = selection_range(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            );
 
             if ranges.is_empty() {
                 return "No selection range found".to_string();

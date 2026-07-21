@@ -13,6 +13,7 @@ pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -166,26 +167,27 @@ pub(crate) fn attribute_declarations<'db, 's>(
 
 /// Get the module-level docstring for the given file.
 pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     docstring_from_body(module.suite())
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
 
 pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    check_file(db, file)
+    check_file(db, PythonFile::new(db, file, db.python_version()))
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }
 
-pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub fn check_file(db: &dyn Db, file: PythonFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let source_file = file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
-    let source = source_text(db, file);
+    let source = source_text(db, source_file);
 
     if let Some(read_error) = source.read_error() {
         return Err(IOErrorDiagnostic {
-            file,
+            file: source_file,
             error: read_error.clone(),
         }
         .to_diagnostic());
@@ -198,16 +200,16 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
         parsed_ref
             .errors()
             .iter()
-            .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
+            .map(|error| Diagnostic::invalid_syntax(source_file, &error.error, error)),
     );
 
     diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = Diagnostic::invalid_syntax(file, error, error);
+        let mut error = Diagnostic::invalid_syntax(source_file, error, error);
         add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
         error
     }));
 
-    diagnostics.extend(check_types(db, file));
+    diagnostics.extend(check_types(db, source_file));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

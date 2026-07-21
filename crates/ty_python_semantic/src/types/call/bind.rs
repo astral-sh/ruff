@@ -17,6 +17,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use itertools::Itertools;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
@@ -4360,7 +4361,11 @@ impl<'db> CallableBinding<'db> {
                             "First overload defined here",
                         );
                         let file = function.file(context.db());
-                        let module = parsed_module(context.db(), file).load(context.db());
+                        let module = parsed_module(
+                            context.db(),
+                            PythonFile::new(context.db(), file, context.db().python_version()),
+                        )
+                        .load(context.db());
                         let node =
                             overload.node(context.db(), function.file(context.db()), &module);
                         let span = if node.body.len() == 1 {
@@ -8029,8 +8034,15 @@ impl<'db> BindingError<'db> {
                     .typevar(context.db())
                     .definition(context.db())
                 {
-                    let module = parsed_module(context.db(), typevar_definition.file(context.db()))
-                        .load(context.db());
+                    let module = parsed_module(
+                        context.db(),
+                        PythonFile::new(
+                            context.db(),
+                            typevar_definition.file(context.db()),
+                            context.db().python_version(),
+                        ),
+                    )
+                    .load(context.db());
                     let typevar_range = typevar_definition.full_range(context.db(), &module);
                     let mut sub = SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,

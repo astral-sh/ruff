@@ -20,7 +20,7 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
-use ruff_db::{files::File, parsed::parsed_module};
+use ruff_db::{PythonFile, files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
@@ -37,7 +37,7 @@ use crate::Db;
     heap_size=ruff_memory_usage::heap_size)
 ]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
 

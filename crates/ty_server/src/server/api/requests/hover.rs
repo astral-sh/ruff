@@ -8,6 +8,7 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::HoverRequest;
 use lsp_types::{HoverParams, MarkupContent, Uri};
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::{MarkupKind, hover};
 use ty_project::ProjectDatabase;
 
@@ -48,7 +49,8 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         };
 
-        let Some(range_info) = hover(db, file, offset) else {
+        let Some(range_info) = hover(db, PythonFile::new(db, file, db.python_version()), offset)
+        else {
             return Ok(None);
         };
 

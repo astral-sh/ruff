@@ -1,6 +1,8 @@
 use crate::completion;
 
-use ruff_db::{files::File, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
@@ -19,10 +21,11 @@ pub struct QuickFix {
 
 pub fn code_actions(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
+    let source_file = file.file(db);
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -42,7 +45,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, source_file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 
@@ -51,13 +54,12 @@ pub fn code_actions(
 
 fn unresolved_fixes(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     diagnostic_range: TextRange,
 ) -> Option<impl Iterator<Item = QuickFix>> {
     let parsed = parsed_module(db, file).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
-
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()
@@ -76,6 +78,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
+        PythonFile,
         diagnostic::{
             Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
             LintName, Span, SubDiagnostic,
@@ -968,7 +971,12 @@ mod tests {
                 .context(0)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+            for mut action in code_actions(
+                &self.db,
+                PythonFile::new(&self.db, self.file, ruff_db::Db::python_version(&self.db)),
+                self.diagnostic_range,
+                &lint.name,
+            ) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,

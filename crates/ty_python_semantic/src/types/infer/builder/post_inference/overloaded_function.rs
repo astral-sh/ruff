@@ -1,4 +1,5 @@
 use ruff_db::{
+    PythonFile,
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
@@ -254,7 +255,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
                 let file = function.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module =
+                    parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
                 let node = first_overload.node(db, file, &module);
                 let span = if node.body.len() == 1 {
                     Span::from(file).with_range(node.range())

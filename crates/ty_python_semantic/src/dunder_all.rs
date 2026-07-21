@@ -1,3 +1,4 @@
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -16,7 +17,7 @@ use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
