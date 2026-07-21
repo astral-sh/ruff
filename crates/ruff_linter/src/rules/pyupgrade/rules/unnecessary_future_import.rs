@@ -73,7 +73,6 @@ const REMOVE_FUTURES: &[&str] = &[
     "with_statement",
     "division",
     "absolute_import",
-    "with_statement",
     "print_function",
     "unicode_literals",
     // Removed in Python 3.7
