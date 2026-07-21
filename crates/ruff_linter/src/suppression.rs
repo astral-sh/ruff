@@ -19,7 +19,7 @@ use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::comments::shebang::leading_shebang_range;
 use crate::fix::edits::delete_comment;
-use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
+use crate::preview::is_human_readable_names_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
@@ -28,7 +28,7 @@ use crate::rules::ruff::rules::{
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
-use crate::{Locator, Violation, warn_user_once};
+use crate::{Locator, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 enum SuppressionAction {
@@ -870,11 +870,9 @@ impl<'a> SuppressionsBuilder<'a> {
     ) -> bool {
         match suppression.action {
             SuppressionAction::Ignore => {
-                if is_ruff_ignore_enabled(self.settings) {
-                    let (before, after) = tokens.split_at(suppression.token_range.start());
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
-                    {
+                let (before, after) = tokens.split_at(suppression.token_range.start());
+                let range =
+                    if indentation_at_offset(suppression.range.start(), self.source).is_some() {
                         // own-line ignore
                         let mut range =
                             Self::standalone_comment_range(suppression.range, before, after);
@@ -891,55 +889,44 @@ impl<'a> SuppressionsBuilder<'a> {
                         // trailing ignore
                         self.trailing_comment_range(suppression.token_range, before)
                     };
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:ignore comment found but not active, enable preview mode"
-                    );
+                for code in suppression.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code: code.into(),
+                        range,
+                        used: false.into(),
+                        comments: SuppressionComments::Single(suppression.clone()),
+                    });
                 }
                 true
             }
             SuppressionAction::FileIgnore => {
-                if is_ruff_ignore_enabled(self.settings) {
-                    match indentation_at_offset(suppression.range.start(), self.source) {
-                        // Module scope
-                        Some("") => {
-                            let range = TextRange::up_to(self.source.text_len());
-                            for code in suppression.codes_as_str(self.source) {
-                                self.valid.push(Suppression {
-                                    code: code.into(),
-                                    range,
-                                    used: false.into(),
-                                    comments: SuppressionComments::Single(suppression.clone()),
-                                });
-                            }
-                        }
-                        // Indented/inside block
-                        Some(_) => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::NotModuleScope,
-                                comment: suppression.clone(),
-                            });
-                        }
-                        // Trailing
-                        None => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression.clone(),
+                match indentation_at_offset(suppression.range.start(), self.source) {
+                    // Module scope
+                    Some("") => {
+                        let range = TextRange::up_to(self.source.text_len());
+                        for code in suppression.codes_as_str(self.source) {
+                            self.valid.push(Suppression {
+                                code: code.into(),
+                                range,
+                                used: false.into(),
+                                comments: SuppressionComments::Single(suppression.clone()),
                             });
                         }
                     }
-                } else {
-                    warn_user_once!(
-                        "#ruff:file-ignore comment found but not active, enable preview mode"
-                    );
+                    // Indented/inside block
+                    Some(_) => {
+                        self.invalid.push(InvalidSuppression {
+                            kind: InvalidSuppressionKind::NotModuleScope,
+                            comment: suppression.clone(),
+                        });
+                    }
+                    // Trailing
+                    None => {
+                        self.invalid.push(InvalidSuppression {
+                            kind: InvalidSuppressionKind::Trailing,
+                            comment: suppression.clone(),
+                        });
+                    }
                 }
                 true
             }
