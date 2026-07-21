@@ -275,9 +275,7 @@ def union_receiver(reader: Reader[int | str]):
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
-variable from the concrete receiver and apply it to the remainder of the signature. At present,
-receiver matching retains the overload, but does not yet apply the inferred `S = str`
-specialization.
+variable from the concrete receiver and apply it to the remainder of the signature.
 
 ```toml
 [environment]
@@ -285,9 +283,11 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import overload
+from typing import Any, Callable, overload
 
 class ReceiverGeneric[T]:
+    value: T
+
     @overload
     def method[S](self: "ReceiverGeneric[S]", value: S) -> S: ...
     @overload
@@ -295,18 +295,20 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# Receiver constraints are preserved for later relation checks, but are not yet solved into the
-# displayed bound signature.
-# TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
-reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
+
+def takes_callable(fn: Callable[..., Any]) -> None: ...
+def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
+    # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
+    reveal_type(value.method)
+    takes_callable(value.method)
 ```
 
 ## Structural protocol receivers
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here
 `get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
-assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. At present, the incompatible overload
-is retained because structural receiver specialization is not yet supported.
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`.
 
 ```py
 from typing import Callable, Protocol, TypeVar, overload
@@ -331,12 +333,45 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 
     def put(self, x: str) -> None: ...
 
-# TODO: The first overload should be eliminated, leaving `bound method
-# BaseWithProtocolSelf.method() -> bytes`.
-reveal_type(ProtocolSelfImplementation().method)  # revealed: Overload[[ProtocolSelfT]() -> ProtocolSelfT, () -> bytes]
+reveal_type(ProtocolSelfImplementation().method)  # revealed: bound method ProtocolSelfImplementation.method() -> bytes
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+```
+
+## One-sided constraints from protocol receivers
+
+An explicit protocol receiver can constrain a method type variable without determining an exact
+specialization. Keep that type variable generic so that compatible callbacks remain valid while the
+receiver constraint rejects incompatible ones.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Protocol, overload
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+class BaseWithProducer:
+    @overload
+    def method[S](self: Producer[S], value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class ProducerImplementation(BaseWithProducer):
+    def get(self) -> str:
+        return ""
+
+reveal_type(ProducerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+producer_callback: Callable[[object], object] = ProducerImplementation().method
+bad_producer_callback: Callable[[int], int] = ProducerImplementation().method  # error: [invalid-assignment]
+reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
 ```
 
 ## Constructor

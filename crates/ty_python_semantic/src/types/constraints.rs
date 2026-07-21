@@ -1501,7 +1501,7 @@ impl<'db> UpperBound<'db> {
         !self.is_empty()
     }
 
-    fn as_single_bound(&self) -> Option<Type<'db>> {
+    pub(crate) fn as_single_bound(&self) -> Option<Type<'db>> {
         if self.clauses.len() != 1 {
             return None;
         }
