@@ -993,25 +993,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn recursive_type_pair_fallback(
         &self,
-        source: Type<'db>,
-        target: Type<'db>,
+        _source: Type<'db>,
+        _target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if matches!(
-            (source, target),
-            (Type::TypeAlias(_), Type::TypeAlias(_))
-                | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
-                | (Type::TypedDict(_), Type::TypedDict(_))
-        ) {
-            // TODO: Recursively-specialized structural types can encode context-free languages,
-            // whose inclusion and equivalence are undecidable. No complete fallback exists, but
-            // more decidable cases can be recognized here before conservatively rejecting the pair.
-            return self.never();
-        }
-
-        // Mixed recursive cycles keep the existing coinductive fallback. Pairs of the same
-        // recursively structural kind are rejected above instead of generating another recursive
-        // obligation.
-        self.always()
+        // TODO: Recursively-specialized structural types can encode context-free languages,
+        // whose inclusion and equivalence are undecidable. No complete fallback exists, but
+        // more decidable cases can be recognized here before conservatively rejecting the pair.
+        //
+        // Strictly speaking, it is incorrect to use either `never` or `always` as a conservative result.
+        // The correct choice here is a logical value that is "neither true nor false", and expressing this requires the introduction of 3-valued logic.
+        // Discussion: https://github.com/astral-sh/ty/issues/4050
+        self.never()
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?

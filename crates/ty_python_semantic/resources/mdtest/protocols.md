@@ -5707,6 +5707,35 @@ def f(c: C[int]) -> None:
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
     takes_c(c)
+
+class Left[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "Left[list[T]]": ...
+
+class Right1[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "RightAlias1[list[T]]": ...
+
+class Right2[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "RightAlias2[set[T]]": ...
+
+type RightAlias1[T] = Right1[T]
+type RightAlias2[T] = Right2[T]
+
+def expect_right1(value: RightAlias1[int]) -> None: ...
+def expect_right2(value: RightAlias2[int]) -> None: ...
+def check(value: Left[int]) -> None:
+    # TODO: no error
+    expect_right1(value)  # error: [invalid-argument-type]
+    # This should be an error
+    expect_right2(value)  # error: [invalid-argument-type]
 ```
 
 ### Recursive legacy generic protocol
