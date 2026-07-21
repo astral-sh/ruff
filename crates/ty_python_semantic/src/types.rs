@@ -18,7 +18,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
@@ -531,6 +531,8 @@ impl Default for MemberLookupPolicy {
 /// The common key for class-member and instance-member lookup.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupKey<'db> {
+    #[returns(copy)]
+    python_version: PythonVersion,
     #[returns(copy)]
     ty: Type<'db>,
     #[returns(ref)]
@@ -1084,9 +1086,12 @@ impl<T> InstanceProjection<T> {
     }
 }
 
-/// An ordered pair of types shared by type-relation and set-theoretic queries.
+/// An ordered pair of types and their Python version shared by type-relation and set-theoretic
+/// queries.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct TypePair<'db> {
+    #[returns(copy)]
+    python_version: PythonVersion,
     #[returns(copy)]
     first: Type<'db>,
     #[returns(copy)]
@@ -1557,32 +1562,33 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     pub(crate) fn top_materialization(&self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        (*self).cached_materialization(ctx.db(), MaterializationKind::Top)
+        (*self).cached_materialization(ctx.db(), ctx.python_version(), MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     pub(crate) fn bottom_materialization(&self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        (*self).cached_materialization(ctx.db(), MaterializationKind::Bottom)
+        (*self).cached_materialization(ctx.db(), ctx.python_version(), MaterializationKind::Bottom)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, materialization_kind| {
+        cycle_initial=|_, id, _, _, materialization_kind| {
             Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
         },
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
-            value.cycle_normalized_impl(&SemanticContext::from_primary(db), *previous, cycle)
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, python_version, _| {
+            value.cycle_normalized_impl(&SemanticContext::from_version(db, python_version), *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn cached_materialization(
         self,
         db: &'db dyn Db,
+        python_version: PythonVersion,
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
-        let ctx = &SemanticContext::from_primary(db);
+        let ctx = &SemanticContext::from_version(db, python_version);
         self.materialize(
             ctx,
             materialization_kind,
@@ -2837,10 +2843,10 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
+            python_version: PythonVersion,
             ty: Type<'db>,
-            (): (),
         ) -> Option<PlaceAndQualifiers<'db>> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             let mut flags = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
             if !ty.is_subtype_of(ctx, KnownClass::Type.to_instance(ctx)) {
                 flags |= MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
@@ -2848,7 +2854,7 @@ impl<'db> Type<'db> {
             ty.find_name_in_mro_with_policy(ctx, "__new__", flags)
         }
 
-        lookup_dunder_new_inner(ctx.db(), self, ())
+        lookup_dunder_new_inner(ctx.db(), ctx.python_version(), self)
     }
 
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
@@ -2867,14 +2873,17 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let db = ctx.db();
-        Self::class_member_with_policy_inner(db, MemberLookupKey::new(db, self, name, policy))
+        Self::class_member_with_policy_inner(
+            db,
+            MemberLookupKey::new(db, ctx.python_version(), self, name, policy),
+        )
     }
 
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
-        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _: MemberLookupKey<'db>| {
-            member.cycle_normalized(&SemanticContext::from_primary(db), *previous, cycle)
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
+            member.cycle_normalized(&SemanticContext::from_version(db, key.python_version(db)), *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -2885,7 +2894,8 @@ impl<'db> Type<'db> {
         let ty = key.ty(db);
         let name = key.name(db);
         let policy = key.policy(db);
-        let ctx = &SemanticContext::from_primary(db);
+        let python_version = key.python_version(db);
+        let ctx = &SemanticContext::from_version(db, python_version);
 
         tracing::trace!("class_member: {}.{}", ty.display(ctx), name);
         if let Some(fallback) = ty.materialized_divergent_fallback() {
@@ -3381,14 +3391,15 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
+            python_version: PythonVersion,
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
         ) -> Option<(Type<'db>, AttributeKind)> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             if let Some(fallback) = ty.materialized_divergent_fallback() {
                 return fallback.try_call_dunder_get(ctx, instance, owner);
             }
@@ -3508,7 +3519,7 @@ impl<'db> Type<'db> {
             return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
         }
 
-        try_call_dunder_get_inner(ctx.db(), self, instance, owner)
+        try_call_dunder_get_inner(ctx.db(), ctx.python_version(), self, instance, owner)
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
@@ -3677,7 +3688,7 @@ impl<'db> Type<'db> {
     /// If this type is a union, requires all elements of union to be data descriptors.
     /// A directly dynamic type is treated as a data descriptor because it could inhabit one.
     pub(crate) fn is_data_descriptor(self, ctx: &SemanticContext<'db>) -> bool {
-        self.is_data_descriptor_impl(ctx.db(), false)
+        self.is_data_descriptor_impl(ctx.db(), ctx.python_version(), false)
     }
 
     /// Returns whether this type should be considered a possible data descriptor.
@@ -3686,7 +3697,7 @@ impl<'db> Type<'db> {
     /// For practical convenience, dynamic union elements are not considered possible data
     /// descriptors here, because doing so would disable narrowing too frequently.
     pub(crate) fn may_be_data_descriptor(self, ctx: &SemanticContext<'db>) -> bool {
-        self.is_data_descriptor_impl(ctx.db(), true)
+        self.is_data_descriptor_impl(ctx.db(), ctx.python_version(), true)
     }
 
     /// Returns whether this type is known not to be a data descriptor.
@@ -3694,7 +3705,7 @@ impl<'db> Type<'db> {
     /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
     /// type arguments do not affect the runtime descriptor class.
     pub(crate) fn is_definitely_non_data_descriptor(self, ctx: &SemanticContext<'db>) -> bool {
-        self.is_definitely_non_data_descriptor_impl(ctx.db(), ())
+        self.is_definitely_non_data_descriptor_impl(ctx.db(), ctx.python_version())
     }
 
     // Recursive aliases use `true`, the identity for the all-of classifications above.
@@ -3703,20 +3714,24 @@ impl<'db> Type<'db> {
         cycle_initial=|_, _, _, _| true,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, (): ()) -> bool {
-        let ctx = &SemanticContext::from_primary(db);
+    fn is_definitely_non_data_descriptor_impl(
+        self,
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+    ) -> bool {
+        let ctx = &SemanticContext::from_version(db, python_version);
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, ())),
+                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, python_version)),
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, ())),
+                .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, python_version)),
             Type::TypeAlias(alias) => alias
                 .value_type(ctx)
-                .is_definitely_non_data_descriptor_impl(db, ()),
+                .is_definitely_non_data_descriptor_impl(db, python_version),
             _ => !self.may_be_data_descriptor(ctx),
         }
     }
@@ -3725,11 +3740,16 @@ impl<'db> Type<'db> {
     // Seed recursive aliases with the corresponding identity value.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, any_of_union: bool| !any_of_union,
+        cycle_initial=|_, _, _, _, any_of_union: bool| !any_of_union,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
-        let ctx = &SemanticContext::from_primary(db);
+    fn is_data_descriptor_impl(
+        self,
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+        any_of_union: bool,
+    ) -> bool {
+        let ctx = &SemanticContext::from_version(db, python_version);
         match self {
             Type::Dynamic(_) => !any_of_union,
             Type::SubclassOf(_) if self.dynamic_descriptor_type().is_some() => true,
@@ -3737,17 +3757,19 @@ impl<'db> Type<'db> {
             Type::Union(union) if any_of_union => union
                 .elements(db)
                 .iter()
-                .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
+                .any(|ty| ty.is_data_descriptor_impl(db, python_version, any_of_union)),
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .all(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
+                .all(|ty| ty.is_data_descriptor_impl(db, python_version, any_of_union)),
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
-            Type::TypeAlias(alias) => alias
-                .value_type(ctx)
-                .is_data_descriptor_impl(db, any_of_union),
+                .any(|ty| ty.is_data_descriptor_impl(db, python_version, any_of_union)),
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(ctx)
+                    .is_data_descriptor_impl(db, python_version, any_of_union)
+            }
             _ => {
                 !self
                     .class_member_with_policy(ctx, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
@@ -3943,8 +3965,8 @@ impl<'db> Type<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
-            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _: MemberLookupKey<'db>| {
-                member.cycle_normalized(&SemanticContext::from_primary(db), *previous, cycle)
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
+                member.cycle_normalized(&SemanticContext::from_version(db, key.python_version(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -3958,8 +3980,8 @@ impl<'db> Type<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
-            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _: MemberLookupKey<'db>, _| {
-                member.cycle_normalized(&SemanticContext::from_primary(db), *previous, cycle)
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>, _| {
+                member.cycle_normalized(&SemanticContext::from_version(db, key.python_version(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -4048,7 +4070,8 @@ impl<'db> Type<'db> {
                 promote_inferred_attribute_class_literals(ctx, result)
             }
 
-            let ctx = &SemanticContext::from_primary(db);
+            let python_version = key.python_version(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             let this = key.ty(db);
             let name = key.name(db);
             let name_str = name.as_str();
@@ -4274,7 +4297,6 @@ impl<'db> Type<'db> {
                 Type::NominalInstance(instance)
                     if matches!(name_str, "major" | "minor") && instance.is_sys_version_info() =>
                 {
-                    let python_version = ctx.python_version();
                     let segment = if name == "major" {
                         python_version.major
                     } else {
@@ -4606,7 +4628,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        let key = MemberLookupKey::new(db, self, name, policy);
+        let key = MemberLookupKey::new(db, ctx.python_version(), self, name, policy);
         match receiver {
             Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
             None => member_lookup_with_policy_inner(db, key),
@@ -6660,23 +6682,24 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(ctx.db(), specialization)
+        self.apply_specialization_inner(ctx.db(), ctx.python_version(), specialization)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
-            value.cycle_normalized_impl(&SemanticContext::from_primary(db), *previous, cycle)
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, python_version, _| {
+            value.cycle_normalized_impl(&SemanticContext::from_version(db, python_version), *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn apply_specialization_inner(
         self,
         db: &'db dyn Db,
+        python_version: PythonVersion,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        let ctx = &SemanticContext::from_primary(db);
+        let ctx = &SemanticContext::from_version(db, python_version);
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                 specialization,
@@ -7343,19 +7366,19 @@ impl<'db> Type<'db> {
     /// Returns the eagerly expanded type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     fn expand_eagerly(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.expand_eagerly_(ctx.db(), ())
+        self.expand_eagerly_(ctx.db(), ctx.python_version())
     }
 
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
-            value.cycle_normalized_impl(&SemanticContext::from_primary(db), *previous, cycle)
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, python_version| {
+            value.cycle_normalized_impl(&SemanticContext::from_version(db, python_version), *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn expand_eagerly_(self, db: &'db dyn Db, (): ()) -> Type<'db> {
-        let ctx = &SemanticContext::from_primary(db);
+    fn expand_eagerly_(self, db: &'db dyn Db, python_version: PythonVersion) -> Type<'db> {
+        let ctx = &SemanticContext::from_version(db, python_version);
         self.apply_type_mapping(ctx, &TypeMapping::EagerExpansion, TypeContext::default())
     }
 

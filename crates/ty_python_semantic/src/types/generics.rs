@@ -5,7 +5,7 @@ use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
 use itertools::{Either, Itertools};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::callable::walk_callable_type;
@@ -506,14 +506,15 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| InferableTypeVars::None,
+            cycle_initial=|_, _, _, _| InferableTypeVars::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
+            python_version: PythonVersion,
             generic_context: GenericContext<'db>,
         ) -> InferableTypeVars<'db> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(ctx, bound_typevar);
@@ -522,7 +523,8 @@ impl<'db> GenericContext<'db> {
         }
 
         let db = ctx.db();
-        inferable_typevars_inner(db, self)
+        let python_version = ctx.python_version();
+        inferable_typevars_inner(db, python_version, self)
     }
 
     pub(crate) fn variables(
@@ -2097,6 +2099,8 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
+    pub(crate) python_version: PythonVersion,
+    #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     types: Box<[Option<Type<'db>>]>,
@@ -2113,7 +2117,7 @@ impl<'db> TypeVarInference<'db> {
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
         ) -> Specialization<'db> {
-            let ctx = SemanticContext::from_primary(db);
+            let ctx = SemanticContext::from_version(db, inference.python_version(db));
             inference.specialization_with(&ctx, |_, _| None)
         }
 
@@ -2244,7 +2248,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .map(|identity| types.get(identity).copied())
             .collect();
 
-        TypeVarInference::new(self.ctx.db(), generic_context, inferred)
+        TypeVarInference::new(
+            self.ctx.db(),
+            self.ctx.python_version(),
+            generic_context,
+            inferred,
+        )
     }
 
     fn solve_pending_with(

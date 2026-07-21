@@ -474,6 +474,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         let db = ctx.db();
+        let python_version = ctx.python_version();
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _| OwnedConstraintSet::always(),
@@ -483,7 +484,8 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let ctx = SemanticContext::from_primary(db);
+            let python_version = types.python_version(db);
+            let ctx = SemanticContext::from_version(db, python_version);
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -506,7 +508,7 @@ impl<'db> Type<'db> {
 
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
-            TypePair::new(db, self, target),
+            TypePair::new(db, python_version, self, target),
         ))
     }
 
@@ -547,9 +549,11 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Redundancy`] for more details.
     pub(super) fn is_redundant_with(self, ctx: &SemanticContext<'db>, other: Type<'db>) -> bool {
         let db = ctx.db();
+        let python_version = ctx.python_version();
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let ctx = SemanticContext::from_primary(db);
+            let python_version = types.python_version(db);
+            let ctx = SemanticContext::from_version(db, python_version);
             types
                 .first(db)
                 .has_relation_to(
@@ -566,7 +570,7 @@ impl<'db> Type<'db> {
             return true;
         }
 
-        is_redundant_with_impl(db, TypePair::new(db, self, other))
+        is_redundant_with_impl(db, TypePair::new(db, python_version, self, other))
     }
 
     pub(super) fn has_relation_to<'c>(

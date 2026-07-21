@@ -22,6 +22,7 @@ use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
 
 use itertools::{Either, EitherOrBoth, Itertools};
+use ruff_python_ast::PythonVersion;
 use smallvec::SmallVec;
 
 use crate::subscript::{
@@ -248,8 +249,12 @@ impl<'db> TupleType<'db> {
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        let ctx = &SemanticContext::from_primary(db);
+    pub(crate) fn to_class_type(
+        self,
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+    ) -> ClassType<'db> {
+        let ctx = &SemanticContext::from_version(db, python_version);
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(ctx)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -743,8 +748,9 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     self_: TupleType<'db>,
+    python_version: PythonVersion,
 ) -> ClassType<'db> {
-    let ctx = &SemanticContext::from_primary(db);
+    let ctx = &SemanticContext::from_version(db, python_version);
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(ctx)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");

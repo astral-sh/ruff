@@ -5,7 +5,7 @@ use crate::SemanticContext;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, PythonVersion};
 
 mod arguments;
 pub(crate) mod bind;
@@ -103,20 +103,21 @@ impl<'db> Type<'db> {
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_return_type_impl<'db>(
             db: &'db dyn Db,
+            python_version: PythonVersion,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
         ) -> Option<Type<'db>> {
-            let ctx = &SemanticContext::from_primary(db);
+            let ctx = &SemanticContext::from_version(db, python_version);
             Type::try_call_bin_op(ctx, left_ty, op, right_ty)
                 .ok()
                 .map(|bindings| bindings.return_type(ctx))
         }
 
-        try_call_bin_op_return_type_impl(ctx.db(), left_ty, op, right_ty)
+        try_call_bin_op_return_type_impl(ctx.db(), ctx.python_version(), left_ty, op, right_ty)
     }
 
     pub(crate) fn try_call_bin_op(
