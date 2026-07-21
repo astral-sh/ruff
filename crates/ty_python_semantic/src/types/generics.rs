@@ -2782,11 +2782,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     })
                     .reduce(|lhs, rhs| lhs.or(db, constraints, || rhs));
                 let Some(combined) = combined else {
-                    self.pending.intersect(
-                        self.db,
-                        self.constraints,
-                        ConstraintSet::from_bool(self.constraints, false),
-                    );
+                    self.pending = ConstraintSet::from_bool(self.constraints, false);
                     if let Some(ConstraintSetInferenceError::InvalidTypeVar(error)) = first_error {
                         return Err(error);
                     }
