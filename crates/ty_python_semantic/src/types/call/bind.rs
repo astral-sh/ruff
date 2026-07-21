@@ -3832,8 +3832,11 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.iter_types())
-                    .flat_map(move |(matched_argument, argument_types)| {
+                    .zip(arguments.iter())
+                    // A bound receiver participates in overload applicability, but its graduality
+                    // does not make otherwise-applicable overloads ambiguous.
+                    .filter(|(_, (argument, _))| !matches!(argument, Argument::Synthetic))
+                    .flat_map(move |(matched_argument, (_, argument_types))| {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`

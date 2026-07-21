@@ -225,10 +225,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .types = CallArgumentTypes::default();
     }
 
-    pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
-        self.items.iter().map(|item| &item.types)
-    }
-
     /// Returns `true` if the inferred types are equal for the given set of argument indices.
     pub(crate) fn inferred_types_equal_at(&self, other: &Self, argument_indices: &[usize]) -> bool {
         argument_indices.iter().all(|&index| {
