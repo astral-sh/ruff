@@ -335,24 +335,20 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: match global_preview {
-                    PreviewMode::Disabled => FilePatternSet::try_from_iter(
-                        self.include.unwrap_or_else(|| INCLUDE.to_vec()),
-                    )?,
-                    PreviewMode::Enabled => {
-                        FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
-                            let mut patterns = INCLUDE_PREVIEW.to_vec();
-                            if let Some(extension_map) = &self.extension {
-                                patterns.extend(
-                                    extension_map
-                                        .extensions()
-                                        .map(|ext| FilePattern::Config(format!("*.{ext}"))),
-                                );
-                            }
-                            patterns
-                        }))?
+                include: FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
+                    let mut patterns = match global_preview {
+                        PreviewMode::Disabled => INCLUDE.to_vec(),
+                        PreviewMode::Enabled => INCLUDE_PREVIEW.to_vec(),
+                    };
+                    if let Some(extension_map) = &self.extension {
+                        patterns.extend(
+                            extension_map
+                                .extensions()
+                                .map(|ext| FilePattern::Config(format!("*.{ext}"))),
+                        );
                     }
-                },
+                    patterns
+                }))?,
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },
@@ -2118,7 +2114,7 @@ mod tests {
     fn select_linter_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2131,7 +2127,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2139,7 +2135,7 @@ mod tests {
                 ..PreviewOptions::default()
             }),
         )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        let expected = RuleSet::from_rule(Rule::PreviewTestRule);
         assert_eq!(actual, expected);
         Ok(())
     }
@@ -2148,7 +2144,7 @@ mod tests {
     fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2161,7 +2157,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2169,7 +2165,7 @@ mod tests {
                 ..PreviewOptions::default()
             }),
         )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        let expected = RuleSet::from_rule(Rule::PreviewTestRule);
         assert_eq!(actual, expected);
         Ok(())
     }

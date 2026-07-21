@@ -1438,10 +1438,6 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
-    /// Whether to show the diff for an available fix after the main diagnostic.
-    ///
-    /// This currently only applies to `DiagnosticFormat::Full`.
-    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 
@@ -1461,7 +1457,6 @@ impl DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
-            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
             cancellation_token: None,
         }
@@ -1536,14 +1531,6 @@ impl DisplayDiagnosticConfig {
     pub fn with_show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             show_fix_status: yes,
-            ..self
-        }
-    }
-
-    /// Whether to show a diff for an available fix after the main diagnostic.
-    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            show_fix_diff: yes,
             ..self
         }
     }

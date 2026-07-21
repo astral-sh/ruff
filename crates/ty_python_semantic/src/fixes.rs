@@ -900,6 +900,11 @@ mod tests {
           |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Remove the unused suppression comment
+          |
+        1 | import sys
+          - a = 5 + 10  # ty: ignore[unresolved-reference]
+        2 + a = 5 + 10
+          |
         ");
     }
 
@@ -1102,6 +1107,12 @@ class B(A):
         9 |         b: str
           |
         help: Remove the unused suppression code
+          |
+        6 | class B(A):
+          -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+        7 +     def test(  # ty:ignore[invalid-method-override]
+        8 |         self,
+          |
         "#);
     }
 
@@ -1147,6 +1158,10 @@ class B(A):
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Remove the unused suppression comment
+          |
+          - value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        1 + value = missing  # ty:ignore[unresolved-reference]
+          |
         "
         );
     }
@@ -1181,6 +1196,11 @@ class B(A):
           |                                        ^^^^^^^^^^^^^^^^
           |
         help: Remove the unused suppression code
+          |
+        2 |
+          - result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+        3 + result: int = f(missing)  # ty: ignore[invalid-assignment, too-many-positional-arguments, unresolved-reference]
+          |
         "#
         );
     }
@@ -1221,6 +1241,12 @@ class B(A):
         5 | ]
           |
         help: Remove the unused suppression comment
+          |
+        2 | values = [
+          -     # ty: ignore[]
+        3 +
+        4 |     missing,  # ty:ignore[unresolved-reference]
+          |
         "
         );
     }
@@ -1271,6 +1297,12 @@ class B(A):
         3 | value = missing  # ty:ignore[unresolved-reference]
           |
         help: Remove the unused suppression comment
+          |
+        1 | seen_code = True
+          - # ty: ignore[]
+        2 +
+        3 | value = missing  # ty:ignore[unresolved-reference]
+          |
         "#
         );
     }
