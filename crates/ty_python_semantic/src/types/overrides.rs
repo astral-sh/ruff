@@ -186,6 +186,21 @@ fn check_inherited_method_conflicts<'db>(
             continue;
         };
         let scope = owner_literal.body_scope(db);
+        // TODO: Include synthesized members when checking inherited conflicts. For example,
+        // `Ordered.__gt__` is synthesized here and is incompatible with `AcceptsObject.__gt__`:
+        //
+        // ```python
+        // from functools import total_ordering
+        //
+        // @total_ordering
+        // class Ordered:
+        //     def __lt__(self, other: Ordered) -> bool: ...
+        //
+        // class AcceptsObject:
+        //     def __gt__(self, other: object) -> bool: ...
+        //
+        // class Conflict(Ordered, AcceptsObject): ...
+        // ```
         let members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
 
         #[expect(

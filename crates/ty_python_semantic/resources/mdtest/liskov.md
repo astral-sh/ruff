@@ -844,6 +844,24 @@ class ReturnsInt:
 class PropertyConflict(ReturnsStr, ReturnsInt): ...
 ```
 
+### Synthesized members
+
+Methods synthesized on an earlier base can conflict with methods defined on a later base.
+
+```pyi
+from functools import total_ordering
+
+@total_ordering
+class Ordered:
+    def __lt__(self, other: Ordered) -> bool: ...
+
+class AcceptsObject:
+    def __gt__(self, other: object) -> bool: ...
+
+# TODO: The synthesized `Ordered.__gt__` method conflicts with `AcceptsObject.__gt__`.
+class SynthesizedConflict(Ordered, AcceptsObject): ...
+```
+
 ### Enum mixins
 
 Ordinary mixin methods continue to contribute inherited contracts when the resulting class is an
