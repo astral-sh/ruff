@@ -24,9 +24,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction, MemberLookupKey,
-        MemberLookupPolicy, Parameter, PropertyInstanceType, ProtocolInstanceType, SelfBinding,
-        Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
+        GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
+        MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType, ProtocolInstanceType,
+        SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
         TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
@@ -481,6 +481,29 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Returns whether `name` has an instance-write requirement of `type[T]`, where `T` belongs
+    /// to `generic_context`.
+    pub(super) fn includes_generic_writable_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        self.member_by_name(db, name)
+            .and_then(|member| member.capabilities(db).instance.write)
+            .and_then(ProtocolMemberWrite::domain)
+            .and_then(|write| write.resolve(db))
+            .is_some_and(|write| {
+                matches!(
+                    write.ty(),
+                    Type::SubclassOf(subclass_of)
+                        if subclass_of.into_type_var().is_some_and(|typevar| {
+                            generic_context.contains(db, typevar.identity(db))
+                        })
+                )
+            })
     }
 
     /// Returns the declared instance-write requirement for a protocol member.

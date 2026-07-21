@@ -6137,7 +6137,12 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
-                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    Some(KnownClass::Float)
+                        if !inference_flags
+                            .contains(InferenceFlags::DISABLE_INT_FLOAT_SPECIAL_CASE) =>
+                    {
+                        KnownUnion::Float.to_type(db)
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
