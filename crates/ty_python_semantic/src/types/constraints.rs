@@ -2407,67 +2407,6 @@ impl NodeId {
         }
     }
 
-    fn for_each_path<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(&PathAssignments),
-    ) {
-        match self.node() {
-            Node::AlwaysTrue => {}
-            Node::AlwaysFalse => {}
-            Node::Interior(interior) => {
-                let mut path = interior.path_assignments(builder);
-                self.for_each_path_inner(db, builder, &mut f, &mut path);
-            }
-        }
-    }
-
-    fn for_each_path_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: &mut dyn FnMut(&PathAssignments),
-        path: &mut PathAssignments,
-    ) {
-        match self.node() {
-            Node::AlwaysTrue => f(path),
-            Node::AlwaysFalse => {}
-            Node::Interior(_) => {
-                let interior = builder.interior_node_data(self);
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_true(),
-                    interior.source_order,
-                    |path, _| {
-                        interior.if_true.for_each_path_inner(db, builder, f, path);
-                    },
-                );
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_unconstrained(),
-                    interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_uncertain
-                            .for_each_path_inner(db, builder, f, path);
-                    },
-                );
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| {
-                        interior.if_false.for_each_path_inner(db, builder, f, path);
-                    },
-                );
-            }
-        }
-    }
-
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied<'db>(
         self,
@@ -3682,6 +3621,69 @@ impl<'db> PathBounds<'db> {
         node: NodeId,
         inferable: InferableTypeVars<'db>,
     ) -> Self {
+        #[derive(Default)]
+        struct CollectVisitor {
+            sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+        }
+
+        impl PathVisitor for CollectVisitor {
+            type Result = ();
+            type Interior = ();
+            type Break = Infallible;
+
+            fn visit_satisfied(
+                &mut self,
+                path: Option<&PathAssignments>,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                if let Some(path) = path {
+                    let mut path: Vec<_> = path.positive_constraints().collect();
+                    path.sort_by_key(|(_, source_order)| *source_order);
+                    self.sorted_paths.push(path);
+                }
+                ControlFlow::Continue(())
+            }
+
+            fn visit_unsatisfied(
+                &mut self,
+                _path: Option<&PathAssignments>,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn enter_interior(
+                &mut self,
+                _interior_node: InteriorNode,
+            ) -> ControlFlow<Self::Break, Self::Interior> {
+                ControlFlow::Continue(())
+            }
+
+            fn extend_path(
+                &mut self,
+                _interior_node: InteriorNode,
+                _interior_value: &Self::Interior,
+                _subtree: Self::Result,
+                _path: &PathAssignments,
+                _new_range: Range<usize>,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn leave_interior(
+                &mut self,
+                _interior_node: InteriorNode,
+                _interior_value: &Self::Interior,
+                _if_true: Self::Result,
+                _if_uncertain: Self::Result,
+                _if_false: Self::Result,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+        }
+
         if let Some(path_bounds) =
             Self::compute_simple_bound_conjunction(db, builder, node, inferable)
         {
@@ -3689,34 +3691,31 @@ impl<'db> PathBounds<'db> {
         }
 
         let node = node.remove_noninferable(db, builder, inferable);
-        match node.node() {
+        let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
-            Node::Interior(_) => {}
-        }
+            Node::Interior(interior) => interior,
+        };
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let mut sorted_paths = Vec::new();
-        node.for_each_path(db, builder, |path| {
-            let mut path: Vec<_> = path.positive_constraints().collect();
-            path.sort_by_key(|(_, source_order)| *source_order);
-            sorted_paths.push(path);
-        });
-        sorted_paths.sort_by(|path1, path2| {
+        let mut collect_visitor = CollectVisitor::default();
+        let mut path = interior.path_assignments(builder);
+        let _ = path.visit(db, builder, node, &mut collect_visitor);
+        collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
-        let mut result = Vec::with_capacity(sorted_paths.len());
+        let mut result = Vec::with_capacity(collect_visitor.sorted_paths.len());
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
-        for path in sorted_paths {
+        for path in collect_visitor.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = builder.constraint_data(constraint);
