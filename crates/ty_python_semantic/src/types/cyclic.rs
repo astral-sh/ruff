@@ -59,6 +59,9 @@ impl<'db> Type<'db> {
     /// A `true` result is only a candidate match and must be confirmed with
     /// [`Type::to_type_identity`].
     pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
         match (self, other) {
             (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
             (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
