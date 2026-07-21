@@ -5448,34 +5448,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
-        // The synthetic `cls` already carries the constructor's identity specialization.
-        // For example, typeshed's `map` constructor is roughly:
-        //
-        // ```py
-        // class map[S]:
-        //     def __new__[T](cls, callback: Callable[[T], S], values: Iterable[T], /) -> Self: ...
-        //
-        // map(os.path.abspath, list_fonts("fonts"))
-        // ```
-        //
-        // Once the call specializes `S` to `PathLike[Never]`, applying that specialization to
-        // `cls` again produces `map[PathLike[PathLike[Never]]]` instead of
-        // `map[PathLike[Never]]`, causing a spurious argument error. Decorators can also
-        // re-express the `cls` annotation using their own TypeVar, possibly through a type alias.
-        let constructor_receiver = matches!(argument, Argument::Synthetic)
-            && self.constructor_kind == Some(ConstructorCallableKind::New)
-            && matches!(
-                parameter.annotated_type().resolve_type_alias(self.db),
-                Type::SubclassOf(subclass_of) if subclass_of.into_type_var().is_some()
-            );
-
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
-            if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(self.db, specialization);
-            }
+            argument_type = argument_type.apply_specialization(self.db, specialization);
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
+
+        // Decorators can re-express `cls` using a type variable that is not inferable from the
+        // constructor call. In that case, the constraint solver is the authority for the receiver;
+        // a final assignability check against the unsolved type variable would be misleading.
+        let unsolved_constructor_receiver = matches!(argument, Argument::Synthetic)
+            && self.constructor_kind == Some(ConstructorCallableKind::New)
+            && matches!(
+                expected_ty.resolve_type_alias(self.db),
+                Type::SubclassOf(subclass_of) if subclass_of.into_type_var().is_some()
+            );
 
         // Some typing special forms are valid class-info arguments at runtime but are not
         // assignable to typeshed's `isinstance`/`issubclass` class-info annotation.
@@ -5508,7 +5495,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
-            && !constructor_receiver
+            && !unsolved_constructor_receiver
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
             && argument_type

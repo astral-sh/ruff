@@ -282,8 +282,8 @@ reveal_type(Foo(1))  # revealed: Foo
 Adding an implicit `type[Self]` annotation for `cls` must not cause valid constructor calls to be
 rejected when a generic callback determines the class's type argument. These calls already pass on
 `main`; they guard against regressions when the implicit `__new__` receiver is added. The overloaded
-callback, protocol, and `Any` argument exercise the nested specialization that previously caused the
-synthetic `cls` argument to be specialized twice.
+callback, protocol, and `Any` argument exercise the nested specialization and correlated receiver
+constraints that previously caused the synthetic `cls` argument to be rejected.
 
 ```pyi
 from collections.abc import Callable
