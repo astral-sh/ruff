@@ -2237,9 +2237,9 @@ bool_value: JustInt = True  # error: [invalid-assignment]
 ```
 
 Explicitly specializing a protocol that directly declares a `__class__` write type of `type[T]` for
-one of its type parameters does not apply the `int`/`float` special case to its type arguments.
-This allows such protocols to distinguish an actual `float` from an `int`. This is a
-narrowly-focused special case to better support the `Just` type in pandas-stubs:
+one of its type parameters does not apply the `int`/`float` special case to its type arguments. This
+allows such protocols to distinguish an actual `float` from an `int`. This is a narrowly-focused
+special case to better support the `Just` type in pandas-stubs:
 
 ```py
 from typing import Generic, TypeVar
