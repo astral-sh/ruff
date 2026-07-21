@@ -449,8 +449,8 @@ impl<'db> Type<'db> {
         // relation retains many one-off type pairs. Preserve conditional results because call
         // binding needs to distinguish "not always" from "never" assignable.
         if inferable == InferableTypeVars::None
-            && any_over_type(db, target.resolve_type_alias(db), false, |ty| {
-                matches!(ty, Type::ProtocolInstance(_))
+            && any_over_type(db, target, false, |ty| {
+                matches!(ty, Type::ProtocolInstance(_) | Type::TypeAlias(_))
                     || matches!(
                         ty,
                         Type::SubclassOf(target)
