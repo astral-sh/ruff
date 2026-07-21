@@ -264,7 +264,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
             for pattern in allowed_unresolved_imports {
                 builder
                     .add(pattern)
-                    .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
+                    .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}`");
             }
             builder.build().unwrap()
         } else {
@@ -277,7 +277,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
             for pattern in replace_imports_with_any {
                 builder
                     .add(pattern)
-                    .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
+                    .expect("Invalid `replace-imports-with-any` pattern `{pattern}`");
             }
             builder.build().unwrap()
         } else {
