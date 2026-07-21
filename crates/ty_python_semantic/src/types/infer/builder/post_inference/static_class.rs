@@ -444,6 +444,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that the class's MRO is resolvable
+    let mut inconsistent_generic_bases = false;
     match class.try_mro(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
@@ -530,7 +531,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
-            report_inconsistent_generic_bases(
+            inconsistent_generic_bases = report_inconsistent_generic_bases(
                 context,
                 class.header_range(db),
                 explicit_bases,
@@ -1004,7 +1005,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // (13) Check for violations of the Liskov Substitution Principle,
     // and for violations of other rules relating to invalid overrides of some sort.
-    overrides::check_class(context, class);
+    overrides::check_class(context, class, inconsistent_generic_bases);
 
     // (14) Check compatibility between class namespace values and metaclass-populated attributes.
     check_class_namespace_against_metaclass_members(context, class, index);
