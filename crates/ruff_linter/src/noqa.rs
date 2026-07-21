@@ -3070,7 +3070,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ```
         "
