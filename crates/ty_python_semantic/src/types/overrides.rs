@@ -79,13 +79,13 @@ pub(super) fn check_class<'db>(
         return;
     }
 
-    let class_specialized = class.identity_specialization(db);
-    if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
-        check_inherited_method_conflicts(context, class, class_specialized);
-    }
-
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+    let class_specialized = class.identity_specialization(db);
+    if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
+        check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
+    }
+
     let enum_info = enum_metadata(db, class.into());
 
     #[expect(
@@ -106,9 +106,9 @@ pub(super) fn check_class<'db>(
 
 /// Rechecks methods defined on parents against the remainder of the resolved MRO.
 ///
-/// A multiple-inheritance join can place two otherwise-unrelated classes in the same MRO. Every
-/// source-defined method in that ordering must be compatible with each later definition of the
-/// same method, even if an earlier method happens to satisfy both contracts:
+/// A multiple-inheritance join can place two otherwise-unrelated classes in the same MRO. The
+/// effective source-defined method in that ordering must be compatible with each later definition
+/// of the same method:
 ///
 /// ```python
 /// class ReturnsStr:
@@ -126,6 +126,7 @@ fn check_inherited_method_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     class_specialized: ClassType<'db>,
+    own_class_members: &FxHashSet<MemberWithDefinition<'db>>,
 ) {
     let db = context.db();
 
@@ -166,6 +167,10 @@ fn check_inherited_method_conflicts<'db>(
         }
     }
     let receiver = Type::instance(db, class_specialized);
+    let mut seen_names: FxHashSet<_> = own_class_members
+        .iter()
+        .map(|member| member.member.name.clone())
+        .collect();
 
     for (index, owner) in mro.iter().copied().enumerate() {
         let Some((owner_literal, _)) = owner.static_class_literal(db) else {
@@ -180,7 +185,10 @@ fn check_inherited_method_conflicts<'db>(
         )]
         'members: for member in members {
             let name = &member.member.name;
-            if is_mangled_private(name.as_str()) || is_constructor_like_method(name.as_str()) {
+            if is_mangled_private(name.as_str())
+                || is_constructor_like_method(name.as_str())
+                || !seen_names.insert(name.clone())
+            {
                 continue;
             }
             let Some((selected_decorator, selected_ty)) =

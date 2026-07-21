@@ -637,8 +637,8 @@ class ProtocolWithClassVarImpl(ProtocolBase):
 
 ## Inherited method conflicts in multiple inheritance
 
-Every method definition in a class's resolved MRO must be compatible with the later definitions of
-that method. This matters even when the class does not define the method itself.
+The effective method definition in a class's resolved MRO must be compatible with the later
+definitions of that method. This matters even when the class does not define the method itself.
 
 ### Basic conflicts
 
@@ -696,10 +696,10 @@ class ReturnsInt:
 class LaterBaseConflict(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
 ```
 
-### An earlier compatible method does not hide a conflict
+### An earlier compatible method satisfies both contracts
 
-`SatisfiesBoth.method` is compatible with both later definitions because it returns `NoReturn`.
-`ReturnsStr.method` is still incompatible with the later `ReturnsInt.method`.
+`SatisfiesBoth.method` is compatible with both later definitions because it returns `NoReturn`. It
+is the effective method for `Compatible`, so the later definitions do not conflict.
 
 ```pyi
 from typing import NoReturn
@@ -713,7 +713,33 @@ class ReturnsStr:
 class ReturnsInt:
     def method(self) -> int: ...
 
-class HiddenConflict(SatisfiesBoth, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
+```
+
+### A compatible subclass override satisfies both contracts
+
+A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
+
+```pyi
+from typing import NoReturn
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class CompatibleReturn(ReturnsStr, ReturnsInt):
+    def method(self) -> NoReturn: ...
+
+class AcceptsStr:
+    def accepts(self, value: str) -> None: ...
+
+class AcceptsInt:
+    def accepts(self, value: int) -> None: ...
+
+class CompatibleParameter(AcceptsStr, AcceptsInt):
+    def accepts(self, value: str | int) -> None: ...
 ```
 
 ### An intermediate `Any` does not hide a conflict
