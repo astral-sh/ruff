@@ -449,18 +449,27 @@ impl<'db> CallableSignature<'db> {
                     .iter()
                     .any(Signature::has_explicit_positional_receiver_annotation)
             {
-                return Self::from_overloads(
-                    self.overloads
-                        .iter()
-                        .filter(|signature| signature.can_bind_self_to(db, receiver_type))
-                        .map(|signature| {
-                            signature.bind_self_with_receiver(
-                                db,
-                                Some(receiver_type),
-                                typing_self_type,
-                            )
-                        }),
-                );
+                let retained: Vec<_> = self
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
+                    .collect();
+
+                // A receiver that still contains a type variable (e.g. a constrained `TypeVar`, or a
+                // generic specialization such as `State[T]`) does not pin down a single concrete
+                // receiver, so receiver-based pruning cannot confidently reject an overload. When it
+                // would remove *every* overload we keep them all and defer to normal overload
+                // resolution, rather than exposing an empty (non-callable) `Overload[]`. Concrete
+                // receivers still prune to empty when nothing matches.
+                let overloads = if retained.is_empty() && receiver_type.has_typevar(db) {
+                    self.overloads.iter().collect()
+                } else {
+                    retained
+                };
+
+                return Self::from_overloads(overloads.into_iter().map(|signature| {
+                    signature.bind_self_with_receiver(db, Some(receiver_type), typing_self_type)
+                }));
             }
 
             return Self::from_overloads(self.overloads.iter().map(|signature| {
