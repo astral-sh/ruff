@@ -4713,11 +4713,7 @@ from pathlib import Missing as Alias
         fn highlight_file(&self) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(
-                    &self.db,
-                    self.file,
-                    ty_python_semantic::Db::python_version(&self.db),
-                ),
+                PythonFile::new(&self.db, self.file, self.db.python_version()),
                 None,
             )
         }
@@ -4726,11 +4722,7 @@ from pathlib import Missing as Alias
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(
-                    &self.db,
-                    self.file,
-                    ty_python_semantic::Db::python_version(&self.db),
-                ),
+                PythonFile::new(&self.db, self.file, self.db.python_version()),
                 Some(range),
             )
         }

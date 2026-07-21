@@ -1,7 +1,7 @@
 use lsp_types::CallHierarchyIncomingCallsRequest;
 use lsp_types::{CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams};
 use ruff_db::PythonFile;
-use ty_project::SemanticDb as _;
+use ty_project::Db as _;
 
 use crate::document::{ToRangeExt as _, resolve_file_uri_range};
 use crate::server::api::requests::prepare_call_hierarchy::convert_to_lsp_item;

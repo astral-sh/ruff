@@ -19,7 +19,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::SemanticDb as _;
+use ty_project::Db as _;
 use ty_project::{ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;

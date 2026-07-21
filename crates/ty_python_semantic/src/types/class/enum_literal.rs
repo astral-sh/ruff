@@ -1,3 +1,4 @@
+use crate::SemanticContext;
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -27,15 +28,16 @@ pub struct EnumSpec<'db> {
 impl<'db> EnumSpec<'db> {
     fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let db = ctx.db();
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(ctx, div, true);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
@@ -68,14 +70,14 @@ pub enum DynamicEnumAnchor<'db> {
 impl<'db> DynamicEnumAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Definition { definition, spec } => Some(Self::Definition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(ctx, div, nested)?,
             }),
             Self::ScopeOffset {
                 scope,
@@ -84,7 +86,7 @@ impl<'db> DynamicEnumAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(ctx, div, nested)?,
             }),
         }
     }
@@ -108,13 +110,14 @@ impl get_size2::GetSize for DynamicEnumLiteral<'_> {}
 impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let db = ctx.db();
         let mixin_type = match self.mixin_type(db) {
             Some(mixin) => {
-                let mixin = mixin.recursive_type_normalized_impl(db, div, true);
+                let mixin = mixin.recursive_type_normalized_impl(ctx, div, true);
                 Some(if nested { mixin? } else { mixin.unwrap_or(div) })
             }
             None => None,
@@ -124,7 +127,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(ctx, div, nested)?,
             self.base_class(db),
             mixin_type,
         ))
@@ -154,12 +157,13 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
     }
 
-    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+    pub(crate) fn explicit_bases(self, ctx: &SemanticContext<'db>) -> Box<[Type<'db>]> {
+        let db = ctx.db();
         let mut bases = Vec::with_capacity(2);
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
         }
-        bases.push(self.base_class(db).to_class_literal(db));
+        bases.push(self.base_class(db).to_class_literal(ctx));
         bases.into_boxed_slice()
     }
 
@@ -192,8 +196,8 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     #[expect(clippy::unused_self)]
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        KnownClass::EnumType.to_class_literal(db)
+    pub(crate) fn metaclass(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+        KnownClass::EnumType.to_class_literal(ctx)
     }
 
     #[salsa::tracked(
@@ -202,21 +206,23 @@ impl<'db> DynamicEnumLiteral<'db> {
         cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
-                ClassBase::object(db),
+                ClassBase::object(&SemanticContext::from_file(db, self_.scope(db).python_file(db))),
             ]))
         }
     )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_enum(db, self)
+        let ctx = SemanticContext::from_file(db, self.scope(db).python_file(db));
+        Mro::of_dynamic_enum(&ctx, self)
     }
 
     fn has_known_members(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_members(db)
     }
 
-    fn mixin_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+    fn mixin_class(self, ctx: &SemanticContext<'db>) -> Option<ClassType<'db>> {
+        let db = ctx.db();
         let mixin = self.mixin_type(db)?;
-        let ClassBase::Class(class) = ClassBase::try_from_type(db, mixin, None)? else {
+        let ClassBase::Class(class) = ClassBase::try_from_type(ctx, mixin, None)? else {
             return None;
         };
         Some(class)
@@ -240,7 +246,8 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// For unknown members, returns `Member::unbound()` — the unknown-member
     /// fallback is handled in `class_member` as a last resort after checking
     /// the full MRO (matching the `NamedTuple` pattern).
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_class_member(self, ctx: &SemanticContext<'db>, name: &str) -> Member<'db> {
+        let db = ctx.db();
         let spec = self.spec(db);
         if spec.has_known_members(db)
             && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(db)
@@ -257,22 +264,27 @@ impl<'db> DynamicEnumLiteral<'db> {
     ///
     /// If members are unknown and nothing was found in the MRO, returns `Unknown`
     /// as a last resort to avoid false `unresolved-attribute` errors.
-    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let own = self.own_class_member(db, name);
+    pub(crate) fn class_member(
+        self,
+        ctx: &SemanticContext<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        let db = ctx.db();
+        let own = self.own_class_member(ctx, name);
         if !own.is_undefined() {
             return own.inner;
         }
-        if let Some(mixin_class) = self.mixin_class(db) {
-            let result = mixin_class.class_member(db, name, MemberLookupPolicy::default());
+        if let Some(mixin_class) = self.mixin_class(ctx) {
+            let result = mixin_class.class_member(ctx, name, MemberLookupPolicy::default());
             if !result.place.is_undefined() {
                 return result;
             }
         }
         let result = self
             .base_class(db)
-            .to_class_literal(db)
+            .to_class_literal(ctx)
             .as_class_literal()
-            .map(|cls| cls.class_member(db, name, MemberLookupPolicy::default()))
+            .map(|cls| cls.class_member(ctx, name, MemberLookupPolicy::default()))
             .unwrap_or_else(|| Place::Undefined.into());
 
         // When members are unknown (e.g. `Enum("E", some_var)`), any name could
@@ -286,17 +298,22 @@ impl<'db> DynamicEnumLiteral<'db> {
     ///
     /// If members are unknown and nothing was found, returns `Unknown`
     /// as a last resort.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        if let Some(mixin_class) = self.mixin_class(db) {
-            let result = mixin_class.instance_member(db, name);
+    pub(crate) fn instance_member(
+        self,
+        ctx: &SemanticContext<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        let db = ctx.db();
+        if let Some(mixin_class) = self.mixin_class(ctx) {
+            let result = mixin_class.instance_member(ctx, name);
             if !result.place.is_undefined() {
                 return result;
             }
         }
         let result = self
             .base_class(db)
-            .to_instance(db)
-            .instance_member(db, name);
+            .to_instance(ctx)
+            .instance_member(ctx, name);
 
         self.with_unknown_member_fallback(db, result)
     }
@@ -304,7 +321,11 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// Functional enums don't define own instance attributes — `.name`, `.value`
     /// etc. come from the `Enum` base class, not from the dynamic enum itself.
     #[expect(clippy::unused_self)]
-    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        _ctx: &SemanticContext<'db>,
+        _name: &str,
+    ) -> Member<'db> {
         Member::unbound()
     }
 }

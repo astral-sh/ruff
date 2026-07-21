@@ -398,12 +398,17 @@ impl MainLoop {
                             }
                         }
                         MainLoopMode::Fix(mode) => {
+                            let python_version = db.python_version();
                             let result = match mode {
-                                FixMode::AddIgnore => {
-                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
-                                }
+                                FixMode::AddIgnore => suppress_all_diagnostics(
+                                    db,
+                                    python_version,
+                                    result,
+                                    &self.cancellation_token,
+                                ),
                                 FixMode::ApplyFixes => fix_all_diagnostics(
                                     db,
+                                    python_version,
                                     result,
                                     Applicability::Safe,
                                     &self.cancellation_token,

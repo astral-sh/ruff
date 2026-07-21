@@ -47,7 +47,7 @@ pub use types::ide_support::{
     definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
-pub use types::{DisplaySettings, TypeQualifiers};
+pub use types::{DisplaySettings, SemanticContext, TypeQualifiers};
 
 mod db;
 mod dunder_all;
@@ -170,8 +170,8 @@ pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<Stri
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
 
-pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    check_file(db, PythonFile::new(db, file, db.python_version()))
+pub fn check_file_unwrap(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
+    check_file(db, file)
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }

@@ -72,6 +72,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
+use ty_python_semantic::SemanticContext;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
@@ -278,23 +279,24 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
 }
 
 pub trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets;
+    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets;
 }
 
 impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets {
+        let db = ctx.db();
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .flat_map(|target| target.navigation_targets(db))
+                .flat_map(|target| target.navigation_targets(ctx))
                 .collect(),
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                if let Some(alternatives) = intersection.finite_alternatives(ctx) {
                     return alternatives
                         .iter()
-                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .flat_map(|alternative| alternative.navigation_targets(ctx))
                         .collect();
                 }
 
@@ -311,26 +313,27 @@ impl HasNavigationTargets for Type<'_> {
                         // because the type is the intersection of all those types.
                         NavigationTargets::empty()
                     }
-                    None => first.navigation_targets(db),
+                    None => first.navigation_targets(ctx),
                 }
             }
 
             Type::EnumComplement(complement) => complement
-                .remaining_literal_types(db)
+                .remaining_literal_types(ctx)
                 .iter()
-                .flat_map(|alternative| alternative.navigation_targets(db))
+                .flat_map(|alternative| alternative.navigation_targets(ctx))
                 .collect(),
 
             ty => ty
-                .definition(db)
-                .map(|definition| definition.navigation_targets(db))
+                .definition(ctx)
+                .map(|definition| definition.navigation_targets(ctx))
                 .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
 impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets {
+        let db = ctx.db();
         let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };
@@ -416,7 +419,6 @@ mod tests {
     use ty_project::{Db as _, ProjectMetadata};
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
-    use ty_python_semantic::Db as _;
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.

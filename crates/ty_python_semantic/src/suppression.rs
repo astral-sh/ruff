@@ -917,7 +917,7 @@ impl IntervalIndex {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::{PythonFile, files::system_path_to_file};
     use ruff_text_size::{TextLen as _, TextRange};
 
     use super::suppressions;
@@ -942,7 +942,7 @@ value = missing
         let missing_start = source.find("missing").unwrap().try_into().unwrap();
         let missing_range = TextRange::at(missing_start, "missing".text_len());
 
-        let suppressions = suppressions(&db, file);
+        let suppressions = suppressions(&db, PythonFile::new(&db, file, db.python_version()));
         assert_eq!(suppressions.inline.len(), 4);
         assert_eq!(
             suppressions
@@ -969,7 +969,7 @@ value = missing
         let missing_start = source.find("missing").unwrap().try_into().unwrap();
         let missing_range = TextRange::at(missing_start, "missing".text_len());
 
-        let suppressions = suppressions(&db, file);
+        let suppressions = suppressions(&db, PythonFile::new(&db, file, db.python_version()));
         assert_eq!(suppressions.inline.len(), 4);
         assert_eq!(
             suppressions

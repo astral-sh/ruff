@@ -58,7 +58,9 @@ pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Ve
         GotoTarget::FunctionDef(function) => function
             .inferred_type(&model)
             .and_then(Type::as_property_instance)
-            .and_then(|property| property.accessor_role(db, function.definition(&model))),
+            .and_then(|property| {
+                property.accessor_role(&model.semantic_context(), function.definition(&model))
+            }),
         _ => None,
     };
 
@@ -339,10 +341,11 @@ impl<'a> CallSitesFinder<'a, '_> {
         // Route the site by access kind. Without this filter, a read of
         // `c.prop` would also match the setter when both accessors are
         // co-definitions in `target_definitions`.
+        let ctx = self.model.semantic_context();
         let intersects = current_definitions.iter().any(|resolved| {
             let role = resolved
                 .definition()
-                .and_then(|def| property.accessor_role(self.db, def));
+                .and_then(|def| property.accessor_role(&ctx, def));
             let matches_site_kind = match attribute.ctx {
                 ast::ExprContext::Load => {
                     matches!(role, Some(PropertyAccessorRole::Getter) | None)

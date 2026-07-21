@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
+use ty_python_semantic::SemanticContext;
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::PythonFile;
@@ -51,8 +52,12 @@ pub fn completion<'db>(
             return vec![];
         };
 
-        let mut completions =
-            Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
+        let mut completions = Completions::new(
+            db,
+            python_file,
+            CollectionContext::none(),
+            UserQuery::fuzzy(None),
+        );
 
         add_string_literal_completions(
             &model,
@@ -67,6 +72,7 @@ pub fn completion<'db>(
     let query = UserQuery::fuzzy(context.cursor.typed);
     let mut completions = Completions::new(
         db,
+        python_file,
         context.collection_context(db, &model, settings, capabilities),
         query,
     );
@@ -85,6 +91,7 @@ pub fn completion<'db>(
                 completions.extend(model.attribute_completions(expr));
             }
             CompletionTargetAst::Scoped(scoped) => {
+                let ctx = model.semantic_context();
                 for semantic_completion in model.scoped_completions(scoped.node) {
                     let module_dependency_kind = if semantic_completion.builtin {
                         ModuleDependencyKind::Builtin
@@ -92,11 +99,11 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                        CompletionBuilder::from_semantic_completion(db, &ctx, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(db, &mut completions);
+                add_keyword_completions(&ctx, &mut completions);
                 add_argument_completions(
                     db,
                     python_file,
@@ -139,6 +146,7 @@ impl CompletionCapabilities {
 /// A collection of completions built up from various sources.
 struct Completions<'db> {
     db: &'db dyn Db,
+    python_file: PythonFile<'db>,
     context: CollectionContext<'db>,
     items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
@@ -162,9 +170,15 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(db: &'db dyn Db, context: CollectionContext<'db>, query: UserQuery) -> Completions<'db> {
+    fn new(
+        db: &'db dyn Db,
+        python_file: PythonFile<'db>,
+        context: CollectionContext<'db>,
+        query: UserQuery,
+    ) -> Completions<'db> {
         Completions {
             db,
+            python_file,
             context,
             items: BinaryHeap::new(),
             query,
@@ -234,9 +248,13 @@ impl<'db> Completions<'db> {
     /// Attempts to add the given semantic completion to this collection.
     ///
     /// When added, `true` is returned.
-    fn add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
+    fn add_semantic(
+        &mut self,
+        ctx: &SemanticContext<'db>,
+        completion: SemanticCompletion<'db>,
+    ) -> bool {
         self.add(CompletionBuilder::from_semantic_completion(
-            self.db, completion,
+            self.db, ctx, completion,
         ))
     }
 
@@ -254,7 +272,8 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        let completion =
+            CompletionRanker(builder.build(self.db, self.python_file, &self.context, &self.query));
         if self.items.len() >= Completions::LIMIT {
             // OK because `self.items` is guaranteed to be non-empty here.
             let worst = self.items.peek_mut().unwrap();
@@ -273,8 +292,9 @@ impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
     where
         T: IntoIterator<Item = SemanticCompletion<'db>>,
     {
+        let ctx = SemanticContext::from_file(self.db, self.python_file);
         for c in it {
-            self.add_semantic(c);
+            self.add_semantic(&ctx, c);
         }
     }
 }
@@ -420,9 +440,10 @@ impl<'db> CompletionBuilder<'db> {
 
     fn from_semantic_completion(
         db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ctx, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
@@ -461,9 +482,11 @@ impl<'db> CompletionBuilder<'db> {
     fn build(
         mut self,
         db: &'db dyn Db,
-        ctx: &CollectionContext<'db>,
+        python_file: PythonFile<'db>,
+        collection_context: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
+        let ctx = SemanticContext::from_file(db, python_file);
         if let Some(ty) = self.ty {
             self.is_type_check_only = ty.is_type_check_only(db);
             // Tags completions with context-specific if they are
@@ -473,10 +496,10 @@ impl<'db> CompletionBuilder<'db> {
             // It's possible that some completions are usable in an exception
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
-            if let Some(exception_ty) = ctx.exception_ty {
-                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
+            if let Some(exception_ty) = collection_context.exception_ty {
+                self.is_context_specific |= ty.is_assignable_to(&ctx, exception_ty);
             }
-            if ctx.is_in_class_def() {
+            if collection_context.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
                         ty,
@@ -493,29 +516,29 @@ impl<'db> CompletionBuilder<'db> {
         }
         let kind = self
             .kind
-            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
-        let relevance = Relevance::new(ctx, query, &self);
-        let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
-        {
-            let label = self.insert.unwrap_or_else(|| self.name.clone());
-            if ctx.capabilities.snippets {
-                let insert = compact_str::format_compact!("{label}($0)");
-                (
-                    Some(label),
-                    Some(insert),
-                    CompletionInsertTextFormat::Snippet,
-                )
+            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(&ctx, ty)));
+        let relevance = Relevance::new(collection_context, query, &self);
+        let (label, insert, insert_text_format) =
+            if collection_context.should_complete_callable_parentheses(kind) {
+                let label = self.insert.unwrap_or_else(|| self.name.clone());
+                if collection_context.capabilities.snippets {
+                    let insert = compact_str::format_compact!("{label}($0)");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::Snippet,
+                    )
+                } else {
+                    let insert = compact_str::format_compact!("{label}()");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::PlainText,
+                    )
+                }
             } else {
-                let insert = compact_str::format_compact!("{label}()");
-                (
-                    Some(label),
-                    Some(insert),
-                    CompletionInsertTextFormat::PlainText,
-                )
-            }
-        } else {
-            (None, self.insert, CompletionInsertTextFormat::PlainText)
-        };
+                (None, self.insert, CompletionInsertTextFormat::PlainText)
+            };
         Completion {
             name: self.name,
             label,
@@ -764,7 +787,7 @@ impl<'m> Context<'m> {
     /// Returns a filtering context for use with a completion collector.
     fn collection_context<'db>(
         &self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         model: &SemanticModel<'db>,
         settings: &CompletionSettings,
         capabilities: CompletionCapabilities,
@@ -772,7 +795,8 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let exception_ty = self.cursor.exception_ty(db);
+                let ctx = model.semantic_context();
+                let exception_ty = self.cursor.exception_ty(&ctx);
                 let complete_callable_parentheses = settings.complete_function_parentheses
                     && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
@@ -1307,13 +1331,14 @@ impl<'m> ContextCursor<'m> {
     ///
     /// The return value is always `None` if the cursor is not
     /// inside a `raise` or `except` context.
-    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
-        let base_exception_instance = KnownClass::BaseException.to_instance(db);
-        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
-        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+    fn exception_ty<'db>(&self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
+        let db = ctx.db();
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(ctx);
+        let base_exception_instance = KnownClass::BaseException.to_instance(ctx);
+        let raise_ty = UnionType::from_elements(ctx, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(ctx, [raise_ty, Type::none(ctx)]);
         let except_ty = UnionType::from_elements(
-            db,
+            ctx,
             [
                 base_exception_ty,
                 Type::homogeneous_tuple(db, base_exception_ty),
@@ -1963,9 +1988,10 @@ fn add_class_arg_completions<'db>(
             .as_ref()
             .is_some_and(|args| args.find_keyword(name).is_some())
     };
+    let ctx = model.semantic_context();
 
     if !is_set("metaclass") {
-        let ty = KnownClass::Type.to_subclass_of(model.db());
+        let ty = KnownClass::Type.to_subclass_of(&ctx);
         completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
@@ -1979,7 +2005,7 @@ fn add_class_arg_completions<'db>(
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = KnownClass::Bool.to_instance(model.db());
+        let ty = KnownClass::Bool.to_instance(&ctx);
         completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
@@ -2083,7 +2109,7 @@ pub(crate) fn unresolved_fixes<'db>(
     let ctx = CollectionContext::none();
 
     // Request imports we could add to put the symbol in scope
-    let mut completions = Completions::new(db, ctx.clone(), query.clone());
+    let mut completions = Completions::new(db, file, ctx.clone(), query.clone());
     add_unimported_completions(
         db,
         file,
@@ -2097,7 +2123,7 @@ pub(crate) fn unresolved_fixes<'db>(
     results.extend(completions.into_imports());
 
     // Request qualifications we could apply to the symbol to make it resolve
-    let mut completions = Completions::new(db, ctx, query);
+    let mut completions = Completions::new(db, file, ctx, query);
     add_unimported_completions(
         db,
         file,
@@ -2118,9 +2144,9 @@ pub(crate) fn unresolved_fixes<'db>(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
+fn add_keyword_completions<'db>(ctx: &SemanticContext<'db>, completions: &mut Completions<'db>) {
     let keyword_values = [
-        ("None", Type::none(db)),
+        ("None", Type::none(ctx)),
         ("True", Type::bool_literal(true)),
         ("False", Type::bool_literal(false)),
     ];
@@ -3006,9 +3032,10 @@ fn add_import_completions_impl<'db>(
     semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
     module_dependency_kind: impl Fn(&SemanticCompletion<'db>) -> Option<ModuleDependencyKind>,
 ) {
+    let ctx = SemanticContext::from_file(db, completions.python_file);
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
-        let mut builder = CompletionBuilder::from_semantic_completion(db, semantic);
+        let mut builder = CompletionBuilder::from_semantic_completion(db, &ctx, semantic);
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }
@@ -3111,15 +3138,19 @@ fn is_name_like_token(token: &Token) -> bool {
 /// general, if callers have more specific knowledge about the kind of
 /// a completion, then they should use that to explicitly set its kind
 /// on `CompletionBuilder`.
-fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
+fn completion_kind_from_type<'db>(
+    ctx: &SemanticContext<'db>,
+    ty: Type<'db>,
+) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
         CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         ty: Type<'db>,
         visitor: &CompletionKindVisitor<'db>,
     ) -> Option<CompletionKind> {
+        let db = ctx.db();
         Some(match ty {
             Type::FunctionLiteral(_)
             | Type::DataclassDecorator(_)
@@ -3148,10 +3179,10 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&ty| imp(db, ty, visitor))?,
+                .find_map(|&ty| imp(ctx, ty, visitor))?,
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .find_map(|ty| imp(db, ty, visitor))?,
+                .find_map(|ty| imp(ctx, ty, visitor))?,
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -3160,11 +3191,11 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
+                visitor.visit(db, ty, || imp(ctx, alias.value_type(ctx), visitor))?
             }
         })
     }
-    imp(db, ty, &CompletionKindVisitor::default())
+    imp(ctx, ty, &CompletionKindVisitor::default())
 }
 
 /// Defines an ordering relating the two completions for ranking purposes.
@@ -10947,13 +10978,14 @@ raise <CURSOR>
                 // ---AG
                 return "<No completions found after filtering out completions>".to_string();
             }
+            let ctx = self.db.semantic_context();
             self.filtered
                 .iter()
                 .map(|c| {
                     let mut snapshot = c.insert.as_deref().unwrap_or(c.label()).to_string();
                     if self.type_signatures {
                         let ty =
-                            c.ty.map(|ty| ty.display(self.db).to_string())
+                            c.ty.map(|ty| ty.display(&ctx).to_string())
                                 .unwrap_or_else(|| "Unavailable".to_string());
                         snapshot = format!("{snapshot} :: {ty}");
                     }

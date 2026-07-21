@@ -57,6 +57,10 @@ impl TestDb {
             analysis_settings: AnalysisSettings::default().into(),
         }
     }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
 }
 
 #[salsa::db]
@@ -89,10 +93,6 @@ impl ModuleResolverDb for TestDb {
     fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
         Program::get(self).search_paths(self)
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
@@ -106,7 +106,8 @@ impl ty_python_core::Db for TestDb {
 impl SemanticDb for TestDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            ty_python_semantic::check_file_unwrap(self, file)
+            let python_file = PythonFile::new(self, file, self.python_version());
+            ty_python_semantic::check_file_unwrap(self, python_file)
         } else {
             Vec::new()
         }

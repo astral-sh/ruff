@@ -1507,7 +1507,6 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
-    use ty_python_semantic::Db as _;
 
     use super::symbols_for_file_global_only;
 

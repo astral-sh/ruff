@@ -5,6 +5,7 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
     StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
+use crate::SemanticContext;
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -764,18 +765,18 @@ pub(super) fn report_missing_type_arguments<'db>(
             let Some(generic_context) = class.generic_context(db) else {
                 return;
             };
-
+            let ctx = &context.semantic_context();
             // Don't warn if all type parameters have defaults (PEP 696).
             if generic_context
                 .variables(db)
-                .all(|tv| tv.default_type(db).is_some())
+                .all(|tv| tv.default_type(ctx).is_some())
             {
                 return;
             }
 
             let required_count = generic_context
                 .variables(db)
-                .filter(|tv| tv.default_type(db).is_none())
+                .filter(|tv| tv.default_type(ctx).is_none())
                 .count();
 
             if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
@@ -1304,9 +1305,10 @@ pub(crate) fn report_mismatched_type_name<'db>(
                 "Expected \"{expected_name}\", got \"{actual_name}\""
             ));
         } else {
+            let ctx = &context.semantic_context();
             diagnostic.set_primary_message(format_args!(
                 "Expected \"{expected_name}\", got variable of type `{}`",
-                actual_name_ty.display(context.db())
+                actual_name_ty.display(ctx)
             ));
         }
     }
@@ -1397,9 +1399,10 @@ pub(super) fn report_index_out_of_bounds(
     let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
         return;
     };
+    let ctx = &context.semantic_context();
     builder.into_diagnostic(format_args!(
         "Index {index} is out of bounds for {kind} `{}` with length {length}",
-        tuple_ty.display(context.db())
+        tuple_ty.display(ctx)
     ));
 }
 
@@ -1413,15 +1416,16 @@ pub(super) fn report_not_subscriptable(
     let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
         return;
     };
+    let ctx = &context.semantic_context();
     if method == "__delitem__" {
         builder.into_diagnostic(format_args!(
             "Cannot delete subscript on object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(ctx)
         ));
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot subscript object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(ctx)
         ));
     }
 }
@@ -1436,12 +1440,12 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 // We avoid emitting invalid assignment diagnostic for literal assignments to a `TypedDict`, as
 // they can only occur if we already failed to validate the dict (and emitted some diagnostic).
 pub(crate) fn is_invalid_typed_dict_literal(
-    db: &dyn Db,
+    ctx: &SemanticContext,
     target_ty: Type,
     source: AnyNodeRef<'_>,
 ) -> bool {
     target_ty
-        .filter_union(db, Type::is_typed_dict)
+        .filter_union(ctx, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
@@ -1457,7 +1461,7 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     diag: &mut Diagnostic,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
@@ -1465,14 +1469,18 @@ pub(super) fn note_numbers_module_not_supported<'db>(
     const BUILTIN_NUMBERS: [KnownClass; 3] =
         [KnownClass::Int, KnownClass::Float, KnownClass::Complex];
 
+    let db = ctx.db();
     if let Type::NominalInstance(target_instance) = target_ty {
-        let file = target_instance.class(db).class_literal(db).python_file(db);
+        let file = target_instance.class(ctx).class_literal(db).python_file(db);
         if let Some(module) = file_to_module(db, file)
             && module.is_known(db, KnownModule::Numbers)
         {
             let is_numeric = value_ty.is_subtype_of(
-                db,
-                UnionType::from_elements(db, BUILTIN_NUMBERS.iter().map(|cls| cls.to_instance(db))),
+                ctx,
+                UnionType::from_elements(
+                    ctx,
+                    BUILTIN_NUMBERS.iter().map(|cls| cls.to_instance(ctx)),
+                ),
             );
 
             if is_numeric {
@@ -1515,16 +1523,17 @@ fn covariant_supertype_hint<'db>(
 /// Add a diagnostic hint for cases like an invalid `list[bool]` to `list[int]` assignment,
 /// that fails due to invariance.
 pub(super) fn add_invariant_generic_hints<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     diag: &mut Diagnostic,
     expected_ty: Type<'db>,
     provided_ty: Type<'db>,
 ) {
-    let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(db)
+    let db = ctx.db();
+    let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(ctx)
     else {
         return;
     };
-    let Some((provided_class, provided_specialization)) = provided_ty.class_specialization(db)
+    let Some((provided_class, provided_specialization)) = provided_ty.class_specialization(ctx)
     else {
         return;
     };
@@ -1544,14 +1553,14 @@ pub(super) fn add_invariant_generic_hints<'db>(
         .zip(provided_specialization.types(db))
         .enumerate()
         .filter_map(|(index, ((bound_typevar, expected_arg), provided_arg))| {
-            (bound_typevar.variance(db) == TypeVarVariance::Invariant
-                && !expected_arg.is_equivalent_to(db, *provided_arg))
+            (bound_typevar.variance(ctx) == TypeVarVariance::Invariant
+                && !expected_arg.is_equivalent_to(ctx, *provided_arg))
             .then_some((index, expected_arg, provided_arg))
         });
 
     let mut mismatch_indices = Vec::new();
     for (index, expected_arg, provided_arg) in mismatched_invariant_arguments {
-        if !provided_arg.is_assignable_to(db, *expected_arg) {
+        if !provided_arg.is_assignable_to(ctx, *expected_arg) {
             return;
         }
         mismatch_indices.push(index);
@@ -1600,13 +1609,13 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(context.db(), target_ty, value_node.into())
+        && is_invalid_typed_dict_literal(&context.semantic_context(), target_ty, value_node.into())
     {
         return;
     }
 
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [target_ty, value_ty]);
+    let ctx = &context.semantic_context();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(ctx, [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -1629,8 +1638,8 @@ pub(super) fn report_invalid_assignment<'db>(
         diagnostic_range,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            value_ty.display_with(context.db(), settings.clone()),
-            target_ty.display_with(context.db(), settings)
+            value_ty.display_with(ctx, settings.clone()),
+            target_ty.display_with(ctx, settings)
         ),
     ) else {
         return;
@@ -1666,20 +1675,21 @@ pub(super) fn report_invalid_assignment<'db>(
             }
             _ => {
                 // Otherwise, annotate the target with its declared type.
-                diag.annotate(context.secondary(target_node).message(format_args!(
-                    "Declared type `{}`",
-                    target_ty.display(context.db()),
-                )));
+                diag.annotate(
+                    context
+                        .secondary(target_node)
+                        .message(format_args!("Declared type `{}`", target_ty.display(ctx))),
+                );
             }
         }
 
         diag.set_primary_message(format_args!(
             "Incompatible value of type `{}`",
-            value_ty.display(context.db()),
+            value_ty.display(ctx),
         ));
 
-        let error_context = value_ty.assignability_error_context(context.db(), target_ty);
-        error_context.attach_to(context.db(), &mut diag);
+        let error_context = value_ty.assignability_error_context(ctx, target_ty);
+        error_context.attach_to(ctx, &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.primary_message().to_string();
@@ -1687,8 +1697,8 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     // special case message
-    note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
-    add_invariant_generic_hints(context.db(), &mut diag, target_ty, value_ty);
+    note_numbers_module_not_supported(ctx, &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(ctx, &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -1703,20 +1713,21 @@ pub(super) fn report_invalid_attribute_assignment(
     // silenced diagnostics during attribute resolution, and rely on the assignability
     // diagnostic being emitted here.
 
+    let ctx = &context.semantic_context();
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
+            source_ty.display(ctx),
+            target_ty.display(ctx),
         ),
     ) else {
         return;
     };
 
-    let error_context = source_ty.assignability_error_context(context.db(), target_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = source_ty.assignability_error_context(ctx, target_ty);
+    error_context.attach_to(ctx, &mut diag);
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(
@@ -1729,18 +1740,19 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     value: &ast::Expr,
 ) {
     let db = context.db();
+    let ctx = &context.semantic_context();
     let attribute = target.attr.as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
         let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
             return;
         };
-        let object_type = object_type.display(db);
+        let object_type = object_type.display(ctx);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
         ));
         if let Some(file_range) = property
             .getter(db)
-            .and_then(|getter| getter.definition(db))
+            .and_then(|getter| getter.definition(ctx))
             .and_then(|definition| definition.focus_range(db))
         {
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
@@ -1763,11 +1775,11 @@ pub(super) fn report_bad_dunder_set_call<'db>(
                 lint: &INVALID_ASSIGNMENT,
                 message: format!(
                     "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
-                    object_type.display(db)
+                    object_type.display(ctx)
                 ),
                 info: &format!(
                     "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
-                    descriptor_type.display(db)
+                    descriptor_type.display(ctx)
                 ),
                 argument_ranges,
             },
@@ -1786,15 +1798,20 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
         return;
     };
     let db = context.db();
+    let ctx = &context.semantic_context();
     if let Some(property) = dunder_delete_failure.as_attempt_to_delete_property_with_no_deleter() {
-        let object_type = object_type.display(db);
+        let object_type = object_type.display(ctx);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot delete read-only property `{attribute}` on object of type `{object_type}`",
         ));
         if let Some(file_range) = property
             .getter(db)
-            .and_then(|getter| getter.definition(db))
-            .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+            .and_then(|getter| getter.definition(ctx))
+            .or_else(|| {
+                property
+                    .setter(db)
+                    .and_then(|setter| setter.definition(ctx))
+            })
             .and_then(|definition| definition.focus_range(db))
         {
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
@@ -1808,7 +1825,7 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
         builder.into_diagnostic(format_args!(
             "Invalid deletion of data descriptor attribute \
             `{attribute}` on type `{}` with custom `__delete__` method",
-            object_type.display(db)
+            object_type.display(ctx)
         ));
     }
 }
@@ -1823,15 +1840,15 @@ pub(super) fn report_bad_dunder_delattr_call(
     let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
         return;
     };
-    let db = context.db();
+    let ctx = &context.semantic_context();
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method",
-        object_type.display(db),
+        object_type.display(ctx),
     ));
     if binding_error {
         diagnostic.info(format_args!(
             "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
-            object_type.display(db)
+            object_type.display(ctx)
         ));
         diagnostic.info(
             "Expected a signature at least as permissive as \
@@ -1851,25 +1868,25 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
+    let ctx = &context.semantic_context();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(ctx, [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display_with(context.db(), settings.clone()),
-        actual_ty = actual_ty.display_with(context.db(), settings.clone()),
+        expected_ty = expected_ty.display_with(ctx, settings.clone()),
+        actual_ty = actual_ty.display_with(ctx, settings.clone()),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display_with(context.db(), settings),
+            expected_ty = expected_ty.display_with(ctx, settings),
         )),
     );
 
-    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = actual_ty.assignability_error_context(ctx, expected_ty);
+    error_context.attach_to(ctx, &mut diag);
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
@@ -1882,11 +1899,12 @@ pub(super) fn report_invalid_generator_function_return_type(
         return;
     };
 
+    let ctx = &context.semantic_context();
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
-    let inferred_ty = inferred_return.display(context.db());
+    let inferred_ty = inferred_return.display(ctx.python_version());
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{inferred_ty}`",
-        expected_ty = expected_ty.display(context.db()),
+        expected_ty = expected_ty.display(ctx),
     ));
 
     let (description, link) = if inferred_return == KnownClass::AsyncGeneratorType {
@@ -1925,10 +1943,10 @@ pub(super) fn report_invalid_generator_yield_type(
         return;
     };
 
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
-    let expected_display = expected_ty.display_with(context.db(), settings.clone());
-    let actual_display = actual_ty.display_with(context.db(), settings);
+    let ctx = &context.semantic_context();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(ctx, [expected_ty, actual_ty]);
+    let expected_display = expected_ty.display_with(ctx, settings.clone());
+    let actual_display = actual_ty.display_with(ctx, settings);
 
     let (kind_name, title, concise) = match kind {
         GeneratorMismatchKind::YieldType => (
@@ -1965,8 +1983,8 @@ pub(super) fn report_invalid_generator_yield_type(
         )));
     }
 
-    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = actual_ty.assignability_error_context(ctx, expected_ty);
+    error_context.attach_to(ctx, &mut diag);
 }
 
 pub(super) fn report_implicit_return_type(
@@ -1989,12 +2007,13 @@ pub(super) fn report_implicit_return_type(
     let Some(builder) = context.report_lint(lint_to_use, range) else {
         return;
     };
+    let ctx = &context.semantic_context();
 
     // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
             "Function always implicitly returns `None`, which is not assignable to return type `{}`",
-            expected_ty.display(db),
+            expected_ty.display(ctx),
         ));
         diag.info(
             "Consider changing the return annotation to `-> None` or adding a `return` statement",
@@ -2003,7 +2022,7 @@ pub(super) fn report_implicit_return_type(
     } else {
         builder.into_diagnostic(format_args!(
             "Function can implicitly return `None`, which is not assignable to return type `{}`",
-            expected_ty.display(db),
+            expected_ty.display(ctx),
         ))
     };
     if !has_empty_body {
@@ -2017,7 +2036,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db).contains(&ClassBase::Protocol) {
+    if class.iter_mro(ctx).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -2071,6 +2090,7 @@ pub(super) fn report_possibly_missing_attribute(
         return;
     };
     let db = context.db();
+    let ctx = &context.semantic_context();
     match object_ty {
         Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
             "Member `{attribute}` may be missing on module `{}`",
@@ -2082,11 +2102,11 @@ pub(super) fn report_possibly_missing_attribute(
         )),
         Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
-            alias.display(db),
+            alias.display(ctx),
         )),
         _ => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on object of type `{}`",
-            object_ty.display(db),
+            object_ty.display(ctx),
         )),
     };
 }
@@ -2101,17 +2121,18 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
         return;
     };
 
+    let ctx = &context.semantic_context();
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
     diagnostic.set_concise_message(format_args!(
         "Cannot catch object of type `{}` in an exception handler",
-        node_type.display(context.db())
+        node_type.display(ctx)
     ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
         diagnostic.annotate(Annotation::secondary(span.clone()).message(format_args!(
             "Invalid element of type `{}`",
-            ty.display(context.db())
+            ty.display(ctx)
         )));
         if ty.is_notimplemented(context.db()) {
             diagnostic.annotate(
@@ -2130,6 +2151,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
         return;
     };
 
+    let ctx = &context.semantic_context();
     let mut diagnostic = if ty.is_notimplemented(context.db()) {
         let mut diag =
             builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
@@ -2138,16 +2160,13 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
     } else {
         let mut diag = builder.into_diagnostic(format_args!(
             "Invalid {thing} caught in an exception handler",
-            thing = if ty.tuple_instance_spec(context.db()).is_some() {
+            thing = if ty.tuple_instance_spec(ctx).is_some() {
                 "tuple"
             } else {
                 "object"
             },
         ));
-        diag.set_primary_message(format_args!(
-            "Object has type `{}`",
-            ty.display(context.db())
-        ));
+        diag.set_primary_message(format_args!("Object has type `{}`", ty.display(ctx)));
         diag
     };
 
@@ -2164,6 +2183,7 @@ pub(crate) fn report_invalid_exception_raised(
     let Some(builder) = context.report_lint(&INVALID_RAISE, raised_node) else {
         return;
     };
+    let ctx = &context.semantic_context();
     if raise_type.is_notimplemented(context.db()) {
         let mut diagnostic = builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
         diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
@@ -2171,7 +2191,7 @@ pub(crate) fn report_invalid_exception_raised(
     } else {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot raise object of type `{}`",
-            raise_type.display(context.db())
+            raise_type.display(ctx)
         ));
         diagnostic.set_primary_message("Not an instance or subclass of `BaseException`");
     }
@@ -2181,6 +2201,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
     };
+    let ctx = &context.semantic_context();
     let mut diagnostic = if ty.is_notimplemented(context.db()) {
         let mut diag = builder.into_diagnostic(format_args!(
             "Cannot use `NotImplemented` as an exception cause",
@@ -2190,7 +2211,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot use object of type `{}` as an exception cause",
-            ty.display(context.db())
+            ty.display(ctx)
         ))
     };
     diagnostic.info(
@@ -2355,7 +2376,7 @@ impl<'db> IncompatibleBases<'db> {
     /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
-    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
+    pub(super) fn remove_redundant_entries(&mut self, ctx: &SemanticContext<'db>) {
         self.0 = self
             .0
             .iter()
@@ -2369,8 +2390,8 @@ impl<'db> IncompatibleBases<'db> {
                         // base share the same layout.
                         !disjoint_base
                             .class
-                            .default_specialization(db)
-                            .is_subtype_of_class_literal(db, other_base.class)
+                            .default_specialization(ctx)
+                            .is_subtype_of_class_literal(ctx, other_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
@@ -2484,7 +2505,8 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
     diagnostic
         .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
 
-    if let Some(class) = param_type.to_class_type(context.db()) {
+    let ctx = &context.semantic_context();
+    if let Some(class) = param_type.to_class_type(ctx) {
         let mut class_def_diagnostic = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
@@ -2526,8 +2548,8 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
         return;
     };
-    let db = context.db();
-    let class_display = cls_ty.display(db);
+    let ctx = &context.semantic_context();
+    let class_display = cls_ty.display(ctx);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`{class_display}` cannot be used in a class pattern because it is not a type"
     ));
@@ -2558,9 +2580,9 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
         return;
     };
-    let db = context.db();
-    let class_display = cls_ty.display(db);
-    let match_args_display = match_args_ty.display(db);
+    let ctx = &context.semantic_context();
+    let class_display = cls_ty.display(ctx);
+    let match_args_display = match_args_ty.display(ctx);
     builder.into_diagnostic(format_args!(
         "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
     ));
@@ -2832,7 +2854,8 @@ pub(crate) fn report_undeclared_protocol_member(
     /// We want to avoid suggesting an annotation for e.g. `x = None`,
     /// because the user almost certainly doesn't want to write `x: None = None`.
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
-    fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    fn should_give_hint<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> bool {
+        let db = ctx.db();
         let class = match ty {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::FromClass(_),
@@ -2844,12 +2867,12 @@ pub(crate) fn report_undeclared_protocol_member(
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
-            Type::NominalInstance(instance) => instance.class(db),
+            Type::NominalInstance(instance) => instance.class(ctx),
             Type::Union(union) => {
                 return union
                     .elements(db)
                     .iter()
-                    .all(|elem| should_give_hint(db, *elem));
+                    .all(|elem| should_give_hint(ctx, *elem));
             }
             _ => return false,
         };
@@ -2880,13 +2903,13 @@ pub(crate) fn report_undeclared_protocol_member(
 
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
+        let ctx = &context.semantic_context();
+        let suggestion = binding_type.promote(ctx);
 
-        let suggestion = binding_type.promote(db);
-
-        if should_give_hint(db, suggestion) {
+        if should_give_hint(ctx, suggestion) {
             diagnostic.set_primary_message(format_args!(
                 "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
-                suggestion.display(db)
+                suggestion.display(ctx)
             ));
         } else {
             diagnostic.set_primary_message(format_args!(
@@ -3006,9 +3029,10 @@ pub(crate) fn report_invalid_or_unsupported_base(
     class: StaticClassLiteral,
 ) {
     let db = context.db();
-    let instance_of_type = KnownClass::Type.to_instance(db);
+    let ctx = &context.semantic_context();
+    let instance_of_type = KnownClass::Type.to_instance(ctx);
 
-    if base_type.is_assignable_to(db, instance_of_type) {
+    if base_type.is_assignable_to(ctx, instance_of_type) {
         report_unsupported_base(context, base_node, base_type, class);
         return;
     }
@@ -3040,14 +3064,15 @@ pub(crate) fn report_invalid_or_unsupported_base(
         );
     };
 
+    let ctx = &context.semantic_context();
     match base_type.try_call_dunder(
-        db,
+        ctx,
         "__mro_entries__",
         CallArguments::positional([tuple_of_types]),
         TypeContext::default(),
     ) {
         Ok(ret) => {
-            if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
+            if ret.return_type(ctx).is_assignable_to(ctx, tuple_of_types) {
                 report_unsupported_base(context, base_node, base_type, class);
             } else {
                 let Some(mut diagnostic) =
@@ -3058,7 +3083,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 explain_mro_entries(&mut diagnostic);
                 diagnostic.info(format_args!(
                     "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
-                    base_type.display(db)
+                    base_type.display(ctx)
                 ));
             }
         }
@@ -3074,13 +3099,13 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
-                        base_type.display(db)
+                        base_type.display(ctx)
                     ));
                     if let Some(unbound_on) = unbound_on {
                         for ty in unbound_on {
                             diagnostic.info(format_args!(
                                 "`{}` does not implement `__mro_entries__`",
-                                ty.display(db)
+                                ty.display(ctx)
                             ));
                         }
                     }
@@ -3089,7 +3114,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
-                        base_type.display(db)
+                        base_type.display(ctx)
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
@@ -3097,7 +3122,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it cannot be called with the expected arguments",
-                        base_type.display(db)
+                        base_type.display(ctx)
                     ));
                     diagnostic.info(
                         "Expected a signature at least as permissive as \
@@ -3109,7 +3134,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it may not be callable",
-                        base_type.display(db)
+                        base_type.display(ctx)
                     ));
                 }
             }
@@ -3127,11 +3152,12 @@ pub(crate) fn report_unsupported_base(
         return;
     };
     let db = context.db();
+    let ctx = &context.semantic_context();
     let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(ctx)));
     diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(db)
+        base_type.display(ctx)
     ));
     diagnostic.info(format_args!(
         "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
@@ -3147,9 +3173,10 @@ fn report_invalid_base<'ctx, 'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
     let builder = context.report_lint(&INVALID_BASE, base_node)?;
+    let ctx = &context.semantic_context();
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Invalid class base with type `{}`",
-        base_type.display(context.db())
+        base_type.display(ctx)
     ));
     diagnostic.info(format_args!(
         "Definition of class `{}` will raise `TypeError` at runtime",
@@ -3169,10 +3196,11 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        let ctx = &context.semantic_context();
         match key_ty.as_string_literal() {
             Some(key) => {
                 let key = key.value(db);
-                let typed_dict_name = typed_dict_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(ctx);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
@@ -3186,7 +3214,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         } else {
                             "intersection"
                         },
-                        full_object_ty = full_object_ty.display(db)
+                        full_object_ty = full_object_ty.display(ctx)
                     ))
                 } else {
                     context
@@ -3223,7 +3251,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     if let Some(full_ty) = full_object_ty {
                         diagnostic.set_concise_message(format_args!(
                             "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
-                            full_ty = full_ty.display(db),
+                            full_ty = full_ty.display(ctx),
                         ));
                     } else {
                         diagnostic.set_concise_message(format_args!(
@@ -3236,14 +3264,14 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict `{}` can only be subscripted with a string literal key, \
                      got key of type `{}`",
-                    typed_dict_ty.display(db),
-                    key_ty.display(db),
+                    typed_dict_ty.display(ctx),
+                    key_ty.display(ctx),
                 ));
 
                 if let Some(full_object_ty) = full_object_ty {
                     diagnostic.info(format_args!(
                         "The full type of the subscripted object is `{}`",
-                        full_object_ty.display(db)
+                        full_object_ty.display(ctx)
                     ));
                 }
             }
@@ -3340,9 +3368,9 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
     typed_dict_ty: Type<'db>,
     missing_field: &str,
 ) {
-    let db = context.db();
     if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_KEY, constructor_node) {
-        let typed_dict_name = typed_dict_ty.display(db);
+        let ctx = &context.semantic_context();
+        let typed_dict_name = typed_dict_ty.display(ctx);
         builder.into_diagnostic(format_args!(
             "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
         ));
@@ -3355,9 +3383,9 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
     typed_dict_ty: Type<'db>,
     field_name: &str,
 ) {
-    let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
-        let typed_dict_name = typed_dict_ty.display(db);
+        let ctx = &context.semantic_context();
+        let typed_dict_name = typed_dict_ty.display(ctx);
         builder.into_diagnostic(format_args!(
             "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
@@ -3387,8 +3415,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
         return;
     };
+    let ctx = &context.semantic_context();
 
-    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db);
+    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(ctx);
 
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
@@ -3592,6 +3621,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     base_nodes: Option<&[ast::Expr]>,
 ) -> bool {
     let db = context.db();
+    let ctx = &context.semantic_context();
     // Maps each generic ancestor's class literal to the first
     // specialization seen and the index of the explicit base it
     // came from.
@@ -3607,7 +3637,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             _ => continue,
         };
 
-        for supercls in base_class.iter_mro(db) {
+        for supercls in base_class.iter_mro(ctx) {
             let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
                 continue;
             };
@@ -3643,41 +3673,41 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ) {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db)
+                            earlier_alias.display(ctx)
                         )));
                         let later_annotation = context.secondary(later_base);
                         diagnostic.annotate(if later_is_direct {
                             later_annotation.message(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(ctx)
                             ))
                         } else {
                             later_annotation.message(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(ctx)
                             ))
                         });
                     } else {
                         diagnostic.info(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db)
+                            earlier_alias.display(ctx)
                         ));
                         if later_is_direct {
                             diagnostic.info(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(ctx)
                             ));
                         } else {
                             diagnostic.info(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(ctx)
                             ));
                         }
                     }
                     diagnostic.set_concise_message(format_args!(
                         "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
-                        supercls_alias.display(db),
-                        earlier_alias.display(db)
+                        supercls_alias.display(ctx),
+                        earlier_alias.display(ctx)
                     ));
                     return true;
                 }
@@ -3802,8 +3832,9 @@ pub(super) fn report_invalid_method_override<'db>(
         "Definition is incompatible with `{overridden_method}`"
     ));
 
+    let ctx = &context.semantic_context();
     let class_member = |cls: ClassType<'db>| {
-        cls.class_member(db, member, MemberLookupPolicy::default())
+        cls.class_member(ctx, member, MemberLookupPolicy::default())
             .place
     };
 
@@ -3829,7 +3860,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    error_context().attach_to(context.db(), &mut diagnostic);
+    error_context().attach_to(ctx, &mut diagnostic);
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
@@ -3983,14 +4014,14 @@ pub(super) fn report_incompatible_base_method<'db>(
             contract_decorator.description(),
         ));
     }
-    error_context().attach_to(db, &mut diagnostic);
+    error_context().attach_to(&context.semantic_context(), &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 
     for (definition, owner_name) in [
         (selected_definition, selected_name),
         (contract_definition, contract_name),
     ] {
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(definition.focus_range(db, &module)))
                 .message(format_args!("`{owner_name}.{member}` defined here")),
@@ -4248,44 +4279,43 @@ pub(super) fn report_unsupported_comparison<'db>(
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) {
-    let db = context.db();
-
     let Some(diagnostic_builder) = context.report_lint(&UNSUPPORTED_OPERATOR, range) else {
         return;
     };
 
+    let ctx = &context.semantic_context();
     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-        db,
+        ctx,
         [error.left_ty, error.right_ty, left_ty, right_ty],
     );
 
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
-    if left_ty.is_equivalent_to(db, right_ty) {
+    if left_ty.is_equivalent_to(ctx, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone())
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between two objects of type `{}`",
             error.op,
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone())
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
             diagnostic.annotate(context.secondary(expr).message(format_args!(
                 "Has type `{}`",
-                ty.display_with(db, display_settings.clone())
+                ty.display_with(ctx, display_settings.clone())
             )));
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between objects of type `{}` and `{}`",
             error.op,
-            left_ty.display_with(db, display_settings.clone()),
-            right_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone()),
+            right_ty.display_with(ctx, display_settings.clone())
         ));
     }
 
@@ -4298,8 +4328,8 @@ pub(super) fn report_unsupported_comparison<'db>(
     // - `error.left_ty` is `Literal["foo"]`
     // - `error.right_ty` is `Literal[3]`
     if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
-        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(db).as_deref()
-            && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
+        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(ctx).as_deref()
+            && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(ctx).as_deref()
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
                 .all_elements()
@@ -4307,13 +4337,13 @@ pub(super) fn report_unsupported_comparison<'db>(
                 .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
-            if error.left_ty.is_equivalent_to(db, error.right_ty) {
+            if error.left_ty.is_equivalent_to(ctx, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported between \
                     the tuple elements at index {} (both of type `{}`)",
                     error.op,
                     position + 1,
-                    error.left_ty.display_with(db, display_settings),
+                    error.left_ty.display_with(ctx, display_settings),
                 ));
             } else {
                 diagnostic.info(format_args!(
@@ -4321,25 +4351,25 @@ pub(super) fn report_unsupported_comparison<'db>(
                     the tuple elements at index {} (of type `{}` and `{}`)",
                     error.op,
                     position + 1,
-                    error.left_ty.display_with(db, display_settings.clone()),
-                    error.right_ty.display_with(db, display_settings),
+                    error.left_ty.display_with(ctx, display_settings.clone()),
+                    error.right_ty.display_with(ctx, display_settings),
                 ));
             }
         } else {
-            if error.left_ty.is_equivalent_to(db, error.right_ty) {
+            if error.left_ty.is_equivalent_to(ctx, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between two objects of type `{}`",
                     error.op,
-                    error.left_ty.display_with(db, display_settings),
+                    error.left_ty.display_with(ctx, display_settings),
                 ));
             } else {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between objects of type `{}` and `{}`",
                     error.op,
-                    error.left_ty.display_with(db, display_settings.clone()),
-                    error.right_ty.display_with(db, display_settings)
+                    error.left_ty.display_with(ctx, display_settings.clone()),
+                    error.right_ty.display_with(ctx, display_settings)
                 ));
             }
         }
@@ -4412,35 +4442,35 @@ fn report_unsupported_binary_operation_impl<'a>(
     right_ty: Type<'a>,
     operator: OperatorDisplay,
 ) -> Option<LintDiagnosticGuard<'a, 'a>> {
-    let db = context.db();
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
-    let display_settings = DisplaySettings::from_possibly_ambiguous_types(db, [left_ty, right_ty]);
+    let ctx = &context.semantic_context();
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(ctx, [left_ty, right_ty]);
 
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
-    if left_ty.is_equivalent_to(db, right_ty) {
+    if left_ty.is_equivalent_to(ctx, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone())
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between two objects of type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone())
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
             diagnostic.annotate(context.secondary(expr).message(format_args!(
                 "Has type `{}`",
-                ty.display_with(db, display_settings.clone())
+                ty.display_with(ctx, display_settings.clone())
             )));
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between objects of type `{}` and `{}`",
-            left_ty.display_with(db, display_settings.clone()),
-            right_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(ctx, display_settings.clone()),
+            right_ty.display_with(ctx, display_settings.clone())
         ));
     }
 
@@ -4611,7 +4641,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         return false;
     };
 
-    let python_version = program.python_version(db);
+    let python_version = parent_module.python_version(db);
     if version_range.contains(python_version) {
         return false;
     }
@@ -4688,14 +4718,12 @@ pub(super) fn report_invalid_concatenate_last_arg<'db>(
     last_arg_type: Type<'db>,
 ) {
     if let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENTS, last_arg) {
+        let ctx = &context.semantic_context();
         let mut diag = builder.into_diagnostic(
             "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` \
                 type variable",
         );
-        diag.set_primary_message(format_args!(
-            "Got `{}`",
-            last_arg_type.display(context.db())
-        ));
+        diag.set_primary_message(format_args!("Got `{}`", last_arg_type.display(ctx)));
     }
 }
 
@@ -4718,9 +4746,9 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
             let class_name = class.name(db);
             let mut diagnostic =
                 builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
-
+            let ctx = &context.semantic_context();
             let class_and_def = class
-                .iter_mro(db, None)
+                .iter_mro(ctx, None)
                 .filter_map(|base| base.into_class()?.class_literal(db).as_static())
                 .find_map(|class| {
                     let scope = class.body_scope(db);
@@ -4728,7 +4756,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     let symbol = place_table.symbol_id("__init_subclass__")?;
                     let use_def = use_def_map(db, scope);
                     let bindings = use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
-                    let place_with_def = place_from_bindings(db, bindings);
+                    let place_with_def = place_from_bindings(ctx, bindings);
                     if place_with_def.place.is_undefined() {
                         return None;
                     }
@@ -4752,7 +4780,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which is not callable",
-                        bindings.callable_type().display(db)
+                        bindings.callable_type().display(ctx)
                     ));
                 } else {
                     diagnostic.set_concise_message(format_args!(
@@ -4762,7 +4790,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which may not be callable",
-                        bindings.callable_type().display(db)
+                        bindings.callable_type().display(ctx)
                     ));
                 }
                 diagnostic.annotate(annotation);
