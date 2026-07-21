@@ -399,6 +399,38 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
+## Gradual constraints can obscure a more specific constraint
+
+A gradual constraint that is compatible with a concrete argument can be selected before a more
+specific constraint. This makes inference depend on the order in which the constraints are declared.
+
+```py
+from typing import Any, TypeVar
+
+class Row(tuple[Any, ...]):
+    def asDict(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+GradualFirst = TypeVar("GradualFirst", list[Any], tuple[Any, ...], Row)
+RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...], list[Any])
+
+def gradual_first(row: GradualFirst) -> GradualFirst:
+    return row
+
+def row_first(row: RowFirst) -> RowFirst:
+    return row
+
+gradual = gradual_first(Row())
+# TODO: revealed: Row
+reveal_type(gradual)  # revealed: tuple[Any, ...]
+# error: [unresolved-attribute] "Object of type `tuple[Any, ...]` has no attribute `asDict`"
+gradual.asDict()
+
+specific = row_first(Row())
+reveal_type(specific)  # revealed: Row
+specific.asDict()
+```
+
 ## Typevar inference is a unification problem
 
 When inferring typevar assignments in a generic function call, we cannot simply solve constraints
