@@ -167,4 +167,3 @@ S602 `subprocess` call with truthy `shell` seems safe, but may be changed in the
 41 | x = 1
 42 | Popen("true", shell=f"{x=}")
    | ^^^^^
-   |

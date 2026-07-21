@@ -25,7 +25,6 @@ PYI009 [*] Empty body should contain `...`, not `pass`
 7 | class Foo:
 8 |     pass  # ERROR PYI009, since we're in a stub file
   |     ^^^^
-  |
 help: Replace `pass` with `...`
   |
 7 | class Foo:

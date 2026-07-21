@@ -187,7 +187,6 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -211,7 +210,6 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
   |                            |
   |                            This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -235,7 +233,6 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -259,7 +256,6 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
    |
 23 |     if issubclass(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```

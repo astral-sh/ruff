@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
 F811 [*] Redefinition of unused `BrokerUsecase` from line 2
- --> F811_36.py:2:41
+ --> F811_36.py:7:45
   |
 1 | from typing import TYPE_CHECKING
 2 | from faststream._internal.broker import BrokerUsecase

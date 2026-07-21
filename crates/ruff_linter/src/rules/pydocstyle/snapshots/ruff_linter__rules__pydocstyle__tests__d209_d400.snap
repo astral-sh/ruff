@@ -8,7 +8,6 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
   | |________________________________________________________________________^
-  |
 help: Move closing quotes to new line
   |
 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
@@ -24,7 +23,6 @@ D400 [*] First line should end with a period
 2 | /     """lorem ipsum dolor sit amet consectetur adipiscing elit
 3 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
   | |________________________________________________________________________^
-  |
 help: Add period
   |
 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit

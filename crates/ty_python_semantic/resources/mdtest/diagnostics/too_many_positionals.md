@@ -40,13 +40,11 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
   |
 3 | f(1, 2, 3)  # snapshot: too-many-positional-arguments
   |         ^
-  |
 info: Function signature here
  --> src/module.py:1:5
   |
 1 | def f(a, b=42): ...
   |     ^^^^^^^^^^
-  |
 
 
 error[too-many-positional-arguments]: Too many positional arguments to function `f`: expected 2, got 3
@@ -54,7 +52,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 12 | h(1, 2, 3)
    |         ^
-   |
 info: Union variant `def f(a, b=42) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -64,7 +61,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 12 | h(1, 2, 3)
    |         ^
-   |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -74,11 +70,9 @@ error[too-many-positional-arguments]: Too many positional arguments to bound met
    |
 14 | Foo().method(1, 2)  # snapshot: too-many-positional-arguments
    |                 ^
-   |
 info: Method signature here
  --> src/module.py:5:9
   |
 5 |     def method(self, a): ...
   |         ^^^^^^^^^^^^^^^
-  |
 ```

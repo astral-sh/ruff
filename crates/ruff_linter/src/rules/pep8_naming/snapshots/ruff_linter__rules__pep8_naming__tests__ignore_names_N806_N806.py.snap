@@ -18,4 +18,3 @@ N806 Variable `STILL_BAD` in function should be lowercase
 5 |     BAD_ALLOWED = 0
 6 |     STILL_BAD = 0
   |     ^^^^^^^^^
-  |

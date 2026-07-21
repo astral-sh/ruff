@@ -61,7 +61,6 @@ COM812 [*] Trailing comma missing
 22 |     2,
 23 |     3
    |      ^
-   |
 help: Add trailing comma
    |
 22 |     2,

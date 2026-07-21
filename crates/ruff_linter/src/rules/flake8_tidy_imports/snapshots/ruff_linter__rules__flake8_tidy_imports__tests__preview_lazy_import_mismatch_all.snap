@@ -99,7 +99,6 @@ TID254 [*] Use a `lazy` import instead of an eager import
 27 |
 28 | x = 1; import pkg.submodule
    |               ^^^^^^^^^^^^^
-   |
 help: Convert to a lazy import
    |
 27 |

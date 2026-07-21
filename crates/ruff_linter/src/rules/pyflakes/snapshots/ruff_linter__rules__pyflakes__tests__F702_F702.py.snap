@@ -19,7 +19,6 @@ F702 `continue` not properly in loop
 15 |
 16 |     continue
    |     ^^^^^^^^
-   |
 
 F702 `continue` not properly in loop
   --> F702.py:20:5
@@ -27,11 +26,9 @@ F702 `continue` not properly in loop
 19 | class Foo:
 20 |     continue
    |     ^^^^^^^^
-   |
 
 F702 `continue` not properly in loop
   --> F702.py:23:1
    |
 23 | continue
    | ^^^^^^^^
-   |

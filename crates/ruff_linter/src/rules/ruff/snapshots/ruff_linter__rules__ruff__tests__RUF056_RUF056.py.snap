@@ -438,7 +438,6 @@ RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in boolean test posi
 190 | d = {}
 191 | not d.get("key", (False))
     |                   ^^^^^
-    |
 help: Remove falsy fallback from `dict.get()`
     |
 190 | d = {}

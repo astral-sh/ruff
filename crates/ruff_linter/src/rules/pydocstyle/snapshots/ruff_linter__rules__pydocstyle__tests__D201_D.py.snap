@@ -8,7 +8,6 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 136 |
 137 |     """Leading space."""
     |     ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Remove blank line(s) before function docstring
     |
 135 | def leading_space():
@@ -43,7 +42,6 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 548 | |     More content.
 549 | |     """
     | |_______^
-    |
 help: Remove blank line(s) before function docstring
     |
 544 | def multiline_leading_space():

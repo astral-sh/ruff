@@ -246,7 +246,6 @@ PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
 35 | getsize(filename1)
 36 | getsize(filename2)
    | ^^^^^^^
-   |
 help: Replace with `Path(...).stat().st_size`
 
 PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
@@ -361,5 +360,4 @@ PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
 81 |
 82 | os.path.getsize(pathlib.Path("filename"))
    | ^^^^^^^^^^^^^^^
-   |
 help: Replace with `Path(...).stat().st_size`

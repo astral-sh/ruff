@@ -76,7 +76,6 @@ W605 [*] Invalid escape sequence: `\_`
 24 | #: W605:1:38
 25 | value = f'new line\nand invalid escape \_ here'
    |                                        ^^
-   |
 help: Add backslash to escape sequence
    |
 24 | #: W605:1:38
@@ -267,7 +266,6 @@ W605 [*] Invalid escape sequence: `\I`
 67 | # Debug text (should trigger)
 68 | t = f"{'\InHere'=}"
    |         ^^
-   |
 help: Use a raw string literal
    |
 67 | # Debug text (should trigger)
@@ -351,7 +349,6 @@ W605 [*] Invalid escape sequence: `\_`
 93 | #: W605:1:38
 94 | value = t'new line\nand invalid escape \_ here'
    |                                        ^^
-   |
 help: Add backslash to escape sequence
    |
 93 | #: W605:1:38
@@ -542,7 +539,6 @@ W605 [*] Invalid escape sequence: `\I`
 136 | # Debug text (should trigger)
 137 | t = t"{'\InHere'=}"
     |         ^^
-    |
 help: Use a raw string literal
     |
 136 | # Debug text (should trigger)

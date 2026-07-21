@@ -7,7 +7,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 10 | def func():
 11 |     defaultdict(default_factory=int)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=int)`
    |
 10 | def func():
@@ -23,7 +22,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 14 | def func():
 15 |     defaultdict(default_factory=float)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=float)`
    |
 14 | def func():
@@ -39,7 +37,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 18 | def func():
 19 |     defaultdict(default_factory=dict)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=dict)`
    |
 18 | def func():
@@ -55,7 +52,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 22 | def func():
 23 |     defaultdict(default_factory=list)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=list)`
    |
 22 | def func():
@@ -71,7 +67,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 26 | def func():
 27 |     defaultdict(default_factory=tuple)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 26 | def func():
@@ -88,7 +83,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 33 |
 34 |     defaultdict(default_factory=foo)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=foo)`
    |
 33 |
@@ -104,7 +98,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 37 | def func():
 38 |     defaultdict(default_factory=lambda: 1)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=lambda: 1)`
    |
 37 | def func():
@@ -121,7 +114,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 43 |
 44 |     defaultdict(default_factory=deque)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=deque)`
    |
 43 |
@@ -138,7 +130,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 51 |
 52 |     defaultdict(default_factory=MyCallable())  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=MyCallable())`
    |
 51 |
@@ -154,7 +145,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 55 | def func():
 56 |     defaultdict(default_factory=tuple, member=1)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 55 | def func():
@@ -170,7 +160,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 59 | def func():
 60 |     defaultdict(member=1, default_factory=tuple)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 59 | def func():
@@ -186,7 +175,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 63 | def func():
 64 |     defaultdict(member=1, default_factory=tuple,)  # RUF026
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 63 | def func():
@@ -205,7 +193,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 70 | |         default_factory=tuple,
 71 | |     )  # RUF026
    | |_____^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 68 |     defaultdict(
@@ -225,7 +212,6 @@ RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
 77 | |         member=1,
 78 | |     )  # RUF026
    | |_____^
-   |
 help: Replace with `defaultdict(default_factory=tuple)`
    |
 75 |     defaultdict(

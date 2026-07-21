@@ -27,7 +27,6 @@ B002 Python does not support the unary prefix increment operator (`++`)
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n
    |            ^^^
-   |
 
 B002 Python does not support the unary prefix decrement operator (`--`)
   --> B002.py:24:17
@@ -35,4 +34,3 @@ B002 Python does not support the unary prefix decrement operator (`--`)
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n
    |                 ^^^
-   |

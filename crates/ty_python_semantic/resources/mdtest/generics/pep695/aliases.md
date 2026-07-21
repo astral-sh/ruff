@@ -364,7 +364,6 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
   |          ------^^^^^
   |          |
   |          Alias to `A`, which is not generic
-  |
 ```
 
 ```py
@@ -380,7 +379,6 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
    |          ------^^^^^
    |          |
    |          Alias to `B[int]`, which is already specialized
-   |
 ```
 
 ## Aliases are not callable
@@ -698,13 +696,12 @@ type Alias1[*Ts, T = int] = tuple[*Ts, T]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:2:13
+ --> src/mdtest_snippet.py:2:18
   |
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
   |             ---  ^^^^^^^ `T` has a default
   |             |
   |             `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
@@ -715,13 +712,12 @@ type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:4:17
+ --> src/mdtest_snippet.py:4:22
   |
 4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
   |                 ---  ^^^^^^^^ `T2` has a default
   |                 |
   |                 `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
@@ -732,14 +728,13 @@ type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:6:13
+ --> src/mdtest_snippet.py:6:18
   |
 6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
   |             ---  ^^^^^^^^  -------- `T2` also has a default
   |             |    |
   |             |    `T1` has a default
   |             `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
@@ -752,13 +747,12 @@ type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:10:13
+  --> src/mdtest_snippet.py:10:18
    |
 10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
    |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
    |             |
    |             `Us` is a TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 

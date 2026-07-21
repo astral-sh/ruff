@@ -7,7 +7,6 @@ D301 [*] Use `r"""` if any backslashes in a docstring
 1 | def double_quotes_backslash():
 2 |     """Sum\\mary."""
   |     ^^^^^^^^^^^^^^^^
-  |
 help: Add `r` prefix
   |
 1 | def double_quotes_backslash():
@@ -23,7 +22,6 @@ D301 Use `r"""` if any backslashes in a docstring
 36 | def shouldnt_add_raw_here2():
 37 |     u"Sum\\mary."
    |     ^^^^^^^^^^^^^
-   |
 help: Add `r` prefix
 
 D301 [*] Use `r"""` if any backslashes in a docstring
@@ -34,7 +32,6 @@ D301 [*] Use `r"""` if any backslashes in a docstring
 94 | |     This is single quote escape \".
 95 | |     """
    | |_______^
-   |
 help: Add `r` prefix
    |
 92 | def should_add_raw_for_single_double_quote_escape():
@@ -52,7 +49,6 @@ D301 [*] Use `r"""` if any backslashes in a docstring
 100 | |     This is single quote escape \'.
 101 | |     '''
     | |_______^
-    |
 help: Add `r` prefix
     |
 98  | def should_add_raw_for_single_single_quote_escape():

@@ -27,7 +27,6 @@ error[PT006]: Wrong type passed to first argument of `pytest.mark.parametrize`; 
   |
 5 | @pytest.mark.parametrize(("param",), [(1,), variable])  # snapshot: pytest-parametrize-names-wrong-type
   |                          ^^^^^^^^^^
-  |
 help: Use a string for the first argument
 ```
 

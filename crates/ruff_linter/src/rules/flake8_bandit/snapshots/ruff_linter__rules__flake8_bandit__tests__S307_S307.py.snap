@@ -17,4 +17,3 @@ S307 Use of possibly insecure function; consider using `ast.literal_eval`
 3 | print(eval("1+1"))  # S307
 4 | print(eval("os.getcwd()"))  # S307
   |       ^^^^^^^^^^^^^^^^^^^
-  |

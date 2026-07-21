@@ -8,4 +8,3 @@ F821 Undefined name `y`
 18 | x: (y := 1)
 19 | print(y)
    |       ^
-   |

@@ -204,4 +204,3 @@ Module(
 3 | {1, x := 2, 3}
 4 | {1, 2, x := 3}
   |        ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.8 (syntax was added in Python 3.9)
-  |

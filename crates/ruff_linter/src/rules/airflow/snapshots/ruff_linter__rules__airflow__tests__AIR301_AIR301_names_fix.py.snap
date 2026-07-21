@@ -204,7 +204,6 @@ AIR301 [*] `airflow.security.permissions.RESOURCE_DATASET` is removed in Airflow
 31 |
 32 | RESOURCE_DATASET
    | ^^^^^^^^^^^^^^^^
-   |
 help: Use `RESOURCE_ASSET` from `airflow.security.permissions` instead.
    |
 14 | from airflow.secrets.local_filesystem import load_connections
@@ -243,7 +242,6 @@ AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Air
 40 | on_dataset_created()
 41 | on_dataset_changed()
    | ^^^^^^^^^^^^^^^^^^
-   |
 help: Use `on_asset_changed` from `airflow.listeners.spec.asset` instead.
    |
 38 | )
@@ -357,7 +355,6 @@ AIR301 [*] `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed 
 71 |
 72 | BaseAuthManager()
    | ^^^^^^^^^^^^^^^
-   |
 help: Use `BaseAuthManager` from `airflow.api_fastapi.auth.managers.base_auth_manager` instead.
    |
 69 | # airflow.auth.manager
@@ -650,7 +647,6 @@ AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
 113 | #  airflow.utils.log
 114 | secrets_masker
     | ^^^^^^^^^^^^^^
-    |
 help: `secrets_masker` has been moved to `airflow.sdk.execution_time` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
     |
 110 |

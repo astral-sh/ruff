@@ -199,7 +199,6 @@ AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensor` is moved in
 32 | ExternalTaskMarker()
 33 | ExternalTaskSensor()
    | ^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSensor` from `airflow.providers.standard.sensors.external_task` instead.
    |
 16 |     ExternalTaskMarker,
@@ -408,7 +407,6 @@ AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is move
 77 |
 78 | ExternalTaskSensorLink()
    | ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalDagLink` from `airflow.providers.standard.sensors.external_task` instead.
    |
 76 | from airflow.sensors.external_task_sensor import ExternalTaskSensorLink

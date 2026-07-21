@@ -189,7 +189,6 @@ RUF039 [*] First argument to `re.subn()` is not raw string
 37 | )
 38 | re.subn("()"r' am I'"??")
    |         ^^^^
-   |
 help: Replace with raw string
    |
 37 | )
@@ -205,7 +204,6 @@ RUF039 [*] First argument to `re.subn()` is not raw string
 37 | )
 38 | re.subn("()"r' am I'"??")
    |                     ^^^^
-   |
 help: Replace with raw string
    |
 37 | )
@@ -402,7 +400,6 @@ RUF039 [*] First argument to `regex.subn()` is not raw string
 77 | )
 78 | regex.subn("()"r' am I'"??")
    |            ^^^^
-   |
 help: Replace with raw string
    |
 77 | )
@@ -418,7 +415,6 @@ RUF039 [*] First argument to `regex.subn()` is not raw string
 77 | )
 78 | regex.subn("()"r' am I'"??")
    |                        ^^^^
-   |
 help: Replace with raw string
    |
 77 | )

@@ -29,7 +29,6 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
 4 | |     2 * x + 1 for x in range(3)
 5 | | )
   | |_^
-  |
 help: Rewrite as a list comprehension
   |
 2 | even_nums = list(2 * x for x in range(3))
@@ -170,7 +169,6 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
 26 | |      # some more
 27 | |  )
    | |__^
-   |
 help: Rewrite as a list comprehension
    |
 21 | list((0 for _ in []),)

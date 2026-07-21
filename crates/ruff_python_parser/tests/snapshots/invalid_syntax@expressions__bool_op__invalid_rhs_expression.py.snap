@@ -132,4 +132,3 @@ Module(
 2 |
 3 | x or yield y
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |

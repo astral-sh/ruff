@@ -6,15 +6,14 @@ RUF054 Indented form feed
   |
 6 | # Errors
 7 |
-8 |  
+8 |  ␌
   |  ^
-  |
 help: Remove form feed
 
 RUF054 Indented form feed
   --> RUF054.py:10:3
    |
-10 |         
+10 |         ␌
    |         ^
 11 |
 12 | def _():
@@ -25,7 +24,7 @@ RUF054 Indented form feed
   --> RUF054.py:13:2
    |
 12 | def _():
-13 |         pass
+13 |     ␌    pass
    |     ^
 14 |
 15 | if False:
@@ -37,7 +36,6 @@ RUF054 Indented form feed
    |
 15 | if False:
 16 |     print('F')
-17 |     print('T')
+17 |     ␌print('T')
    |     ^
-   |
 help: Remove form feed

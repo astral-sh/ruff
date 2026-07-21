@@ -37,7 +37,6 @@ UP037 [*] Remove quotes from type annotation
 18 | def foo(var: "MyClass") -> "MyClass":
 19 |     x: "MyClass"
    |        ^^^^^^^^^
-   |
 help: Remove quotes
    |
 18 | def foo(var: "MyClass") -> "MyClass":
@@ -114,7 +113,6 @@ UP037 [*] Remove quotes from type annotation
 31 |
 32 | x: Callable[["MyClass"], None]
    |              ^^^^^^^^^
-   |
 help: Remove quotes
    |
 31 |
@@ -129,7 +127,6 @@ UP037 [*] Remove quotes from type annotation
 35 | class Foo(NamedTuple):
 36 |     x: "MyClass"
    |        ^^^^^^^^^
-   |
 help: Remove quotes
    |
 35 | class Foo(NamedTuple):
@@ -144,7 +141,6 @@ UP037 [*] Remove quotes from type annotation
 39 | class D(TypedDict):
 40 |     E: TypedDict("E", foo="int", total=False)
    |                           ^^^^^
-   |
 help: Remove quotes
    |
 39 | class D(TypedDict):
@@ -159,7 +155,6 @@ UP037 [*] Remove quotes from type annotation
 43 | class D(TypedDict):
 44 |     E: TypedDict("E", {"foo": "int"})
    |                               ^^^^^
-   |
 help: Remove quotes
    |
 43 | class D(TypedDict):
@@ -559,7 +554,6 @@ UP037 [*] Remove quotes from type annotation
 125 | def foo(bar: "A\n#"): ...
 126 | def foo(bar: "A\n#\n"): ...
     |              ^^^^^^^^
-    |
 help: Remove quotes
     |
 125 | def foo(bar: "A\n#"): ...

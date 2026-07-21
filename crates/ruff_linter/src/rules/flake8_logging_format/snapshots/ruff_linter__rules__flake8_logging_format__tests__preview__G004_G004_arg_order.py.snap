@@ -19,5 +19,4 @@ G004 Logging statement uses f-string
  9 | logger.error(f"{X} -> %s", Y)
 10 | logger.error(f"{Y} -> %s", X)
    |              ^^^^^^^^^^^^
-   |
 help: Convert to lazy `%` formatting

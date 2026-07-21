@@ -97,7 +97,6 @@ F522 [*] `.format` call has unused named argument(s): greeting
 13 | # even though the used argument has a side effect
 14 | "Hello, {name}".format(greeting="Pikachu", name=print(1))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove extra named arguments: greeting
    |
 13 | # even though the used argument has a side effect

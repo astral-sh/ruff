@@ -273,7 +273,6 @@ PYI034 [*] `__enter__` methods in classes like `Generic1` usually return `self` 
 334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
 335 |     def __enter__(self: Generic1) -> Generic1: ...
     |         ^^^^^^^^^
-    |
 help: Use `Self` as return type
     |
 334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
@@ -415,7 +414,6 @@ PYI034 [*] `__enter__` methods in classes like `Generic5` usually return `self` 
 359 |     def __new__(cls: type[Generic5]) -> Generic5: ...
 360 |     def __enter__(self: Generic5) -> Generic5: ...
     |         ^^^^^^^^^
-    |
 help: Use `Self` as return type
     |
 359 |     def __new__(cls: type[Generic5]) -> Generic5: ...
@@ -487,7 +485,6 @@ PYI034 [*] `__iadd__` methods in classes like `UsesStringizedForwardReferences` 
 393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
 394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
     |         ^^^^^^^^
-    |
 help: Use `Self` as return type
     |
 393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034

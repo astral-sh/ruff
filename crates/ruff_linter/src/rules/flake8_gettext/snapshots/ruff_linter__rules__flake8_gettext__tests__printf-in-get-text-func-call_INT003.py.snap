@@ -90,4 +90,3 @@ INT003 printf-style format is resolved before function call; consider `_("string
 36 |     print(_(a))
 37 |     print(_("%s" % a))
    |             ^^^^^^^^
-   |

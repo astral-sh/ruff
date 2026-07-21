@@ -57,7 +57,6 @@ D204 [*] 1 blank line required after class docstring
 653 | class StatementOnSameLineAsDocstring:
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Insert 1 blank line after class docstring
     |
 653 | class StatementOnSameLineAsDocstring:

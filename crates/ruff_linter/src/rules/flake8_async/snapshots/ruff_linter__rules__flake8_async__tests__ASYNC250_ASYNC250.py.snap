@@ -17,7 +17,6 @@ ASYNC250 Blocking call to `input()` in async context
 7 |     k = input()  # ASYNC250
 8 |     input("hello world")  # ASYNC250
   |     ^^^^^
-  |
 
 ASYNC250 Blocking call to `input()` in async context
   --> ASYNC250.py:21:5

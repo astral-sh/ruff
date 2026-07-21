@@ -627,13 +627,11 @@ error[override-of-final-variable]: Cannot override `module_a.Foo.X`
   |
 5 |     X = 2
   |     ^ Overrides a final variable from superclass `module_a.Foo`
-  |
 info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
  --> src/module_a.py:4:5
   |
 4 |     X: Final[int] = 1
   |     - `module_a.Foo.X` defined here
-  |
 ```
 
 ### `Final` declaration without a value
@@ -1312,7 +1310,6 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
   |
 3 | MY_CONSTANT: Final[int] = 1
   |              ---------- Symbol declared as `Final` here
-  |
 ```
 
 Imported `Final` symbol:

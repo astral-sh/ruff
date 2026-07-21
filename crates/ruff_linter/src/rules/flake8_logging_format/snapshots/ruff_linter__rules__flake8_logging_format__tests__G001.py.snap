@@ -156,4 +156,3 @@ G001 Logging statement uses `str.format`
 26 | log(level=logging.INFO, msg="Hello {}".format("World!"))
 27 | log(msg="Hello {}".format("World!"), level=logging.INFO)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

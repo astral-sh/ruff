@@ -8,7 +8,6 @@ D413 [*] Missing blank line after last section ("Returns")
 66 |
 67 |     Returns"""
    |     ^^^^^^^
-   |
 help: Add blank line after "Returns"
    |
 66 |

@@ -62,5 +62,4 @@ PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
 11 | getctime(b"filename")
 12 | getctime(Path("filename"))
    | ^^^^^^^^
-   |
 help: Replace with `Path.stat(...).st_ctime`

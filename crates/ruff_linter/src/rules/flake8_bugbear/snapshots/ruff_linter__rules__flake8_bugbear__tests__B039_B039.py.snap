@@ -159,5 +159,4 @@ B039 Do not use mutable data structures for `ContextVar` defaults
 39 | def baz(): ...
 40 | ContextVar("cv", default=baz())
    |                          ^^^^^
-   |
 help: Replace with `None`; initialize with `.set()``

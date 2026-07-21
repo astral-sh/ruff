@@ -208,7 +208,6 @@ FURB162 [*] Unnecessary timezone replacement with zero offset
 51 | # Edge case
 52 | datetime.fromisoformat("Z2025-01-01T00:00:00Z".strip("Z") + "+00:00")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove `.replace()` call
    |
 51 | # Edge case

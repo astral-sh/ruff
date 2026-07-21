@@ -48,7 +48,6 @@ F821 Undefined name `T`
 41 | def foo[T](t: T) -> None: ...
 42 | T  # F821: Undefined name `T` - not accessible afterward function scope
    | ^
-   |
 
 F821 Undefined name `T`
   --> F821_17.py:64:17

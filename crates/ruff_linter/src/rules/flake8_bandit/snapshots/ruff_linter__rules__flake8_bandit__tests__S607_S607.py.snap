@@ -249,4 +249,3 @@ S607 Starting a process with a partial executable path
 48 | import subprocess
 49 | subprocess.run(("echo", "foo"))
    |                ^^^^^^^^^^^^^^^
-   |

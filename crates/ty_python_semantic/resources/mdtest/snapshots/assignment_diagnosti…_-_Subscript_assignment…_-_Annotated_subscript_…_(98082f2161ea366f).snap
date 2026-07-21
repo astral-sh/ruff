@@ -27,7 +27,6 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
   |
 4 | numbers[0]: str = "three"
   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 
 ```
 
@@ -37,6 +36,5 @@ error[invalid-type-form]: Type annotations are not allowed on subscripted expres
   |
 4 | numbers[0]: str = "three"
   |             ^^^
-  |
 
 ```

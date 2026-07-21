@@ -147,7 +147,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
 33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
    |                                            ^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -184,7 +183,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 37 | class C[**P](Generic[_P2]): ...
 38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
    |              ^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -192,7 +190,6 @@ RUF053 [*] Class with type parameter list inherits from `Generic`
    |
 41 | class C[T](Generic[T, _A]): ...
    |            ^^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
    |
 40 |
@@ -209,7 +206,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 46 | # only simple assignments, so there is no fix.
 47 | class C[T: (_Z := TypeVar('_Z'))](Generic[_Z]): ...
    |                                   ^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -218,7 +214,6 @@ RUF053 [*] Class with type parameter list inherits from `Generic`
 50 | class C(Generic[_B]):
 51 |     class D[T](Generic[_B, T]): ...
    |                ^^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
    |
 50 | class C(Generic[_B]):
@@ -234,7 +229,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 54 | class C[T]:
 55 |     class D[U](Generic[T, U]): ...
    |                ^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -262,7 +256,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 60 | class C[T](Generic[_C], Generic[_D]): ...
 61 | class C[T, _C: (str, bytes)](Generic[_D]): ...  # TODO: Type parameter defaults
    |                              ^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 Class with type parameter list inherits from `Generic`
@@ -272,7 +265,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 65 | T  # Comment
 66 | ](Generic[_E]): ...  # TODO: Type parameter defaults
    |   ^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 Class with type parameter list inherits from `Generic`
@@ -338,7 +330,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 73 | class C[T](Generic[Unpack[*_As]]): ...
 74 | class C[T](Generic[Unpack[_As, _Bs]]): ...
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -382,7 +373,6 @@ RUF053 [*] Class with type parameter list inherits from `Generic`
 78 | class C[T](Generic[_A, Unpack[_As]]): ...
 79 | class C[T](Generic[*_As, _A]): ...
    |            ^^^^^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
    |
 78 | class C[T](Generic[_A, Unpack[_As]]): ...
@@ -409,7 +399,6 @@ RUF053 Class with type parameter list inherits from `Generic`
 83 | class C[T](Generic[APublicTypeVar]): ...
 84 | class C[T](Generic[APublicTypeVar, _A]): ...
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
@@ -419,7 +408,6 @@ RUF053 [*] Class with type parameter list inherits from `Generic`
 90 | # See also the `_Z` example above.
 91 | class C[T](Generic[_G]): ...  # Should be moved down below eventually
    |            ^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
    |
 90 | # See also the `_Z` example above.
@@ -453,7 +441,6 @@ RUF053 [*] Class with type parameter list inherits from `Generic`
 95 | class C[T: (str,)](Generic[_A]): ...
 96 | class C[T: [a]](Generic[_A]): ...
    |                 ^^^^^^^^^^^
-   |
 help: Remove `Generic` base class
    |
 95 | class C[T: (str,)](Generic[_A]): ...

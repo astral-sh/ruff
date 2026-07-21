@@ -8,4 +8,3 @@ F821 Undefined name `𝒟`
 8 |
 9 | print(𝒟)  # F821
   |       ^
-  |

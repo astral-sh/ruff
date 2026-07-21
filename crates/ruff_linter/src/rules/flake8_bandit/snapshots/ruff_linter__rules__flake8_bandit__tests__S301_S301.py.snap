@@ -8,4 +8,3 @@ S301 `pickle` and modules that wrap it can be unsafe when used to deserialize un
 2 |
 3 | pickle.loads()
   | ^^^^^^^^^^^^^^
-  |

@@ -117,14 +117,13 @@ class ParamSpecOuterClass(Generic[P]):
 
 ```snapshot
 error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:70:7
+  --> src/mdtest_snippet.py:72:11
    |
 70 | class ParamSpecOuterClass(Generic[P]):
    |       ------------------------------- ParamSpec `P` is bound in this enclosing scope
 71 |     # snapshot: shadowed-type-variable
 72 |     class InnerClass(SingleParamSpec[P]): ...
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
-   |
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each

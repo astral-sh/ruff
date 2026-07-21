@@ -4500,7 +4500,6 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |
     1 | import math
       |        ^^^^
-      |
     help: Remove unused import: `math`
       |
       - import math
@@ -5214,7 +5213,6 @@ fn ruff_toml_is_linted() -> Result<()> {
       |
     1 | lint.select = ["F401"]
       |                 ^^^^
-      |
     help: Replace rule code with `unused-import`
       |
       - lint.select = ["F401"]

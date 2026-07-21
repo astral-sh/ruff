@@ -55,7 +55,6 @@ TC001 [*] Move application import `.first_party` into a type-checking block
 4 |
 5 | from . import first_party
   |               ^^^^^^^^^^^
-  |
 help: Move into type-checking block
   |
 4 |

@@ -7,7 +7,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 3 | class F:
 4 |     def m[S](self: S) -> S: ...
   |          ^^^^^^^^^^^^^^^^^
-  |
 help: Replace TypeVar `S` with `Self`
   |
 3 | class F:

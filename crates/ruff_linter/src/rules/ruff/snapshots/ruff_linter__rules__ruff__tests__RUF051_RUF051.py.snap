@@ -514,7 +514,6 @@ RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
 98 | if b'yt' b'es' in d:
 99 |     del d[rb"""ytes"""]             # This should not make the fix unsafe
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `if` statement with `.pop(..., None)`
    |
 97 |

@@ -15,4 +15,3 @@ F821 Undefined name `Baz`
 24 | f(Callable[["Bar"], None])
 25 | f(Callable[["Baz"], None])
    |              ^^^
-   |

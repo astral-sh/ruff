@@ -26,4 +26,3 @@ PLW0406 Module `import_self.module` imports itself
 2 | from import_self import module
 3 | from . import module
   |               ^^^^^^
-  |

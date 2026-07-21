@@ -8,7 +8,6 @@ D210 [*] No whitespaces allowed surrounding docstring text
 287 | def endswith():
 288 |     """Whitespace at the end. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Trim surrounding whitespace
     |
 287 | def endswith():
@@ -24,7 +23,6 @@ D210 [*] No whitespaces allowed surrounding docstring text
 292 | def around():
 293 |     """ Whitespace at everywhere. """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Trim surrounding whitespace
     |
 292 | def around():
@@ -43,7 +41,6 @@ D210 [*] No whitespaces allowed surrounding docstring text
 301 | |     This is the end.
 302 | |     """
     | |_______^
-    |
 help: Trim surrounding whitespace
     |
 298 | def multiline():
@@ -59,5 +56,4 @@ D210 No whitespaces allowed surrounding docstring text
 580 | def endswith_quote():
 581 |     """Whitespace at the end, but also a quote" """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Trim surrounding whitespace

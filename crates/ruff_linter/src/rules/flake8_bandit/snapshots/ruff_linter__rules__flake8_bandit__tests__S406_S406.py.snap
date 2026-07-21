@@ -26,4 +26,3 @@ S406 `xml.sax` methods are vulnerable to XML attacks
 2 | import xml.sax as xmls  # S406
 3 | import xml.sax  # S406
   |        ^^^^^^^
-  |

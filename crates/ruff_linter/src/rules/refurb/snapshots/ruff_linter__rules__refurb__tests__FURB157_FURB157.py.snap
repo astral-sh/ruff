@@ -680,7 +680,6 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 92 | Decimal("_+1")      # Should flag as verbose
 93 | Decimal("_-1_000")  # Should flag as verbose
    |         ^^^^^^^^^
-   |
 help: Replace with `-1_000`
    |
 92 | Decimal("_+1")      # Should flag as verbose

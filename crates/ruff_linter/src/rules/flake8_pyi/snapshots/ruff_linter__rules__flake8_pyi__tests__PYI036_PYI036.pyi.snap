@@ -169,7 +169,6 @@ PYI036 All keyword-only arguments in `__aexit__` must have a default value
 74 |     def __exit__(self, typ, exc, tb, weird_extra_arg, extra_arg2 = None) -> None: ... # PYI036: Extra arg must have default
 75 |     async def __aexit__(self, typ, exc, tb, *, weird_extra_arg) -> None: ... # PYI036: kwargs must have default
    |                                                ^^^^^^^^^^^^^^^
-   |
 
 PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
   --> PYI036.pyi:89:29
@@ -220,4 +219,3 @@ PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) s
 164 |     @overload
 165 |     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |

@@ -8,7 +8,6 @@ AIR302 [*] `airflow.operators.papermill_operator.PapermillOperator` is moved int
 4 |
 5 | PapermillOperator()
   | ^^^^^^^^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOperator` from `airflow.providers.papermill.operators.papermill` instead.
   |
 2 |

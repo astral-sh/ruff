@@ -395,7 +395,6 @@ PIE800 [*] Unnecessary spread `**`
 96 | |     # Comment
 97 | | }), 6: 3}
    | |_^
-   |
 help: Remove unnecessary dict
    |
 94 | }, 6: 3}

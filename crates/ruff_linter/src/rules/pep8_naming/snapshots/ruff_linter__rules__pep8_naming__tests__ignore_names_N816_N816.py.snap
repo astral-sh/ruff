@@ -27,4 +27,3 @@ N816 Variable `still_Bad` in global scope should not be mixedCase
 7 | bad_Allowed = 0
 8 | still_Bad = 0
   | ^^^^^^^^^
-  |

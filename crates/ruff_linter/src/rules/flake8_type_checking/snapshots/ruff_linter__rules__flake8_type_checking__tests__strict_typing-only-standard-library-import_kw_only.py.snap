@@ -8,7 +8,6 @@ TC003 [*] Move standard library import `dataclasses.Field` into a type-checking 
 4 |
 5 | from dataclasses import KW_ONLY, dataclass, Field
   |                                             ^^^^^
-  |
 help: Move into type-checking block
    |
 4  |

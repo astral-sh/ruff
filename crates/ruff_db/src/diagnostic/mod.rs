@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path, sync::Arc};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
-use ruff_annotate_snippets::Level as AnnotateLevel;
+use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -1322,11 +1322,11 @@ pub enum Severity {
 }
 
 impl Severity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            Severity::Info => AnnotateLevel::Info,
-            Severity::Warning => AnnotateLevel::Warning,
-            Severity::Error => AnnotateLevel::Error,
+            Severity::Info => AnnotateLevel::INFO,
+            Severity::Warning => AnnotateLevel::WARNING,
+            Severity::Error => AnnotateLevel::ERROR,
             // NOTE: Should we really collapse this to "error"?
             //
             // After collapsing this, the snapshot tests seem to reveal that we
@@ -1334,7 +1334,7 @@ impl Severity {
             // And maybe *rendering* this as just an `error` is fine. If we
             // really do need different rendering, then I think we can add a
             // `Level::Fatal`. ---AG
-            Severity::Fatal => AnnotateLevel::Error,
+            Severity::Fatal => AnnotateLevel::ERROR,
         }
     }
 
@@ -1358,13 +1358,13 @@ pub enum SubDiagnosticSeverity {
 }
 
 impl SubDiagnosticSeverity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
-            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
-            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
-            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
-            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+            SubDiagnosticSeverity::Help => AnnotateLevel::HELP,
+            SubDiagnosticSeverity::Info => AnnotateLevel::INFO,
+            SubDiagnosticSeverity::Warning => AnnotateLevel::WARNING,
+            SubDiagnosticSeverity::Error => AnnotateLevel::ERROR,
+            SubDiagnosticSeverity::Fatal => AnnotateLevel::ERROR,
         }
     }
 }

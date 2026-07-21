@@ -15,4 +15,3 @@ S411 XMLRPC is vulnerable to remote XML attacks
 1 | import xmlrpc  # S411
 2 | from xmlrpc import server  # S411
   |      ^^^^^^
-  |

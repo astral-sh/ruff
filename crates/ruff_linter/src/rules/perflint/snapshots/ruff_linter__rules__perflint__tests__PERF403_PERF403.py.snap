@@ -8,7 +8,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 4 |     for idx, name in enumerate(fruit):
 5 |         result[idx] = name  # PERF403
   |         ^^^^^^^^^^^^^^^^^^
-  |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -18,7 +17,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 12 |         if idx % 2:
 13 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -28,7 +26,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 32 |         if idx % 2:
 33 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -38,7 +35,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 62 |         if idx % 2:
 63 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -48,7 +44,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 77 |     for name in fruit:
 78 |         result[name] = name  # PERF403
    |         ^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -58,7 +53,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 84 |     for idx, name in enumerate(fruit):
 85 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -68,7 +62,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 93 |     for idx, name in enumerate(fruit):
 94 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -80,7 +73,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 107 | |             name  # comment 4
 108 | |         ] = idx  # PERF403
     | |_______________^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -90,7 +82,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 114 |     for idx, name in enumerate(fruit):
 115 |         result[name] = idx  # PERF403
     |         ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -100,7 +91,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 121 |     for idx, name in enumerate(fruit):
 122 |         result[name] = idx  # PERF403
     |         ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -110,7 +100,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 128 |     for idx, name in enumerate(fruit):
 129 |         result[name] = idx  # PERF403
     |         ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -120,7 +109,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 136 |     for idx, name in enumerate(fruit):
 137 |         result[name] = idx  # PERF403
     |         ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -130,7 +118,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 144 |         if last_idx := idx % 3:
 145 |             result[name] = idx  # PERF403
     |             ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -140,7 +127,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 152 |     for idx, name in indices, fruit:
 153 |         result[name] = idx  # PERF403
     |         ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -174,7 +160,6 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 171 |     for o,(x,)in():
 172 |         v[x,]=o
     |         ^^^^^^^
-    |
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
@@ -229,5 +214,4 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 232 |     ) in ["a", "b", "c"]:
 233 |         result[k] = k
     |         ^^^^^^^^^^^^^
-    |
 help: Replace for loop with dict comprehension

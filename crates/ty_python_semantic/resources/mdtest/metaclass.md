@@ -787,7 +787,6 @@ error[invalid-metaclass]: Metaclass type `int` is not callable
   |
 3 |     class B(metaclass=n):
   |             ^^^^^^^^^^^
-  |
 ```
 
 ## Cyclic

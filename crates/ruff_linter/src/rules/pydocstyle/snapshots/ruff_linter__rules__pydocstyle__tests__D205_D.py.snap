@@ -11,7 +11,6 @@ D205 1 blank line required between summary line and description
 202 | |
 203 | |     """
     | |_______^
-    |
 help: Insert single blank line
 
 D205 [*] 1 blank line required between summary line and description (found 2)
@@ -26,7 +25,6 @@ D205 [*] 1 blank line required between summary line and description (found 2)
 214 | |
 215 | |     """
     | |_______^
-    |
 help: Insert single blank line
     |
 211 |

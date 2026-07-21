@@ -127,4 +127,3 @@ PLW1501 `Ua` is not a valid mode for `open`
 36 | import builtins
 37 | builtins.open(NAME, "Ua", encoding="utf-8")
    |                     ^^^^
-   |

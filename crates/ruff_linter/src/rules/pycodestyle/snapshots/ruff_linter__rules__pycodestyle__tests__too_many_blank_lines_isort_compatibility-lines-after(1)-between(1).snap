@@ -10,7 +10,6 @@ I001 [*] Import block is un-sorted or un-formatted
 4 | |
 5 | | from typing import Any, Sequence
   | |________________________________^
-  |
 help: Organize imports
   |
 2 |
@@ -26,7 +25,6 @@ E303 [*] Too many blank lines (3)
   |
 5 | from typing import Any, Sequence
   | ^^^^
-  |
 help: Remove extraneous blank line(s)
   |
 3 |
@@ -39,7 +37,6 @@ E303 [*] Too many blank lines (2)
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
-  |
 help: Remove extraneous blank line(s)
   |
 6 |
@@ -72,7 +69,6 @@ I001 [*] Import block is un-sorted or un-formatted
 29 | |
 30 | |     from typing_extensions import TypeAlias
    | |___________________________________________^
-   |
 help: Organize imports
    |
 27 |
@@ -86,7 +82,6 @@ E303 [*] Too many blank lines (3)
    |
 30 |     from typing_extensions import TypeAlias
    |     ^^^^
-   |
 help: Remove extraneous blank line(s)
    |
 27 |

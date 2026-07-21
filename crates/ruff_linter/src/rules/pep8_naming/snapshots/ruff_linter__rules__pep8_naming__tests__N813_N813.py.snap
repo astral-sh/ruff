@@ -26,4 +26,3 @@ N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
 2 | from mod import CamelCase as camelcase
 3 | from mod import AnotherCamelCase as another_camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

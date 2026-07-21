@@ -198,7 +198,6 @@ Module(
 4 | return x := 1
 5 | return *x and y
   |         ^^^^^^^ Syntax Error: Boolean expression cannot be used here
-  |
 
 
 ## Semantic Syntax Errors
@@ -216,4 +215,3 @@ Module(
 4 | return x := 1
 5 | return *x and y
   |        ^^^^^^^^ Syntax Error: Starred expression cannot be used here
-  |

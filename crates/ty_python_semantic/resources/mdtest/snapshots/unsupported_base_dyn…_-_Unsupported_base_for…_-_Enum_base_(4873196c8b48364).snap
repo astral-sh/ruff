@@ -29,7 +29,6 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 6 | X = type("X", (MyEnum,), {})  # error: [invalid-base]
   |                ^^^^^^ Has type `<class 'MyEnum'>`
-  |
 info: Creating an enum class via `type()` is not supported
 info: Consider using `Enum("X", [])` instead
 

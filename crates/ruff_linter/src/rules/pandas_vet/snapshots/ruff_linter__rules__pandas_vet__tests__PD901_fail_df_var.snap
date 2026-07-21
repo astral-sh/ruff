@@ -7,4 +7,3 @@ PD901 Avoid using the generic variable name `df` for DataFrames
 2 | import pandas as pd
 3 | df = pd.DataFrame()
   | ^^
-  |

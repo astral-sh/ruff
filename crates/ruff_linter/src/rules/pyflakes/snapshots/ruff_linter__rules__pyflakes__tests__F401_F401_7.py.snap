@@ -25,7 +25,6 @@ F401 [*] `typing.Awaitable` imported but unused
 65 | # This should mark F501 as unused.
 66 | from typing import Awaitable, AwaitableGenerator  # noqa: F501
    |                    ^^^^^^^^^
-   |
 help: Remove unused import
    |
 65 | # This should mark F501 as unused.
@@ -38,7 +37,6 @@ F401 [*] `typing.AwaitableGenerator` imported but unused
 65 | # This should mark F501 as unused.
 66 | from typing import Awaitable, AwaitableGenerator  # noqa: F501
    |                               ^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unused import
    |
 65 | # This should mark F501 as unused.

@@ -28,7 +28,6 @@ invalid-syntax: Expected `)`, found newline
 17 |
 18 | foo = Foo(
    |           ^
-   |
 
 invalid-syntax: Expected `)`, found newline
   --> E30_syntax_error.py:21:9

@@ -7,4 +7,3 @@ F821 Undefined name `display`
 3 | x = 1
 4 | display(x)
   | ^^^^^^^
-  |

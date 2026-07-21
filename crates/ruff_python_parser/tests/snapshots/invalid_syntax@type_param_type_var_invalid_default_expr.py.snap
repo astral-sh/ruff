@@ -427,7 +427,6 @@ Module(
 5 | type X[T = x := int] = int
 6 | type X[T: int = *int] = int
   |                 ^^^^ Syntax Error: Starred expression cannot be used here
-  |
 
 
 ## Semantic Syntax Errors

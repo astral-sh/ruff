@@ -57,7 +57,6 @@ F401 [*] `j.k` imported but unused
 4 | import h.i
 5 | import j.k as l
   |               ^
-  |
 help: Remove unused import: `j.k`
   |
 4 | import h.i

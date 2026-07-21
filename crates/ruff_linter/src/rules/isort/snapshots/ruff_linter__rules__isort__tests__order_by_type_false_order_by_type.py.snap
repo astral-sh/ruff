@@ -17,7 +17,6 @@ I001 [*] Import block is un-sorted or un-formatted
 11 | | import BAR
 12 | | import bar
    | |__________^
-   |
 help: Organize imports
    |
    - import StringIO

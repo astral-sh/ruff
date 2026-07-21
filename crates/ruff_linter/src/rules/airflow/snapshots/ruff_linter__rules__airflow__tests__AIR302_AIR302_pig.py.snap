@@ -26,7 +26,6 @@ AIR302 [*] `airflow.operators.pig_operator.PigOperator` is moved into `apache-pi
 6 | PigCliHook()
 7 | PigOperator()
   | ^^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigOperator` from `airflow.providers.apache.pig.operators.pig` instead.
   |
 3 | from airflow.hooks.pig_hook import PigCliHook

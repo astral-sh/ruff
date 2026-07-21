@@ -21,7 +21,6 @@ I001 [*] Import block is un-sorted or un-formatted
 15 | |     uint64,
 16 | | )
    | |_^
-   |
 help: Organize imports
    |
 1  | import numpy1

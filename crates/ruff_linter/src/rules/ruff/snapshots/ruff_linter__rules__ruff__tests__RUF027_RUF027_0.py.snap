@@ -8,7 +8,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 4 |
 5 | print("but don't ignore this: {val}")  # RUF027
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Add `f` prefix
   |
 4 |
@@ -43,7 +42,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 10 |     b = "{a}"  # RUF027
 11 |     c = "{a} {b} f'{val}' "  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^
-   |
 help: Add `f` prefix
    |
 10 |     b = "{a}"  # RUF027
@@ -78,7 +76,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 21 |     b = r"raw string with formatting: {a}"  # RUF027
 22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add `f` prefix
    |
 21 |     b = r"raw string with formatting: {a}"  # RUF027
@@ -113,7 +110,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 27 |     print("Hello, {name}!")  # RUF027
 28 |     print("The test value we're using today is {a}")  # RUF027
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add `f` prefix
    |
 27 |     print("Hello, {name}!")  # RUF027
@@ -130,7 +126,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 32 |     a = 4
 33 |     print(do_nothing(do_nothing("{a}")))  # RUF027
    |                                 ^^^^^
-   |
 help: Add `f` prefix
    |
 32 |     a = 4
@@ -169,7 +164,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 42 | |     c}  d
 43 | |     """
    | |_______^
-   |
 help: Add `f` prefix
    |
 40 |     # RUF027
@@ -189,7 +183,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 50 | |     a} \
 51 | |     "
    | |_____^
-   |
 help: Add `f` prefix
    |
 48 |     # RUF027
@@ -224,7 +217,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
 57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
    |                  ^^^^^
-   |
 help: Add `f` prefix
    |
 56 |     b = "{a}" "+" "{b}" r" \\ "  # RUF027 for the first part only
@@ -241,7 +233,6 @@ RUF027 [*] Possible f-string without an `f` prefix
 61 |     a = 4
 62 |     b = "\"not escaped:\" '{a}' \"escaped:\": '{{c}}'"  # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add `f` prefix
    |
 61 |     a = 4

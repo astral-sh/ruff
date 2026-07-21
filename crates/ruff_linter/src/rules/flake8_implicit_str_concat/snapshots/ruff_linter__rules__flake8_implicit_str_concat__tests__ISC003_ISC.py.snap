@@ -349,7 +349,6 @@ ISC003 Explicitly concatenated string should be implicitly concatenated
 223 | |     "def"
 224 | | ) + "ghi"
     | |_________^
-    |
 help: Remove redundant '+' operator to implicitly concatenate
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated

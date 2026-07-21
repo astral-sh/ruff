@@ -83,4 +83,3 @@ Module(
 2 | global x,
 3 | global x, y,
   |            ^ Syntax Error: Trailing comma not allowed
-  |

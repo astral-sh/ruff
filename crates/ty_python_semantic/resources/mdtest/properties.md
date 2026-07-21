@@ -313,7 +313,6 @@ error[invalid-assignment]: Cannot delete read-only property `attr` on object of 
   |
 3 |     def attr(self) -> int:
   |         ---- Property `C.attr` defined here with no deleter
-  |
 ```
 
 ## Limitations

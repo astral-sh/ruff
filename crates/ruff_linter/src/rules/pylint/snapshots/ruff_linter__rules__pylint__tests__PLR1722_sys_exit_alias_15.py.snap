@@ -8,7 +8,6 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 5 |     code = 1
 6 | exit(code)
   | ^^^^
-  |
 help: Replace `exit` with `sys.exit()`
   |
 1 + import sys

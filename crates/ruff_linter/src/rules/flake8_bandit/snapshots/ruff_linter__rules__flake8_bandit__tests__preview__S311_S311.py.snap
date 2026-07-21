@@ -27,4 +27,3 @@ S311 Standard pseudo-random generators are not suitable for cryptographic purpos
 26 | map(random.randrange, [])
 27 | foo = random.randrange
    |       ^^^^^^^^^^^^^^^^
-   |

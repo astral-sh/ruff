@@ -28,7 +28,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 55 | def broken3():
 56 |     return (yield from [])
    |     ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:61:5
@@ -37,7 +36,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 60 |     x = yield from []
 61 |     return x
    |     ^^^^^^^^
-   |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:72:5
@@ -45,7 +43,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 71 |     inner((yield from []))
 72 |     return x
    |     ^^^^^^^^
-   |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:83:5
@@ -54,7 +51,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 82 |     yield 1
 83 |     return foo()
    |     ^^^^^^^^^^^^
-   |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:88:5
@@ -63,7 +59,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 87 |     yield 1
 88 |     return [1, 2, 3]
    |     ^^^^^^^^^^^^^^^^
-   |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    --> B901.py:116:5
@@ -72,7 +67,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 115 |     yield
 116 |     return "should error"
     |     ^^^^^^^^^^^^^^^^^^^^^
-    |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    --> B901.py:122:5
@@ -81,7 +75,6 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 121 |     yield
 122 |     return "should error"
     |     ^^^^^^^^^^^^^^^^^^^^^
-    |
 
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    --> B901.py:128:5
@@ -90,4 +83,3 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 127 |     yield
 128 |     return "should error"
     |     ^^^^^^^^^^^^^^^^^^^^^
-    |

@@ -483,8 +483,8 @@ Module(
    |
  9 |         'format spec'}
 10 |
-   | ^ Syntax Error: Expected a statement
 11 | f'middle {'string':\\\
+   | ^ Syntax Error: Expected a statement
 12 |         'format spec'}
    |
 
@@ -493,25 +493,21 @@ Module(
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |         ^ Syntax Error: f-string: expecting `}`
-   |
 
 
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |          ^^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-   |
 
 
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-   |
 
 
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |                     ^^ Syntax Error: missing closing quote in string literal
-   |

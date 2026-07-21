@@ -26,7 +26,6 @@ B011 [*] Do not `assert False` (`python -O` removes these calls), raise `Asserti
  9 | assert 1 != 2, "message"
 10 | assert False, "message"
    |        ^^^^^
-   |
 help: Replace `assert False`
    |
 9  | assert 1 != 2, "message"

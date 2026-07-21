@@ -48,74 +48,69 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:2:11
+ --> src/mdtest_snippet.py:2:16
   |
 2 | class Foo[*Ts, T = int]: ...
   |           ---  ^^^^^^^ `T` has a default
   |           |
   |           `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:5:15
+ --> src/mdtest_snippet.py:5:20
   |
 5 | class Bar[T1, *Ts, T2 = int]: ...
   |               ---  ^^^^^^^^ `T2` has a default
   |               |
   |               `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:8:11
+ --> src/mdtest_snippet.py:8:16
   |
 8 | class Baz[*Ts, T1 = int, T2 = str]: ...
   |           ---  ^^^^^^^^  -------- `T2` also has a default
   |           |    |
   |           |    `T1` has a default
   |           `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:15:11
+  --> src/mdtest_snippet.py:15:16
    |
 15 | class Qux[*Ts, **P = [int, str]]: ...
    |           ---  ^^^^^^^^^^^^^^^^ `P` has a default
    |           |
    |           `Ts` is a TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:18:12
+  --> src/mdtest_snippet.py:18:17
    |
 18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...
    |            ---  ^^^^^^^^  ---------------- `P` also has a default
    |            |    |
    |            |    `T1` has a default
    |            `Ts` is a TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:21:13
+  --> src/mdtest_snippet.py:21:18
    |
 21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
    |             ---  ^^^^^^^^  --------  ---------------- `P` also has a default
@@ -123,33 +118,30 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
    |             |    |         `T2` also has a default
    |             |    `T1` has a default
    |             `Ts` is a TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
 
 ```
 error[invalid-type-form]: Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters
-  --> src/mdtest_snippet.py:25:14
+  --> src/mdtest_snippet.py:25:19
    |
 25 | class Grault[*Us, *Ts = *tuple[int, str]]: ...
    |              ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` is an additional TypeVarTuple
    |              |
    |              `Us` is the first TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#multiple-type-variable-tuples-not-allowed
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:25:14
+  --> src/mdtest_snippet.py:25:19
    |
 25 | class Grault[*Us, *Ts = *tuple[int, str]]: ...
    |              ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
    |              |
    |              `Us` is a TypeVarTuple
-   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```

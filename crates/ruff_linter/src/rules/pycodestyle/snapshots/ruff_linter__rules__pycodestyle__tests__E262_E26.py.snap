@@ -116,7 +116,6 @@ E262 [*] Inline comment should start with `# `
 85 |
 86 | a = 1  #:Foo
    |        ^^^^^
-   |
 help: Format space
    |
 85 |

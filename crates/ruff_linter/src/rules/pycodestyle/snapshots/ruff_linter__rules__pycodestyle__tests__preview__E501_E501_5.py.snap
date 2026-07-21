@@ -17,4 +17,3 @@ E501 Line too long (89 > 88)
 13 | # Error - trailing type: ignore after another comment (89 characters before pragma)
 14 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa"  # comment  # type: ignore
    |                                                                                         ^
-   |

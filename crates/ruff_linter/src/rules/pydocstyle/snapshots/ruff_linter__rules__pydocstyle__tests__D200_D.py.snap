@@ -10,7 +10,6 @@ D200 [*] One-line docstring should fit on one line
 130 | |     Wrong.
 131 | |     """
     | |_______^
-    |
 help: Reformat to one line
     |
 128 | def asdlkfasd():
@@ -31,7 +30,6 @@ D200 [*] One-line docstring should fit on one line
 598 | |
 599 | |     Wrong."""
     | |_____________^
-    |
 help: Reformat to one line
     |
 596 | def one_liner():
@@ -52,7 +50,6 @@ D200 [*] One-line docstring should fit on one line
 607 | |
 608 | |     """
     | |_______^
-    |
 help: Reformat to one line
     |
 605 | def one_liner():
@@ -73,7 +70,6 @@ D200 One-line docstring should fit on one line
 616 | |
 617 | |     """
     | |_______^
-    |
 help: Reformat to one line
 
 D200 One-line docstring should fit on one line
@@ -85,7 +81,6 @@ D200 One-line docstring should fit on one line
 625 | |
 626 | |     "Wrong."""
     | |______________^
-    |
 help: Reformat to one line
 
 D200 One-line docstring should fit on one line

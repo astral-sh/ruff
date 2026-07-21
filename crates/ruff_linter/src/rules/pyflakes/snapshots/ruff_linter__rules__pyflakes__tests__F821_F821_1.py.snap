@@ -7,7 +7,6 @@ F821 Undefined name `Model`
 10 | # F821 Undefined name `Model`
 11 | x = cast("Model", x)
    |           ^^^^^
-   |
 
 F821 Undefined name `Model`
   --> F821_1.py:18:18
@@ -15,7 +14,6 @@ F821 Undefined name `Model`
 17 | # F821 Undefined name `Model`
 18 | x = typing.cast("Model", x)
    |                  ^^^^^
-   |
 
 F821 Undefined name `Model`
   --> F821_1.py:24:14
@@ -23,7 +21,6 @@ F821 Undefined name `Model`
 23 | # F821 Undefined name `Model`
 24 | x = Pattern["Model"]
    |              ^^^^^
-   |
 
 F821 Undefined name `Model`
   --> F821_1.py:30:12
@@ -31,4 +28,3 @@ F821 Undefined name `Model`
 29 | # F821 Undefined name `Model`
 30 | x = Match["Model"]
    |            ^^^^^
-   |

@@ -29,4 +29,3 @@ D419 Docstring is empty
 79 |     def nested():
 80 |         ''
    |         ^^
-   |

@@ -7,7 +7,6 @@ F704 `yield` statement outside of a function
 5 | class Foo:
 6 |     yield 2
   |     ^^^^^^^
-  |
 
 F704 `yield` statement outside of a function
   --> F704.py:9:1

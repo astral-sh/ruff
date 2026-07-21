@@ -529,7 +529,6 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 38 | t"a {dict(x='y') | dict(y='z')} b"
 39 | t"a { dict(x='y') | dict(y='z') } b"
    |       ^^^^^^^^^^^
-   |
 help: Rewrite as a literal
    |
 38 | t"a {dict(x='y') | dict(y='z')} b"
@@ -545,7 +544,6 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 38 | t"a {dict(x='y') | dict(y='z')} b"
 39 | t"a { dict(x='y') | dict(y='z') } b"
    |                     ^^^^^^^^^^^
-   |
 help: Rewrite as a literal
    |
 38 | t"a {dict(x='y') | dict(y='z')} b"

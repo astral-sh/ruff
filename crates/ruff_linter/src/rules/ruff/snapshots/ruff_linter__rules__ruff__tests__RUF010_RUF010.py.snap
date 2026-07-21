@@ -619,7 +619,6 @@ RUF010 [*] Use explicit conversion flag
 121 | |     1
 122 | | ))}"
     | |__^
-    |
 help: Replace with conversion flag
     |
 118 |

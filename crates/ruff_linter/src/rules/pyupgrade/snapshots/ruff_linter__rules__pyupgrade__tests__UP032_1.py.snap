@@ -6,7 +6,6 @@ UP032 [*] Use f-string instead of `format` call
   |
 1 | "{} {}".format(a, b)  # Intentionally at start-of-file, to ensure graceful handling.
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
   - "{} {}".format(a, b)  # Intentionally at start-of-file, to ensure graceful handling.

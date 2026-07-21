@@ -19,4 +19,3 @@ PLE0304 `__bool__` does not return `bool`
 8 |     def __bool__(self):
 9 |         return 0  # [invalid-bool-return]
   |                ^
-  |

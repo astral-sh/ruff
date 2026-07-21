@@ -36,14 +36,12 @@ fn exclude_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `temp_undefined_var` used when not defined
      --> temp_file.py:2:7
       |
     2 | print(temp_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -60,7 +58,6 @@ fn exclude_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -112,7 +109,6 @@ fn configuration_include() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -137,14 +133,12 @@ fn configuration_include() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -202,7 +196,6 @@ fn configuration_include_no_extension() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -254,14 +247,12 @@ fn configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `temp_undefined_var` used when not defined
      --> temp_file.py:2:7
       |
     2 | print(temp_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -286,7 +277,6 @@ fn configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -339,7 +329,6 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -391,7 +380,6 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -429,7 +417,6 @@ fn remove_default_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -454,14 +441,12 @@ fn remove_default_exclude() -> anyhow::Result<()> {
       |
     2 | print(another_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -508,7 +493,6 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -525,14 +509,12 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
       |
     2 | print(build_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -583,7 +565,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -600,7 +581,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(dist_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -617,7 +597,6 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -668,14 +647,12 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `dist_undefined_var` used when not defined
      --> tests/generated.py:2:7
       |
     2 | print(dist_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -692,7 +669,6 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -709,14 +685,12 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -733,7 +707,6 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -780,14 +753,12 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
       |
     3 | if base_path not in CMAKE_PREFIX_PATH:
       |                     ^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `CMAKE_PREFIX_PATH` used when not defined
      --> out/amd64/install/_setup_util.py:4:5
       |
     4 |     CMAKE_PREFIX_PATH.insert(0, base_path)
       |     ^^^^^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -847,14 +818,12 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(other_undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/main.py:2:7
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -870,7 +839,6 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
       |
     2 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -1054,14 +1022,12 @@ print(other_undefined)  # error: unresolved-reference
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> main.py:5:7
       |
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -1078,7 +1044,6 @@ print(other_undefined)  # error: unresolved-reference
       |
     5 | print(undefined_var)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -1131,21 +1096,18 @@ print(regular_undefined)  # error: unresolved-reference
       |
     2 | print(regular_undefined)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `undefined_var` used when not defined
      --> src/module.py:3:12
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> src/utils.py:3:12
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     Found 3 diagnostics
 
@@ -1162,21 +1124,18 @@ print(regular_undefined)  # error: unresolved-reference
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `missing_value` used when not defined
      --> generated_utils.py:3:12
       |
     3 |     return missing_value  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     error[unresolved-reference]: Name `regular_undefined` used when not defined
      --> regular.py:2:7
       |
     2 | print(regular_undefined)  # error: unresolved-reference
       |       ^^^^^^^^^^^^^^^^^
-      |
 
     Found 3 diagnostics
 
@@ -1193,7 +1152,6 @@ print(regular_undefined)  # error: unresolved-reference
       |
     3 |     return undefined_var  # error: unresolved-reference
       |            ^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 

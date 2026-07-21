@@ -8,7 +8,6 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
 3 |         return
 4 |     return None  # error
   |     ^^^^^^^^^^^
-  |
 help: Remove explicit `return None`
   |
 3 |         return
@@ -44,7 +43,6 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
 60 | |             None # comment
 61 | |         )
    | |_________^
-   |
 help: Remove explicit `return None`
    |
 58 |             return

@@ -17,4 +17,3 @@ PYI005 Version comparison must be against a length-2 tuple
 4 | if sys.version_info[:1] == (2, 7): ...  # Y005
 5 | if sys.version_info[:2] == (2,): ...  # Y005
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

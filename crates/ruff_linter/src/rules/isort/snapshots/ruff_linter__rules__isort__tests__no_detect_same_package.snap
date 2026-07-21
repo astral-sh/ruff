@@ -8,7 +8,6 @@ I001 [*] Import block is un-sorted or un-formatted
 2 | | import pandas
 3 | | import foo.baz
   | |______________^
-  |
 help: Organize imports
   |
 1 | import os

@@ -415,7 +415,6 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 147 |
 148 | a < (b) and (((b)) < c)
     | ^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use a single compare expression
     |
 147 |

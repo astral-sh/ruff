@@ -1898,7 +1898,6 @@ error[unresolved-reference]: Name `x` used when not defined
   |
 5 |         y = x  # snapshot
   |             ^
-  |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -1916,7 +1915,6 @@ error[unresolved-reference]: Name `x` used when not defined
    |
 10 |         y = x  # snapshot
    |             ^
-   |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -4113,7 +4111,6 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
   |             ^^^^^^^^^^^^
-  |
 info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
@@ -4135,7 +4132,6 @@ error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
   |
 4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
   |             ^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
@@ -4172,7 +4168,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `foo.bar`
 ```
 
@@ -4191,7 +4186,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `baz.bar`
 ```
 
@@ -4217,7 +4211,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__n
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^
-  |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
@@ -4233,7 +4226,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__a
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^^^^^
-  |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```

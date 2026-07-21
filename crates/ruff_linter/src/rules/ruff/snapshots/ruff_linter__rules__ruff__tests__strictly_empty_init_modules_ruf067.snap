@@ -28,7 +28,6 @@ RUF067 `__init__` module should only contain docstrings and re-exports
 14 |
 15 | os.environ["FOO"] = 1
    | ^^^^^^^^^^^^^^^^^^^^^
-   |
 
 
 RUF067 `__init__` module should only contain docstrings and re-exports
@@ -186,7 +185,6 @@ RUF067 `__init__` module should not contain any code
 14 |
 15 | os.environ["FOO"] = 1
    | ^^^^^^^^^^^^^^^^^^^^^
-   |
 
 
 RUF067 `__init__` module should not contain any code
@@ -421,4 +419,3 @@ RUF067 `__init__` module should not contain any code
 57 | # also allow `__author__`
 58 | __author__ = "The Author"  # ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

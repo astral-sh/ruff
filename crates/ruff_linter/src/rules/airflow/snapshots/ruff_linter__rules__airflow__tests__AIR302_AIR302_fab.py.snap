@@ -366,7 +366,6 @@ AIR302 [*] `airflow.www.security.FabAirflowSecurityManagerOverride` is moved int
 54 |
 55 | FabAirflowSecurityManagerOverride()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-fab>=1.0.0` and use `FabAirflowSecurityManagerOverride` from `airflow.providers.fab.auth_manager.security_manager.override` instead.
    |
 52 |

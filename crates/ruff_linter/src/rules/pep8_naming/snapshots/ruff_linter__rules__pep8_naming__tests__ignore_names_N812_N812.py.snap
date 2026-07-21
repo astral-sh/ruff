@@ -17,4 +17,3 @@ N812 Lowercase `stillbad` imported as non-lowercase `StillBad`
 4 | from mod import badallowed as BadAllowed
 5 | from mod import stillbad as StillBad
   |                 ^^^^^^^^^^^^^^^^^^^^
-  |

@@ -28,4 +28,3 @@ F722 Syntax error in forward annotation: Unexpected token at the end of an expre
 8 |     def f(self, arg: "this isn't python") -> "this isn't python either":
 9 |         x: "this also isn't python" = 1
   |            ^^^^^^^^^^^^^^^^^^^^^^^^
-  |

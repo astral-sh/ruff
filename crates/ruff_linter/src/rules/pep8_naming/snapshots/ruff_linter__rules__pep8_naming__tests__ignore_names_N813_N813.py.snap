@@ -27,4 +27,3 @@ N813 Camelcase `StillBad` imported as lowercase `still_bad`
 7 | from mod import BadAllowed as bad_allowed
 8 | from mod import StillBad as still_bad
   |                 ^^^^^^^^^^^^^^^^^^^^^
-  |

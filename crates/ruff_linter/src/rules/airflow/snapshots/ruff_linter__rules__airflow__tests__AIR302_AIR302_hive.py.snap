@@ -197,7 +197,6 @@ AIR302 [*] `airflow.operators.hive_to_samba_operator.HiveToSambaOperator` is mov
 28 | HiveToMySqlOperator()
 29 | HiveToSambaOperator()
    | ^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToSambaOperator` from `airflow.providers.apache.hive.transfers.hive_to_samba` instead.
    |
 15 | from airflow.operators.hive_to_mysql import HiveToMySqlOperator
@@ -381,7 +380,6 @@ AIR302 [*] `airflow.sensors.named_hive_partition_sensor.NamedHivePartitionSensor
 69 |
 70 | NamedHivePartitionSensor()
    | ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `NamedHivePartitionSensor` from `airflow.providers.apache.hive.sensors.named_hive_partition` instead.
    |
 67 |

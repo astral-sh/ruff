@@ -27,4 +27,3 @@ S301 `pickle` and modules that wrap it can be unsafe when used to deserialize un
 7 | map(pickle.load, [])
 8 | foo = pickle.load
   |       ^^^^^^^^^^^
-  |

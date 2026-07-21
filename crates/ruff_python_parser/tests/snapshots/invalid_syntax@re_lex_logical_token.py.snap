@@ -949,4 +949,3 @@ Module(
 56 |     def bar():
 57 |         pass
    |             ^ Syntax Error: Expected a statement
-   |

@@ -235,7 +235,6 @@ B909 Mutation to loop iterable `a.some_list` during iteration
 84 |     a.some_list.remove(0)
 85 |     del a.some_list[2]
    |     ^^^^^^^^^^^^^^^^^^
-   |
 
 B909 Mutation to loop iterable `foo` during iteration
   --> B909.py:93:5
@@ -330,7 +329,6 @@ B909 Mutation to loop iterable `foo` during iteration
 104 |     foo -= bar
 105 |     foo ^= bar
     |     ^^^^^^^^^^
-    |
 
 B909 Mutation to loop iterable `foo` during iteration
    --> B909.py:136:9

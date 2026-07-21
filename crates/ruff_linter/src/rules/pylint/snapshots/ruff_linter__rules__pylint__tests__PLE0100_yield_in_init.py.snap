@@ -8,7 +8,6 @@ PLE0100 `__init__` method is a generator
 8 |     def __init__(self):
 9 |         yield
   |         ^^^^^
-  |
 
 PLE0100 `__init__` method is a generator
   --> yield_in_init.py:14:9

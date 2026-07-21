@@ -80,7 +80,6 @@ E303 [*] Too many blank lines (2)
     |
 687 |     # comment
     |     ^^^^^^^^^
-    |
 help: Remove extraneous blank line(s)
     |
 685 |
@@ -153,7 +152,6 @@ E303 [*] Too many blank lines (2)
     |
 731 |     # comment
     |     ^^^^^^^^^
-    |
 help: Remove extraneous blank line(s)
     |
 729 |

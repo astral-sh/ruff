@@ -40,5 +40,4 @@ error[invalid-syntax]: Expected class, function definition or async function def
   |
 2 | @staticmethod
   |              ^
-  |
 ```

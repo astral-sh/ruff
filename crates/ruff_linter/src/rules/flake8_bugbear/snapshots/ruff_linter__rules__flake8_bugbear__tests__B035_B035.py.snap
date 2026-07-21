@@ -94,4 +94,3 @@ B035 Dictionary comprehension uses static key: `tokens`
 24 | {constant[0]: value.upper() for value in data}
 25 | {tokens: token for token in tokens}
    |  ^^^^^^
-   |

@@ -7,7 +7,6 @@ F821 Undefined name `self`
 1 | def get_name():
 2 |     return self.name
   |            ^^^^
-  |
 
 F821 Undefined name `self`
  --> F821_0.py:6:13
@@ -15,7 +14,6 @@ F821 Undefined name `self`
 5 | def get_name():
 6 |     return (self.name,)
   |             ^^^^
-  |
 
 F821 Undefined name `self`
   --> F821_0.py:10:9
@@ -23,7 +21,6 @@ F821 Undefined name `self`
  9 | def get_name():
 10 |     del self.name
    |         ^^^^
-   |
 
 F821 Undefined name `numeric_string`
   --> F821_0.py:21:12
@@ -31,7 +28,6 @@ F821 Undefined name `numeric_string`
 20 | def randdec(maxprec, maxexp):
 21 |     return numeric_string(maxprec, maxexp)
    |            ^^^^^^^^^^^^^^
-   |
 
 F821 Undefined name `Bar`
   --> F821_0.py:58:5

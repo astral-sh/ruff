@@ -1884,7 +1884,6 @@ Module(
 41 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
 42 | (x, foo(), y) = (42, 42, 42)
    |     ^^^^^ Syntax Error: Invalid assignment target
-   |
 
 
 ## Semantic Syntax Errors

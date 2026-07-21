@@ -9,7 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | from module import CLASS, Class, CONSTANT, function, BASIC, Apple
 4 | | from torch.nn import SELU, AClass, A_CONSTANT
   | |_____________________________________________^
-  |
 help: Organize imports
   |
   - from sklearn.svm import func, SVC, CONST, Klass

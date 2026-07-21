@@ -30,7 +30,6 @@ error[empty-body]: Function always implicitly returns `None`, which is not assig
   |
 7 |     def method(self) -> str: ...  # error: [empty-body]
   |                         ^^^
-  |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: Functions with empty bodies and non-`None` return types are only permitted:
 info:  - in stub files
@@ -43,7 +42,6 @@ info: Only classes that directly inherit from `typing.Protocol` or `typing_exten
   |
 6 | class Concrete(Abstract):
   |       ^^^^^^^^^^^^^^^^^^ `Protocol` not present in `Concrete`'s immediate bases
-  |
 info: See https://typing.python.org/en/latest/spec/protocol.html#
 
 ```

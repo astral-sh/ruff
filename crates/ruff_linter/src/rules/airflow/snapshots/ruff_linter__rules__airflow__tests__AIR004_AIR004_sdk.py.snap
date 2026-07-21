@@ -12,4 +12,3 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 12 | |         return ["my_downstream_task"]
 13 | |     return []
    | |_____________^
-   |

@@ -42,7 +42,6 @@ RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
 22 | |     6,
 23 | | ]
    | |_^
-   |
 help: Replace with `[*first, 4, 5, 6]`
 
 RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation

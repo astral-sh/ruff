@@ -26,7 +26,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 16 | repl = "new"
 17 | re.sub(r"abc", repl, haystack)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `haystack.replace(r"abc", repl)`
    |
 16 | repl = "new"

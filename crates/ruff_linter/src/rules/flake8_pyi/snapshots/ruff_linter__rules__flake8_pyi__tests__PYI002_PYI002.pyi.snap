@@ -39,4 +39,3 @@ PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.vers
 5 | if hasattr(sys, 'maxint'): ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
 6 | if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |    ^^^^^^^^^^^^^^^^^
-  |

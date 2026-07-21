@@ -17,4 +17,3 @@ YTT301 `sys.version[0]` referenced (python10), use `sys.version_info`
 4 | py_major = sys.version[0]
 5 | py_major = version[0]
   |            ^^^^^^^
-  |

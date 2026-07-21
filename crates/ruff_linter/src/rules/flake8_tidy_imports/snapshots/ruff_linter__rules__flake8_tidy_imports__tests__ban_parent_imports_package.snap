@@ -112,7 +112,6 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
  9 | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace relative imports from parent modules with absolute imports
    |
 9  | from . import logger, models

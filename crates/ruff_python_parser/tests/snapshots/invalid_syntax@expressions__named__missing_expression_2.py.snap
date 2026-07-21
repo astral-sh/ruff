@@ -102,11 +102,9 @@ Module(
 5 | def foo():
 6 |     pass
   |     ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
-  |
 
 
   |
 5 | def foo():
 6 |     pass
   |         ^ Syntax Error: unexpected EOF while parsing
-  |

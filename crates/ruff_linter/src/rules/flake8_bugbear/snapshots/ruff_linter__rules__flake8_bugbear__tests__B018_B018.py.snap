@@ -106,7 +106,6 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 19 |     {1, 2}  # set
 20 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^
-   |
 
 B018 Found useless expression. Either assign it to a variable or remove it.
   --> B018.py:24:5
@@ -125,7 +124,6 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 26 |     "str"
 27 |     1
    |     ^
-   |
 
 B018 Found useless expression. Either assign it to a variable or remove it.
   --> B018.py:39:5
@@ -232,7 +230,6 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 47 |     {1, 2}  # set
 48 |     {"foo": "bar"}  # dict
    |     ^^^^^^^^^^^^^^
-   |
 
 B018 Found useless expression. Either assign it to a variable or remove it.
   --> B018.py:52:5
@@ -251,7 +248,6 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 54 |     "str"
 55 |     3
    |     ^
-   |
 
 B018 Found useless expression. Either assign it to a variable or remove it.
   --> B018.py:63:5
@@ -280,4 +276,3 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 64 |     object().__class__  # Attribute (raise)
 65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^
-   |

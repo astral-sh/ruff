@@ -44,7 +44,6 @@ PIE794 [*] Class field `bar` is defined multiple times
 22 |     # ...
 23 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove duplicate field definition for `bar`
    |
 22 |     # ...
@@ -60,7 +59,6 @@ PIE794 [*] Class field `bar` is defined multiple times
 39 |     # ...
 40 |     bar = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove duplicate field definition for `bar`
    |
 39 |     # ...
@@ -76,7 +74,6 @@ PIE794 [*] Class field `name` is defined multiple times
 45 |     name = name + " Bar"
 46 |     name = "Bar"  # PIE794
    |     ^^^^^^^^^^^^
-   |
 help: Remove duplicate field definition for `name`
    |
 45 |     name = name + " Bar"
@@ -92,7 +89,6 @@ PIE794 [*] Class field `name` is defined multiple times
 51 |     name: str = name + " Bar"
 52 |     name: str = "Bar"  # PIE794
    |     ^^^^^^^^^^^^^^^^^
-   |
 help: Remove duplicate field definition for `name`
    |
 51 |     name: str = name + " Bar"
@@ -108,7 +104,6 @@ PIE794 [*] Class field `start_line` is defined multiple times
 56 |     start_line: int
 57 |     start_line: int  # PIE794
    |     ^^^^^^^^^^^^^^^
-   |
 help: Remove duplicate field definition for `start_line`
    |
 56 |     start_line: int

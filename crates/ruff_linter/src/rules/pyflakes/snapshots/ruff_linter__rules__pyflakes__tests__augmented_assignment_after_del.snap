@@ -8,7 +8,6 @@ F821 Undefined name `x`
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
    |     ^
-   |
 
 F841 Local variable `x` is assigned to but never used
   --> <filename>:10:5
@@ -17,5 +16,4 @@ F841 Local variable `x` is assigned to but never used
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
    |     ^
-   |
 help: Remove assignment to unused variable `x`

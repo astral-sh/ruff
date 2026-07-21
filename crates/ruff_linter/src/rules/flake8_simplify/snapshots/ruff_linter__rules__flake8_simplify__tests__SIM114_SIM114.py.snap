@@ -284,7 +284,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 73 | | elif result.eofs == "C":
 74 | |     errors = 1
    | |______________^
-   |
 help: Combine `if` branches
    |
 70 |     errors = 1
@@ -328,7 +327,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 124 | |     elif b is None:
 125 | |         return 4
     | |________________^
-    |
 help: Combine `if` branches
     |
 121 |         return 3
@@ -349,7 +347,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 134 | |     elif a := 1:
 135 | |         return 3
     | |________________^
-    |
 help: Combine `if` branches
     |
 131 |     b = False
@@ -368,7 +365,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 140 | | elif c:  # but not on the second branch
 141 | |     b
     | |_____^
-    |
 help: Combine `if` branches
     |
 137 |
@@ -385,7 +381,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 144 | / if a: b  # here's a comment
 145 | | elif c: b
     | |_________^
-    |
 help: Combine `if` branches
     |
 143 |
@@ -402,7 +397,6 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 149 | | elif(100 < x and x < 200 and 300 < y and y < 800):
 150 | |     pass
     | |________^
-    |
 help: Combine `if` branches
     |
 147 |

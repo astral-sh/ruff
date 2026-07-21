@@ -16,7 +16,6 @@ I001 [*] Import block is un-sorted or un-formatted
 10 | | from errno import EIO
 11 | | import abc
    | |__________^
-   |
 help: Organize imports
    |
 1  + import abc

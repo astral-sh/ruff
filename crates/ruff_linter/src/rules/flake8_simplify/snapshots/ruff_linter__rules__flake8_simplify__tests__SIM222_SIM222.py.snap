@@ -586,7 +586,6 @@ SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset(frozenset({1}))
 96 |
 97 | a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `frozenset(frozenset({1}))`
    |
 96 |
@@ -968,7 +967,6 @@ SIM222 [*] Use `f"{1}{''}"` instead of `f"{1}{''}" or ...`
 168 | print(f"{''}{''}" or "bar")
 169 | print(f"{1}{''}" or "bar")
     |       ^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with `f"{1}{''}"`
     |
 168 | print(f"{''}{''}" or "bar")

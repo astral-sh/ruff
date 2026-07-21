@@ -308,7 +308,6 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 44 | # even though the used argument has a side effect
 45 | "Hello, {0}".format(print(1), "Pikachu")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove extra positional arguments at position(s): 1
    |
 44 | # even though the used argument has a side effect

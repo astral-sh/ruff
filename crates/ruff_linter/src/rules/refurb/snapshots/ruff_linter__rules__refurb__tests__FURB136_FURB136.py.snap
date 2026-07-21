@@ -155,7 +155,6 @@ FURB136 [*] Replace `if` expression with `max(y, x)`
 24 | |     > y
 25 | | ) else y  # FURB136
    | |________^
-   |
 help: Replace with `max(y, x)`
    |
 21 |

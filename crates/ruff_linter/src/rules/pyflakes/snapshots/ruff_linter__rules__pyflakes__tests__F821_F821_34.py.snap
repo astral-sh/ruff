@@ -8,7 +8,6 @@ F821 Undefined name `x`
 8 |     x: int
 9 |     print(x)
   |           ^
-  |
 
 F821 Undefined name `x`
   --> F821_34.py:17:16

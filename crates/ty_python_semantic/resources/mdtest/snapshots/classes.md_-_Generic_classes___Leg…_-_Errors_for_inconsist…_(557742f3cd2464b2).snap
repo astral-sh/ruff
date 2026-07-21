@@ -85,7 +85,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                |               |
    |                |               Later class base is `Grandparent[T2@BadChild, T1@BadChild]`
    |                Earlier class base inherits from `Grandparent[T1@BadChild, T2@BadChild]`
-   |
 
 ```
 
@@ -98,7 +97,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |                |
    |                 |                Later class base is `Grandparent[T2@BadChild2, int]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild2, T2@BadChild2]`
-   |
 
 ```
 
@@ -111,7 +109,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |                |
    |                 |                Later class base inherits from `Grandparent[T2@BadChild3, T1@BadChild3]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild3, T2@BadChild3]`
-   |
 
 ```
 
@@ -121,7 +118,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent` (
    |
 29 | class Fine(Parent, Grandparent[T1, T2]): ...  # error: [missing-type-argument]
    |            ^^^^^^
-   |
 
 ```
 
@@ -131,7 +127,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent3` 
    |
 30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...  # error: [missing-type-argument]
    |                ^^^^^^^
-   |
 
 ```
 
@@ -141,7 +136,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent` (
    |
 35 | class Dandy(Parent, Parent3, Parent4): ...
    |             ^^^^^^
-   |
 
 ```
 
@@ -151,7 +145,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent3` 
    |
 35 | class Dandy(Parent, Parent3, Parent4): ...
    |                     ^^^^^^^
-   |
 
 ```
 
@@ -161,7 +154,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent4` 
    |
 35 | class Dandy(Parent, Parent3, Parent4): ...
    |                              ^^^^^^^
-   |
 
 ```
 
@@ -174,7 +166,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                         |                |
    |                         |                Later class base inherits from `Grandparent[T2@BadChild4, T1@BadChild4]`
    |                         Earlier class base inherits from `Grandparent[T1@BadChild4, T2@BadChild4]`
-   |
 
 ```
 
@@ -184,7 +175,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent` (
    |
 42 | class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
    |                 ^^^^^^
-   |
 
 ```
 
@@ -197,7 +187,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                                   |                |
    |                                   |                Later class base inherits from `Grandparent[T2@BadChild5, T1@BadChild5]`
    |                                   Earlier class base inherits from `Grandparent[T1@BadChild5, T2@BadChild5]`
-   |
 
 ```
 
@@ -210,7 +199,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |                        |
    |                 |                        Later class base inherits from `Grandparent[T2@BadChild6, T1@BadChild6]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild6, T2@BadChild6]`
-   |
 
 ```
 
@@ -220,7 +208,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent3` 
    |
 49 | class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
    |                                 ^^^^^^^
-   |
 
 ```
 
@@ -233,7 +220,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |                                  |
    |                 |                                  Later class base inherits from `Grandparent[T2@BadChild7, T1@BadChild7]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild7, T2@BadChild7]`
-   |
 
 ```
 
@@ -246,7 +232,6 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |               |
    |                 |               Later class base inherits from `Grandparent[T2@BadChild8, T1@BadChild8]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild8, T2@BadChild8]`
-   |
 
 ```
 
@@ -256,7 +241,6 @@ info[missing-type-argument]: Missing type arguments for generic class `Parent4` 
    |
 56 | class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
    |                                                  ^^^^^^^
-   |
 
 ```
 
@@ -269,6 +253,5 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |               |
    |                 |               Later class base inherits from `Grandparent[T2@BadChild9, T1@BadChild9]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild9, T2@BadChild9]`
-   |
 
 ```

@@ -8,7 +8,6 @@ W391 [*] Extra newline at end of file
 13 |     bar()
 14 |
    | ^
-   |
 help: Remove trailing newline
    |
 13 |     bar()

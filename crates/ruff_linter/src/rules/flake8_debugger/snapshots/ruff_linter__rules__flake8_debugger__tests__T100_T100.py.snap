@@ -201,7 +201,6 @@ T100 Trace found: `ptvsd.wait_for_attach` used
 24 | break_into_debugger()
 25 | wait_for_attach()
    | ^^^^^^^^^^^^^^^^^
-   |
 
 T100 Import for `sys.breakpointhook` found
   --> T100.py:33:5
@@ -261,4 +260,3 @@ T100 Trace found: `sys.__breakpointhook__` used
 42 | sys.breakpointhook() # error
 43 | sys.__breakpointhook__() # error
    | ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
