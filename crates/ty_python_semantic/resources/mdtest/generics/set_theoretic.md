@@ -254,7 +254,7 @@ If we use the interpretation where `Bottom[Invariant[Any]]` is a special bottom 
 `Invariant`. And so we get:
 
 ```ignore
-Invariant[P] & Invariant[Any] = Invariant[P]
+Invariant[P] & Invariant[Any] = Invariant[P]    (6)
 ```
 
 One seemingly problematic observation here is the following. If we compute the bottom
@@ -298,6 +298,143 @@ materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we enco
 static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
+```
+
+In `isinstance` narrowing, where we intersect with the top-materialization of generic classes, we
+can end up with intersections like `C[P] & Top[D[Any]]`, where `C` and `D` are generic classes in a
+subtyping relationship. If `C[T] = Sub[T]` is a subtype of `D[T] = Base[T]`, we can immediately
+simplify:
+
+```ignore
+Sub[P] & Top[Base[Any]] = Sub[P]
+```
+
+This relation holds regardless of the variance of `Base` and `Sub`:
+
+```pyi
+from ty_extensions import Top
+
+class CoBase[T]:
+    def get(self) -> T: ...
+
+class CoSub[T](CoBase[T]): ...
+
+class ContraBase[T]:
+    def push(self, x: T) -> None: ...
+
+class ContraSub[T](ContraBase[T]): ...
+class InvariantBase[T](CoBase[T], ContraBase[T]): ...
+class InvariantSub[T](InvariantBase[T]): ...
+
+static_assert(is_equivalent_to(CoSub[P] & Top[CoBase[Any]], CoSub[P]))
+static_assert(is_equivalent_to(ContraSub[P] & Top[ContraBase[Any]], ContraSub[P]))
+static_assert(is_equivalent_to(InvariantSub[P] & Top[InvariantBase[Any]], InvariantSub[P]))
+```
+
+The other direction, `Base[P] & Top[Sub[Any]]`, is more interesting. It can only be simplified under
+the additional assumption that `Base` (and `Sub`) are nominal types. There are five cases to
+consider, depending on the variance of `Base` and `Sub`. Since variance can only be restricted
+further in subtypes, we have five cases to consider:
+
+- `Base` is covariant and `Sub` is covariant
+- `Base` is covariant and `Sub` is invariant
+- `Base` is contravariant and `Sub` is contravariant
+- `Base` is contravariant and `Sub` is invariant
+- `Base` is invariant and `Sub` is invariant
+
+We look at the covariant `Base` case first (first two items):
+
+```ignore
+class CoBase[T]: ...  # covariant
+class Sub[T](CoBase[T]): ...  # covariant or invariant
+```
+
+Since `CoBase` is a nominal type, inhabitants of the intersection `CoBase[P] & Top[Sub[Any]]` need
+to have a consistent specialization of `CoBase` in their MRO. This implies that subtypes of that
+intersection must be of the form `CoBase[X] & Sub[X] = Sub[X]` (or unions/intersections of such
+types). In addition, since `Sub[X]` must be a subtype of `CoBase[P]`, we also need `X` to be a
+subtype of `P`.
+
+The whole intersection `CoBase[P] & Top[Sub[Any]]` can therefore be seen as the union of all these
+subtypes, which can be expressed as `Top[Sub[P & Any]]`:
+
+```ignore
+CoBase[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (7a)
+```
+
+If `Sub` is covariant, this relation further simplifies:
+
+```ignore
+CoBase[P] & Top[CoSub[Any]] = CoSub[P & object] = CoSub[P]    (7b)
+```
+
+Two practical examples of these relations are:
+
+```ignore
+Sequence[int] & Top[tuple[Any, ...]] = tuple[int, ...]    (covariant base, covariant subtype)
+Sequence[int] & Top[list[Any]] = Top[list[int & Any]]     (covariant base, invariant subtype)
+```
+
+We can encode these relations in ty assertions:
+
+```pyi
+class InvariantSubOfCoBase[T](CoSub[T]):
+    def push(self, x: T) -> None: ...
+
+# TODO: both should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(CoBase[P] & Top[CoSub[Any]], CoSub[P]))
+# error: [static-assert-error]
+static_assert(is_equivalent_to(CoBase[P] & Top[InvariantSubOfCoBase[Any]], Top[InvariantSubOfCoBase[P & Any]]))
+```
+
+Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar, but now we
+need `X` to be a supertype of `P`:
+
+```ignore
+ContraBase[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (8a)
+```
+
+If `Sub` is contravariant, this relation further simplifies:
+
+```ignore
+ContraBase[P] & Top[ContraSub[Any]] = ContraSub[P | Never] = ContraSub[P]    (8b)
+```
+
+An example of this relation for contravariant base and contravariant subclass would be:
+
+```ignore
+Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]] = CoroutineType[str, int, bytes]    
+```
+
+Again, we can encode the results in ty assertions:
+
+```pyi
+class InvariantSubOfContraBase[T](ContraSub[T]):
+    def get(self) -> T: ...
+
+# TODO: both should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(ContraBase[P] & Top[ContraSub[Any]], ContraSub[P]))
+# error: [static-assert-error]
+static_assert(is_equivalent_to(ContraBase[P] & Top[InvariantSubOfContraBase[Any]], Top[InvariantSubOfContraBase[P | Any]]))
+```
+
+Finally, we look at the invariant `Base` case (item 5). Here, we need `X` to be equal to `P`, and so
+we immediately get:
+
+```ignore
+InvariantBase[P] & Top[Sub[Any]] = Sub[P]    (9)
+```
+
+In ty assertions:
+
+```pyi
+class InvariantSubOfInvariantBase[T](InvariantBase[T]): ...
+
+# TODO: should pass
+# error: [static-assert-error]
+static_assert(is_equivalent_to(InvariantBase[P] & Top[InvariantSubOfInvariantBase[Any]], InvariantSubOfInvariantBase[P]))
 ```
 
 ## Edge cases
