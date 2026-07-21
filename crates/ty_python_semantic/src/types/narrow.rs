@@ -526,7 +526,7 @@ impl ClassInfoConstraintFunction {
                         // whole intersection. Narrowing on the remaining members
                         // is still sound.
                         if let Some(c) = self.generate_constraint(ctx, *element, is_positive) {
-                            builder = builder.add_positive(c);
+                            builder.add_positive_in_place(c);
                             any_member = true;
                         }
                     }
@@ -810,7 +810,7 @@ impl<'db> NarrowingConstraint<'db> {
             .into_iter()
             .chain(self.intersection_disjuncts)
         {
-            union = union.add(conjunctions.evaluate_constraint_type(ctx));
+            union.add_in_place(conjunctions.evaluate_constraint_type(ctx));
         }
         union.build()
     }
@@ -2822,9 +2822,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     // Apply the narrowing constraint to the whole intersection.
                     let mut builder = IntersectionBuilder::new(ctx).add_positive(ty);
                     if is_positive {
-                        builder = builder.add_negative(Type::AlwaysFalsy);
+                        builder.add_negative_in_place(Type::AlwaysFalsy);
                     } else {
-                        builder = builder.add_negative(Type::AlwaysTruthy);
+                        builder.add_negative_in_place(Type::AlwaysTruthy);
                     }
                     Some(builder.build())
                 } else {
@@ -2834,9 +2834,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ if Self::is_base_type_narrowable_by_len(ctx, ty) => {
                 let mut builder = IntersectionBuilder::new(ctx).add_positive(ty);
                 if is_positive {
-                    builder = builder.add_negative(Type::AlwaysFalsy);
+                    builder.add_negative_in_place(Type::AlwaysFalsy);
                 } else {
-                    builder = builder.add_negative(Type::AlwaysTruthy);
+                    builder.add_negative_in_place(Type::AlwaysTruthy);
                 }
                 Some(builder.build())
             }
@@ -3064,7 +3064,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // exclusion when every value represented by a slot is known to compare equal.
         for element_ty in fixed_length.all_elements().iter().copied() {
             if let Some(constraint) = equality_exclusion_constraint(&self.ctx, element_ty) {
-                builder = builder.add_positive(constraint);
+                builder.add_positive_in_place(constraint);
                 constrained = true;
             }
         }

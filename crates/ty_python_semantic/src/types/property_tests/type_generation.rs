@@ -213,10 +213,10 @@ impl Ty {
             Ty::Intersection { pos, neg } => {
                 let mut builder = IntersectionBuilder::new(ctx);
                 for p in pos {
-                    builder = builder.add_positive(p.into_type(ctx));
+                    builder.add_positive_in_place(p.into_type(ctx));
                 }
                 for n in neg {
-                    builder = builder.add_negative(n.into_type(ctx));
+                    builder.add_negative_in_place(n.into_type(ctx));
                 }
                 builder.build()
             }

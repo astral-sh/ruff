@@ -7100,7 +7100,6 @@ impl PathAssignments {
         source_order: usize,
         fuel: AssignmentFuel,
     ) -> Result<(), PathAssignmentConflict> {
-        let db = ctx.db();
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
             // already any assignment for this constraint (positive, negative, or unconstrained),

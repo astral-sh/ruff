@@ -1856,7 +1856,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 for unpacked in &unpacked_elements {
                     if let Some(unpacked_key) = unpacked.keys.get(&key) {
                         saw_key = true;
-                        value_ty = value_ty.add(unpacked_key.value_ty);
+                        value_ty.add_in_place(unpacked_key.value_ty);
                         is_required &= unpacked_key.is_required;
                         definition = Some(if let Some(definition) = definition {
                             merge_unpacked_key_definitions(definition, unpacked_key.definition)
@@ -1865,7 +1865,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                         });
                     } else if let Some(extra_items) = unpacked.openness.effective_extra_items() {
                         saw_key = true;
-                        value_ty = value_ty.add(extra_items.declared_ty);
+                        value_ty.add_in_place(extra_items.declared_ty);
                         is_required = false;
                         definition = Some(None);
                     } else {
