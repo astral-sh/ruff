@@ -583,7 +583,7 @@ impl<'db> StaticClassLiteral<'db> {
         ctx: &SemanticContext<'db>,
     ) -> impl Iterator<Item = ClassType<'db>> {
         let db = ctx.db();
-        let ctx = *ctx;
+        let ctx = ctx.clone();
         self.explicit_bases(db)
             .iter()
             .copied()
@@ -986,12 +986,6 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         ctx: &SemanticContext<'db>,
     ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-        let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
-
         #[salsa::tracked(
             returns(clone),
             cycle_initial=|_, _, _| Err(MetaclassError {
@@ -1142,6 +1136,12 @@ impl<'db> StaticClassLiteral<'db> {
                 });
             Ok((candidate.metaclass.into(), transform_info))
         }
+
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.python_file(db).python_version(db)
+        );
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
             return Ok((KnownClass::Type.to_class_literal(ctx), None));
@@ -2116,7 +2116,7 @@ impl<'db> StaticClassLiteral<'db> {
         let use_def = use_def_map(db, class_body_scope);
         let ctx = context.semantic_context();
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-            let result = place_from_declarations(&ctx, declarations.clone());
+            let result = place_from_declarations(ctx, declarations.clone());
             let attr = result.ignore_conflicting_declarations();
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
@@ -2129,7 +2129,7 @@ impl<'db> StaticClassLiteral<'db> {
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
                     if field_policy.is_dataclass_like()
-                        && self.is_frozen_dataclass(&ctx) == Some(true)
+                        && self.is_frozen_dataclass(ctx) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,

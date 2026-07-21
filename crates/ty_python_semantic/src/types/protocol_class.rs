@@ -240,7 +240,7 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            if self.has_member_declaration(&ctx, symbol_name) {
+            if self.has_member_declaration(ctx, symbol_name) {
                 continue;
             }
 
@@ -693,17 +693,20 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    pub(super) fn display(self, ctx: &SemanticContext<'db>) -> impl std::fmt::Display {
-        struct ProtocolInterfaceDisplay<'db> {
-            ctx: SemanticContext<'db>,
+    pub(super) fn display<'ctx>(
+        self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> impl std::fmt::Display + 'ctx {
+        struct ProtocolInterfaceDisplay<'ctx, 'db> {
+            ctx: &'ctx SemanticContext<'db>,
             interface: ProtocolInterface<'db>,
         }
 
-        impl std::fmt::Display for ProtocolInterfaceDisplay<'_> {
+        impl std::fmt::Display for ProtocolInterfaceDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_char('{')?;
                 for (i, (name, data)) in self.interface.inner(self.ctx.db()).iter().enumerate() {
-                    write!(f, "\"{name}\": {data}", data = data.display(&self.ctx))?;
+                    write!(f, "\"{name}\": {data}", data = data.display(self.ctx))?;
                     if i < self.interface.inner(self.ctx.db()).len() - 1 {
                         f.write_str(", ")?;
                     }
@@ -713,7 +716,7 @@ impl<'db> ProtocolInterface<'db> {
         }
 
         ProtocolInterfaceDisplay {
-            ctx: *ctx,
+            ctx,
             interface: self,
         }
     }
@@ -1286,36 +1289,33 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn display(&self, ctx: &SemanticContext<'db>) -> impl std::fmt::Display {
-        struct ProtocolMemberDataDisplay<'db> {
-            ctx: SemanticContext<'db>,
+    fn display<'ctx>(&self, ctx: &'ctx SemanticContext<'db>) -> impl std::fmt::Display + 'ctx {
+        struct ProtocolMemberDataDisplay<'ctx, 'db> {
+            ctx: &'ctx SemanticContext<'db>,
             kind: ProtocolMemberKind<'db>,
             qualifiers: TypeQualifiers,
         }
 
-        impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
+        impl std::fmt::Display for ProtocolMemberDataDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.kind {
                     ProtocolMemberKind::Method(member, _) => {
-                        write!(f, "MethodMember(`{}`)", member.ty().display(&self.ctx))
+                        write!(f, "MethodMember(`{}`)", member.ty().display(self.ctx))
                     }
                     ProtocolMemberKind::Property { read, write } => {
                         let ctx = self.ctx;
                         let mut d = f.debug_struct("PropertyMember");
-                        if let Some(read) = read.and_then(|read| read.resolve(&ctx)) {
-                            d.field("read", &format_args!("`{}`", read.ty().display(&self.ctx)));
+                        if let Some(read) = read.and_then(|read| read.resolve(ctx)) {
+                            d.field("read", &format_args!("`{}`", read.ty().display(self.ctx)));
                         }
-                        if let Some(write) = write.and_then(|write| write.display_type(&ctx)) {
-                            d.field(
-                                "write",
-                                &format_args!("`{}`", write.ty().display(&self.ctx)),
-                            );
+                        if let Some(write) = write.and_then(|write| write.display_type(ctx)) {
+                            d.field("write", &format_args!("`{}`", write.ty().display(self.ctx)));
                         }
                         d.finish()
                     }
                     ProtocolMemberKind::Attribute(attribute) => {
                         f.write_str("AttributeMember(")?;
-                        write!(f, "`{}`", attribute.ty().display(&self.ctx))?;
+                        write!(f, "`{}`", attribute.ty().display(self.ctx))?;
                         if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                             f.write_str("; ClassVar")?;
                         }
@@ -1326,7 +1326,7 @@ impl<'db> ProtocolMemberData<'db> {
         }
 
         ProtocolMemberDataDisplay {
-            ctx: *ctx,
+            ctx,
             kind: self.kind,
             qualifiers: self.qualifiers,
         }

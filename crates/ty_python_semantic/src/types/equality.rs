@@ -400,7 +400,7 @@ struct ComparisonEvaluator<'db> {
 impl<'db> ComparisonEvaluator<'db> {
     fn new(ctx: &SemanticContext<'db>, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             active: FxHashSet::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
@@ -416,7 +416,7 @@ impl<'db> ComparisonEvaluator<'db> {
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
@@ -494,7 +494,7 @@ fn evaluate_comparison_once<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     let ctx = &ctx;
     let db = evaluator.ctx.db();
 
@@ -914,7 +914,7 @@ fn evaluate_union_left<'db>(
         );
     }
 
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     evaluate_target_union(&ctx, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
     })
@@ -1015,7 +1015,7 @@ fn evaluate_union_right<'db>(
         );
     }
 
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     evaluate_against_results(
         &ctx,
         left,
@@ -1278,7 +1278,7 @@ fn compare_literal_to_other<'db>(
     operator: ComparisonOperator,
     literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
-    let ctx = evaluator.ctx;
+    let ctx = evaluator.ctx.clone();
     let ctx = &ctx;
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {

@@ -1321,7 +1321,7 @@ fn iter_parent_enum_classes<'db>(
     ctx: &SemanticContext<'db>,
     class: StaticClassLiteral<'db>,
 ) -> impl Iterator<Item = StaticClassLiteral<'db>> + 'db {
-    let ctx = *ctx;
+    let ctx = ctx.clone();
     let db = ctx.db();
     class
         .iter_mro(&ctx, None)

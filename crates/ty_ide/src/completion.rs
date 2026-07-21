@@ -3191,7 +3191,7 @@ fn completion_kind_from_type<'db>(
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(db, ty, || imp(ctx, alias.value_type(ctx), visitor))?
+                visitor.visit(ctx, ty, || imp(ctx, alias.value_type(ctx), visitor))?
             }
         })
     }

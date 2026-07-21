@@ -854,7 +854,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     let mut projector = NarrowingProjector::new(ctx, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
-        ctx: *ctx,
+        ctx,
         base_ty,
         graph: &projector.graph,
         joins: projector.graph.joins(projected_root),
@@ -1072,7 +1072,7 @@ impl ProjectedNarrowingGraph<'_> {
 
 /// Removes predicates that cannot narrow one place from a narrowing constraint.
 struct NarrowingProjector<'a, 'db> {
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
@@ -1083,13 +1083,13 @@ struct NarrowingProjector<'a, 'db> {
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     fn new(
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx,
             constraints,
             predicates,
             place,
@@ -1154,7 +1154,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(&self.ctx, &predicate) {
+                    let branch = match analyze_single(self.ctx, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
@@ -1209,7 +1209,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
@@ -1244,7 +1244,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
             // then apply the incoming prefix constraint to its narrowed type.
             let suffix_ty = self.narrow_join(id);
-            return apply_accumulated_narrowing(&self.ctx, suffix_ty, accumulated);
+            return apply_accumulated_narrowing(self.ctx, suffix_ty, accumulated);
         }
 
         self.narrow_uncached(id, accumulated)
@@ -1261,7 +1261,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            apply_accumulated_narrowing(&self.ctx, self.base_ty, accumulated)
+            apply_accumulated_narrowing(self.ctx, self.base_ty, accumulated)
         } else {
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
@@ -1287,8 +1287,8 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
-                    UnionType::from_two_elements(&self.ctx, true_ty, uncertain_ty);
-                UnionType::from_two_elements(&self.ctx, true_or_uncertain, false_ty)
+                    UnionType::from_two_elements(self.ctx, true_ty, uncertain_ty);
+                UnionType::from_two_elements(self.ctx, true_or_uncertain, false_ty)
             }
         }
     }
@@ -1844,8 +1844,9 @@ mod tests {
                     .collect();
                 let constraints = NarrowingConstraints::from_test_nodes(nodes);
                 let x = index.place_table(function_scope).symbol_id("x").unwrap();
+                let ctx = db.semantic_context();
                 let mut projector = NarrowingProjector::new(
-                    &db.semantic_context(),
+                    &ctx,
                     &constraints,
                     &predicates,
                     ScopedPlaceId::Symbol(x),

@@ -1508,7 +1508,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
         }
 
         if diagnostic::is_invalid_typed_dict_literal(
-            &self.context.semantic_context(),
+            self.context.semantic_context(),
             item.declared_ty,
             self.value_node,
         ) {
@@ -2368,7 +2368,8 @@ fn report_duplicate_typed_dict_constructor_key<'db, 'ast>(
         return;
     };
 
-    let typed_dict_display = Type::TypedDict(typed_dict).display(&context.semantic_context());
+    let ctx = context.semantic_context();
+    let typed_dict_display = Type::TypedDict(typed_dict).display(ctx);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Multiple values provided for key \"{key}\" in TypedDict `{typed_dict_display}` constructor",
     ));
@@ -2819,7 +2820,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
     // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
     // all target keys as provided.
     let ctx = context.semantic_context();
-    if unpacked_keyword_is_gradual(&ctx, unpacked_type) {
+    if unpacked_keyword_is_gradual(ctx, unpacked_type) {
         shadowed_keys.extend(items.keys().cloned());
         for key_name in items.keys() {
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
@@ -2827,7 +2828,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         return true;
     }
 
-    if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(&ctx, unpacked_type) {
+    if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(ctx, unpacked_type) {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
@@ -2863,12 +2864,12 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         return unpacked_valid;
     }
 
-    if let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(&ctx) {
-        if !key_ty.is_assignable_to(&ctx, KnownClass::Str.to_instance(&ctx)) {
+    if let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(ctx) {
+        if !key_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx)) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
                 builder.into_diagnostic(format_args!(
                     "Unpacked argument has key type `{}` that is not assignable to `str`",
-                    key_ty.display(&ctx),
+                    key_ty.display(ctx),
                 ));
             }
             return false;
@@ -2879,7 +2880,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                 context,
                 typed_dict,
                 &BTreeMap::new(),
-                TypedDictOpenness::extra(&ctx, value_ty, true),
+                TypedDictOpenness::extra(ctx, value_ty, true),
                 nodes,
                 shadowed_keys,
             );

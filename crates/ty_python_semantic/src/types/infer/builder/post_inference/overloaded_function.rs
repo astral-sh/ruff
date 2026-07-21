@@ -67,7 +67,7 @@ pub(crate) fn check_overloaded_function<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = place_from_bindings(
-        &ctx,
+        ctx,
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
     )
     .place
@@ -145,7 +145,7 @@ pub(crate) fn check_overloaded_function<'db>(
             if class.is_protocol(db)
                 || ({
                     Type::ClassLiteral(class)
-                        .is_subtype_of(&ctx, KnownClass::ABCMeta.to_instance(&ctx))
+                        .is_subtype_of(ctx, KnownClass::ABCMeta.to_instance(ctx))
                 } && overloads.iter().all(|overload| {
                     overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
                 }))
@@ -288,7 +288,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let db = context.db();
     let ctx = context.semantic_context();
-    let implementation_signature = implementation.signature(&ctx);
+    let implementation_signature = implementation.signature(ctx);
 
     // TODO: Remove this temporary non-generic restriction once overload implementation consistency
     // handles type-variable domains.
@@ -298,7 +298,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads
         .iter()
-        .map(|overload| (overload, overload.signature(&ctx)));
+        .map(|overload| (overload, overload.signature(ctx)));
 
     if overload_signatures
         .clone()
@@ -310,9 +310,9 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     for (overload, overload_signature) in overload_signatures {
         let function_node = overload.node(db, context.file(), context.module());
         let parameter_consistency = implementation_signature
-            .non_generic_implementation_parameters_consistency_with(&ctx, &overload_signature);
+            .non_generic_implementation_parameters_consistency_with(ctx, &overload_signature);
         let return_type_consistency = implementation_signature
-            .non_generic_implementation_return_type_consistency_with(&ctx, &overload_signature);
+            .non_generic_implementation_return_type_consistency_with(ctx, &overload_signature);
 
         let (parameter_error_context, return_type_error_context, message) =
             match (parameter_consistency, return_type_consistency) {
@@ -350,18 +350,18 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(&ctx),
-                overload_signature.display(&ctx),
+                implementation_signature.display(ctx),
+                overload_signature.display(ctx),
             ));
-            error_context.attach_to(&ctx, &mut diagnostic);
+            error_context.attach_to(ctx, &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(&ctx),
-                implementation_signature.return_ty.display(&ctx),
+                overload_signature.return_ty.display(ctx),
+                implementation_signature.return_ty.display(ctx),
             ));
-            error_context.attach_to(&ctx, &mut diagnostic);
+            error_context.attach_to(ctx, &mut diagnostic);
         }
         diagnostic.annotate(
             context

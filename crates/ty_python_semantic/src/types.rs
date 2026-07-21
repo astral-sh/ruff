@@ -3961,7 +3961,6 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        let db = ctx.db();
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
@@ -4636,6 +4635,7 @@ impl<'db> Type<'db> {
             }
         }
 
+        let db = ctx.db();
         let key = MemberLookupKey::new(db, ctx.python_version(), self, name, policy);
         match receiver {
             Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
@@ -8520,8 +8520,8 @@ impl<'db> InvalidTypeExpressionError<'db> {
             let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
                 continue;
             };
-            let diagnostic = builder.into_diagnostic(error.reason(&ctx, flags));
-            error.add_subdiagnostics(&ctx, diagnostic, node);
+            let diagnostic = builder.into_diagnostic(error.reason(ctx, flags));
+            error.add_subdiagnostics(ctx, diagnostic, node);
         }
         fallback_type
     }
@@ -8577,7 +8577,7 @@ enum InvalidTypeExpression<'db> {
 }
 
 impl<'db> InvalidTypeExpression<'db> {
-    const fn reason(
+    fn reason(
         self,
         ctx: &SemanticContext<'db>,
         flags: InferenceFlags,
@@ -8718,7 +8718,7 @@ impl<'db> InvalidTypeExpression<'db> {
 
         Display {
             error: self,
-            ctx: *ctx,
+            ctx: ctx.clone(),
             flags,
         }
     }
@@ -8822,7 +8822,7 @@ impl<'db> AwaitError<'db> {
         let ctx = context.semantic_context();
 
         let mut diag = builder.into_diagnostic(
-            format_args!("`{type}` is not awaitable", type = context_expression_type.display(&ctx)),
+            format_args!("`{type}` is not awaitable", type = context_expression_type.display(ctx)),
         );
         match self {
             Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
@@ -8862,7 +8862,7 @@ impl<'db> AwaitError<'db> {
                     for ty in unbound_on {
                         diag.info(format_args!(
                             "`{}` does not implement `__await__`",
-                            ty.display(&ctx)
+                            ty.display(ctx)
                         ));
                     }
                 }
@@ -8875,7 +8875,7 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::MethodNotAvailable) => {
                 diag.info("`__await__` is missing");
-                if let Some(type_definition) = context_expression_type.definition(&ctx)
+                if let Some(type_definition) = context_expression_type.definition(ctx)
                     && let Some(definition_range) = type_definition.focus_range(db)
                 {
                     diag.annotate(
@@ -8886,7 +8886,7 @@ impl<'db> AwaitError<'db> {
             Self::InvalidReturnType(return_type, bindings) => {
                 diag.info(format_args!(
                     "`__await__` returns `{return_type}`, which is not a valid iterator",
-                    return_type = return_type.display(&ctx)
+                    return_type = return_type.display(ctx)
                 ));
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(

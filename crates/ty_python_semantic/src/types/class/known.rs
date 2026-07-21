@@ -1950,7 +1950,7 @@ impl KnownClass {
                         let first_param = binding_type(db, definition);
 
                         let bound_super = BoundSuperType::build(
-                            &context.semantic_context(),
+                            context.semantic_context(),
                             Type::ClassLiteral(ClassLiteral::Static(enclosing_class)),
                             first_param,
                         )
@@ -1979,7 +1979,7 @@ impl KnownClass {
                         }
 
                         let bound_super = BoundSuperType::build(
-                            &context.semantic_context(),
+                            context.semantic_context(),
                             *pivot_class_type,
                             *owner_type,
                         )
@@ -2063,20 +2063,20 @@ impl<'db> KnownClassLookupError<'db> {
         }
     }
 
-    fn display(
+    fn display<'ctx>(
         &self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         class: KnownClass,
-    ) -> impl std::fmt::Display + 'db {
-        struct ErrorDisplay<'db> {
-            ctx: SemanticContext<'db>,
+    ) -> impl std::fmt::Display + 'ctx {
+        struct ErrorDisplay<'ctx, 'db> {
+            ctx: &'ctx SemanticContext<'db>,
             class: KnownClass,
             error: KnownClassLookupError<'db>,
         }
 
-        impl std::fmt::Display for ErrorDisplay<'_> {
+        impl std::fmt::Display for ErrorDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let ErrorDisplay { ctx, class, error } = *self;
+                let ErrorDisplay { ctx, class, error } = self;
 
                 let python_version = ctx.python_version();
                 let class = class.display(python_version);
@@ -2095,7 +2095,7 @@ impl<'db> KnownClassLookupError<'db> {
                         f,
                         "Error looking up `{class}`{location}: expected to find a class definition \
                         on Python {python_version}, but found a symbol of type `{found_type}` instead",
-                        found_type = found_type.display(&ctx),
+                        found_type = found_type.display(ctx),
                     ),
                     KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
                         f,
@@ -2107,7 +2107,7 @@ impl<'db> KnownClassLookupError<'db> {
         }
 
         ErrorDisplay {
-            ctx: *ctx,
+            ctx,
             class,
             error: *self,
         }

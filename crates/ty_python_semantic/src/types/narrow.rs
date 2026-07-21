@@ -425,7 +425,7 @@ pub(crate) fn pattern_success_types<'db>(
     let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
     let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
     let analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
-    let ctx = analyzer.ctx;
+    let ctx = analyzer.ctx.clone();
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     PatternSuccessTypes {
         bindings: result
@@ -1636,7 +1636,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Type<'db> {
         let value_ty =
             infer_same_file_expression_type(self.ctx.db(), value, TypeContext::default());
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         evaluate_type_equality(
             &ctx,
             subject_ty,
@@ -2180,7 +2180,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     }
 
     fn mapping_pattern_uses_standard_get(&self, subject_ty: Type<'db>) -> bool {
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         let Some(class) = subject_ty.nominal_class(&self.ctx) else {
             return false;
         };
@@ -2474,7 +2474,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &SequencePatternPredicateKind<'db>,
         matched_element_types: &[Type<'db>],
     ) -> Type<'db> {
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         if let Some((prefix, suffix)) = kind.split_around_star() {
             let prefix_types = matched_element_types.iter().copied().take(prefix.len());
             let suffix_types = matched_element_types
@@ -3842,7 +3842,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         let subject_ty =
             infer_same_file_expression_type(self.ctx.db(), subject, TypeContext::default());
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         let narrowed_ty = pattern_binding_fallthrough_type(&ctx, pattern, subject_ty);
         if narrowed_ty == subject_ty {
             return PatternNarrowingResult::Possible(None);
@@ -4065,7 +4065,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.ctx.db();
         let inference = infer_expression_types(db, expression, TypeContext::default());
-        let ctx = self.ctx;
+        let ctx = self.ctx.clone();
         let sub_constraints = expr_bool_op
             .values
             .iter()

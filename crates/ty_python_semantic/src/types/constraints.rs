@@ -783,7 +783,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions_with(ctx, builder, inferable, choose)
     }
 
-    pub(crate) fn display(self, ctx: &SemanticContext<'db>) -> impl Display {
+    pub(crate) fn display(self, ctx: &'c SemanticContext<'db>) -> impl Display + 'c {
         self.node
             .simplify_for_display(ctx, self.builder)
             .display(ctx, self.builder)
@@ -792,7 +792,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display_graph<'a>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a
     where
@@ -2111,11 +2111,11 @@ impl ConstraintId {
         })
     }
 
-    pub(crate) fn display<'db>(
+    pub(crate) fn display<'db, 'c>(
         self,
-        ctx: &SemanticContext<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> impl Display {
+        ctx: &'c SemanticContext<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> impl Display + 'c {
         self.when_true().display(ctx, builder)
     }
 }
@@ -3225,11 +3225,11 @@ impl NodeId {
         searcher.clauses
     }
 
-    fn display<'db>(
+    fn display<'db, 'c>(
         self,
-        ctx: &SemanticContext<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> impl Display {
+        ctx: &'c SemanticContext<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> impl Display + 'c {
         // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
         // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
         // intersection clauses in the DNF form. The path traverses zero or more interior nodes,
@@ -3237,7 +3237,7 @@ impl NodeId {
         // negative individual constraints in the path's clause.
         struct DisplayNode<'db, 'c> {
             node: NodeId,
-            ctx: SemanticContext<'db>,
+            ctx: &'c SemanticContext<'db>,
             builder: &'c ConstraintSetBuilder<'db>,
         }
 
@@ -3248,8 +3248,8 @@ impl NodeId {
                     Node::AlwaysFalse => f.write_str("never"),
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.builder);
-                        clauses.simplify(&self.ctx, self.builder);
-                        Display::fmt(&clauses.display(&self.ctx, self.builder), f)
+                        clauses.simplify(self.ctx, self.builder);
+                        Display::fmt(&clauses.display(self.ctx, self.builder), f)
                     }
                 }
             }
@@ -3257,7 +3257,7 @@ impl NodeId {
 
         DisplayNode {
             node: self,
-            ctx: *ctx,
+            ctx,
             builder,
         }
     }
@@ -3282,12 +3282,12 @@ impl NodeId {
     /// ```
     fn display_graph<'db, 'a>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         builder: &'a ConstraintSetBuilder<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
         struct DisplayNode<'a, 'db> {
-            ctx: SemanticContext<'db>,
+            ctx: &'a SemanticContext<'db>,
             builder: &'a ConstraintSetBuilder<'db>,
             node: NodeId,
             prefix: &'a dyn Display,
@@ -3355,7 +3355,7 @@ impl NodeId {
         impl Display for DisplayNode<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 format_node(
-                    &self.ctx,
+                    self.ctx,
                     self.builder,
                     self.node,
                     self.prefix,
@@ -3366,7 +3366,7 @@ impl NodeId {
         }
 
         DisplayNode {
-            ctx: *ctx,
+            ctx,
             builder,
             node: self,
             prefix,
@@ -3549,8 +3549,6 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> &'db PathBounds<'db> {
-        let db = ctx.db();
-        let python_version = ctx.python_version();
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _, _, _| PathBounds::Unsatisfiable,
@@ -3568,6 +3566,8 @@ impl<'db> Type<'db> {
             when.query(|builder, when| PathBounds::compute(ctx, builder, when.node, inferable))
         }
 
+        let db = ctx.db();
+        let python_version = ctx.python_version();
         assignable_solutions_impl(db, python_version, self, target, inferable)
     }
 }
@@ -5132,14 +5132,14 @@ impl ConstraintAssignment {
         }
     }
 
-    fn display<'db>(
+    fn display<'db, 'c>(
         self,
-        ctx: &SemanticContext<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> impl Display {
+        ctx: &'c SemanticContext<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> impl Display + 'c {
         struct DisplayConstraintAssignment<'db, 'c> {
             assignment: ConstraintAssignment,
-            ctx: SemanticContext<'db>,
+            ctx: &'c SemanticContext<'db>,
             builder: &'c ConstraintSetBuilder<'db>,
         }
 
@@ -5167,7 +5167,7 @@ impl ConstraintAssignment {
                 let lower = constraint_data.bounds.materialized_lower();
                 let upper = constraint_data.bounds.materialized_upper();
                 let typevar = constraint_data.typevar;
-                if lower.is_equivalent_to(&self.ctx, upper) {
+                if lower.is_equivalent_to(self.ctx, upper) {
                     // If this typevar is equivalent to another, output the constraint in a
                     // consistent alphabetical order, regardless of the salsa ordering that we are
                     // using the in BDD.
@@ -5193,7 +5193,7 @@ impl ConstraintAssignment {
                         "({} {} {})",
                         typevar.identity(self.ctx.db()).display(self.ctx.db()),
                         self.equality_sign(),
-                        lower.display(&self.ctx)
+                        lower.display(self.ctx)
                     );
                 }
 
@@ -5209,14 +5209,14 @@ impl ConstraintAssignment {
                 f.write_str(self.range_prefix())?;
                 f.write_str("(")?;
                 if !lower.is_never() {
-                    write!(f, "{} ≤ ", lower.display(&self.ctx))?;
+                    write!(f, "{} ≤ ", lower.display(self.ctx))?;
                 }
                 typevar
                     .identity(self.ctx.db())
                     .display(self.ctx.db())
                     .fmt(f)?;
                 if !upper.is_object() {
-                    write!(f, " ≤ {}", upper.display(&self.ctx))?;
+                    write!(f, " ≤ {}", upper.display(self.ctx))?;
                 }
                 f.write_str(")")
             }
@@ -5224,7 +5224,7 @@ impl ConstraintAssignment {
 
         DisplayConstraintAssignment {
             assignment: self,
-            ctx: *ctx,
+            ctx,
             builder,
         }
     }
@@ -6308,14 +6308,14 @@ impl SequentMap {
     #[expect(dead_code)] // Keep this around for debugging purposes
     fn display<'db, 'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         builder: &'a ConstraintSetBuilder<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
         struct DisplaySequentMap<'a, 'db> {
             map: &'a SequentMap,
             prefix: &'a dyn Display,
-            ctx: SemanticContext<'db>,
+            ctx: &'a SemanticContext<'db>,
             builder: &'a ConstraintSetBuilder<'db>,
         }
 
@@ -6340,8 +6340,8 @@ impl SequentMap {
                             write!(
                                 f,
                                 "{} ∧ {} → false",
-                                ante1.display(&self.ctx, self.builder),
-                                ante2.display(&self.ctx, self.builder),
+                                ante1.display(self.ctx, self.builder),
+                                ante2.display(self.ctx, self.builder),
                             )?;
                         }
 
@@ -6350,9 +6350,9 @@ impl SequentMap {
                             write!(
                                 f,
                                 "{} ∧ {} → {}",
-                                ante1.display(&self.ctx, self.builder),
-                                ante2.display(&self.ctx, self.builder),
-                                post.display(&self.ctx, self.builder),
+                                ante1.display(self.ctx, self.builder),
+                                ante2.display(self.ctx, self.builder),
+                                post.display(self.ctx, self.builder),
                             )?;
                         }
 
@@ -6361,8 +6361,8 @@ impl SequentMap {
                             write!(
                                 f,
                                 "{} → {}",
-                                ante.display(&self.ctx, self.builder),
-                                post.display(&self.ctx, self.builder)
+                                ante.display(self.ctx, self.builder),
+                                post.display(self.ctx, self.builder)
                             )?;
                         }
                     }
@@ -6378,7 +6378,7 @@ impl SequentMap {
         DisplaySequentMap {
             map: self,
             prefix,
-            ctx: *ctx,
+            ctx,
             builder,
         }
     }

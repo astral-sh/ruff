@@ -364,7 +364,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
         }
 
-        let ctx = *ctx;
+        let ctx = ctx.clone();
         let mut index = 0;
 
         std::iter::successors(
@@ -431,31 +431,34 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         })
     }
 
-    pub(super) fn display(&self, ctx: &SemanticContext<'db>) -> impl Display {
-        struct DisplayCallArgumentTypes<'a, 'db> {
+    pub(super) fn display<'ctx>(
+        &'ctx self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> impl Display + 'ctx {
+        struct DisplayCallArgumentTypes<'ctx, 'a, 'db> {
             types: &'a CallArgumentTypes<'db>,
-            ctx: SemanticContext<'db>,
+            ctx: &'ctx SemanticContext<'db>,
         }
 
-        impl std::fmt::Display for DisplayCallArgumentTypes<'_, '_> {
+        impl std::fmt::Display for DisplayCallArgumentTypes<'_, '_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.debug_map()
                     .entries(self.types.iter().map(|(tcx, ty)| {
                         (
-                            tcx.annotation.as_ref().map(|ty| ty.display(&self.ctx)),
-                            ty.display(&self.ctx),
+                            tcx.annotation.as_ref().map(|ty| ty.display(self.ctx)),
+                            ty.display(self.ctx),
                         )
                     }))
                     .finish()
             }
         }
 
-        struct DisplayCallArguments<'a, 'db> {
+        struct DisplayCallArguments<'ctx, 'a, 'db> {
             call_arguments: &'a CallArguments<'a, 'db>,
-            ctx: SemanticContext<'db>,
+            ctx: &'ctx SemanticContext<'db>,
         }
 
-        impl std::fmt::Display for DisplayCallArguments<'_, '_> {
+        impl std::fmt::Display for DisplayCallArguments<'_, '_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("(")?;
                 for (index, (argument, types)) in self.call_arguments.iter().enumerate() {
@@ -520,7 +523,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         DisplayCallArguments {
             call_arguments: self,
-            ctx: *ctx,
+            ctx,
         }
     }
 }
