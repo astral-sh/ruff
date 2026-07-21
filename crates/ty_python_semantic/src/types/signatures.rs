@@ -1163,6 +1163,10 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
+        if !self.can_bind_self_to(db, receiver_type) {
+            return None;
+        }
+
         let bound_signature =
             self.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
@@ -1172,10 +1176,9 @@ impl<'db> Signature<'db> {
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(db, receiver_constraints);
         let inferable = self.inferable_typevars(db);
-        if !when
-            .reduce_inferable(db, &constraints, inferable)
-            .is_always_satisfied(db)
-        {
+        // Structural receiver checks can produce an unsatisfiable constraint set even when the
+        // eager applicability check above cannot rule out the overload.
+        if when.is_never_satisfied(db) {
             return None;
         }
 
@@ -1214,6 +1217,73 @@ impl<'db> Signature<'db> {
             self.apply_specialization(db, specialization)
                 .bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type)),
         )
+    }
+
+    /// Returns `true` if this signature's first parameter can accept the bound `self` type.
+    ///
+    /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
+    /// If a signature has no positional first parameter, we conservatively keep it.
+    fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        // A dynamic receiver might be compatible with any explicit receiver annotation.
+        if self_type.is_dynamic() {
+            return true;
+        }
+
+        // Without a first parameter, there is no receiver annotation to check.
+        let Some(first_parameter) = self.parameters.get(0) else {
+            return true;
+        };
+
+        // If there is no positional receiver, this signature cannot be pruned based on `self`.
+        if !first_parameter.is_positional() {
+            return true;
+        }
+
+        // Inferred receiver annotations describe the method owner, rather than constraining which
+        // overload is exposed for a bound receiver. Only explicit receiver annotations can prune.
+        if first_parameter.inferred_annotation {
+            return true;
+        }
+
+        let mut expected_self_ty = first_parameter.annotated_type();
+        let accepts_any_or_exact_self =
+            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+
+        // Avoid the more expensive normalization below for receiver annotations that already
+        // accept all values, or already exactly match the bound receiver.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // TODO: Expand type aliases here so `type Alias = Self` in a class body
+        // participates in receiver-specific overload pruning.
+        expected_self_ty = expected_self_ty.bind_self_typevars(db, self_type);
+
+        // `Self` binding can make the receiver annotation trivially compatible.
+        if accepts_any_or_exact_self(expected_self_ty) {
+            return true;
+        }
+
+        // A specialized receiver can make generic receiver annotations concrete enough to compare.
+        if let Some((_, self_specialization)) = self_type.class_specialization(db) {
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
+
+            // Specialization can also make the receiver annotation trivially compatible.
+            if accepts_any_or_exact_self(expected_self_ty) {
+                return true;
+            }
+        }
+
+        let constraints = ConstraintSetBuilder::new();
+        self_type
+            .when_assignable_to(
+                db,
+                expected_self_ty,
+                &constraints,
+                self.inferable_typevars(db),
+            )
+            .is_always_satisfied(db)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
