@@ -205,7 +205,6 @@ result = parse(StringSubclass("a"))
 ```
 
 Enable this option to preserve all possible union members and broad builtin types instead.
-`strict-literal-narrowing` is an alias for this option.
 
 Defaults to `false`.
 
@@ -772,7 +771,6 @@ result = parse(StringSubclass("a"))
 ```
 
 Enable this option to preserve all possible union members and broad builtin types instead.
-`strict-literal-narrowing` is an alias for this option.
 
 Defaults to `false`.
 
