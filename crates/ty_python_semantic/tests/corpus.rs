@@ -246,10 +246,6 @@ impl ty_module_resolver::Db for CorpusDb {
     fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
         Program::get(self).search_paths(self)
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
@@ -261,6 +257,10 @@ impl ty_python_core::Db for CorpusDb {
 
 #[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
+
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
             check_file_unwrap(self, file)

@@ -10,8 +10,8 @@ use ruff_db::PythonFile;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{

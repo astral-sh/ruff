@@ -66,7 +66,8 @@ impl<'db> Unpack<'db> {
 
     /// Returns the scope where the unpack target expression belongs to.
     pub fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.target_file_scope(db).to_scope_id(db, self.file(db))
+        self.target_file_scope(db)
+            .to_scope_id(db, self.python_file(db))
     }
 
     /// Returns the range of the unpack target expression.

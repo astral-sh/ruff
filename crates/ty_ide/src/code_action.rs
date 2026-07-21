@@ -976,7 +976,7 @@ mod tests {
                 PythonFile::new(
                     &self.db,
                     self.file,
-                    ty_module_resolver::Db::python_version(&self.db),
+                    ty_python_semantic::Db::python_version(&self.db),
                 ),
                 self.diagnostic_range,
                 &lint.name,

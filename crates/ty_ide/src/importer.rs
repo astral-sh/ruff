@@ -18,9 +18,9 @@ The main differences here are:
 
 use rustc_hash::FxHashMap;
 
-use ruff_db::PythonFile;
-use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+
+use ruff_db::PythonFile;
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
@@ -146,7 +146,7 @@ impl<'a> Importer<'a> {
         request: ImportRequest<'_>,
         members: &MembersInScope,
     ) -> ImportAction {
-        let request = request.avoid_conflicts(self.db, self.file.file(self.db), members);
+        let request = request.avoid_conflicts(self.db, self.file, members);
         let mut symbol_text: Box<str> = request.member.unwrap_or(request.module).into();
         let Some(response) = self.find(&request, members.at) else {
             let insertion = if let Some(future) = self.find_last_future_import(members.at) {
@@ -248,7 +248,7 @@ impl<'a> Importer<'a> {
                 return choice;
             }
 
-            if let Some(response) = import.satisfies(self.db, self.file.file(self.db), request) {
+            if let Some(response) = import.satisfies(self.db, self.file, request) {
                 let partial = matches!(response.kind, ImportResponseKind::Partial { .. });
 
                 // The LSP doesn't support edits across cell boundaries.
@@ -376,7 +376,7 @@ impl<'ast> MembersInScope<'ast> {
     pub(crate) fn satisfies(
         &self,
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let symbol_text = request.member.unwrap_or(request.module);
@@ -412,7 +412,7 @@ impl<'ast> MemberInScope<'ast> {
     fn satisfies_anywhere(
         &self,
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let MemberImportKind::Imported(ref ast_import) = self.kind else {
@@ -484,7 +484,7 @@ impl<'ast> AstImport<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponse<'importer, 'ast>> {
         self.kind
@@ -515,7 +515,7 @@ impl<'ast> AstImportKind<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponseKind<'ast>> {
         match *self {
@@ -639,7 +639,12 @@ impl<'a> ImportRequest<'a> {
     /// Attempts to change the import request style so that the chances
     /// of an import conflict are minimized (although not always reduced
     /// to zero).
-    fn avoid_conflicts(self, db: &dyn Db, importing_file: File, members: &MembersInScope) -> Self {
+    fn avoid_conflicts(
+        self,
+        db: &dyn Db,
+        importing_file: PythonFile<'_>,
+        members: &MembersInScope,
+    ) -> Self {
         let Some(member) = self.member else {
             return Self {
                 style: ImportStyle::Import,
@@ -919,9 +924,10 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
-    use ty_module_resolver::{Db as _, SearchPathSettings};
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
     use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_semantic::Db as _;
     use ty_python_semantic::{PythonVersionWithSource, SemanticModel};
 
     use super::*;

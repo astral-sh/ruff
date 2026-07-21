@@ -230,8 +230,8 @@ impl<'db> NominalInstanceType<'db> {
     /// repo, but is exposed as a public API for external users of
     /// `ty_python_semantic`.
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
-        let file = self.class(db).class_literal(db).file(db);
-        file_to_module(db, file).map(|module| module.name(db))
+        let class = self.class(db).class_literal(db);
+        file_to_module(db, class.python_file(db)).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {

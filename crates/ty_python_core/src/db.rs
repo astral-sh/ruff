@@ -97,10 +97,6 @@ pub(crate) mod tests {
         fn search_paths(&self) -> &SearchPaths {
             Program::get(self).search_paths(self)
         }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]

@@ -6,9 +6,9 @@ use std::ops::Range;
 
 use regex::Regex;
 
-use ruff_db::PythonFile;
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
@@ -390,11 +390,10 @@ impl SymbolKind {
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
-    let source_file = file.file(db);
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::tree(db, source_file);
+    let mut visitor = SymbolVisitor::tree(db, file);
     visitor.visit_body(&module.syntax().body);
     visitor.into_flat_symbols()
 }
@@ -414,7 +413,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: PythonFile<'_>) ->
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, source_file);
+    let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
     if source_file
@@ -453,7 +452,7 @@ impl ImportedFrom {
 
     fn import_from(
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         ast: &ast::StmtImportFrom,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
@@ -594,7 +593,7 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'db>,
         name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
         let module_name = match self.module_names.get(name.as_str())? {
@@ -652,7 +651,11 @@ enum ImportModuleName<'db> {
 impl<'db> ImportModuleName<'db> {
     /// Converts the lazy representation of a module name into an
     /// actual `ModuleName` that can be used for module resolution.
-    fn to_module_name(self, db: &'db dyn Db, importing_file: File) -> Option<ModuleName> {
+    fn to_module_name(
+        self,
+        db: &'db dyn Db,
+        importing_file: PythonFile<'db>,
+    ) -> Option<ModuleName> {
         match self {
             ImportModuleName::Import(name) => ModuleName::new(name),
             ImportModuleName::ImportFrom { parent, child } => {
@@ -688,7 +691,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function at any point.
@@ -722,7 +725,7 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: File) -> Self {
+    fn tree(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             db,
             file,
@@ -738,7 +741,7 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: File) -> Self {
+    fn globals(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             exports_only: true,
             ..Self::tree(db, file)
@@ -749,7 +752,10 @@ impl<'db> SymbolVisitor<'db> {
         // If `__all__` was found but wasn't recognized,
         // then we emit a diagnostic message indicating as such.
         if self.all_invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+            tracing::debug!(
+                "Invalid `__all__` in `{}`",
+                self.file.file(self.db).path(self.db)
+            );
         }
         // We want to filter out some of the symbols we collected.
         // Specifically, to respect conventions around library
@@ -1500,8 +1506,8 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
-    use ty_module_resolver::Db as _;
     use ty_project::{ProjectMetadata, TestDb};
+    use ty_python_semantic::Db as _;
 
     use super::symbols_for_file_global_only;
 

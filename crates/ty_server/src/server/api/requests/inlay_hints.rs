@@ -6,8 +6,8 @@ use lsp_types::{InlayHintParams, Uri};
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 use crate::PositionEncoding;
 use crate::document::{RangeExt, TextSizeExt, ToLink};

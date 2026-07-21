@@ -144,7 +144,7 @@ pub(crate) fn infer_definition_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,
@@ -192,9 +192,8 @@ pub(crate) fn function_known_decorators<'db>(
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
     let python_file = definition.python_file(db);
-    let file = python_file.file(db);
     let module = parsed_module(db, python_file).load(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,
@@ -289,7 +288,7 @@ pub(crate) fn infer_deferred_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,
@@ -314,13 +313,13 @@ pub(crate) fn infer_complete_scope_types<'db>(
     // Scopes that may require type context are inferred during the inference of
     // their outer scope.
     if scope.accepts_type_context(db) {
-        let file = scope.file(db);
-        let index = semantic_index(db, file);
+        let python_file = scope.python_file(db);
+        let index = semantic_index(db, python_file);
 
         if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
             // Note that nested lambdas or comprehensions may require recursing until we reach
             // an outer scope that is independent of any type context.
-            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, file));
+            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, python_file));
         }
     }
 
@@ -364,7 +363,7 @@ pub(crate) fn infer_scope_types_impl<'db>(
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,
@@ -413,7 +412,7 @@ pub(super) fn infer_expression_types_impl<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,
@@ -527,7 +526,7 @@ fn infer_statement_types_impl<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, python_file);
 
     TypeInferenceBuilder::new(
         db,

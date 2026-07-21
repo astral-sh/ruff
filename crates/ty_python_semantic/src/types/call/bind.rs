@@ -7142,8 +7142,7 @@ impl<'db> CallableDescription<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> Cow<'db, str> {
-            let file = function.file(db);
-            let semantic_index = semantic_index(db, file);
+            let semantic_index = semantic_index(db, function.python_file(db));
             let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
             if let Some(class_node) = enclosing_scope.node().as_class()
                 && let Some(class) =

@@ -1068,7 +1068,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
     {
         let body_scope = metaclass.body_scope(db);
-        let metaclass_index = semantic_index(db, body_scope.file(db));
+        let metaclass_index = semantic_index(db, body_scope.python_file(db));
         let body_scope_id = body_scope.file_scope_id(db);
         let metaclass_table = metaclass_index.place_table(body_scope_id);
         let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);

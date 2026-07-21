@@ -46,7 +46,7 @@ pub fn hints(db: &dyn Db, file: PythonFile<'_>) -> Vec<Hint> {
         return Vec::new();
     }
 
-    let unreachable = unreachable_ranges(db, source_file);
+    let unreachable = unreachable_ranges(db, file);
 
     let mut hints = unused_bindings(db, file)
         .iter()

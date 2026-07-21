@@ -51,6 +51,7 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
@@ -719,6 +720,16 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.scope(db).file(db),
             Self::DynamicTypedDict(class) => class.scope(db).file(db),
             Self::DynamicEnum(enum_lit) => enum_lit.scope(db).file(db),
+        }
+    }
+
+    pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        match self {
+            Self::Static(class) => class.python_file(db),
+            Self::Dynamic(class) => class.scope(db).python_file(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).python_file(db),
+            Self::DynamicTypedDict(class) => class.scope(db).python_file(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).python_file(db),
         }
     }
 

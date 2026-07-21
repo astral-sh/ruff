@@ -693,7 +693,7 @@ impl<'db> TypeVarInstance<'db> {
             return None;
         }
         let typevar_definition = self.definition(db)?;
-        let index = semantic_index(db, typevar_definition.file(db));
+        let index = semantic_index(db, typevar_definition.python_file(db));
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;

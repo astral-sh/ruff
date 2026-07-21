@@ -410,10 +410,11 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
-    use ty_module_resolver::{Db as _, SearchPathSettings};
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::{Db as _, ProjectMetadata};
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::Db as _;
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.

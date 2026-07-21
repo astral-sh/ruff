@@ -260,7 +260,7 @@ impl<'db> PatternPredicate<'db> {
     }
 
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.python_file(db))
     }
 }
 
@@ -307,7 +307,7 @@ impl<'db> PatternPredicate<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
     #[returns(copy)]
-    pub importing_file: File,
+    pub importing_parse_file: PythonFile<'db>,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
@@ -332,7 +332,7 @@ impl<'db> StarImportPlaceholderPredicate<'db> {
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         // See doc-comment above [`StarImportPlaceholderPredicate::symbol_id`]:
         // valid `*`-import definitions can only take place in the global scope.
-        global_scope(db, self.importing_file(db))
+        global_scope(db, self.importing_parse_file(db))
     }
 }
 

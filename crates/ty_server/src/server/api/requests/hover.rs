@@ -10,8 +10,8 @@ use lsp_types::HoverRequest;
 use lsp_types::{HoverParams, MarkupContent, Uri};
 use ruff_db::PythonFile;
 use ty_ide::{MarkupKind, hover};
-use ty_module_resolver::Db as _;
 use ty_project::ProjectDatabase;
+use ty_project::SemanticDb as _;
 
 pub(crate) struct HoverRequestHandler;
 

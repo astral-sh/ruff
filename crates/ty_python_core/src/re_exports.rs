@@ -20,7 +20,9 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
-use ruff_db::{PythonFile, files::File, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_python_ast::{
     self as ast,
     name::Name,
@@ -38,7 +40,7 @@ use crate::Db;
 ]
 pub(super) fn exported_names(db: &dyn Db, file: PythonFile<'_>) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
-    let mut finder = ExportFinder::new(db, file.file(db));
+    let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
 
     let mut exports = finder.resolve_exports();
@@ -51,18 +53,18 @@ pub(super) fn exported_names(db: &dyn Db, file: PythonFile<'_>) -> Box<[Name]> {
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     visiting_stub_file: bool,
     exports: FxHashMap<&'db Name, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
 impl<'db> ExportFinder<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             db,
             file,
-            visiting_stub_file: file.is_stub(db),
+            visiting_stub_file: file.file(db).is_stub(db),
             exports: FxHashMap::default(),
             dunder_all: DunderAll::NotPresent,
         }
