@@ -138,17 +138,9 @@ impl<'db> BoundMethodType<'db> {
             }
 
             return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
-                    .map(|signature| {
-                        signature.bind_self_with_receiver(
-                            db,
-                            Some(receiver_type),
-                            Some(typing_self_type),
-                        )
-                    }),
+                function_signature.overloads.iter().filter_map(|signature| {
+                    signature.bind_self_if_compatible(db, receiver_type, typing_self_type)
+                }),
             );
         };
 
