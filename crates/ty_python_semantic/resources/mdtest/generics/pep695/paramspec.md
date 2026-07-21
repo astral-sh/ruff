@@ -1146,6 +1146,38 @@ async def check_selected_awaitable() -> None:
     reveal_type(await selected_awaitable("one"))  # revealed: str
 ```
 
+An overload whose type-variable bound is not met must be skipped. A synchronous function returns
+`str` rather than `Awaitable[Any]`, so only the second overload applies and wraps the return type in
+`Awaitable`. An asynchronous function satisfies the bound, so the first overload applies and
+preserves its return type.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import Any, overload
+
+@overload
+def make_awaitable[**P, T: Awaitable[Any]](f: Callable[P, T]) -> Callable[P, T]: ...
+@overload
+def make_awaitable[**P, T](f: Callable[P, T]) -> Callable[P, Awaitable[T]]: ...
+def make_awaitable(f: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
+    raise NotImplementedError
+
+@make_awaitable
+def synchronous() -> str:
+    return ""
+
+reveal_type(synchronous())  # revealed: Awaitable[str]
+
+@make_awaitable
+async def asynchronous() -> str:
+    return ""
+
+reveal_type(asynchronous())  # revealed: CoroutineType[Any, Any, str]
+
+async def check_asynchronous() -> None:
+    reveal_type(await asynchronous())  # revealed: str
+```
+
 ### Overloads
 
 #### Return type filtering

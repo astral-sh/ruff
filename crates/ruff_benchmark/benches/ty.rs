@@ -1901,7 +1901,7 @@ fn attrs(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        103,
+        104,
     );
 
     bench_project(&benchmark, criterion);
