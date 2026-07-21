@@ -2482,34 +2482,54 @@ impl NodeId {
         struct IsNeverSatisfiedVisitor;
 
         impl PathVisitor for IsNeverSatisfiedVisitor {
-            type Continue = ();
+            type Result = ();
+            type Interior = ();
             type Break = ();
 
             fn visit_satisfied(
                 &mut self,
                 _path: Option<&PathAssignments>,
-            ) -> ControlFlow<Self::Break, Self::Continue> {
+            ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Break(())
             }
 
             fn visit_unsatisfied(
                 &mut self,
                 _path: Option<&PathAssignments>,
-            ) -> ControlFlow<Self::Break, Self::Continue> {
+            ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Continue> {
+            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn combine(
+            fn enter_interior(
                 &mut self,
+                _interior_node: InteriorNode,
+            ) -> ControlFlow<Self::Break, Self::Interior> {
+                ControlFlow::Continue(())
+            }
+
+            fn extend_path(
+                &mut self,
+                _interior_node: InteriorNode,
+                _interior_value: &Self::Interior,
+                _subtree: Self::Result,
                 _path: &PathAssignments,
-                _if_true: Self::Continue,
-                _if_uncertain: Self::Continue,
-                _if_false: Self::Continue,
-            ) -> ControlFlow<Self::Break, Self::Continue> {
+                _new_range: Range<usize>,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn leave_interior(
+                &mut self,
+                _interior_node: InteriorNode,
+                _interior_value: &Self::Interior,
+                _if_true: Self::Result,
+                _if_uncertain: Self::Result,
+                _if_false: Self::Result,
+            ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
         }
@@ -6410,23 +6430,26 @@ impl SequentMap {
 /// You can use this in one of two ways: bottom-up or top-down.
 ///
 /// You'll use a bottom-up visitor when you are doing something "fold-like" — generating a single
-/// value (of your `Continue` type) that summarizes all of the paths. You implement
+/// value (of your `Result` type) that summarizes all of the paths. You implement
 /// `visit_satisfied`, `visit_unsatisfied`, and `visit_impossible` to define the "base" value for
-/// each path in the BDD. Your `combine` method will be called once for each BDD interior node as
-/// we unwind the path walk stack; it is given the values computed for each subtree, and must
-/// figure out how to combine them into the summary value for the subtree rooted at that node.
+/// each path in the BDD. You implement `enter_interior`, `extend_path`, and `leave_interior` to
+/// define how that value should be updated as we unwind the path walk stack; they are given the
+/// values computed for each subtree, and must figure out how to combine them into the summary
+/// value for the subtree rooted at that node.
 ///
 /// You'll use a top-down visitor when you are doing something "map-like" — generating a separate
 /// value for each path. You implement `visit_satisfied`, `visit_unsatisfied`, and
 /// `visit_impossible`, which will be called for each path, and process the corresponding
 /// [`PathAssignments`]. If you produce some data representing the path, you are responsible for
-/// storing that data somewhere. (You could use a collection like [`Vec`] as your `Continue`, and
-/// concatenate subtree vecs in your `combine` method; but it will typically be more efficient to
-/// maintain an accumulator yourself, and append into it directly in your leaf methods.)
+/// storing that data somewhere. (You could use a collection like [`Vec`] as your `Result`, and
+/// concatenate subtree vecs in your `combine_interior` method; but it will typically be more
+/// efficient to maintain an accumulator yourself, and append into it directly in your leaf
+/// methods.)
 ///
 /// In either case, all of your methods can return [`ControlFlow::Break`] to abort the path walk.
 trait PathVisitor {
-    type Continue;
+    type Result;
+    type Interior;
     type Break;
 
     /// Called once for each satisfied path in the BDD. `path` will contain all of the assignments
@@ -6434,30 +6457,52 @@ trait PathVisitor {
     fn visit_satisfied(
         &mut self,
         path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Continue>;
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called once for each unsatisfied path in the BDD. `path` will contain all of the
     /// assignments on this path.
     fn visit_unsatisfied(
         &mut self,
         path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Continue>;
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called once for each impossible path in the BDD.
     ///
     /// TODO: Provide a path, and make sure it includes all of the assignments that led to a
     /// contradiction.
-    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Continue>;
+    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result>;
 
-    /// Called once for each interior node in the BDD. Combines [`Continue`][Self::Continue] values
-    /// for each of the interior node's subtrees.
-    fn combine(
+    /// Called on the way down as we enter each interior node. You can create a
+    /// [`Interior`][Self::Interior] value that will be passed to the
+    /// [`extend_path`][Self::extend_path] and [`leave_interior`][Self::leave_interior] methods
+    /// when we call them for this node.
+    fn enter_interior(
         &mut self,
+        interior_node: InteriorNode,
+    ) -> ControlFlow<Self::Break, Self::Interior>;
+
+    /// Called once for each edge in the BDD. You are given the [`Result`][Self::Result] value
+    /// of the subtree that the edge points to, as well as the origin and derived assignments that
+    /// are added by the edge.
+    fn extend_path(
+        &mut self,
+        interior_node: InteriorNode,
+        interior_value: &Self::Interior,
+        subtree: Self::Result,
         path: &PathAssignments,
-        if_true: Self::Continue,
-        if_uncertain: Self::Continue,
-        if_false: Self::Continue,
-    ) -> ControlFlow<Self::Break, Self::Continue>;
+        new_range: Range<usize>,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Called on the way back up as we leave each interior node in the BDD. Combines the
+    /// [`Result`][Self::Result] values for each of the interior node's subtrees.
+    fn leave_interior(
+        &mut self,
+        interior_node: InteriorNode,
+        interior_value: &Self::Interior,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 }
 
 /// The collection of constraints that we know to be true or false at a certain point when
@@ -6590,7 +6635,7 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         visitor: &mut V,
-    ) -> ControlFlow<V::Break, V::Continue>
+    ) -> ControlFlow<V::Break, V::Result>
     where
         V: PathVisitor,
     {
@@ -6600,49 +6645,107 @@ impl PathAssignments {
             node: NodeId,
             path: &mut PathAssignments,
             visitor: &mut V,
-        ) -> ControlFlow<V::Break, V::Continue>
+        ) -> ControlFlow<V::Break, V::Result>
         where
             V: PathVisitor,
         {
             match node.node() {
                 Node::AlwaysTrue => visitor.visit_satisfied(Some(path)),
                 Node::AlwaysFalse => visitor.visit_unsatisfied(Some(path)),
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(node);
+                Node::Interior(interior) => {
+                    let interior_value = visitor.enter_interior(interior)?;
+                    let interior_data = builder.interior_node_data(node);
                     let if_true = path
                         .walk_edge(
                             db,
                             builder,
-                            interior.constraint.when_true(),
-                            interior.source_order,
-                            |path, _| {
-                                visit_paths_inner(db, builder, interior.if_true, path, visitor)
+                            interior_data.constraint.when_true(),
+                            interior_data.source_order,
+                            |path, new_range| {
+                                let subtree = visit_paths_inner(
+                                    db,
+                                    builder,
+                                    interior_data.if_true,
+                                    path,
+                                    visitor,
+                                );
+                                match subtree {
+                                    ControlFlow::Continue(subtree) => visitor.extend_path(
+                                        interior,
+                                        &interior_value,
+                                        subtree,
+                                        path,
+                                        new_range,
+                                    ),
+                                    ControlFlow::Break(b) => ControlFlow::Break(b),
+                                }
                             },
                         )
                         .unwrap_or_else(|| visitor.visit_impossible())?;
+
                     let if_uncertain = path
                         .walk_edge(
                             db,
                             builder,
-                            interior.constraint.when_unconstrained(),
-                            interior.source_order,
-                            |path, _| {
-                                visit_paths_inner(db, builder, interior.if_uncertain, path, visitor)
+                            interior_data.constraint.when_unconstrained(),
+                            interior_data.source_order,
+                            |path, new_range| {
+                                let subtree = visit_paths_inner(
+                                    db,
+                                    builder,
+                                    interior_data.if_uncertain,
+                                    path,
+                                    visitor,
+                                );
+                                match subtree {
+                                    ControlFlow::Continue(subtree) => visitor.extend_path(
+                                        interior,
+                                        &interior_value,
+                                        subtree,
+                                        path,
+                                        new_range,
+                                    ),
+                                    ControlFlow::Break(b) => ControlFlow::Break(b),
+                                }
                             },
                         )
                         .unwrap_or_else(|| visitor.visit_impossible())?;
+
                     let if_false = path
                         .walk_edge(
                             db,
                             builder,
-                            interior.constraint.when_false(),
-                            interior.source_order,
-                            |path, _| {
-                                visit_paths_inner(db, builder, interior.if_false, path, visitor)
+                            interior_data.constraint.when_false(),
+                            interior_data.source_order,
+                            |path, new_range| {
+                                let subtree = visit_paths_inner(
+                                    db,
+                                    builder,
+                                    interior_data.if_false,
+                                    path,
+                                    visitor,
+                                );
+                                match subtree {
+                                    ControlFlow::Continue(subtree) => visitor.extend_path(
+                                        interior,
+                                        &interior_value,
+                                        subtree,
+                                        path,
+                                        new_range,
+                                    ),
+                                    ControlFlow::Break(b) => ControlFlow::Break(b),
+                                }
                             },
                         )
                         .unwrap_or_else(|| visitor.visit_impossible())?;
-                    visitor.combine(path, if_true, if_uncertain, if_false)
+
+                    visitor.leave_interior(
+                        interior,
+                        &interior_value,
+                        if_true,
+                        if_uncertain,
+                        if_false,
+                    )
                 }
             }
         }
