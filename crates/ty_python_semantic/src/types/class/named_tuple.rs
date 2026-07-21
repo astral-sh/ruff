@@ -1,4 +1,4 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module};
+use ruff_db::{PythonFile, diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -206,7 +206,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
         let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
 
         match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
@@ -443,7 +443,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let module = parsed_module(
+                db,
+                PythonFile::new(db, definition.file(db), db.python_version()),
+            )
+            .load(db);
             let node = definition
                 .kind(db)
                 .value(&module)

@@ -1,7 +1,7 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_text_size::TextSize;
 use ty_python_semantic::SemanticModel;
 
@@ -9,13 +9,13 @@ use ty_python_semantic::SemanticModel;
 /// Search for references across all files in the project.
 pub fn find_references(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
     include_declaration: bool,
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
 
     // Get the definitions for the symbol at the cursor position
     let goto_target = find_goto_target(&model, &module, offset)?;
@@ -48,7 +48,7 @@ mod tests {
         fn references_with_include_declaration(&self, include_declaration: bool) -> String {
             let Some(mut reference_results) = find_references(
                 &self.db,
-                self.cursor.file,
+                self.python_file(self.cursor.file),
                 self.cursor.offset,
                 include_declaration,
             ) else {

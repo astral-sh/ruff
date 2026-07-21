@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::ReferencesRequest;
 use lsp_types::{Location, ReferenceParams, Uri};
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::find_references;
 use ty_project::ProjectDatabase;
 
@@ -51,7 +52,12 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = find_references(db, file, offset, include_declaration) else {
+        let Some(references_result) = find_references(
+            db,
+            PythonFile::new(db, file, db.python_version()),
+            offset,
+            include_declaration,
+        ) else {
             return Ok(None);
         };
 

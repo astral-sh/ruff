@@ -6,6 +6,7 @@ use lsp_types::{
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
+use ruff_db::{Db as _, PythonFile};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
@@ -62,7 +63,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             snapshot.workspace_settings().completions(),
             CompletionCapabilities::default()
                 .snippets(client_capabilities.supports_completion_item_snippets()),
-            file,
+            PythonFile::new(db, file, db.python_version()),
             offset,
         );
         if completions.is_empty() {

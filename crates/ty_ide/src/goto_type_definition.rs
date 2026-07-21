@@ -1,17 +1,18 @@
 use crate::goto::find_goto_target;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::PythonFile;
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::SemanticModel;
 
 pub fn goto_type_definition(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;
@@ -21,7 +22,7 @@ pub fn goto_type_definition(
     let navigation_targets = ty.navigation_targets(db);
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: navigation_targets,
     })
 }
@@ -2172,7 +2173,11 @@ def function():
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
+                goto_type_definition(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

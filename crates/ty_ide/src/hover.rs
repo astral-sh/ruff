@@ -1,7 +1,8 @@
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::PythonFile;
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
@@ -12,9 +13,13 @@ use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarV
 
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
+pub fn hover<'db>(
+    db: &'db dyn Db,
+    file: PythonFile<'db>,
+    offset: TextSize,
+) -> Option<RangedValue<Hover<'db>>> {
     let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
@@ -133,7 +138,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: Hover { contents },
     })
 }
@@ -7022,7 +7027,11 @@ type U<CURSOR> = MyType
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(hover) = hover(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            ) else {
                 return "Hover provided no content".to_string();
             };
 

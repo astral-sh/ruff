@@ -3,6 +3,7 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -21,7 +22,8 @@ fn get_symbol<'db>(
     symbol_name: &str,
 ) -> Place<'db> {
     let file = system_path_to_file(db, file_name).expect("file to exist");
-    let module = parsed_module(db, file).load(db);
+    let module =
+        parsed_module(db, ruff_db::PythonFile::new(db, file, db.python_version())).load(db);
     let index = semantic_index(db, file);
     let mut file_scope_id = FileScopeId::global();
     let mut scope = file_scope_id.to_scope_id(db, file);
@@ -130,7 +132,11 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     )?;
 
     let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
-    let module = parsed_module(&db, file).load(&db);
+    let module = parsed_module(
+        &db,
+        ruff_db::PythonFile::new(&db, file, db.python_version()),
+    )
+    .load(&db);
     let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
     let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
     let first = semantic_index(&db, file)
@@ -679,7 +685,11 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
+        let ast = parsed_module(
+            db,
+            ruff_db::PythonFile::new(db, file_main, db.python_version()),
+        )
+        .load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
@@ -768,7 +778,11 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 fn dependency_own_instance_member() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
+        let ast = parsed_module(
+            db,
+            ruff_db::PythonFile::new(db, file_main, db.python_version()),
+        )
+        .load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
@@ -861,7 +875,11 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 fn dependency_implicit_class_member() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
+        let ast = parsed_module(
+            db,
+            ruff_db::PythonFile::new(db, file_main, db.python_version()),
+        )
+        .load(db);
         // Get the third statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[2].as_assign_stmt().unwrap().value;
@@ -986,7 +1004,8 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
     let events = db.take_salsa_events();
 
-    let module = parsed_module(&db, bar).load(&db);
+    let module =
+        parsed_module(&db, ruff_db::PythonFile::new(&db, bar, db.python_version())).load(&db);
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 
@@ -1014,7 +1033,8 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
     let events = db.take_salsa_events();
 
-    let module = parsed_module(&db, bar).load(&db);
+    let module =
+        parsed_module(&db, ruff_db::PythonFile::new(&db, bar, db.python_version())).load(&db);
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 

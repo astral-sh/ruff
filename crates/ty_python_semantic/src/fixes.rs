@@ -1,4 +1,5 @@
 use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
+use ruff_db::PythonFile;
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -128,7 +129,7 @@ where
             continue;
         };
 
-        let parsed = parsed_module(db, file);
+        let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version()));
         if parsed.load(db).has_syntax_errors() {
             tracing::warn!("Skipping file `{path}` with syntax errors");
             continue;
@@ -768,7 +769,8 @@ where
 
                     let db = &*db;
 
-                    let parsed = parsed_module(db, file.file);
+                    let parsed =
+                        parsed_module(db, PythonFile::new(db, file.file, db.python_version()));
                     let parsed = parsed.load(db);
 
                     let result = if parsed.has_syntax_errors() {
@@ -801,6 +803,8 @@ mod tests {
     use std::hash::{DefaultHasher, Hash, Hasher};
 
     use insta::assert_snapshot;
+    use ruff_db::Db as _;
+    use ruff_db::PythonFile;
     use ruff_db::cancellation::CancellationTokenSource;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics,
@@ -1958,7 +1962,7 @@ class B(A):
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
-        let parsed_before = parsed_module(&db, file);
+        let parsed_before = parsed_module(&db, PythonFile::new(&db, file, db.python_version()));
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
         let diagnostics = db.check_file(file);
@@ -2009,7 +2013,7 @@ class B(A):
 
         let fixed = source_text(&db, file);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, PythonFile::new(&db, file, db.python_version()));
         let parsed = parsed.load(&db);
 
         let diagnostics_after_applying_fixes = db.check_file(file);

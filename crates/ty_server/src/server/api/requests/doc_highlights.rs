@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::DocumentHighlightRequest;
 use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri};
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::{ReferenceKind, document_highlights};
 use ty_project::ProjectDatabase;
 
@@ -49,7 +50,9 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
             return Ok(None);
         };
 
-        let Some(highlights_result) = document_highlights(db, file, offset) else {
+        let Some(highlights_result) =
+            document_highlights(db, PythonFile::new(db, file, db.python_version()), offset)
+        else {
             return Ok(None);
         };
 

@@ -9,7 +9,7 @@
 use crate::Db;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
@@ -73,8 +73,13 @@ pub struct SignatureHelpInfo<'db> {
 }
 
 /// Signature help information for function calls at the given position
-pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo<'_>> {
+pub fn signature_help<'db>(
+    db: &'db dyn Db,
+    file: PythonFile<'db>,
+    offset: TextSize,
+) -> Option<SignatureHelpInfo<'db>> {
     let parsed = parsed_module(db, file).load(db);
+    let file = file.file(db);
 
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
@@ -158,7 +163,7 @@ fn get_call_expr(
         return None;
     };
 
-    // Determine which argument corresponding to the current cursor location.
+    // Determine which argument corresponds to the current cursor location.
     let current_arg_index = get_argument_index(call_expr, offset);
 
     Some((call_expr, current_arg_index))
@@ -1441,7 +1446,11 @@ def ab(a: int, *, c: int):
 
     impl CursorTest {
         fn signature_help(&self) -> Option<SignatureHelpInfo<'_>> {
-            crate::signature_help::signature_help(&self.db, self.cursor.file, self.cursor.offset)
+            crate::signature_help::signature_help(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            )
         }
 
         fn signature_help_render(&self) -> String {

@@ -1,4 +1,5 @@
 use itertools::{Either, EitherOrBoth, Itertools};
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
@@ -603,7 +604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
             let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
             let range = definition.focus_range(db, &module).range();
             diagnostic.annotate(
                 Annotation::secondary(Span::from(file).with_range(range))
@@ -962,7 +963,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     continue;
                                 };
                                 let file = definition.file(db);
-                                let module = parsed_module(db, file).load(db);
+                                let module = parsed_module(
+                                    db,
+                                    PythonFile::new(db, file, db.python_version()),
+                                )
+                                .load(db);
                                 let range = definition.focus_range(db, &module).range();
                                 diagnostic.annotate(
                                     Annotation::secondary(Span::from(file).with_range(range))

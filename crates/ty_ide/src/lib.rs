@@ -398,6 +398,7 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
+    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
@@ -432,6 +433,10 @@ mod tests {
     impl CursorTest {
         pub(super) fn builder() -> CursorTestBuilder {
             CursorTestBuilder::default()
+        }
+
+        pub(super) fn python_file(&self, file: File) -> PythonFile<'_> {
+            PythonFile::new(&self.db, file, self.db.python_version())
         }
 
         pub(super) fn write_file(
@@ -558,7 +563,9 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed =
+                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
+                            .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -710,7 +717,9 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed =
+                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
+                            .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

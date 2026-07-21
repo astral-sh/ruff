@@ -52,6 +52,7 @@
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -382,17 +383,21 @@ impl<'db> OverloadLiteral<'db> {
     ) -> Option<Span> {
         let definition = self.definition(db);
         let file = definition.file(db);
-        self.node(db, file, &parsed_module(db, file).load(db))
-            .decorator_list
-            .iter()
-            .find(|decorator| {
-                predicate(definition_expression_type(
-                    db,
-                    definition,
-                    &decorator.expression,
-                ))
-            })
-            .map(|decorator| Span::from(file).with_range(decorator.range))
+        self.node(
+            db,
+            file,
+            &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
+        )
+        .decorator_list
+        .iter()
+        .find(|decorator| {
+            predicate(definition_expression_type(
+                db,
+                definition,
+                &decorator.expression,
+            ))
+        })
+        .map(|decorator| Span::from(file).with_range(decorator.range))
     }
 
     /// Iterate through the decorators on this function, returning the span of the first one
@@ -441,7 +446,8 @@ impl<'db> OverloadLiteral<'db> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let module =
+            parsed_module(db, PythonFile::new(db, self.file(db), db.python_version())).load(db);
         let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
@@ -493,7 +499,8 @@ impl<'db> OverloadLiteral<'db> {
         let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let module =
+            parsed_module(db, PythonFile::new(db, self.file(db), db.python_version())).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, scope.file(db));
         let file_scope_id = scope.file_scope_id(db);
@@ -578,7 +585,8 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let module =
+            parsed_module(db, PythonFile::new(db, self.file(db), db.python_version())).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
@@ -686,7 +694,7 @@ impl<'db> OverloadLiteral<'db> {
     ) -> (Span, Span) {
         let file = self.file(db);
         let span = Span::from(file);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
         let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
@@ -705,7 +713,8 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         let file = self.file(db);
         let span = Span::from(file);
-        let module = parsed_module(db, self.file(db)).load(db);
+        let module =
+            parsed_module(db, PythonFile::new(db, self.file(db), db.python_version())).load(db);
         let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
@@ -931,7 +940,7 @@ impl<'db> FunctionLiteral<'db> {
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
             let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
             let node = implementation.node(db, file, &module);
             function_body_kind(db, node, |expr| {
                 definition_expression_type(db, definition, expr)

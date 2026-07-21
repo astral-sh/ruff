@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
 use compact_str::{CompactString, CompactStringExt};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
@@ -33,10 +34,12 @@ pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
     capabilities: CompletionCapabilities,
-    file: File,
+    file: PythonFile<'db>,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
+    let python_file = file;
     let parsed = parsed_module(db, file).load(db);
+    let file = file.file(db);
     let source = source_text(db, file);
 
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
@@ -95,7 +98,13 @@ pub fn completion<'db>(
                     );
                 }
                 add_keyword_completions(db, &mut completions);
-                add_argument_completions(db, &model, &context.cursor, &mut completions);
+                add_argument_completions(
+                    db,
+                    python_file,
+                    &model,
+                    &context.cursor,
+                    &mut completions,
+                );
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
@@ -1897,6 +1906,7 @@ enum Sort {
 /// Detect and add completions for unset arguments.
 fn add_argument_completions<'db>(
     db: &'db dyn Db,
+    file: PythonFile<'db>,
     model: &SemanticModel<'db>,
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
@@ -1916,7 +1926,7 @@ fn add_argument_completions<'db>(
             }
             ast::AnyNodeRef::ExprCall(_) => {
                 if in_arguments {
-                    add_function_arg_completions(db, model.file(), cursor, completions);
+                    add_function_arg_completions(db, file, cursor, completions);
                 }
                 return;
             }
@@ -1982,7 +1992,7 @@ fn add_class_arg_completions<'db>(
 /// set and 2) been defined as positional-only.
 fn add_function_arg_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
@@ -2061,13 +2071,14 @@ pub(crate) struct ImportEdit {
 }
 
 /// Get fixes that would resolve an unresolved reference
-pub(crate) fn unresolved_fixes(
-    db: &dyn Db,
-    file: File,
+pub(crate) fn unresolved_fixes<'db>(
+    db: &'db dyn Db,
+    file: PythonFile<'db>,
     parsed: &ParsedModuleRef,
     symbol: &str,
     node: AnyNodeRef,
 ) -> Vec<ImportEdit> {
+    let file = file.file(db);
     let mut results = Vec::new();
     let scoped = ScopedTarget { node };
     let query = UserQuery::exactly(symbol);
@@ -10770,7 +10781,7 @@ raise <CURSOR>
                 &self.cursor_test.db,
                 &self.settings,
                 self.capabilities,
-                self.cursor_test.cursor.file,
+                self.cursor_test.python_file(self.cursor_test.cursor.file),
                 self.cursor_test.cursor.offset,
             );
             let filtered = original

@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Formatter;
 
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::LintName;
 use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::File;
@@ -38,7 +39,7 @@ pub fn suppress_all(
 ) -> Vec<SuppressFix> {
     let suppressions = suppressions(db, file);
     let source = source_text(db, file);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let tokens = parsed.tokens();
 
     // Compute the full suppression ranges for each diagnostic, while retaining the original
@@ -196,7 +197,7 @@ pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) ->
 fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> TextRange {
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
     // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let line_start = line_start(parsed.tokens(), range.start());
 
     let after_token_range = match parsed.tokens().at_offset(range.end()) {

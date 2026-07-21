@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use lsp_types::{PrepareRenameParams, PrepareRenameRequest, PrepareRenameResult, Uri};
+use ruff_db::{Db as _, PythonFile};
 use ty_ide::can_rename;
 use ty_project::ProjectDatabase;
 
@@ -48,7 +49,8 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(range) = can_rename(db, file, offset) else {
+        let Some(range) = can_rename(db, PythonFile::new(db, file, db.python_version()), offset)
+        else {
             return Ok(None);
         };
 

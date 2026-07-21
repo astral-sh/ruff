@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ordermap::OrderSet;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
@@ -256,7 +257,11 @@ impl<'db> TypedDictType<'db> {
                 }
             };
 
-            let module = parsed_module(db, static_class.file(db)).load(db);
+            let module = parsed_module(
+                db,
+                PythonFile::new(db, static_class.file(db), db.python_version()),
+            )
+            .load(db);
             let class_definition = static_class.definition(db);
             let class_stmt = class_definition
                 .kind(db)
@@ -1271,7 +1276,11 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
-    let module = parsed_module(db, definition.file(db)).load(db);
+    let module = parsed_module(
+        db,
+        PythonFile::new(db, definition.file(db), db.python_version()),
+    )
+    .load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1333,7 +1342,11 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
-    let module = parsed_module(db, definition.file(db)).load(db);
+    let module = parsed_module(
+        db,
+        PythonFile::new(db, definition.file(db), db.python_version()),
+    )
+    .load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1554,7 +1567,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     ) {
         if let Some(declaration) = item.first_declaration() {
             let file = declaration.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
 
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Item declaration");
             sub.annotate(

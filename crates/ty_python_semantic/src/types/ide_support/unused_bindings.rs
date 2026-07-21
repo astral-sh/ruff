@@ -3,6 +3,7 @@ use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
 use get_size2::GetSize;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -73,7 +74,7 @@ pub struct UnusedBinding {
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();

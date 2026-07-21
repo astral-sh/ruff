@@ -15,6 +15,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ty_module_resolver::file_to_module;
 
 use crate::Db;
@@ -719,7 +721,7 @@ pub(super) fn qualified_name_components_from_scope(
     file_scope_id: FileScopeId,
     skip_count: usize,
 ) -> Vec<String> {
-    let module_ast = parsed_module(db, file).load(db);
+    let module_ast = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
     let index = semantic_index(db, file);
 
     let mut name_parts = vec![];
@@ -850,7 +852,14 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
             let definition = self.type_alias.definition(self.db);
             let file = definition.file(self.db);
             let offset = definition
-                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .focus_range(
+                    self.db,
+                    &parsed_module(
+                        self.db,
+                        PythonFile::new(self.db, file, self.db.python_version()),
+                    )
+                    .load(self.db),
+                )
                 .range()
                 .start();
             fmt_file_location(self.db, file, offset, f)?;

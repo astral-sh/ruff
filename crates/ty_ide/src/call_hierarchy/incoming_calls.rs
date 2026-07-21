@@ -3,6 +3,7 @@ use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::is_dunder;
@@ -26,9 +27,10 @@ const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
-pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<IncomingCall> {
+pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<IncomingCall> {
     let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+    let source_file = file.file(db);
+    let model = SemanticModel::new(db, source_file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
     };
@@ -72,10 +74,11 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
 
     if is_externally_visible {
         let files = db.project().files(db);
+        let python_version = file.python_version(db);
         let files: Vec<_> = files
             .iter()
             .copied()
-            .filter(|other| *other != file)
+            .filter(|other| *other != source_file)
             .collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         // The byte-level text prefilter still pays off as a coarse gate:
@@ -96,7 +99,13 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
                     return Vec::new();
                 }
 
-                call_sites_for_file(db, other_file, &target_definitions, target_role, needle)
+                call_sites_for_file(
+                    db,
+                    PythonFile::new(db, other_file, python_version),
+                    &target_definitions,
+                    target_role,
+                    needle,
+                )
             })
             .flat_map_iter(|sites| sites)
             .collect::<Vec<_>>();
@@ -159,14 +168,14 @@ struct EnclosingKey {
 /// `target_definitions`.
 fn call_sites_for_file(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     target_definitions: &Definitions<'_>,
     target_role: Option<PropertyAccessorRole>,
     needle: Option<&str>,
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file.file(db));
     let mut sites = Vec::new();
 
     let mut finder = CallSitesFinder {
@@ -512,7 +521,11 @@ mod tests {
             else {
                 return "No incoming calls found".to_string();
             };
-            let calls = incoming_calls(&self.db, target.file, target.selection_range.start());
+            let calls = incoming_calls(
+                &self.db,
+                self.python_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No incoming calls found".to_string();
             }
@@ -1160,7 +1173,11 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.python_file(target.file),
+            target.selection_range.start(),
+        );
         // The selection identifies the anonymous callable header.
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
@@ -1297,14 +1314,18 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.python_file(target.file),
+            target.selection_range.start(),
+        );
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         let lambda_item = &incoming[0].from;
         assert_eq!(lambda_item.name.as_str(), "(lambda)");
 
         let follow_up_incoming = incoming_calls(
             &test.db,
-            lambda_item.file,
+            test.python_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(
@@ -1314,7 +1335,7 @@ def make() -> C:
 
         let follow_up_outgoing = outgoing_calls(
             &test.db,
-            lambda_item.file,
+            test.python_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(

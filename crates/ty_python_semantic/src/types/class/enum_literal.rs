@@ -1,3 +1,4 @@
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -166,7 +167,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
         let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db);
         match self.anchor(db) {
             DynamicEnumAnchor::Definition { definition, .. } => definition
                 .kind(db)

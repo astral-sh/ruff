@@ -22,6 +22,7 @@ use crate::{
     },
 };
 use ruff_db::{
+    PythonFile,
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
@@ -243,7 +244,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let file = definition.file(db);
                     diagnostic.annotate(
                         Annotation::secondary(Span::from(
-                            definition.full_range(db, &parsed_module(db, file).load(db)),
+                            definition.full_range(
+                                db,
+                                &parsed_module(db, PythonFile::new(db, file, db.python_version()))
+                                    .load(db),
+                            ),
                         ))
                         .message(format_args!("`{default_name}` defined here")),
                     );
@@ -520,9 +525,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(definition) = outer_typevar.definition(db) {
             let file = definition.file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(definition.full_range(
+                    db,
+                    &parsed_module(db, PythonFile::new(db, file, db.python_version())).load(db),
+                )))
                 .message(format_args!("`{outer_name}` defined here")),
             );
         }
