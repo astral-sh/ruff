@@ -6519,21 +6519,27 @@ pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
     /// Each assignment's source order and the first per-path fuel value with which it was derived.
-    assignments: FxIndexMap<ConstraintAssignment, (usize, AssignmentFuel)>,
+    assignments: FxIndexMap<ConstraintAssignment, (usize, u16)>,
     /// Additional per-path fuel values that can derive an assignment, keyed by its index in
     /// `assignments`. These are stored separately so that branch-local additions can be rolled
     /// back by truncating the set. Only the greatest fuel value participates in further
     /// derivation.
-    additional_fuels: Vec<(usize, AssignmentFuel)>,
+    additional_fuels: Vec<(usize, u16)>,
     /// The amount of global fuel that remains across all assignments and paths.
     remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
-    /// Derived assignments that have been queued up to add because of the most recent BDD
-    /// assignment
+
+    /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
+
+    /// The next chunk of derived assignments that have been queued up to add to the current path.
+    /// If we derive the same assignment multiple times, we keep the derivation that lets us make
+    /// the most additional progress (more remaining fuel for this derivation chain, less overall
+    /// fuel consumed).
+    new_assignments: FxIndexMap<ConstraintAssignment, AssignmentFuel>,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -6546,7 +6552,7 @@ const OVERALL_FUEL_BUDGET: u16 = 256;
 const PATH_FUEL_BUDGET: u16 = 8;
 
 /// The fuel cost of deriving a particular assignment during BDD path walking.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AssignmentFuel {
     /// The amount of fuel consumed when deriving the assignment, or None if this assignment came
     /// directly from the BDD
@@ -6575,6 +6581,20 @@ impl AssignmentFuel {
     }
 }
 
+impl PartialOrd for AssignmentFuel {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AssignmentFuel {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_key = (self.remaining, std::cmp::Reverse(self.consumed));
+        let other_key = (other.remaining, std::cmp::Reverse(other.consumed));
+        self_key.cmp(&other_key)
+    }
+}
+
 impl PathAssignments {
     fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
         let discovered = constraints
@@ -6588,6 +6608,7 @@ impl PathAssignments {
             discovered,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
         }
     }
 
@@ -6641,7 +6662,8 @@ impl PathAssignments {
             "walk edge",
         );
         debug_assert!(self.assignment_queue.is_empty());
-        self.enqueue_assignment(assignment, AssignmentFuel::origin());
+        self.assignment_queue
+            .push_back((assignment, AssignmentFuel::origin()));
         let found_conflict = self.drain_assignment_queue(db, builder, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
@@ -6703,8 +6725,8 @@ impl PathAssignments {
             .additional_fuels
             .iter()
             .filter(|(fuel_index, _)| *fuel_index == index)
-            .map(|(_, fuel)| fuel.remaining)
-            .fold(first_fuel.remaining, u16::max);
+            .map(|(_, fuel)| *fuel)
+            .fold(*first_fuel, u16::max);
         Some(max_fuel)
     }
 
@@ -6771,7 +6793,8 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment, (source_order, fuel));
+            self.assignments
+                .insert(assignment, (source_order, fuel.remaining));
             return Ok(());
         }
 
@@ -6800,7 +6823,7 @@ impl PathAssignments {
                             None => return Ok(()),
                         };
                 }
-                entry.insert((source_order, fuel));
+                entry.insert((source_order, fuel.remaining));
             }
 
             Entry::Occupied(mut entry) => {
@@ -6823,43 +6846,23 @@ impl PathAssignments {
                 // there might be some consequents that were skipped previously due to a lack of
                 // fuel, that can be added now because of the replinished fuel budget.
 
-                // There is no need to replenish the fuel for this derivation if there is already
-                // an existing derivation whose fuel "dominates" (it both consumes as much fuel,
-                // and provides at least as much remaining fuel).
-                let existing_fuels = self
-                    .additional_fuels
-                    .iter()
-                    .filter(|(fuel_index, _)| *fuel_index == index);
-                let max_existing_remaining_fuel = existing_fuels
-                    .clone()
-                    .map(|(_, fuel)| fuel.remaining)
-                    .fold(existing_fuel.remaining, u16::max);
-                let max_existing_consumed_fuel = existing_fuels
-                    .clone()
-                    .filter_map(|(_, fuel)| fuel.consumed)
-                    .fold(existing_fuel.consumed.unwrap_or(0), u16::max);
-                if max_existing_remaining_fuel >= fuel.remaining
-                    && max_existing_consumed_fuel >= fuel.consumed.unwrap_or(0)
+                // There is another derivation of this assignment that already provides at least as
+                // much fuel as this constraint. That means replenishing the fuel won't have any
+                // effect.
+                if *existing_fuel >= fuel.remaining
+                    || self
+                        .additional_fuels
+                        .iter()
+                        .any(|(fuel_index, existing_fuel)| {
+                            *fuel_index == index && *existing_fuel >= fuel.remaining
+                        })
                 {
                     return Ok(());
                 }
 
-                // If this derivation of this assignment consumes more fuel than the other
-                // derivations that we've seen, we need to update the overall fuel consumed for
-                // this assignment.
-                if let Some(consumed) = fuel.consumed
-                    && let Some(delta) = consumed.checked_sub(max_existing_consumed_fuel)
-                {
-                    self.remaining_overall_fuel =
-                        match self.remaining_overall_fuel.checked_sub(delta) {
-                            Some(updated_fuel) => updated_fuel,
-                            None => return Ok(()),
-                        };
-                }
-
                 // Record the replenished fuel separately so that `walk_edge` can restore the
                 // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.push((index, fuel));
+                self.additional_fuels.push((index, fuel.remaining));
             }
         }
 
@@ -6875,6 +6878,7 @@ impl PathAssignments {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
+        self.new_assignments.clear();
         self.discover_constraint(db, builder, assignment.constraint());
 
         for i in 0..self.sequents.len() {
@@ -6882,11 +6886,20 @@ impl PathAssignments {
             self.check_sequent(db, builder, sequent)?;
         }
 
+        // If we were able to derive any new assignments from this one, add them to the processing
+        // queue.
+        self.assignment_queue.extend(self.new_assignments.drain(..));
+
         Ok(())
     }
 
     fn enqueue_assignment(&mut self, assignment: ConstraintAssignment, new_fuel: AssignmentFuel) {
-        self.assignment_queue.push_back((assignment, new_fuel));
+        self.new_assignments
+            .entry(assignment)
+            .and_modify(|existing_fuel| {
+                *existing_fuel = std::cmp::max(*existing_fuel, new_fuel);
+            })
+            .or_insert(new_fuel);
     }
 
     fn check_sequent<'db>(
