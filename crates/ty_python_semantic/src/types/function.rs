@@ -606,7 +606,9 @@ impl<'db> OverloadLiteral<'db> {
 
         let generic_context = raw_signature.generic_context;
         raw_signature.add_implicit_self_annotation(db, || {
-            if self.is_staticmethod(db) {
+            let is_staticmethod = self.is_staticmethod(db);
+            let is_dunder_new = self.name(db) == "__new__";
+            if is_staticmethod && !is_dunder_new {
                 return None;
             }
 
@@ -654,7 +656,7 @@ impl<'db> OverloadLiteral<'db> {
                      for an implicit self: Self annotation",
                     );
 
-                if self.is_classmethod(db) {
+                if self.is_classmethod(db) || is_dunder_new {
                     Some(SubclassOfType::from(
                         db,
                         SubclassOfInner::TypeVar(typing_self),
@@ -665,7 +667,7 @@ impl<'db> OverloadLiteral<'db> {
             } else {
                 // If skip creating the typevar, we use "instance of class" or "subclass of
                 // class" as the implicit annotation instead.
-                if self.is_classmethod(db) {
+                if self.is_classmethod(db) || is_dunder_new {
                     Some(SubclassOfType::from(
                         db,
                         SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),

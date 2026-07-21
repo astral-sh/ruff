@@ -553,7 +553,7 @@ impl<'db> ConstructorContext<'db> {
         self.instance_type
     }
 
-    fn kind(self) -> ConstructorCallableKind {
+    pub(super) fn kind(self) -> ConstructorCallableKind {
         self.kind
     }
 }
@@ -635,7 +635,7 @@ impl<'db> Binding<'db> {
             return false;
         };
 
-        let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
+        let Type::SubclassOf(subclass_of) = cls_parameter_ty.resolve_type_alias(db) else {
             return false;
         };
         let Some(cls_typevar) = subclass_of.into_type_var() else {

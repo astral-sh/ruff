@@ -1004,7 +1004,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .and_then(|class| class.known(db))
             {
-                if known_class == KnownClass::Staticmethod {
+                if known_class == KnownClass::Staticmethod && function_name != "__new__" {
                     return None;
                 }
 

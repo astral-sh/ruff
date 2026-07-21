@@ -865,7 +865,7 @@ class C[T]:
     x: T
 
     def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
-        return object.__new__(cls)
+        raise NotImplementedError()
 
 reveal_type(C(1))  # revealed: C[tuple[int, int]]
 reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
