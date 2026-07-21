@@ -487,6 +487,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::ImplicitCwd), // FURB177
     RuleSelector::rule(Rule::HashlibDigestHex), // FURB181
     RuleSelector::rule(Rule::SliceToRemovePrefixOrSuffix), // FURB188
+    RuleSelector::rule(Rule::SortedMinMax), // FURB192
     RuleSelector::rule(Rule::LoggingWarn), // G010
     RuleSelector::rule(Rule::LoggingExtraAttrClash), // G101
     RuleSelector::rule(Rule::LoggingExcInfo), // G201
@@ -495,6 +496,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::FStringInGetTextFuncCall), // INT001
     RuleSelector::rule(Rule::FormatInGetTextFuncCall), // INT002
     RuleSelector::rule(Rule::PrintfInGetTextFuncCall), // INT003
+    RuleSelector::rule(Rule::ImplicitStringConcatenationInCollectionLiteral), // ISC004
     RuleSelector::rule(Rule::DirectLoggerInstantiation), // LOG001
     RuleSelector::rule(Rule::InvalidGetLoggerArgument), // LOG002
     RuleSelector::rule(Rule::UndocumentedWarn), // LOG009
@@ -528,6 +530,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::NonlocalWithoutBinding), // PLE0117
     RuleSelector::rule(Rule::LoadBeforeGlobalDeclaration), // PLE0118
     RuleSelector::rule(Rule::InvalidLengthReturnType), // PLE0303
+    RuleSelector::rule(Rule::InvalidBoolReturnType), // PLE0304
     RuleSelector::rule(Rule::InvalidIndexReturnType), // PLE0305
     RuleSelector::rule(Rule::InvalidStrReturnType), // PLE0307
     RuleSelector::rule(Rule::InvalidBytesReturnType), // PLE0308
@@ -558,6 +561,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::PropertyWithParameters), // PLR0206
     RuleSelector::rule(Rule::ManualFromImport), // PLR0402
     RuleSelector::rule(Rule::RedefinedArgumentFromLocal), // PLR1704
+    RuleSelector::rule(Rule::StopIterationReturn), // PLR1708
     RuleSelector::rule(Rule::UselessReturn), // PLR1711
     RuleSelector::rule(Rule::BooleanChainedComparison), // PLR1716
     RuleSelector::rule(Rule::SysExitAlias), // PLR1722
@@ -672,6 +676,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryRound), // RUF057
     RuleSelector::rule(Rule::StarmapZip), // RUF058
     RuleSelector::rule(Rule::UnusedUnpackedVariable), // RUF059
+    RuleSelector::rule(Rule::AccessAnnotationsFromClassDict), // RUF063
+    RuleSelector::rule(Rule::DuplicateEntryInDunderAll), // RUF068
     RuleSelector::rule(Rule::UnusedNOQA), // RUF100
     RuleSelector::rule(Rule::RedirectedNOQA), // RUF101
     RuleSelector::rule(Rule::InvalidPyprojectToml), // RUF200
