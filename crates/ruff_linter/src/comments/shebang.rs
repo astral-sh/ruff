@@ -23,7 +23,15 @@ impl<'a> ShebangDirective<'a> {
             return None;
         }
 
-        Some(Self(cursor.chars().as_str()))
+        // A shebang must specify an absolute interpreter path, which always
+        // begins with `/` (optionally preceded by spaces or tabs). We reject
+        // bare `#!` comments like `#! regular comment` that are not shebangs.
+        let rest = cursor.chars().as_str();
+        if !rest.trim_start_matches([' ', '\t']).starts_with('/') {
+            return None;
+        }
+
+        Some(Self(rest))
     }
 }
 
@@ -83,6 +91,34 @@ mod tests {
     #[test]
     fn shebang_leading_space() {
         let source = "  #!/usr/bin/env python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    /// `#! /usr/bin/env python` — space between `!` and `/` is valid.
+    #[test]
+    fn shebang_space_before_path() {
+        let source = "#! /usr/bin/env python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    /// `#! regular comment` — not a shebang; no interpreter path.
+    #[test]
+    fn shebang_regular_comment() {
+        let source = "#! regular comment";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    /// `#!python` — not a valid shebang; interpreter must be an absolute path.
+    #[test]
+    fn shebang_no_slash() {
+        let source = "#!python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    /// `#!` (empty) — not a shebang.
+    #[test]
+    fn shebang_empty() {
+        let source = "#!";
         assert_debug_snapshot!(ShebangDirective::try_extract(source));
     }
 }
