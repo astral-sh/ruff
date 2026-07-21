@@ -526,6 +526,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
+    #[inline]
     pub(crate) fn and(
         mut self,
         db: &'db dyn Db,
