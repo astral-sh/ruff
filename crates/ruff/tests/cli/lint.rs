@@ -2685,7 +2685,6 @@ fn add_noqa_existing_ignore() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        warning: #ruff:ignore comment found but not active, enable preview mode
         Added 1 noqa directive.
         ",
     );
@@ -2696,7 +2695,7 @@ fn add_noqa_existing_ignore() -> Result<()> {
         test_code,
         @"
 
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ",
     );
