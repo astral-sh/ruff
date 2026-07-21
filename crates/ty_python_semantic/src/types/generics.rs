@@ -2232,10 +2232,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.constraints,
             self.inferable,
             |_variance, path_bound| {
-                // A projection choice must not turn an invalid path into a satisfiable one.
-                let solution = PathBounds::default_solve(self.db, self.constraints, path_bound)?;
                 let typevar = path_bound.bound_typevar;
-                Ok(choose(typevar, Some(path_bound)).or(solution))
+                if let Some(ty) = choose(typevar, Some(path_bound)) {
+                    return Ok(Some(ty));
+                }
+
+                PathBounds::default_solve(self.db, self.constraints, path_bound)
             },
         ) {
             Solutions::Unsatisfiable => return Err(()),
