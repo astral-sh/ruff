@@ -35,6 +35,8 @@ use crate::Db;
 use crate::types::Type;
 use crate::types::function::FunctionLiteral;
 
+const MAX_RECURSIVE_TYPE_EXPANSIONS: usize = 10;
+
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
@@ -171,7 +173,7 @@ where
         item: T,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit(db, item) {
+        match self.begin_visit_with_expansion_limit(db, item, MAX_RECURSIVE_TYPE_EXPANSIONS) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
@@ -182,6 +184,37 @@ where
     }
 
     fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+        self.begin_visit_with_expansion_limit(db, item, 0)
+    }
+
+    /// Starts a visit while allowing `expansion_limit` different items with the same identity
+    /// after the first active item. A limit of zero therefore stops at the first different item,
+    /// while a limit of `N` permits `N` further expansions. Exact item recurrence is handled
+    /// before this limit and returns the configured fallback at any depth.
+    ///
+    /// This is necessary because there are recursive aliases that require several expansions to reach a "stable point", such as:
+    ///
+    /// ```python
+    /// type Left[A, B, C] = tuple[A, Left[B, C, None]]
+    /// type Right[A, B, C] = tuple[A, Right[B, C, None]]
+    ///
+    /// # Left[int, int, int]
+    /// # = tuple[int, Left[int, int, None]]
+    /// # = tuple[int, tuple[int, Left[int, None, None]]]
+    /// # = tuple[int, tuple[int, tuple[int, Left[None, None, None]]]]
+    /// # Left[None, None, None] (= tuple[None, Left[None, None, None]]) is stable, so it can be completely determined
+    /// static_assert(is_subtype_of(Left[int, int, int], Right[int, int, int]))
+    /// ```
+    ///
+    /// A growing specialization chain may never reach such an exact recurrence. The finite limit
+    /// guarantees that it eventually produces [`CycleDetectorVisit::Cycle`], allowing the caller
+    /// to return a conservative result.
+    fn begin_visit_with_expansion_limit(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        expansion_limit: usize,
+    ) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -192,7 +225,12 @@ where
         }
 
         let identity = item.to_identity(db);
-        if seen.iter().any(|active| active.identity == identity) {
+        if seen
+            .iter()
+            .filter(|active| active.identity == identity)
+            .count()
+            > expansion_limit
+        {
             return CycleDetectorVisit::Cycle(item);
         }
         drop(seen);
