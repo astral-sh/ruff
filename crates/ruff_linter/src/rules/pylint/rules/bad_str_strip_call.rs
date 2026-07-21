@@ -46,7 +46,7 @@ use ruff_python_ast::PythonVersion;
 /// - `target-version`
 ///
 /// ## References
-/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
+/// - [Python documentation: `str.strip()`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct BadStrStripCall {
