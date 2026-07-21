@@ -5382,20 +5382,20 @@ enum Sequent {
         ante2: ConstraintId,
     },
 
-    /// Sequent of the form `C₁ ∧ C₂ → D`
+    /// Sequent of the form `C → D`
     ///
-    /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
-    /// well. For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if
-    /// it doesn't appear in the BDD.
+    /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
+    /// holds, we can add `D` to the path even if it doesn't appear in the BDD.
     SingleImplication {
         ante: ConstraintId,
         post: ConstraintId,
     },
 
-    /// Sequent of the form `C → D`
+    /// Sequent of the form `C₁ ∧ C₂ → D`
     ///
-    /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
-    /// holds, we can add `D` to the path even if it doesn't appear in the BDD.
+    /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
+    /// well. For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if
+    /// it doesn't appear in the BDD.
     PairImplication {
         ante1: ConstraintId,
         ante2: ConstraintId,
