@@ -24,7 +24,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
 
     fn run_with_snapshot(
         snapshot: Self::Snapshot,
-        client: &Client,
+        _client: &Client,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
         let snapshot = match snapshot {
@@ -37,12 +37,12 @@ impl super::BackgroundDocumentRequestHandler for Format {
             }
         };
 
-        format_document(&snapshot, client)
+        format_document(&snapshot)
     }
 }
 
 /// Formats either a full text document or each individual cell in a single notebook document.
-pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client) -> Result<Fixes> {
+pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
     let query = snapshot.query();
     let backend = snapshot
@@ -56,21 +56,16 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client)
                 .uris()
                 .map(|uri| (uri.clone(), notebook.cell_document_by_uri(uri).unwrap()))
             {
-                if let Some(changes) = format_text_document(
-                    text_document,
-                    query,
-                    snapshot.encoding(),
-                    true,
-                    backend,
-                    client,
-                )? {
+                if let Some(changes) =
+                    format_text_document(text_document, query, snapshot.encoding(), true, backend)?
+                {
                     fixes.insert(uri, changes);
                 }
             }
         }
         DocumentQuery::Text { document, .. } => {
             if let Some(changes) =
-                format_text_document(document, query, snapshot.encoding(), false, backend, client)?
+                format_text_document(document, query, snapshot.encoding(), false, backend)?
             {
                 fixes.insert(snapshot.query().make_key().into_uri(), changes);
             }
@@ -82,10 +77,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client)
 
 /// Formats either a full text document or an specific notebook cell. If the query within the snapshot is a notebook document
 /// with no selected cell, this will throw an error.
-pub(super) fn format_document(
-    snapshot: &DocumentSnapshot,
-    client: &Client,
-) -> Result<super::FormatResponse> {
+pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse> {
     let text_document = snapshot
         .query()
         .as_single_document()
@@ -102,7 +94,6 @@ pub(super) fn format_document(
         snapshot.encoding(),
         query.as_notebook().is_some(),
         backend,
-        client,
     )
 }
 
@@ -112,7 +103,6 @@ fn format_text_document(
     encoding: PositionEncoding,
     is_notebook: bool,
     backend: crate::format::FormatBackend,
-    client: &Client,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
@@ -140,14 +130,6 @@ fn format_text_document(
     let mut formatted = match formatted {
         FormatResult::Formatted(formatted) => formatted,
         FormatResult::Unchanged => return Ok(None),
-        FormatResult::PreviewOnly { file_format } => {
-            client.show_warning_message(
-                format_args!(
-                    "{file_format} formatting is available only in preview mode. Enable `format.preview = true` in your Ruff configuration."
-                ),
-            );
-            return Ok(None);
-        }
     };
 
     // special case - avoid adding a newline to a notebook cell if it didn't already exist

@@ -2504,31 +2504,12 @@ fn cookiecutter_globbing() -> Result<()> {
 }
 
 #[test]
-fn markdown_formatting_preview_disabled() -> Result<()> {
+fn markdown_formatting() -> Result<()> {
     let test = CliTest::new()?;
     let unformatted = test.fixture_path("unformatted.md");
 
     assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--no-preview", "--diff"])
-        .arg(unformatted),
-        @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, enable preview mode.
-    ");
-    Ok(())
-}
-
-#[test]
-fn markdown_formatting_preview_enabled() -> Result<()> {
-    let test = CliTest::new()?;
-    let unformatted = test.fixture_path("unformatted.md");
-
-    assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--preview", "--check"])
+        .args(["--isolated", "--check"])
         .arg(unformatted),
         @r#"
     success: false
@@ -2570,7 +2551,7 @@ fn markdown_formatting_stdin() -> Result<()> {
     let unformatted = fs::read(test.fixture_path("unformatted.md")).unwrap();
 
     assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--preview", "--stdin-filename", "unformatted.md"])
+        .args(["--isolated", "--stdin-filename", "unformatted.md"])
         .arg("-")
         .pass_stdin(unformatted), @r#"
     success: true
@@ -2613,7 +2594,7 @@ print( 'hello' )
     ])?;
 
     assert_cmd_snapshot!(
-        test.format_command().args(["--preview", "--diff", "test.qmd"]),
+        test.format_command().args(["--diff", "test.qmd"]),
         @r#"
     success: false
     exit_code: 1
@@ -2666,14 +2647,11 @@ print( 'hello' )
 
     assert_cmd_snapshot!(
             test.format_command()
-                .args(["format", "--preview", "--check", "."]),
+                .args(["--check", "."]),
             @r#"
     success: false
-    exit_code: 2
+    exit_code: 1
     ----- stdout -----
-    io: [TMP]/format: No such file or directory (os error 2)
-    --> format:1:1
-
     unformatted: File would be reformatted
      --> test.bar:1:1
       |
