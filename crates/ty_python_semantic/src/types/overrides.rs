@@ -136,7 +136,13 @@ fn check_inherited_method_conflicts<'db>(
             Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
                 direct_bases.push(base);
             }
-            Some(ClassBase::Generic | ClassBase::Protocol) => {}
+            Some(
+                ClassBase::Generic
+                | ClassBase::Protocol
+                | ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_),
+            ) => {}
             _ => return,
         }
     }
@@ -154,16 +160,16 @@ fn check_inherited_method_conflicts<'db>(
     }
 
     let mut mro = Vec::new();
+    let mut first_dynamic_base = None;
     for base in class_specialized.iter_mro(db).skip(1) {
         match base {
             ClassBase::Class(base) if base.is_object(db) => break,
             ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
             ClassBase::Protocol | ClassBase::Generic => {}
-            ClassBase::Any
-            | ClassBase::Dynamic(_)
-            | ClassBase::Divergent(_)
-            | ClassBase::TypedDict(_)
-            | ClassBase::Class(_) => return,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                first_dynamic_base.get_or_insert(mro.len());
+            }
+            ClassBase::TypedDict(_) | ClassBase::Class(_) => return,
         }
     }
     let receiver = Type::instance(db, class_specialized);
@@ -173,6 +179,9 @@ fn check_inherited_method_conflicts<'db>(
         .collect();
 
     for (index, owner) in mro.iter().copied().enumerate() {
+        if first_dynamic_base.is_some_and(|dynamic_index| index >= dynamic_index) {
+            break;
+        }
         let Some((owner_literal, _)) = owner.static_class_literal(db) else {
             continue;
         };

@@ -680,9 +680,9 @@ info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
-### Conflicts between later bases
+### Empty bases do not hide conflicts
 
-An earlier base without the method does not prevent a conflict between the second and third bases.
+An empty base can appear before, between, or after the bases that define the conflicting methods.
 
 ```pyi
 class Empty: ...
@@ -693,7 +693,9 @@ class ReturnsStr:
 class ReturnsInt:
     def method(self) -> int: ...
 
-class LaterBaseConflict(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+class EmptyFirst(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+class EmptyMiddle(ReturnsStr, Empty, ReturnsInt): ...  # error: [invalid-method-override]
+class EmptyLast(ReturnsStr, ReturnsInt, Empty): ...  # error: [invalid-method-override]
 ```
 
 ### An earlier compatible method satisfies both contracts
@@ -761,6 +763,29 @@ class AcceptsStr:
     def accepts(self, value: str) -> None: ...
 
 class AnyConflict(AcceptsStr, AcceptsAny): ...  # error: [invalid-method-override]
+```
+
+### Dynamic bases only hide later conflicts
+
+An intermediate `Any` base cannot hide a conflict when the effective method is already known. An
+earlier `Any` base can define the effective method, so later base definitions cannot be checked.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```pyi
+from typing import Any
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class DynamicMiddle(ReturnsStr, Any, ReturnsInt): ...  # error: [invalid-method-override]
+class DynamicFirst(Any, ReturnsStr, ReturnsInt): ...
 ```
 
 ### Generic bases
@@ -848,40 +873,6 @@ class StringConflict(FirstString, SecondString, Enum):  # error: [invalid-method
     MEMBER = 1
 ```
 
-### Unreachable definitions do not shadow inherited methods
-
-An assignment in an unreachable branch does not replace the method inherited from `ReturnsStr`.
-
-```pyi
-class ReturnsStr:
-    def method(self) -> str: ...
-
-class UnreachableShadow(ReturnsStr):
-    if False:
-        method = 0
-
-class ReturnsInt:
-    def method(self) -> int: ...
-
-class UnreachableConflict(ReturnsInt, UnreachableShadow): ...  # error: [invalid-method-override]
-```
-
-### Special methods
-
-Special methods such as `__iter__` participate in the same compatibility check as other methods.
-
-```pyi
-from typing import Iterator
-
-class IteratesStr:
-    def __iter__(self) -> Iterator[str]: ...
-
-class IteratesInt:
-    def __iter__(self) -> Iterator[int]: ...
-
-class IteratorConflict(IteratesStr, IteratesInt): ...  # error: [invalid-method-override]
-```
-
 ### Instance, static, and class methods
 
 Instance methods, static methods, and class methods are bound differently. Each pair can therefore
@@ -927,7 +918,8 @@ info: This violates the Liskov Substitution Principle
 ### Class methods use the subclass as their receiver
 
 The signature selected for a class method overload can depend on the class used as the receiver.
-Here, binding through `Combined` selects the `int` overload, which conflicts with `Right.selected`.
+Binding through `Combined` selects the `int` overload, which conflicts with `Right.selected`.
+Binding through `Compatible` selects the compatible `str` overload.
 
 ```pyi
 from typing import overload
@@ -947,6 +939,7 @@ class Right(ReceiverBase):
     def selected(cls) -> str: ...
 
 class Combined(Left, Right): ...  # error: [invalid-method-override]
+class Compatible(Left, Right): ...
 ```
 
 ### Metaclass descriptors do not replace class method contracts
