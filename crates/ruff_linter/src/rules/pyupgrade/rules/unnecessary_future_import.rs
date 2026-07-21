@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use itertools::{Itertools, chain};
+use itertools::Itertools;
 use ruff_python_semantic::NodeId;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -45,16 +45,15 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
-pub(crate) struct UnnecessaryFutureImport {
-    pub names: Vec<String>,
+pub(crate) struct UnnecessaryFutureImport<'a> {
+    pub names: &'a [&'a str],
 }
 
-impl AlwaysFixableViolation for UnnecessaryFutureImport {
+impl AlwaysFixableViolation for UnnecessaryFutureImport<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryFutureImport { names } = self;
-        if names.len() == 1 {
-            let import = &names[0];
+        if let [import] = names {
             format!("Unnecessary `__future__` import `{import}` for target Python version")
         } else {
             let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
@@ -67,7 +66,8 @@ impl AlwaysFixableViolation for UnnecessaryFutureImport {
     }
 }
 
-const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
+const REMOVE_FUTURES: &[&str] = &[
+    // Removed in Python 3.3
     "nested_scopes",
     "generators",
     "with_statement",
@@ -76,17 +76,7 @@ const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "with_statement",
     "print_function",
     "unicode_literals",
-];
-
-const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
+    // Removed in Python 3.7
     "generator_stop",
 ];
 
@@ -131,7 +121,7 @@ pub(crate) fn is_import_required_by_isort(
 /// UP010
 pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
     let mut unused_imports: HashMap<NodeId, Vec<&Alias>> = HashMap::new();
-    for future_name in chain(PY33_PLUS_REMOVE_FUTURES, PY37_PLUS_REMOVE_FUTURES).unique() {
+    for future_name in REMOVE_FUTURES {
         for binding_id in scope.get_all(future_name) {
             let binding = checker.semantic().binding(binding_id);
             if binding.kind.is_future_import() && binding.is_unused() {
@@ -170,14 +160,13 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
         reason = "each import statement produces an independent diagnostic and fix"
     )]
     for (node_id, unused_aliases) in unused_imports {
+        let names: Vec<_> = unused_aliases
+            .iter()
+            .map(|alias| alias.name.as_str())
+            .sorted()
+            .collect();
         let mut diagnostic = checker.report_diagnostic(
-            UnnecessaryFutureImport {
-                names: unused_aliases
-                    .iter()
-                    .map(|alias| alias.name.to_string())
-                    .sorted()
-                    .collect(),
-            },
+            UnnecessaryFutureImport { names: &names },
             checker.semantic().statement(node_id).range(),
         );
 
@@ -185,10 +174,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
             let statement = checker.semantic().statement(node_id);
             let parent = checker.semantic().parent_statement(node_id);
             let edit = fix::edits::remove_unused_imports(
-                unused_aliases
-                    .iter()
-                    .map(|alias| &alias.name)
-                    .map(ast::Identifier::as_str),
+                names.into_iter(),
                 statement,
                 parent,
                 checker.locator(),
