@@ -732,6 +732,13 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
         TypeVarEvaluation,
     );
 
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0)
+            && self.1.may_share_type_identity(db, other.1)
+            && self.2 == other.2
+            && self.3 == other.3
+    }
+
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (
             self.0.to_type_identity(db),
@@ -874,6 +881,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    /// Checks class subtyping without discarding the active recursive relation state.
+    pub(super) fn is_class_subtype(
+        &self,
+        db: &'db dyn Db,
+        source: ClassType<'db>,
+        target: ClassType<'db>,
+    ) -> bool {
+        Self::subtyping(
+            self.constraints,
+            InferableTypeVars::None,
+            self.relation_visitor,
+            self.disjointness_visitor,
+            self.signature_relation_visitor,
+            self.materialization_visitor,
+        )
+        .check_class_pair(db, source, target)
+        .is_always_satisfied(db)
+    }
+
     pub(super) const fn is_eager_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
@@ -967,20 +993,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn recursive_type_pair_fallback(
         &self,
-        source: Type<'db>,
-        target: Type<'db>,
+        _source: Type<'db>,
+        _target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
-            // TODO: Recursive aliases can encode context-free languages, whose inclusion and
-            // equivalence are undecidable. No complete fallback exists, but more decidable cases
-            // can be recognized here before conservatively rejecting the pair.
-            return self.never();
-        }
-
-        // Mixed recursive cycles (for example, alias vs. protocol) keep the existing coinductive
-        // fallback. Alias pairs are rejected above instead of generating another recursive
-        // obligation.
-        self.always()
+        // TODO: Recursively-specialized structural types can encode context-free languages,
+        // whose inclusion and equivalence are undecidable. No complete fallback exists, but
+        // more decidable cases can be recognized here before conservatively rejecting the pair.
+        //
+        // Strictly speaking, it is incorrect to use either `never` or `always` as a conservative result.
+        // The correct choice here is a logical value that is "neither true nor false", and expressing this requires the introduction of 3-valued logic.
+        // Discussion: https://github.com/astral-sh/ty/issues/4050
+        self.never()
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?

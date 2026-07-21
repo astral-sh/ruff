@@ -2091,6 +2091,67 @@ static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
 ```
 
+## Recursively-specialized generic `TypedDict`s
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class LeftRecursiveDict[T](TypedDict):
+    child: LeftRecursiveDict[list[T]]
+
+class RightRecursiveDict[T](TypedDict):
+    child: RightRecursiveDict[list[T]]
+
+class DifferentRecursiveDict[T](TypedDict):
+    child: DifferentRecursiveDict[set[T]]
+
+# TODO: These structurally equivalent TypedDicts should be recognized as subtypes.
+static_assert(not is_subtype_of(LeftRecursiveDict[int], RightRecursiveDict[int]))
+# A conservative cycle fallback must not accept structurally different recursive TypedDicts.
+static_assert(not is_subtype_of(LeftRecursiveDict[int], DifferentRecursiveDict[int]))
+
+class FiniteLeftDict[T](TypedDict):
+    value: T
+
+class FiniteRightDict[T](TypedDict):
+    value: T
+
+# Reusing a non-recursive TypedDict at a finite nesting depth is not a recursive definition.
+static_assert(
+    is_subtype_of(
+        FiniteLeftDict[FiniteLeftDict[int]],
+        FiniteRightDict[FiniteRightDict[int]],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        FiniteLeftDict[FiniteLeftDict[int]],
+        FiniteRightDict[FiniteRightDict[str]],
+    )
+)
+
+class DictBox[T](TypedDict):
+    value: T
+
+class NestedLeftDict[T](TypedDict):
+    child: DictBox[DictBox[NestedLeftDict[list[T]]]]
+
+class NestedRightDict[T](TypedDict):
+    child: DictBox[DictBox[NestedRightDict[list[T]]]]
+
+# TODO: These structurally equivalent TypedDicts should be recognized as subtypes.
+static_assert(not is_subtype_of(NestedLeftDict[int], NestedRightDict[int]))
+```
+
 ## Redundant cast warnings
 
 <!-- snapshot-diagnostics -->

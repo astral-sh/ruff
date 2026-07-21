@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -32,15 +32,19 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::Db;
-use crate::types::Type;
 use crate::types::function::FunctionLiteral;
+use crate::types::generics::Specialization;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
+    RecursiveProtocol(Definition<'db>),
     RecursiveTypeAlias(Definition<'db>),
+    RecursiveTypedDict(Definition<'db>),
     NonRecursive(Type<'db>),
 }
 
@@ -48,6 +52,28 @@ impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::NonRecursive(self))
+    }
+
+    /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
+    ///
+    /// A `true` result is only a candidate match and must be confirmed with
+    /// [`Type::to_type_identity`].
+    pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+        match (self, other) {
+            (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
+            (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
+            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            _ => false,
+        }
     }
 
     #[allow(clippy::inline_always)]
@@ -67,8 +93,174 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) if alias.is_recursive(db) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
+            Type::ProtocolInstance(protocol) if protocol.is_recursive(db) => {
+                Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
+            }
+            Type::TypedDict(typed_dict) if typed_dict.is_recursive(db) => {
+                let definition = typed_dict.definition(db)?;
+                Some(TypeIdentity::RecursiveTypedDict(definition))
+            }
             _ => None,
         }
+    }
+}
+
+struct DefinitionReferenceVisitor<'db> {
+    target: Definition<'db>,
+    active_definitions: ActiveRecursionDetector<Definition<'db>>,
+    visited_types: TypeCollector<'db>,
+    found: Cell<bool>,
+}
+
+impl<'db> DefinitionReferenceVisitor<'db> {
+    /// Returns whether the definition represented by `ty` references `target`.
+    fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
+        let visitor = Self::new(target);
+        visitor.visit_definition_body(db, ty);
+        visitor.found.get()
+    }
+
+    fn new(target: Definition<'db>) -> Self {
+        Self {
+            target,
+            active_definitions: ActiveRecursionDetector::default(),
+            visited_types: TypeCollector::default(),
+            found: Cell::new(false),
+        }
+    }
+
+    fn definition_and_specialization(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(Definition<'db>, Option<Specialization<'db>>)> {
+        if let Type::TypeAlias(alias) = ty {
+            return Some((alias.definition(db), alias.specialization(db)));
+        }
+
+        let class = match ty {
+            Type::ProtocolInstance(protocol) => *protocol.class_origin()?,
+            Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
+            _ => return None,
+        };
+        let definition = class.definition(db)?;
+        let specialization = class
+            .into_generic_alias()
+            .map(|generic| generic.specialization(db));
+        Some((definition, specialization))
+    }
+
+    fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        for ty in specialization.types(db) {
+            self.visit_type(db, *ty);
+        }
+    }
+
+    fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
+            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(db, protocol),
+            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
+            _ => {}
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+
+        if let Some((definition, specialization)) = Self::definition_and_specialization(db, ty) {
+            if definition == self.target {
+                self.found.set(true);
+                return;
+            }
+
+            if let Some(specialization) = specialization {
+                self.visit_specialization(db, specialization);
+            }
+
+            if !self.found.get() {
+                self.active_definitions.visit(
+                    &definition,
+                    || {},
+                    || self.visit_definition_body(db, ty),
+                );
+            }
+        } else {
+            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        }
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        if let Some(class) = protocol.class_origin() {
+            class.walk_recursive_member_types(db, self);
+        }
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.visit_type(db, alias.raw_value_type(db));
+    }
+
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        for field in typed_dict.items(db).values() {
+            self.visit_type(db, field.declared_ty);
+        }
+        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+            self.visit_type(db, extra_items.declared_ty);
+        }
+    }
+}
+
+impl<'db> TypeAliasType<'db> {
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        DefinitionReferenceVisitor::references(
+            db,
+            Type::TypeAlias(self.unspecialized(db)),
+            self.definition(db),
+        )
+    }
+}
+
+impl<'db> ProtocolInstanceType<'db> {
+    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let (origin, _) = self.class_origin()?.static_class_literal(db)?;
+        Some(origin.definition(db))
+    }
+
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        let Some(class) = self.class_origin() else {
+            return false;
+        };
+        let Some((origin, _)) = class.static_class_literal(db) else {
+            return false;
+        };
+        let definition = origin.definition(db);
+        // Inspect the definition without its current specialization. Otherwise, a finite
+        // type such as `Protocol[Protocol[int]]` would appear recursive.
+        let unspecialized = Type::instance(db, ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(db, unspecialized, definition)
+    }
+}
+
+impl<'db> TypedDictType<'db> {
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        let Some(class) = self.defining_class() else {
+            return false;
+        };
+        let Some((origin, _)) = class.static_class_literal(db) else {
+            return false;
+        };
+        let definition = origin.definition(db);
+        // Inspect the definition without its current specialization for the same reason as
+        // protocols above.
+        let unspecialized = Type::typed_dict(ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(db, unspecialized, definition)
     }
 }
 
@@ -76,12 +268,24 @@ impl<'db> Type<'db> {
 pub trait HasIdentity<'db> {
     type Id: PartialEq;
 
+    /// Returns `false` if `self` and `other` cannot have the same identity.
+    ///
+    /// Implementations can use this to avoid constructing an expensive identity. Returning
+    /// `true` does not imply that the identities match; [`HasIdentity::to_identity`] confirms it.
+    fn may_share_identity(&self, _db: &'db dyn Db, _other: &Self) -> bool {
+        true
+    }
+
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
     type Id = TypeIdentity<'db>;
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.may_share_type_identity(db, *other)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         Type::to_type_identity(*self, db)
@@ -93,6 +297,10 @@ pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, T
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
 
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
+    }
+
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_type_identity(db), self.1.to_type_identity(db))
     }
@@ -103,6 +311,12 @@ where
     Context: Copy + PartialEq,
 {
     type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0)
+            && self.1 == other.1
+            && self.2.may_share_type_identity(db, other.2)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (
@@ -117,7 +331,7 @@ where
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
-    /// The active recursion stack and the identity of each item.
+    /// The active recursion stack and the lazily-computed identity of each item.
     /// Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
 
@@ -191,10 +405,23 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        let identity = item.to_identity(db);
-        if seen.iter().any(|active| active.identity == identity) {
-            return CycleDetectorVisit::Cycle(item);
-        }
+        let mut candidates = seen
+            .iter()
+            .filter(|active| item.may_share_identity(db, &active.item))
+            .peekable();
+        let identity = if candidates.peek().is_none() {
+            OnceCell::new()
+        } else {
+            // Deriving an identity can require a structural definition walk. Defer it until a
+            // cheap candidate match shows that another active item could form a cycle.
+            let identity = item.to_identity(db);
+            if candidates.any(|active| {
+                active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
+            }) {
+                return CycleDetectorVisit::Cycle(item);
+            }
+            OnceCell::from(identity)
+        };
         drop(seen);
 
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
@@ -217,7 +444,7 @@ where
 
 struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
     item: T,
-    identity: T::Id,
+    identity: OnceCell<T::Id>,
 }
 
 impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
@@ -449,9 +676,14 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
-    use crate::db::tests::setup_db;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::Type;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem;
+    use std::cell::Cell;
+    use std::hash::{Hash, Hasher};
 
     struct TestVisit;
 
@@ -465,17 +697,45 @@ mod tests {
         }
     }
 
-    static IDENTITY_CALLS: AtomicUsize = AtomicUsize::new(0);
+    #[derive(Clone)]
+    struct CountingIdentityItem<'a> {
+        value: u8,
+        identity_calls: &'a Cell<usize>,
+    }
 
-    #[derive(Clone, Eq, Hash, PartialEq)]
-    struct CountingIdentityItem(u8);
+    impl<'a> CountingIdentityItem<'a> {
+        const fn new(value: u8, identity_calls: &'a Cell<usize>) -> Self {
+            Self {
+                value,
+                identity_calls,
+            }
+        }
+    }
 
-    impl<'db> HasIdentity<'db> for CountingIdentityItem {
+    impl PartialEq for CountingIdentityItem<'_> {
+        fn eq(&self, other: &Self) -> bool {
+            self.value == other.value
+        }
+    }
+
+    impl Eq for CountingIdentityItem<'_> {}
+
+    impl Hash for CountingIdentityItem<'_> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.value.hash(state);
+        }
+    }
+
+    impl<'db> HasIdentity<'db> for CountingIdentityItem<'_> {
         type Id = u8;
 
+        fn may_share_identity(&self, _db: &'db dyn Db, other: &Self) -> bool {
+            self.value % 2 == other.value % 2
+        }
+
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
-            IDENTITY_CALLS.fetch_add(1, Ordering::Relaxed);
-            self.0
+            self.identity_calls.set(self.identity_calls.get() + 1);
+            self.value
         }
     }
 
@@ -486,6 +746,57 @@ mod tests {
         type Id = ();
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {}
+    }
+
+    fn global_instance_type<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+        let file = system_path_to_file(db, "/src/a.py").unwrap();
+        global_symbol(db, file, name)
+            .place
+            .expect_type()
+            .to_instance_approximation(db)
+            .unwrap()
+    }
+
+    #[test]
+    fn property_receiver_does_not_make_protocol_recursive() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from __future__ import annotations
+
+from typing import Protocol
+
+class GenericProperty[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class RecursiveProperty[T](Protocol):
+    @property
+    def child(self) -> RecursiveProperty[list[T]]: ...
+
+class RecursivePropertySetter[T](Protocol):
+    @property
+    def child(self) -> int: ...
+
+    @child.setter
+    def child(self, value: RecursivePropertySetter[list[T]]) -> None: ...
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            global_instance_type(&db, "GenericProperty").recursive_identity(&db),
+            None
+        );
+        assert!(matches!(
+            global_instance_type(&db, "RecursiveProperty").recursive_identity(&db),
+            Some(TypeIdentity::RecursiveProtocol(_))
+        ));
+        assert!(matches!(
+            global_instance_type(&db, "RecursivePropertySetter").recursive_identity(&db),
+            Some(TypeIdentity::RecursiveProtocol(_))
+        ));
     }
 
     #[test]
@@ -518,16 +829,48 @@ mod tests {
     #[test]
     fn computes_each_active_identity_once() {
         let db = setup_db();
-        IDENTITY_CALLS.store(0, Ordering::Relaxed);
-        let detector = CycleDetector::<TestVisit, CountingIdentityItem, u8, 1>::new(0);
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem(1), || {
-                detector.visit(&db, CountingIdentityItem(2), || 1)
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&db, CountingIdentityItem::new(3, &identity_calls), || 1)
             }),
             1
         );
-        assert_eq!(IDENTITY_CALLS.load(Ordering::Relaxed), 2);
+        assert_eq!(identity_calls.get(), 2);
+    }
+
+    #[test]
+    fn skips_identity_for_distinct_candidates() {
+        let db = setup_db();
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&db, CountingIdentityItem::new(2, &identity_calls), || 1)
+            }),
+            1
+        );
+        assert_eq!(identity_calls.get(), 0);
+    }
+
+    #[test]
+    fn skips_identity_without_a_distinct_active_item() {
+        let db = setup_db();
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 1),
+            1
+        );
+        assert_eq!(
+            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 2),
+            1
+        );
+        assert_eq!(identity_calls.get(), 0);
     }
 
     #[test]
