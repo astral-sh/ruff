@@ -32,10 +32,10 @@ use crate::types::{
     UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet};
-use ty_python_core::SemanticIndex;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
+use ty_python_core::{SemanticIndex, place_table};
 
 /// Given a string literal or a union of string literals, return an iterator over the contained
 /// strings, or `None` if the type is neither.
@@ -475,14 +475,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }))
         };
 
-        let disable_int_float_special_case = generic_class
-            .identity_specialization(db)
-            .into_protocol_class(db)
-            .is_some_and(|protocol| {
-                protocol
-                    .interface(db)
-                    .includes_generic_writable_instance_member(db, "__class__", generic_context)
-            });
+        // Avoid constructing an identity specialization and a full protocol interface for the
+        // many generic protocols that do not directly declare `__class__`.
+        let disable_int_float_special_case = generic_class.is_protocol(db)
+            && place_table(db, generic_class.body_scope(db))
+                .symbol_id("__class__")
+                .is_some()
+            && generic_class
+                .identity_specialization(db)
+                .into_protocol_class(db)
+                .is_some_and(|protocol| {
+                    protocol
+                        .interface(db)
+                        .includes_generic_writable_instance_member(db, "__class__", generic_context)
+                });
         let previously_disabled_int_float_special_case =
             disable_int_float_special_case.then(|| {
                 self.context
