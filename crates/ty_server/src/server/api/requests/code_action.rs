@@ -7,8 +7,8 @@ use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 use types::CodeActionKind;
 
 use crate::db::Db;

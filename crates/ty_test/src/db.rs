@@ -1,6 +1,5 @@
 use crate::config::{Analysis, Rules, ScriptOptions};
 use camino::{Utf8Component, Utf8PathBuf};
-use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::source::source_text;
@@ -9,6 +8,7 @@ use ruff_db::system::{
     WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::{Db as SourceDb, PythonFile};
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
 use std::borrow::Cow;
@@ -48,6 +48,10 @@ impl Db {
 
         db.settings = Some(Settings::new(&db));
         db
+    }
+
+    pub(crate) fn python_version(&self) -> ruff_python_ast::PythonVersion {
+        Program::get(self).python_version(self)
     }
 
     fn settings(&self) -> Settings {
@@ -128,16 +132,12 @@ impl ty_python_core::Db for Db {
 
 #[salsa::db]
 impl SemanticDb for Db {
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
-
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if !self.should_check_file(file) {
             return Vec::new();
         }
 
-        check_file_unwrap(self, file)
+        check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {

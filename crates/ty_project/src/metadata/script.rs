@@ -1,13 +1,13 @@
 use std::sync::{Arc, LazyLock};
 
 use memchr::memmem::Finder;
-use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
-use ruff_python_ast::script::ScriptTag;
+use ruff_db::{Db, PythonFile};
 use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{PythonVersion, script::ScriptTag};
 use ruff_ranged_value::ValueSource;
 use ruff_text_size::Ranged;
 
@@ -40,7 +40,8 @@ pub(crate) fn script_metadata(db: &dyn Db, file: File) -> Option<Box<PyProject>>
         .filter(|&offset| offset == 0 || matches!(source_bytes[offset - 1], b'\r' | b'\n'));
     let first_candidate = candidates.next()?;
 
-    let parsed = parsed_module(db, file).load(db);
+    // FIXME: Use the outer Python version to avoid reparsing scripts checked with another version.
+    let parsed = parsed_module(db, PythonFile::new(db, file, PythonVersion::latest())).load(db);
     let tokens = parsed.tokens();
     let tag = std::iter::once(first_candidate)
         .chain(candidates)

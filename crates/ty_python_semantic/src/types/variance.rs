@@ -1,4 +1,4 @@
-use crate::{Db, types::BoundTypeVarIdentity};
+use crate::{SemanticContext, types::BoundTypeVarIdentity};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
@@ -141,7 +141,11 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     ///
     /// Sometimes the recursive calls will be in positions where you need to
     /// specify a non-covariant polarity. See `with_polarity` for more details.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance;
+    fn variance_of(
+        self,
+        ctx: &SemanticContext<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
@@ -173,12 +177,16 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        ctx: &SemanticContext<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, typevar))
+        polarity.compose_thunk(|| variance_inferable.variance_of(ctx, typevar))
     }
 }

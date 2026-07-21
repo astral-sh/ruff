@@ -973,11 +973,7 @@ mod tests {
 
             for mut action in code_actions(
                 &self.db,
-                PythonFile::new(
-                    &self.db,
-                    self.file,
-                    ty_python_semantic::Db::python_version(&self.db),
-                ),
+                PythonFile::new(&self.db, self.file, self.db.python_version()),
                 self.diagnostic_range,
                 &lint.name,
             ) {

@@ -1,9 +1,10 @@
 use crate::Db;
+use crate::SemanticContext;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
 
@@ -54,15 +55,18 @@ impl<'db> NewType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
+        cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
+            &SemanticContext::from_file(db, self_.definition(db).python_file(db)),
+        )),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
-        let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
         let definition = self.definition(db);
+        let ctx = SemanticContext::from_file(db, definition.python_file(db));
+        let object_fallback = NewTypeBase::ClassType(ClassType::object(&ctx));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return object_fallback;
@@ -75,7 +79,7 @@ impl<'db> NewType<'db> {
         };
         match definition_expression_type(db, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
-                NewTypeBase::ClassType(nominal_instance_type.class(db))
+                NewTypeBase::ClassType(nominal_instance_type.class(&ctx))
             }
             Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
             // There are exactly two union types allowed as bases for NewType: `int | float` and
@@ -101,11 +105,12 @@ impl<'db> NewType<'db> {
 
     // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
     // one if this `NewType` is cyclical, and we fall back to `object` in that case.
-    pub fn concrete_base_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn concrete_base_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+        let db = ctx.db();
         for base in self.iter_bases(db) {
             match base {
                 NewTypeBase::NewType(_) => continue,
-                concrete => return concrete.instance_type(db),
+                concrete => return concrete.instance_type(ctx),
             }
         }
         Type::object()
@@ -181,12 +186,13 @@ impl<'db> NewType<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let db = ctx.db();
         let eager_base = match self.eager_base(db) {
-            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            Some(base) => Some(base.recursive_type_normalized_impl(ctx, div, nested)?),
             None => None,
         };
 
@@ -226,17 +232,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn check_newtype_pair(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         left: NewType<'db>,
         right: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
+        let db = ctx.db();
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
             .check_newtype_pair(db, left, right)
-            .or(db, self.constraints, || {
+            .or(ctx, self.constraints, || {
                 relation_checker.check_newtype_pair(db, right, left)
             })
             .negate(db, self.constraints)
@@ -244,17 +251,18 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 }
 
 pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     newtype: NewType<'db>,
     visitor: &V,
 ) {
+    let db = ctx.db();
     let base = if visitor.should_visit_lazy_type_attributes() {
         Some(newtype.base(db))
     } else {
         newtype.eager_base(db)
     };
     if let Some(base) = base {
-        visitor.visit_type(db, base.instance_type(db));
+        visitor.visit_type(ctx, base.instance_type(ctx));
     }
 }
 
@@ -272,27 +280,27 @@ pub enum NewTypeBase<'db> {
 }
 
 impl<'db> NewTypeBase<'db> {
-    pub fn instance_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn instance_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
         match self {
-            NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
+            NewTypeBase::ClassType(class_type) => Type::instance(ctx, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
-            NewTypeBase::Float => KnownUnion::Float.to_type(db),
-            NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+            NewTypeBase::Float => KnownUnion::Float.to_type(ctx),
+            NewTypeBase::Complex => KnownUnion::Complex.to_type(ctx),
         }
     }
 
     fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             NewTypeBase::ClassType(class_type) => class_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(ctx, div, nested)
                 .map(NewTypeBase::ClassType),
             NewTypeBase::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(ctx, div, nested)
                 .map(NewTypeBase::NewType),
             NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }

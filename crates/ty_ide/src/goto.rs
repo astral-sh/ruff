@@ -22,7 +22,7 @@ use ty_python_semantic::types::ide_support::{
     typed_dict_key_definition,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
+    HasDefinition, HasType, ImportAliasResolution, SemanticContext, SemanticModel, TypeQualifiers,
     definitions_for_imported_symbol, definitions_for_name,
 };
 
@@ -256,8 +256,12 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(db)?;
+    pub(crate) fn from_ty(
+        db: &'db dyn crate::Db,
+        ctx: &SemanticContext<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let ty_def = ty.definition(ctx)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
                 ResolvedDefinition::Module(module.python_file(db)?)

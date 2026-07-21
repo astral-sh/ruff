@@ -31,11 +31,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::Db;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::Specialization;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
+use crate::{Db, SemanticContext};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -49,8 +49,8 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
-        self.recursive_identity(db)
+    pub(crate) fn to_type_identity(self, ctx: &SemanticContext<'db>) -> TypeIdentity<'db> {
+        self.recursive_identity(ctx)
             .unwrap_or(TypeIdentity::NonRecursive(self))
     }
 
@@ -78,7 +78,11 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::inline_always)]
     #[inline(always)]
-    pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
+    pub(crate) fn recursive_identity(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> Option<TypeIdentity<'db>> {
+        let db = ctx.db();
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -90,13 +94,13 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) if alias.is_recursive(db) => {
+            Type::TypeAlias(alias) if alias.is_recursive(ctx) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
-            Type::ProtocolInstance(protocol) if protocol.is_recursive(db) => {
+            Type::ProtocolInstance(protocol) if protocol.is_recursive(ctx) => {
                 Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
             }
-            Type::TypedDict(typed_dict) if typed_dict.is_recursive(db) => {
+            Type::TypedDict(typed_dict) if typed_dict.is_recursive(ctx) => {
                 let definition = typed_dict.definition(db)?;
                 Some(TypeIdentity::RecursiveTypedDict(definition))
             }
@@ -114,9 +118,9 @@ struct DefinitionReferenceVisitor<'db> {
 
 impl<'db> DefinitionReferenceVisitor<'db> {
     /// Returns whether the definition represented by `ty` references `target`.
-    fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
+    fn references(ctx: &SemanticContext<'db>, ty: Type<'db>, target: Definition<'db>) -> bool {
         let visitor = Self::new(target);
-        visitor.visit_definition_body(db, ty);
+        visitor.visit_definition_body(ctx, ty);
         visitor.found.get()
     }
 
@@ -149,17 +153,22 @@ impl<'db> DefinitionReferenceVisitor<'db> {
         Some((definition, specialization))
     }
 
-    fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
+    fn visit_specialization(
+        &self,
+        ctx: &SemanticContext<'db>,
+        specialization: Specialization<'db>,
+    ) {
+        let db = ctx.db();
         for ty in specialization.types(db) {
-            self.visit_type(db, *ty);
+            self.visit_type(ctx, *ty);
         }
     }
 
-    fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
+    fn visit_definition_body(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
         match ty {
-            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
-            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(db, protocol),
-            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
+            Type::TypeAlias(alias) => self.visit_type_alias_type(ctx, alias),
+            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(ctx, protocol),
+            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(ctx, typed_dict),
             _ => {}
         }
     }
@@ -170,7 +179,8 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
         false
     }
 
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+    fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
+        let db = ctx.db();
         if self.found.get() {
             return;
         }
@@ -182,45 +192,51 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
             }
 
             if let Some(specialization) = specialization {
-                self.visit_specialization(db, specialization);
+                self.visit_specialization(ctx, specialization);
             }
 
             if !self.found.get() {
                 self.active_definitions.visit(
                     &definition,
                     || {},
-                    || self.visit_definition_body(db, ty),
+                    || self.visit_definition_body(ctx, ty),
                 );
             }
         } else {
-            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+            walk_type_with_recursion_guard(ctx, ty, self, &self.visited_types);
         }
     }
 
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+    fn visit_protocol_instance_type(
+        &self,
+        ctx: &SemanticContext<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) {
         if let Some(class) = protocol.class_origin() {
-            class.walk_recursive_member_types(db, self);
+            class.walk_recursive_member_types(ctx, self);
         }
     }
 
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        self.visit_type(db, alias.raw_value_type(db));
+    fn visit_type_alias_type(&self, ctx: &SemanticContext<'db>, alias: TypeAliasType<'db>) {
+        self.visit_type(ctx, alias.raw_value_type(ctx.db()));
     }
 
-    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+    fn visit_typed_dict_type(&self, ctx: &SemanticContext<'db>, typed_dict: TypedDictType<'db>) {
+        let db = ctx.db();
         for field in typed_dict.items(db).values() {
-            self.visit_type(db, field.declared_ty);
+            self.visit_type(ctx, field.declared_ty);
         }
         if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
-            self.visit_type(db, extra_items.declared_ty);
+            self.visit_type(ctx, extra_items.declared_ty);
         }
     }
 }
 
 impl<'db> TypeAliasType<'db> {
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
+    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         DefinitionReferenceVisitor::references(
-            db,
+            ctx,
             Type::TypeAlias(self.unspecialized(db)),
             self.definition(db),
         )
@@ -233,7 +249,8 @@ impl<'db> ProtocolInstanceType<'db> {
         Some(origin.definition(db))
     }
 
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
+    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         let Some(class) = self.class_origin() else {
             return false;
         };
@@ -243,13 +260,14 @@ impl<'db> ProtocolInstanceType<'db> {
         let definition = origin.definition(db);
         // Inspect the definition without its current specialization. Otherwise, a finite
         // type such as `Protocol[Protocol[int]]` would appear recursive.
-        let unspecialized = Type::instance(db, ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(db, unspecialized, definition)
+        let unspecialized = Type::instance(ctx, ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(ctx, unspecialized, definition)
     }
 }
 
 impl<'db> TypedDictType<'db> {
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
+    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         let Some(class) = self.defining_class() else {
             return false;
         };
@@ -260,7 +278,7 @@ impl<'db> TypedDictType<'db> {
         // Inspect the definition without its current specialization for the same reason as
         // protocols above.
         let unspecialized = Type::typed_dict(ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(db, unspecialized, definition)
+        DefinitionReferenceVisitor::references(ctx, unspecialized, definition)
     }
 }
 
@@ -277,7 +295,7 @@ pub trait HasIdentity<'db> {
     }
 
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
+    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id;
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
@@ -287,8 +305,8 @@ impl<'db> HasIdentity<'db> for Type<'db> {
         self.may_share_type_identity(db, *other)
     }
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        Type::to_type_identity(*self, db)
+    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
+        Type::to_type_identity(*self, ctx)
     }
 }
 
@@ -301,8 +319,8 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
         self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
     }
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_type_identity(db), self.1.to_type_identity(db))
+    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
+        (self.0.to_type_identity(ctx), self.1.to_type_identity(ctx))
     }
 }
 
@@ -318,11 +336,11 @@ where
             && self.2.may_share_type_identity(db, other.2)
     }
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
         (
-            self.0.to_type_identity(db),
+            self.0.to_type_identity(ctx),
             self.1,
-            self.2.to_type_identity(db),
+            self.2.to_type_identity(ctx),
         )
     }
 }
@@ -363,8 +381,8 @@ where
     T: Hash + Eq + Clone + HasIdentity<'db>,
 {
     #[inline]
-    pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.begin_visit(db, item) {
+    pub fn visit(&self, ctx: &SemanticContext<'db>, item: T, compute: impl FnOnce() -> R) -> R {
+        match self.begin_visit(ctx, item) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
@@ -381,11 +399,11 @@ where
     #[inline]
     pub(super) fn try_visit(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         item: T,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit(db, item) {
+        match self.begin_visit(ctx, item) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
@@ -395,7 +413,8 @@ where
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+    fn begin_visit(&self, ctx: &SemanticContext<'db>, item: T) -> CycleDetectorVisit<T, R> {
+        let db = ctx.db();
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -414,9 +433,9 @@ where
         } else {
             // Deriving an identity can require a structural definition walk. Defer it until a
             // cheap candidate match shows that another active item could form a cycle.
-            let identity = item.to_identity(db);
+            let identity = item.to_identity(ctx);
             if candidates.any(|active| {
-                active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
+                active.identity.get_or_init(|| active.item.to_identity(ctx)) == &identity
             }) {
                 return CycleDetectorVisit::Cycle(item);
             }
@@ -489,11 +508,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     #[inline]
     pub(crate) fn visit_type(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         ty: Type<'db>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match self.begin_visit(db, ty) {
+        match self.begin_visit(ctx, ty) {
             TypeTransformerVisit::Ready(result) => result,
             TypeTransformerVisit::Pending(ty) => {
                 let result = compute();
@@ -502,12 +521,12 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
+    fn begin_visit(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) -> TypeTransformerVisit<'db> {
         if let Some(result) = self.cache.borrow().get(&ty) {
             return TypeTransformerVisit::Ready(*result);
         }
 
-        let identity = ty.to_type_identity(db);
+        let identity = ty.to_type_identity(ctx);
         let seen = self.seen.borrow();
         if seen
             .iter()

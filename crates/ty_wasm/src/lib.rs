@@ -24,12 +24,12 @@ use ty_ide::{
     goto_type_definition, hover, inlay_hints, rename,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
-use ty_project::SemanticDb as _;
 use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_semantic::SemanticContext;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -558,11 +558,13 @@ impl Workspace {
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let settings = ty_ide::CompletionSettings::default();
+        let python_file = PythonFile::new(&self.db, file_id.file, self.db.python_version());
+        let ctx = SemanticContext::from_file(&self.db, python_file);
         let completions = ty_ide::completion(
             &self.db,
             &settings,
             CompletionCapabilities::default(),
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            python_file,
             offset,
         );
 
@@ -571,7 +573,7 @@ impl Workspace {
             .map(|comp| {
                 let name = comp.label().to_string();
                 let kind = comp.kind.map(CompletionKind::from);
-                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let type_display = comp.ty.map(|ty| ty.display(&ctx).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
                         edit.range(),

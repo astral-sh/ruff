@@ -4683,7 +4683,6 @@ dependencies = [
  "ruff_db",
  "ruff_text_size",
  "ty_ide",
- "ty_module_resolver",
  "ty_project",
 ]
 
@@ -4947,6 +4946,7 @@ dependencies = [
  "ty_module_resolver",
  "ty_project",
  "ty_python_core",
+ "ty_python_semantic",
 ]
 
 [[package]]
@@ -5031,9 +5031,9 @@ dependencies = [
  "serde-wasm-bindgen",
  "tracing",
  "ty_ide",
- "ty_module_resolver",
  "ty_project",
  "ty_python_core",
+ "ty_python_semantic",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

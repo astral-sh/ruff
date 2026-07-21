@@ -5,8 +5,8 @@ use lsp_types::{DocumentSymbol, DocumentSymbolParams, Uri};
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};

@@ -46,6 +46,8 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
+    let ctx = context.semantic_context();
+
     // Check for MRO errors.
     if report_dynamic_mro_errors(context, dynamic_class, call_expr, bases) {
         report_inconsistent_dynamic_generic_bases(context, dynamic_class, bases);
@@ -56,14 +58,14 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 
         for (idx, base_type) in dynamic_class.explicit_bases(db).iter().enumerate() {
             // Convert to ClassType to access nearest_disjoint_base.
-            if let Some(class_type) = base_type.to_class_type(db)
+            if let Some(class_type) = base_type.to_class_type(&ctx)
                 && let Some(disjoint_base) = class_type.nearest_disjoint_base(db)
             {
                 disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
             }
         }
 
-        disjoint_bases.remove_redundant_entries(db);
+        disjoint_bases.remove_redundant_entries(&ctx);
         if disjoint_bases.len() > 1 {
             report_instance_layout_conflict(
                 context,
@@ -80,16 +82,16 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         base1,
         metaclass2,
         base2,
-    }) = dynamic_class.try_metaclass(db)
+    }) = dynamic_class.try_metaclass(&ctx)
     {
         report_conflicting_metaclass_from_bases(
             context,
             call_expr.into(),
             dynamic_class.name(db),
             metaclass1,
-            base1.display(db),
+            base1.display(&ctx),
             metaclass2,
-            base2.display(db),
+            base2.display(&ctx),
         );
     }
 }

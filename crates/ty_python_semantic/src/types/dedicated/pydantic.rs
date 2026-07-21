@@ -1,3 +1,4 @@
+use crate::SemanticContext;
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
@@ -109,13 +110,13 @@ impl<'db> FieldMetadata<'db> {
     /// ```
     fn collect_from_rhs_type(
         &mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         rhs_type: Option<Type<'db>>,
         specialization: Option<Specialization<'db>>,
     ) {
         match rhs_type {
             Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
-                self.merge_field(db, field, specialization);
+                self.merge_field(ctx, field, specialization);
             }
             Some(rhs_type) => self.default_ty = Some(rhs_type),
             None => {}
@@ -136,17 +137,18 @@ impl<'db> FieldMetadata<'db> {
     /// where `StrictInt` is defined as `StrictInt = Annotated[int, Strict()]`.
     fn collect_from_annotation(
         &mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         definition: Definition<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
+        let db = ctx.db();
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
             return;
         };
         let annotation = assignment.annotation(&module);
 
-        if self.collect_from_annotated(db, definition, annotation, specialization) {
+        if self.collect_from_annotated(ctx, definition, annotation, specialization) {
             return;
         }
 
@@ -190,17 +192,18 @@ impl<'db> FieldMetadata<'db> {
             _ => return,
         };
 
-        self.collect_from_annotated(db, alias_definition, value, specialization);
+        self.collect_from_annotated(ctx, alias_definition, value, specialization);
     }
 
     /// Collect Pydantic field metadata from the `Annotated` part of a field's annotation.
     fn collect_from_annotated(
         &mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         definition: Definition<'db>,
         annotation: &Expr,
         specialization: Option<Specialization<'db>>,
     ) -> bool {
+        let db = ctx.db();
         let Some(subscript) = annotation.as_subscript_expr() else {
             return false;
         };
@@ -241,9 +244,9 @@ impl<'db> FieldMetadata<'db> {
             ) {
                 let field_type = definition_expression_type(db, definition, metadata);
                 if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
-                    self.merge_field(db, field, specialization);
+                    self.merge_field(ctx, field, specialization);
                 } else {
-                    self.merge_field_call(db, definition, call, field_type, specialization);
+                    self.merge_field_call(ctx, definition, call, field_type, specialization);
                 }
             }
         }
@@ -257,12 +260,13 @@ impl<'db> FieldMetadata<'db> {
 
     fn merge_field(
         &mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         field: FieldInstance<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
+        let db = ctx.db();
         if let Some(default_type) = field.default_type(db) {
-            self.default_ty = Some(default_type.apply_optional_specialization(db, specialization));
+            self.default_ty = Some(default_type.apply_optional_specialization(ctx, specialization));
         }
         self.init &= field.init(db);
         if let Some(alias) = field.alias(db) {
@@ -275,25 +279,26 @@ impl<'db> FieldMetadata<'db> {
 
     fn merge_field_call(
         &mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         definition: Definition<'db>,
         call: &ExprCall,
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
+        let db = ctx.db();
         if let Some(default) = call.arguments.find_argument_value("default", 0) {
             let default_type = definition_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
-                    Some(default_type.apply_optional_specialization(db, specialization));
+                    Some(default_type.apply_optional_specialization(ctx, specialization));
             }
         } else if call.arguments.find_keyword("default_factory").is_some() {
-            self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
+            self.default_ty = Some(call_type.apply_optional_specialization(ctx, specialization));
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
             let init = definition_expression_type(db, definition, &init.value);
-            self.init &= !init.bool(db).is_always_false();
+            self.init &= !init.bool(ctx).is_always_false();
         }
 
         if let Some(alias) = call
@@ -317,16 +322,16 @@ impl<'db> FieldMetadata<'db> {
 
 /// Resolve a Pydantic field's metadata from its annotation and right-hand side.
 pub(in crate::types) fn field_metadata<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Option<Definition<'db>>,
     rhs_type: Option<Type<'db>>,
     specialization: Option<Specialization<'db>>,
 ) -> FieldMetadata<'db> {
     let mut metadata = FieldMetadata::default();
     if let Some(definition) = definition {
-        metadata.collect_from_annotation(db, definition, specialization);
+        metadata.collect_from_annotation(ctx, definition, specialization);
     }
-    metadata.collect_from_rhs_type(db, rhs_type, specialization);
+    metadata.collect_from_rhs_type(ctx, rhs_type, specialization);
     metadata
 }
 
@@ -482,9 +487,10 @@ fn config_boolean(
     })
 }
 
-pub(in crate::types) fn is_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+pub(in crate::types) fn is_model(ctx: &SemanticContext<'_>, class: StaticClassLiteral<'_>) -> bool {
+    let db = ctx.db();
     class
-        .iter_mro(db, None)
+        .iter_mro(ctx, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
@@ -515,8 +521,9 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let ctx = SemanticContext::from_file(db, class.python_file(db));
     class
-        .iter_mro(db, None)
+        .iter_mro(&ctx, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticRootModel))
 }
@@ -526,11 +533,12 @@ fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 /// A settings model can populate any field from environment variables or another configured
 /// settings source, so no field value is necessarily required at the call site.
 pub(in crate::types) fn constructor_fields_are_optional(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     class: StaticClassLiteral<'_>,
 ) -> bool {
+    let db = ctx.db();
     class
-        .iter_mro(db, None)
+        .iter_mro(ctx, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
@@ -541,12 +549,13 @@ pub(in crate::types) fn constructor_fields_are_optional(
 /// `model_config` for a single instantiation. These parameters are defined on
 /// `BaseSettings.__init__`, so we reuse them instead of duplicating their names and types.
 pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     class: StaticClassLiteral<'db>,
     parameters: &mut Vec<Parameter<'db>>,
 ) {
+    let db = ctx.db();
     let Some(base_settings) = class
-        .iter_mro(db, None)
+        .iter_mro(ctx, None)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -555,7 +564,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
         return;
     };
 
-    let Some(init) = class_member(db, base_settings.body_scope(db), "__init__")
+    let Some(init) = class_member(ctx, base_settings.body_scope(db), "__init__")
         .ignore_possibly_undefined()
         .and_then(Type::as_function_literal)
     else {
@@ -584,12 +593,13 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
+    let ctx = SemanticContext::from_file(db, class.python_file(db));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
     for base in class.explicit_bases(db) {
-        let Some(base) = base.to_class_type(db) else {
+        let Some(base) = base.to_class_type(&ctx) else {
             config = ModelConfig::unknown();
             continue;
         };
@@ -599,34 +609,42 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
             continue;
         };
 
-        if is_model(db, base) {
+        if is_model(&ctx, base) {
             config.merge(model_config(db, base));
-        } else if let Some(base_config) = inherited_model_config(db, base) {
+        } else if let Some(base_config) = inherited_model_config(&ctx, base) {
             config.merge(base_config);
         }
     }
 
-    if let Some(own_config) = own_model_config(db, class) {
+    if let Some(own_config) = own_model_config(&ctx, class) {
         config.merge(own_config);
     }
     config.merge(class_keyword_config(db, class));
     config
 }
 
-fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
-    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
+fn inherited_model_config(
+    ctx: &SemanticContext<'_>,
+    class: StaticClassLiteral<'_>,
+) -> Option<ModelConfig> {
+    let db = ctx.db();
+    for base in class.iter_mro(ctx, None).filter_map(ClassBase::into_class) {
         let Some((base, _)) = base.static_class_literal(db) else {
             return Some(ModelConfig::unknown());
         };
-        if let Some(config) = own_model_config(db, base) {
+        if let Some(config) = own_model_config(ctx, base) {
             return Some(config);
         }
     }
     None
 }
 
-fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
-    let model_config = class_member(db, class.body_scope(db), "model_config")
+fn own_model_config(
+    ctx: &SemanticContext<'_>,
+    class: StaticClassLiteral<'_>,
+) -> Option<ModelConfig> {
+    let db = ctx.db();
+    let model_config = class_member(ctx, class.body_scope(db), "model_config")
         .inner
         .place;
     let Place::Defined(DefinedPlace {
@@ -807,14 +825,15 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     class: StaticClassLiteral<'db>,
     field_name: &Name,
     field_type: Type<'db>,
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
-    if has_before_or_plain_field_validator(db, class, field_name.clone()) {
+    let db = ctx.db();
+    if has_before_or_plain_field_validator(ctx, class, field_name.clone()) {
         return Type::any();
     }
 
@@ -822,7 +841,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
         return field_type;
     }
 
-    lax_input_type(db, field_type)
+    lax_input_type(ctx, field_type)
 }
 
 /// Return whether `field_name` has a Pydantic field validator that receives the raw input.
@@ -830,18 +849,31 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
 /// A before validator can transform arbitrary values before Pydantic validates them against the
 /// declared field type, while a plain validator bypasses that validation entirely. We therefore
 /// cannot derive a useful input type from the field annotation alone.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
+    ctx: &SemanticContext<'db>,
+    class: StaticClassLiteral<'db>,
+    field_name: Name,
+) -> bool {
+    debug_assert_eq!(
+        ctx.python_version(),
+        class.python_file(ctx.db()).python_version(ctx.db())
+    );
+    has_before_or_plain_field_validator_inner(ctx.db(), class, field_name)
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn has_before_or_plain_field_validator_inner<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
+    let ctx = SemanticContext::from_file(db, class.python_file(db));
     let field_name = CharStr::from(field_name);
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
     let mut shadowed_symbols = FxHashSet::default();
 
-    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
+    for base in class.iter_mro(&ctx, None).filter_map(ClassBase::into_class) {
         if base.is_known(db, KnownClass::PydanticBaseModel) {
             break;
         }
@@ -857,7 +889,7 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
             if !shadowed_symbols.insert(name) {
                 continue;
             }
-            if declarations.any_reachable(db, |declaration| {
+            if declarations.any_reachable(&ctx, |declaration| {
                 declaration.is_defined_and(|definition| {
                     function_has_before_or_plain_field_validator(
                         db,
@@ -925,15 +957,16 @@ fn function_has_before_or_plain_field_validator<'db>(
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.
-fn lax_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Type<'db> {
-    lax_input_type_impl(db, field_type, &mut FxHashSet::default())
+fn lax_input_type<'db>(ctx: &SemanticContext<'db>, field_type: Type<'db>) -> Type<'db> {
+    lax_input_type_impl(ctx, field_type, &mut FxHashSet::default())
 }
 
 fn lax_input_type_impl<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Type<'db> {
+    let db = ctx.db();
     if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
         return field_type;
     }
@@ -942,35 +975,35 @@ fn lax_input_type_impl<'db>(
         if !expanding_types.insert(field_type) {
             return Type::any();
         }
-        let result = lax_input_type_impl(db, alias.value_type(db), expanding_types);
+        let result = lax_input_type_impl(ctx, alias.value_type(ctx), expanding_types);
         expanding_types.remove(&field_type);
         return result;
     }
 
     if field_type.as_union().and_then(|union| union.known(db)) == Some(KnownUnion::Float) {
-        return lax_alias(db, "LaxFloat");
+        return lax_alias(ctx, "LaxFloat");
     }
 
     if let Type::Union(union) = field_type {
         return UnionType::from_elements_leave_aliases(
-            db,
+            ctx,
             union
                 .elements(db)
                 .iter()
-                .map(|element| lax_input_type_impl(db, *element, expanding_types)),
+                .map(|element| lax_input_type_impl(ctx, *element, expanding_types)),
         );
     }
 
-    if let Some(input_type) = root_model_input_type(db, field_type, expanding_types) {
+    if let Some(input_type) = root_model_input_type(ctx, field_type, expanding_types) {
         return input_type;
     }
 
-    if let Some(input_type) = model_input_type(db, field_type) {
+    if let Some(input_type) = model_input_type(ctx, field_type) {
         return input_type;
     }
 
     let known_class = field_type
-        .nominal_class(db)
+        .nominal_class(ctx)
         .and_then(|class| class.known(db));
 
     if matches!(
@@ -985,25 +1018,25 @@ fn lax_input_type_impl<'db>(
                 | KnownClass::Tuple
         )
     ) {
-        let Ok(elements) = field_type.try_iterate(db) else {
+        let Ok(elements) = field_type.try_iterate(ctx) else {
             return Type::any();
         };
         let element_type =
-            lax_input_type_impl(db, elements.homogeneous_element_type(db), expanding_types);
-        return KnownClass::Iterable.to_specialized_instance(db, &[element_type]);
+            lax_input_type_impl(ctx, elements.homogeneous_element_type(ctx), expanding_types);
+        return KnownClass::Iterable.to_specialized_instance(ctx, &[element_type]);
     }
 
     if matches!(known_class, Some(KnownClass::Dict | KnownClass::Mapping)) {
         let Some(specialization) =
-            known_class.and_then(|known_class| field_type.known_specialization(db, known_class))
+            known_class.and_then(|known_class| field_type.known_specialization(ctx, known_class))
         else {
             return Type::any();
         };
         let [key_type, value_type] = specialization.types(db) else {
             return Type::any();
         };
-        let value_type = lax_input_type_impl(db, *value_type, expanding_types);
-        return KnownClass::Mapping.to_specialized_instance(db, &[*key_type, value_type]);
+        let value_type = lax_input_type_impl(ctx, *value_type, expanding_types);
+        return KnownClass::Mapping.to_specialized_instance(ctx, &[*key_type, value_type]);
     }
 
     let builtin_alias = match known_class {
@@ -1016,10 +1049,10 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = builtin_alias {
-        return lax_alias(db, alias);
+        return lax_alias(ctx, alias);
     }
 
-    let Some((module, symbol, class)) = instance_symbol(db, field_type) else {
+    let Some((module, symbol, class)) = instance_symbol(ctx, field_type) else {
         return Type::any();
     };
     let symbol_alias = match (module, symbol) {
@@ -1039,23 +1072,23 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = symbol_alias {
-        return lax_alias(db, alias);
+        return lax_alias(ctx, alias);
     }
 
     let alias = if (module, symbol) == (KnownModule::Re, "Pattern") {
-        let Some(specialization) = field_type.specialization_of(db, class) else {
+        let Some(specialization) = field_type.specialization_of(ctx, class) else {
             return Type::any();
         };
         let [pattern_type] = specialization.types(db) else {
             return Type::any();
         };
         if pattern_type
-            .nominal_class(db)
+            .nominal_class(ctx)
             .is_some_and(|class| class.is_known(db, KnownClass::Str))
         {
             "LaxStrPattern"
         } else if pattern_type
-            .nominal_class(db)
+            .nominal_class(ctx)
             .is_some_and(|class| class.is_known(db, KnownClass::Bytes))
         {
             "LaxBytesPattern"
@@ -1066,7 +1099,7 @@ fn lax_input_type_impl<'db>(
         return Type::any();
     };
 
-    lax_alias(db, alias)
+    lax_alias(ctx, alias)
 }
 
 /// Return the input type accepted for a Pydantic root model field.
@@ -1075,11 +1108,12 @@ fn lax_input_type_impl<'db>(
 /// a field annotated with an `IntList` derived from `RootModel[list[int]]` accepts both an
 /// `IntList` instance and an `Iterable[LaxInt]`.
 fn root_model_input_type<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Option<Type<'db>> {
-    let (class, specialization) = field_type.nominal_class(db)?.static_class_literal(db)?;
+    let db = ctx.db();
+    let (class, specialization) = field_type.nominal_class(ctx)?.static_class_literal(db)?;
     if !is_root_model(db, class) {
         return None;
     }
@@ -1096,15 +1130,15 @@ fn root_model_input_type<'db>(
     if !expanding_types.insert(field_type) {
         return Some(Type::any());
     }
-    let root_input_type = lax_input_type_impl(db, root_field.declared_ty, expanding_types);
+    let root_input_type = lax_input_type_impl(ctx, root_field.declared_ty, expanding_types);
 
     expanding_types.remove(&field_type);
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(db, class.unknown_specialization(db));
+    let model_instance = Type::instance(ctx, class.unknown_specialization(db));
     Some(UnionType::from_two_elements(
-        db,
+        ctx,
         model_instance,
         root_input_type,
     ))
@@ -1115,9 +1149,10 @@ fn root_model_input_type<'db>(
 /// By default, Pydantic accepts either an instance of the model or a mapping of string keys to
 /// input values. Other custom validators can accept additional input types, which are not modeled
 /// here.
-fn model_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Option<Type<'db>> {
-    let (class, _) = field_type.nominal_class(db)?.static_class_literal(db)?;
-    if !is_model(db, class) || is_root_model(db, class) {
+fn model_input_type<'db>(ctx: &SemanticContext<'db>, field_type: Type<'db>) -> Option<Type<'db>> {
+    let db = ctx.db();
+    let (class, _) = field_type.nominal_class(ctx)?.static_class_literal(db)?;
+    if !is_model(ctx, class) || is_root_model(db, class) {
         return None;
     }
 
@@ -1129,25 +1164,26 @@ fn model_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Option<Type<
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(db, class.unknown_specialization(db));
+    let model_instance = Type::instance(ctx, class.unknown_specialization(db));
     let mapping = KnownClass::Mapping
-        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
-    Some(UnionType::from_two_elements(db, model_instance, mapping))
+        .to_specialized_instance(ctx, &[KnownClass::Str.to_instance(ctx), Type::any()]);
+    Some(UnionType::from_two_elements(ctx, model_instance, mapping))
 }
 
 /// Return the known module, name, and class literal for an instance's nominal class.
 fn instance_symbol<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
-    let class = ty.nominal_class(db)?.class_literal(db).as_static()?;
+    let db = ctx.db();
+    let class = ty.nominal_class(ctx)?.class_literal(db).as_static()?;
     let module = file_to_module(db, class.python_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 
 /// Return a lax-input alias like `LaxInt` from `ty_extensions.pydantic`.
-fn lax_alias<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
-    match known_module_symbol(db, KnownModule::TyExtensionsPydantic, name)
+fn lax_alias<'db>(ctx: &SemanticContext<'db>, name: &str) -> Type<'db> {
+    match known_module_symbol(ctx, KnownModule::TyExtensionsPydantic, name)
         .place
         .ignore_possibly_undefined()
     {
@@ -1170,9 +1206,13 @@ enum ModelInitBehavior {
     Other,
 }
 
-fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitBehavior {
+fn model_init_behavior(
+    ctx: &SemanticContext<'_>,
+    class: StaticClassLiteral<'_>,
+) -> ModelInitBehavior {
+    let db = ctx.db();
     for base in class
-        .iter_mro(db, None)
+        .iter_mro(ctx, None)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -1188,7 +1228,7 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
             return ModelInitBehavior::Other;
         }
 
-        let init = class_member(db, base.body_scope(db), "__init__");
+        let init = class_member(ctx, base.body_scope(db), "__init__");
         if !init.is_undefined() {
             return if init
                 .ignore_possibly_undefined()
@@ -1214,32 +1254,34 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
 /// its subclasses. A variadic custom initializer still allows Pydantic to validate field values
 /// passed via keyword arguments.
 pub(in crate::types) fn synthesizes_constructor_signature_from_fields(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    model_init_behavior(db, class) != ModelInitBehavior::CustomFixed
+    model_init_behavior(ctx, class) != ModelInitBehavior::CustomFixed
 }
 
 /// Return `true` if `class` should accept extra keywords in its synthesized constructor.
 pub(in crate::types) fn model_init_accepts_extra(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
+    let db = ctx.db();
     metadata.accepts_extra(db)
         && matches!(
-            model_init_behavior(db, class),
+            model_init_behavior(ctx, class),
             ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
         )
 }
 
 /// Return `true` if extra keywords passed to `class` are silently discarded by Pydantic.
 pub(in crate::types) fn model_init_discards_extra(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
+    let db = ctx.db();
+    metadata.discards_extra(db) && model_init_behavior(ctx, class) == ModelInitBehavior::BaseModel
 }
 
 /// Report keyword arguments that the Pydantic model constructor silently discards.
@@ -1262,7 +1304,7 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     else {
         return;
     };
-    if !model_init_discards_extra(db, class, metadata) {
+    if !model_init_discards_extra(&context.semantic_context(), class, metadata) {
         return;
     }
 

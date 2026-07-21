@@ -8,6 +8,7 @@ use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
 };
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextRange};
 
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
@@ -25,6 +26,57 @@ use crate::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
+
+#[derive(Clone, Copy)]
+enum PythonEnvironmentSource<'db> {
+    File(PythonFile<'db>),
+    Version(PythonVersion),
+}
+
+/// The database and Python environment used by a semantic operation.
+#[derive(Clone, Copy)]
+pub struct SemanticContext<'db> {
+    db: &'db dyn Db,
+    environment: PythonEnvironmentSource<'db>,
+}
+
+impl<'db> SemanticContext<'db> {
+    /// Creates a context for the primary environment.
+    pub(crate) fn from_primary(db: &'db dyn Db) -> Self {
+        Self::from_version(db, crate::Program::get(db).python_version(db))
+    }
+
+    /// Creates a context that lazily obtains its Python version from `file`.
+    pub const fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+        Self {
+            db,
+            environment: PythonEnvironmentSource::File(file),
+        }
+    }
+
+    /// Creates a context with an already-established Python version.
+    pub const fn from_version(db: &'db dyn Db, python_version: PythonVersion) -> Self {
+        Self {
+            db,
+            environment: PythonEnvironmentSource::Version(python_version),
+        }
+    }
+
+    /// Returns the database used by this operation.
+    #[inline]
+    pub const fn db(self) -> &'db dyn Db {
+        self.db
+    }
+
+    /// Returns the Python version used by this operation.
+    #[inline]
+    pub fn python_version(self) -> PythonVersion {
+        match self.environment {
+            PythonEnvironmentSource::File(file) => file.python_version(self.db),
+            PythonEnvironmentSource::Version(version) => version,
+        }
+    }
+}
 
 /// Context for inferring the types of a single file.
 ///
@@ -55,16 +107,18 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
+        file: File,
         python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         debug_assert_eq!(scope.python_file(db), python_file);
+        debug_assert_eq!(python_file.file(db), file);
 
         Self {
             db,
             scope,
             module,
-            file: python_file.file(db),
+            file,
             python_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
@@ -82,6 +136,15 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(crate) fn python_file(&self) -> PythonFile<'db> {
         self.python_file
+    }
+
+    pub(crate) fn python_version(&self) -> PythonVersion {
+        self.python_file.python_version(self.db)
+    }
+
+    #[inline]
+    pub(crate) fn semantic_context(&self) -> SemanticContext<'db> {
+        SemanticContext::from_file(self.db, self.python_file)
     }
 
     /// The module for which the types are inferred.
@@ -230,7 +293,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     fn is_range_reachable(&self, range: TextRange) -> bool {
         let index = semantic_index(self.db, self.python_file);
         let scope_id = self.scope.file_scope_id(self.db);
-        is_range_reachable(self.db, index, scope_id, range)
+        is_range_reachable(&self.semantic_context(), index, scope_id, range)
     }
 
     /// Are we currently inferring types in a stub file?

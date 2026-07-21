@@ -193,6 +193,7 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use crate::SemanticContext;
 use std::cell::RefCell;
 
 use crate::{
@@ -239,8 +240,9 @@ use ty_python_core::{
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let ctx = SemanticContext::from_file(db, predicate.subject(db).python_file(db));
+        result.cycle_normalized(&ctx, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -269,8 +271,9 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let ctx = SemanticContext::from_file(db, predicate.subject(db).python_file(db));
+        result.cycle_normalized(&ctx, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -279,7 +282,8 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    pattern_binding_fallthrough_type(db, predicate.kind(db), subject_ty)
+    let ctx = SemanticContext::from_file(db, predicate.python_file(db));
+    pattern_binding_fallthrough_type(&ctx, predicate.kind(db), subject_ty)
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -288,7 +292,7 @@ fn type_narrowed_by_pattern<'db>(
 /// same enum class, or an alias to either form. Enum aliases are normalized to the canonical member
 /// name so previous `match` cases can be compared by member identity.
 fn enum_literal_subject_names<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     subject_ty: Type<'db>,
 ) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
     fn add_enum_literal<'db>(
@@ -314,6 +318,7 @@ fn enum_literal_subject_names<'db>(
         Some(())
     }
 
+    let db = ctx.db();
     let mut enum_class = None;
     let mut names = FxHashSet::default();
 
@@ -326,7 +331,7 @@ fn enum_literal_subject_names<'db>(
                 add_enum_literal(db, &mut enum_class, &mut names, *element)?;
             }
         }
-        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => return enum_literal_subject_names(ctx, alias.value_type(ctx)),
         _ => return None,
     }
 
@@ -339,11 +344,12 @@ fn enum_literal_subject_names<'db>(
 /// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let value_ty = definite_match_pattern_type(db, kind);
+    let db = ctx.db();
+    let value_ty = definite_match_pattern_type(ctx, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class_literal(db) != enum_class {
         return None;
@@ -368,7 +374,7 @@ struct EnumMemberPatternCoverage {
 /// before returning. A pattern with additional alternatives such as `Color.GREEN | Color()`
 /// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
 fn enum_member_pattern_coverage<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
@@ -379,7 +385,7 @@ fn enum_member_pattern_coverage<'db>(
     match kind {
         PatternPredicateKind::Or(alts) => {
             for alt in alts {
-                let alt_coverage = enum_member_pattern_coverage(db, enum_class, alt);
+                let alt_coverage = enum_member_pattern_coverage(ctx, enum_class, alt);
                 coverage
                     .definitely_matched
                     .extend(alt_coverage.definitely_matched);
@@ -387,10 +393,10 @@ fn enum_member_pattern_coverage<'db>(
             }
         }
         PatternPredicateKind::As(Some(inner), _) => {
-            return enum_member_pattern_coverage(db, enum_class, inner);
+            return enum_member_pattern_coverage(ctx, enum_class, inner);
         }
         _ => {
-            if let Some(name) = enum_member_pattern_name(db, enum_class, kind) {
+            if let Some(name) = enum_member_pattern_name(ctx, enum_class, kind) {
                 coverage.definitely_matched.insert(name);
             } else {
                 coverage.is_exact = false;
@@ -406,12 +412,13 @@ fn enum_member_pattern_coverage<'db>(
 /// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
 /// ambiguous because the guard can reject an otherwise matching enum member.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
-    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
-    let current_coverage = enum_member_pattern_coverage(db, enum_class, predicate.kind(db));
+    let db = ctx.db();
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(ctx, subject_ty)?;
+    let current_coverage = enum_member_pattern_coverage(ctx, enum_class, predicate.kind(db));
     let current_names = &current_coverage.definitely_matched;
     if current_names.is_empty() {
         return None;
@@ -426,7 +433,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
         }
 
         let previous_coverage =
-            enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+            enum_member_pattern_coverage(ctx, enum_class, previous_predicate.kind(db));
         #[expect(
             clippy::iter_over_hash_type,
             reason = "set removal is independent of iteration order"
@@ -471,15 +478,16 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty =
         infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
+    let ctx = SemanticContext::from_file(db, predicate.subject(db).python_file(db));
 
     if let Some(truthiness) =
-        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
+        analyze_enum_literal_union_pattern_predicate(&ctx, predicate, subject_ty)
     {
         return truthiness;
     }
 
-    let coverage_subject_ty = expand_type(db, subject_ty)
-        .map(|types| UnionType::from_elements(db, types))
+    let coverage_subject_ty = expand_type(&ctx, subject_ty)
+        .map(|types| UnionType::from_elements(&ctx, types))
         .unwrap_or(subject_ty);
     let narrowed_subject_ty =
         type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
@@ -499,7 +507,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 
     let truthiness =
-        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, None);
+        analyze_single_pattern_predicate_kind(&ctx, predicate.kind(db), narrowed_subject_ty, None);
 
     if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
         // Fall back to ambiguous, the guard might change the result.
@@ -562,10 +570,11 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// been inferred. A different predicate graph performs its own pass, which is necessary when
 /// inferring a call crosses into another large scope.
 fn analyze_non_terminal_call_prefix<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
+    let db = ctx.db();
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
         .iter()
@@ -581,7 +590,7 @@ fn analyze_non_terminal_call_prefix<'db>(
                 if !has_many_calls {
                     for predicate in &predicates.raw[..=root_predicate.index()] {
                         if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                            analyze_single(db, predicate);
+                            analyze_single(ctx, predicate);
                         }
                     }
                     return;
@@ -591,7 +600,7 @@ fn analyze_non_terminal_call_prefix<'db>(
                 let call_count =
                     call_predicates.partition_point(|predicate| *predicate <= root_predicate);
                 if call_count <= NON_TERMINAL_CALL_CHUNK_SIZE {
-                    analyze_non_terminal_calls(db, predicates, &call_predicates[..call_count]);
+                    analyze_non_terminal_calls(ctx, predicates, &call_predicates[..call_count]);
                     return;
                 }
 
@@ -609,7 +618,7 @@ fn analyze_non_terminal_call_prefix<'db>(
                 let tail_start =
                     call_count / NON_TERMINAL_CALL_CHUNK_SIZE * NON_TERMINAL_CALL_CHUNK_SIZE;
                 analyze_non_terminal_calls(
-                    db,
+                    ctx,
                     predicates,
                     &call_predicates[tail_start..call_count],
                 );
@@ -639,12 +648,12 @@ fn non_terminal_call_predicates<'db>(
 }
 
 fn analyze_non_terminal_calls<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     call_predicates: &[ScopedPredicateId],
 ) {
     for id in call_predicates {
-        analyze_single(db, &predicates[*id]);
+        analyze_single(ctx, &predicates[*id]);
     }
 }
 
@@ -662,11 +671,12 @@ fn analyze_non_terminal_call_range<'db>(
     index: usize,
 ) {
     if level == 0 {
+        let ctx = SemanticContext::from_file(db, scope.python_file(db));
         let use_def = use_def_map(db, scope);
         let call_predicates = non_terminal_call_predicates(db, scope);
         let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
         let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
-        analyze_non_terminal_calls(db, use_def.predicates(), &call_predicates[start..end]);
+        analyze_non_terminal_calls(&ctx, use_def.predicates(), &call_predicates[start..end]);
         return;
     }
 
@@ -680,10 +690,11 @@ fn analyze_non_terminal_call_range<'db>(
 /// Large scopes reuse canonical call ranges and sparse decision-diagram checkpoints; small scopes
 /// retain the direct evaluation path without creating either cached index.
 fn evaluate_reachability_constraint<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
+    let db = ctx.db();
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
     }
@@ -692,11 +703,11 @@ fn evaluate_reachability_constraint<'db>(
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+    let has_many_calls = analyze_non_terminal_call_prefix(ctx, predicates, root_predicate);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
-        db,
+        ctx,
         scope,
         constraints,
         predicates,
@@ -729,7 +740,7 @@ fn is_reachability_checkpoint(
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
 fn evaluate_reachability_path<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
@@ -737,6 +748,7 @@ fn evaluate_reachability_path<'db>(
     mut id: ScopedReachabilityConstraintId,
     mut use_checkpoint: bool,
 ) -> Truthiness {
+    let db = ctx.db();
     loop {
         if let Some(reachability) = terminal_reachability(id) {
             return reachability;
@@ -751,7 +763,7 @@ fn evaluate_reachability_path<'db>(
             return evaluate_reachability_checkpoint(db, scope, id);
         }
 
-        id = match analyze_single(db, &predicates[node.atom()]) {
+        id = match analyze_single(ctx, &predicates[node.atom()]) {
             Truthiness::AlwaysTrue => node.if_true(),
             Truthiness::Ambiguous => node.if_ambiguous(),
             Truthiness::AlwaysFalse => node.if_false(),
@@ -775,9 +787,10 @@ fn evaluate_reachability_checkpoint<'db>(
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
+    let ctx = SemanticContext::from_file(db, scope.python_file(db));
     let use_def = use_def_map(db, scope);
     evaluate_reachability_path(
-        db,
+        &ctx,
         scope,
         use_def.reachability_constraints(),
         use_def.predicates(),
@@ -791,7 +804,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     /// Analyze the statically known reachability for a given constraint.
     fn evaluate(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
@@ -801,18 +814,19 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     /// Analyze the statically known reachability for a given constraint.
     fn evaluate(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
+        let db = ctx.db();
         if let Some(reachability) = terminal_reachability(id) {
             return reachability;
         }
 
         let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+        analyze_non_terminal_call_prefix(ctx, predicates, root_predicate);
         evaluate_reachability_path(
-            db,
+            ctx,
             predicate_scope(db, &predicates[root_predicate]),
             self,
             predicates,
@@ -824,7 +838,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
 }
 
 pub(crate) fn narrow_type_by_constraint<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     constraints: &NarrowingConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedNarrowingConstraint,
@@ -837,10 +851,10 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let mut projector = NarrowingProjector::new(ctx, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
-        db,
+        ctx: *ctx,
         base_ty,
         graph: &projector.graph,
         joins: projector.graph.joins(projected_root),
@@ -850,14 +864,14 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 }
 
 fn apply_accumulated_narrowing<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     base_ty: Type<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
         Some(constraint) => NarrowingConstraint::intersection(base_ty)
             .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+            .evaluate_constraint_type(ctx),
         None => base_ty,
     }
 }
@@ -1058,7 +1072,7 @@ impl ProjectedNarrowingGraph<'_> {
 
 /// Removes predicates that cannot narrow one place from a narrowing constraint.
 struct NarrowingProjector<'a, 'db> {
-    db: &'db dyn Db,
+    ctx: SemanticContext<'db>,
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
@@ -1069,13 +1083,13 @@ struct NarrowingProjector<'a, 'db> {
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     fn new(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
-            db,
+            ctx: *ctx,
             constraints,
             predicates,
             place,
@@ -1097,7 +1111,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         }
 
         let constraints =
-            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
+            infer_narrowing_constraints(self.ctx.db(), self.predicates[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
@@ -1140,7 +1154,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(self.db, &predicate) {
+                    let branch = match analyze_single(&self.ctx, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
@@ -1195,7 +1209,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
-    db: &'db dyn Db,
+    ctx: SemanticContext<'db>,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
@@ -1230,7 +1244,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
             // then apply the incoming prefix constraint to its narrowed type.
             let suffix_ty = self.narrow_join(id);
-            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+            return apply_accumulated_narrowing(&self.ctx, suffix_ty, accumulated);
         }
 
         self.narrow_uncached(id, accumulated)
@@ -1247,7 +1261,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+            apply_accumulated_narrowing(&self.ctx, self.base_ty, accumulated)
         } else {
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
@@ -1273,25 +1287,26 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
-                    UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
-                UnionType::from_two_elements(self.db, true_or_uncertain, false_ty)
+                    UnionType::from_two_elements(&self.ctx, true_ty, uncertain_ty);
+                UnionType::from_two_elements(&self.ctx, true_or_uncertain, false_ty)
             }
         }
     }
 }
 
 fn analyze_single_pattern_predicate_kind<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     precomputed_definite_match_ty: Option<Type<'db>>,
 ) -> Truthiness {
+    let db = ctx.db();
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             equality_truthiness(
-                db,
+                ctx,
                 subject_ty,
                 value_ty,
                 ComparisonSoundnessPolicy::from_analysis_settings(
@@ -1300,11 +1315,11 @@ fn analyze_single_pattern_predicate_kind<'db>(
             )
         }
         PatternPredicateKind::Singleton(singleton) => {
-            let singleton_ty = singleton_pattern_type(db, *singleton);
+            let singleton_ty = singleton_pattern_type(ctx, *singleton);
 
-            if subject_ty.is_equivalent_to(db, singleton_ty) {
+            if subject_ty.is_equivalent_to(ctx, singleton_ty) {
                 Truthiness::AlwaysTrue
-            } else if subject_ty.is_disjoint_from(db, singleton_ty) {
+            } else if subject_ty.is_disjoint_from(ctx, singleton_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
@@ -1320,13 +1335,13 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     let narrowed_subject_ty = remaining_subject_ty;
 
                     let definitely_matched =
-                        definite_match_pattern_type_for_subject(db, p, narrowed_subject_ty);
+                        definite_match_pattern_type_for_subject(ctx, p, narrowed_subject_ty);
 
-                    let truthiness = if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
+                    let truthiness = if narrowed_subject_ty.is_subtype_of(ctx, definitely_matched) {
                         Truthiness::AlwaysTrue
                     } else {
                         analyze_single_pattern_predicate_kind(
-                            db,
+                            ctx,
                             p,
                             narrowed_subject_ty,
                             Some(definitely_matched),
@@ -1334,7 +1349,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     };
 
                     remaining_subject_ty =
-                        pattern_binding_fallthrough_type(db, p, narrowed_subject_ty);
+                        pattern_binding_fallthrough_type(ctx, p, narrowed_subject_ty);
                     truthiness
                 })
                 // this is just a "max", but with a slight optimization:
@@ -1355,49 +1370,51 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Class(kind) => {
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
+                    Type::ClassLiteral(class) => {
+                        Type::instance(ctx, class.top_materialization(ctx))
+                    }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
+                        callable_pattern_type(ctx)
                     }
                     _ => return Truthiness::Ambiguous,
                 };
             let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
-                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty)
+                definite_match_pattern_type_for_subject(ctx, predicate_kind, subject_ty)
             });
 
-            if subject_ty.is_equivalent_to(db, definitely_matched)
-                || subject_ty.is_subtype_of(db, definitely_matched)
+            if subject_ty.is_equivalent_to(ctx, definitely_matched)
+                || subject_ty.is_subtype_of(ctx, definitely_matched)
             {
                 Truthiness::AlwaysTrue
-            } else if subject_ty.is_disjoint_from(db, class_ty) {
+            } else if subject_ty.is_disjoint_from(ctx, class_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
             }
         }
         PatternPredicateKind::Mapping(kind) => {
-            let mapping_ty = mapping_pattern_type(db);
-            if subject_ty.is_subtype_of(db, mapping_ty) {
+            let mapping_ty = mapping_pattern_type(ctx);
+            if subject_ty.is_subtype_of(ctx, mapping_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
                     Truthiness::Ambiguous
                 }
-            } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+            } else if subject_ty.is_disjoint_from(ctx, mapping_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            let sequence_ty = sequence_pattern_type_builder(db).build();
-            if subject_ty.is_subtype_of(db, sequence_ty) {
+            let sequence_ty = sequence_pattern_type_builder(ctx).build();
+            if subject_ty.is_subtype_of(ctx, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
                     Truthiness::Ambiguous
                 }
-            } else if subject_ty.is_disjoint_from(db, sequence_ty) {
+            } else if subject_ty.is_disjoint_from(ctx, sequence_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
@@ -1407,7 +1424,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| {
                 analyze_single_pattern_predicate_kind(
-                    db,
+                    ctx,
                     p,
                     subject_ty,
                     precomputed_definite_match_ty,
@@ -1453,8 +1470,9 @@ fn analyze_non_terminal_call<'db>(
         return Truthiness::AlwaysTrue;
     }
 
+    let ctx = SemanticContext::from_file(db, callable.python_file(db));
     let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db)
+        .try_upcast_to_callable(&ctx)
         .and_then(CallableTypes::exactly_one)
     {
         callable.signatures(db).overloads.iter()
@@ -1467,10 +1485,10 @@ fn analyze_non_terminal_call<'db>(
     let mut any_overload_is_generic = false;
 
     for overload in overloads_iterator {
-        let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
+        let returns_never = overload.return_ty.is_equivalent_to(&ctx, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
-        any_overload_is_generic |= overload.return_ty.has_typevar(db);
+        any_overload_is_generic |= overload.return_ty.has_typevar(&ctx);
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
@@ -1479,7 +1497,7 @@ fn analyze_non_terminal_call<'db>(
         Truthiness::AlwaysFalse
     } else {
         let call_expr_ty = infer_same_file_expression_type(db, call_expr, TypeContext::default());
-        if call_expr_ty.is_equivalent_to(db, Type::Never) {
+        if call_expr_ty.is_equivalent_to(&ctx, Type::Never) {
             Truthiness::AlwaysFalse
         } else {
             Truthiness::AlwaysTrue
@@ -1496,13 +1514,14 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
-fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+fn analyze_single(ctx: &SemanticContext<'_>, predicate: &Predicate) -> Truthiness {
+    let db = ctx.db();
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
             infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db)
+                .bool(ctx)
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
@@ -1539,7 +1558,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             };
 
             match imported_symbol(
-                db,
+                ctx,
                 Some(python_file),
                 symbol.name(),
                 requires_explicit_reexport,
@@ -1563,7 +1582,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
 /// scope reachability and statement-level reachability within the scope.
 pub(crate) fn is_range_reachable<'db>(
-    db: &'db dyn crate::Db,
+    ctx: &SemanticContext<'db>,
     index: &SemanticIndex<'db>,
     scope_id: FileScopeId,
     range: TextRange,
@@ -1573,35 +1592,35 @@ pub(crate) fn is_range_reachable<'db>(
         !use_def
             .range_reachability()
             .any(|(entry_range, constraint)| {
-                entry_range.contains_range(range) && !is_reachable(db, use_def, constraint)
+                entry_range.contains_range(range) && !is_reachable(ctx, use_def, constraint)
             })
     })
 }
 
 pub(crate) fn is_reachable<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     use_def: &UseDefMap<'db>,
     reachability: ScopedReachabilityConstraintId,
 ) -> bool {
-    evaluate_reachability(db, use_def, reachability).may_be_true()
+    evaluate_reachability(ctx, use_def, reachability).may_be_true()
 }
 
 pub(crate) fn binding_reachability<'db, 'map>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     use_def: &'map UseDefMap<'db>,
     binding: &BindingWithConstraints<'map, 'db>,
 ) -> Truthiness {
-    evaluate_reachability(db, use_def, binding.reachability_constraint)
+    evaluate_reachability(ctx, use_def, binding.reachability_constraint)
 }
 
 pub(crate) fn evaluate_reachability(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     use_def: &UseDefMap,
     reachability: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     use_def
         .reachability_constraints()
-        .evaluate(db, use_def.predicates(), reachability)
+        .evaluate(ctx, use_def.predicates(), reachability)
 }
 
 /// Inference-local cache for static reachability evaluations.
@@ -1649,11 +1668,12 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     /// by graph identity and id.
     pub(crate) fn evaluate(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         constraints: &ReachabilityConstraints,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
+        let db = ctx.db();
         match id {
             ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
             ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
@@ -1671,7 +1691,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id);
+            let result = evaluate_reachability_constraint(ctx, scope, id);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
@@ -1681,7 +1701,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let result = evaluate_reachability_constraint(db, self.primary_scope, id);
+        let result = evaluate_reachability_constraint(ctx, self.primary_scope, id);
         let mut entries = self.primary_entries.borrow_mut();
         if entries.len() <= index {
             entries.resize(index + 1, None);
@@ -1693,30 +1713,30 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 
 /// Evaluates a reachability constraint, optionally using an inference-local cache.
 pub(crate) fn evaluate_reachability_with_cache<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     cache: Option<&ReachabilityEvaluationCache<'db>>,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     if let Some(cache) = cache {
-        cache.evaluate(db, constraints, predicates, id)
+        cache.evaluate(ctx, constraints, predicates, id)
     } else {
-        constraints.evaluate(db, predicates, id)
+        constraints.evaluate(ctx, predicates, id)
     }
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
     fn any_reachable(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool;
 
     /// Return the first reachable declaration that matches the passed in predicate function.
     fn first_reachable_declaration_order(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> Option<ScopedDefinitionId>;
 }
@@ -1724,7 +1744,7 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
     fn any_reachable(
         mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool {
         let predicates = self.predicates();
@@ -1738,7 +1758,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
              }| {
                 predicate(declaration)
                     && !reachability_constraints
-                        .evaluate(db, predicates, reachability_constraint)
+                        .evaluate(ctx, predicates, reachability_constraint)
                         .is_always_false()
             },
         )
@@ -1746,7 +1766,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
 
     fn first_reachable_declaration_order(
         mut self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> Option<ScopedDefinitionId> {
         let reachability_predicates = self.predicates();
@@ -1760,7 +1780,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
              }| {
                 (predicate(declaration)
                     && !reachability_constraints
-                        .evaluate(db, reachability_predicates, reachability_constraint)
+                        .evaluate(ctx, reachability_predicates, reachability_constraint)
                         .is_always_false())
                 .then_some(declaration_order)
             },
@@ -1825,7 +1845,7 @@ mod tests {
                 let constraints = NarrowingConstraints::from_test_nodes(nodes);
                 let x = index.place_table(function_scope).symbol_id("x").unwrap();
                 let mut projector = NarrowingProjector::new(
-                    &db,
+                    &db.semantic_context(),
                     &constraints,
                     &predicates,
                     ScopedPlaceId::Symbol(x),

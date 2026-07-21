@@ -6,8 +6,8 @@ use ruff_db::PythonFile;
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
-use ty_project::SemanticDb as _;
 
 use crate::db::Db;
 use crate::document::ToRangeExt;

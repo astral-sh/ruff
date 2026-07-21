@@ -13,6 +13,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
+use ruff_python_ast::PythonVersion;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_core::program::{
@@ -25,6 +26,9 @@ mod changes;
 
 #[salsa::db]
 pub trait Db: SemanticDb {
+    /// Returns the Python version for files in the primary environment.
+    fn python_version(&self) -> PythonVersion;
+
     fn project(&self) -> Project;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
@@ -542,10 +546,6 @@ impl ty_module_resolver::Db for ProjectDatabase {
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
-
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         ProjectDatabase::check_file(self, file)
     }
@@ -610,6 +610,10 @@ impl salsa::Database for ProjectDatabase {}
 
 #[salsa::db]
 impl Db for ProjectDatabase {
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
+
     fn project(&self) -> Project {
         self.project.unwrap()
     }
@@ -649,7 +653,7 @@ pub(crate) mod testing {
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
+    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource, SemanticContext};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -728,6 +732,14 @@ pub(crate) mod testing {
     }
 
     impl TestDb {
+        pub fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
+        pub fn semantic_context(&self) -> SemanticContext<'_> {
+            SemanticContext::from_version(self, self.python_version())
+        }
+
         /// Takes the salsa events.
         pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
@@ -777,10 +789,6 @@ pub(crate) mod testing {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            Program::get(self).python_version(self)
-        }
-
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             crate::check_file(self, file)
@@ -813,6 +821,10 @@ pub(crate) mod testing {
 
     #[salsa::db]
     impl Db for TestDb {
+        fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
         fn project(&self) -> Project {
             self.project.unwrap()
         }
@@ -832,9 +844,8 @@ mod tests {
     use ruff_db::files::FileRootKind;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ty_module_resolver::list_modules;
-    use ty_python_core::program::Program;
 
-    use crate::{ProjectDatabase, ProjectMetadata};
+    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
@@ -878,7 +889,7 @@ mod tests {
         let metadata = ProjectMetadata::discover(&project, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
 
-        let modules = list_modules(&db, Program::get(&db).python_version(&db));
+        let modules = list_modules(&db, db.python_version());
         assert!(
             modules
                 .iter()
