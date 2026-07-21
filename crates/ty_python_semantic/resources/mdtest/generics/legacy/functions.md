@@ -620,9 +620,7 @@ def accepts_instance_or_int(instance: T_bounded, x: T_bounded | int) -> T_bounde
     return instance
 
 def _(x: int | None, valid: MyClass | int) -> MyClass:
-    # TODO: avoid the duplicate diagnostic when we move to new constraint solver for unions
     # error: [invalid-argument-type] "Argument type `None` does not satisfy upper bound `MyClass` of type variable `T_bounded`"
-    # error: [invalid-argument-type] "Expected `MyClass | int`, found `int | None`"
     result = accepts_instance_or_int(MyClass(), x)
     reveal_type(result)  # revealed: MyClass
     reveal_type(accepts_instance_or_int(MyClass(), valid))  # revealed: MyClass
