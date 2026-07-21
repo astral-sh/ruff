@@ -2236,6 +2236,66 @@ int_value: JustInt = 1
 bool_value: JustInt = True  # error: [invalid-assignment]
 ```
 
+Explicitly specializing a protocol whose `__class__` write type is `type[T]` for one of its type
+parameters does not apply the `int`/`float` special case to its type arguments. This allows such
+protocols to distinguish an actual `float` from an `int`. This is a narrowly-focused special case to
+better support the `Just` type in pandas-stubs:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+JustT = TypeVar("JustT")
+JustT_co = TypeVar("JustT_co", covariant=True)
+
+class Just(Protocol, Generic[JustT]):
+    @property
+    def __class__(self, /) -> type[JustT]: ...
+    @__class__.setter
+    def __class__(self, value: type[JustT], /) -> None: ...
+
+def takes_just_int(value: Just[int]) -> None: ...
+def takes_just_float(value: Just[float]) -> None: ...
+def takes_just_union(value: Just[int | float]) -> None: ...
+
+takes_just_int(1)
+takes_just_int(True)  # error: [invalid-argument-type]
+takes_just_int(1.0)  # error: [invalid-argument-type]
+
+takes_just_float(1.0)
+takes_just_float(1)  # error: [invalid-argument-type]
+takes_just_float(True)  # error: [invalid-argument-type]
+
+# An explicit union remains a union; disabling the special case must not erase its `int` member.
+takes_just_union(1)  # error: [invalid-argument-type]
+takes_just_union(1.0)  # error: [invalid-argument-type]
+
+class Timestamp:
+    def __mul__(self, other: Just[float], /) -> Self:
+        return self
+
+reveal_type(Timestamp() * 1.0)  # revealed: Timestamp
+
+class ReadClass(Protocol[JustT_co]):
+    @property
+    def __class__(self, /) -> type[JustT_co]: ...
+
+def takes_read_class(value: ReadClass[float]) -> None:
+    reveal_type(value)  # revealed: ReadClass[int | float]
+
+takes_read_class(1)
+takes_read_class(1.0)
+
+class WritableValue(Protocol[JustT]):
+    @property
+    def value(self) -> type[JustT]: ...
+    @value.setter
+    def value(self, value: type[JustT], /) -> None: ...
+
+def takes_writable_value(value: WritableValue[float]) -> None:
+    reveal_type(value)  # revealed: WritableValue[int | float]
+```
+
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
 getter, can be satisfied by a mutable attribute of any type bounded by the upper bound of the
 getter-returned type and the lower bound of the setter-accepted type.

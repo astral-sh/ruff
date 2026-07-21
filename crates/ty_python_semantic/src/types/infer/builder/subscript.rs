@@ -475,12 +475,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }))
         };
 
-        self.infer_explicit_callable_specialization(
+        let disable_int_float_special_case = generic_class
+            .identity_specialization(db)
+            .into_protocol_class(db)
+            .is_some_and(|protocol| {
+                protocol
+                    .interface(db)
+                    .includes_generic_writable_instance_member(db, "__class__", generic_context)
+            });
+        let previously_disabled_int_float_special_case =
+            disable_int_float_special_case.then(|| {
+                self.context
+                    .inference_flags
+                    .replace(InferenceFlags::DISABLE_INT_FLOAT_SPECIAL_CASE, true)
+            });
+
+        let result = self.infer_explicit_callable_specialization(
             subscript,
             value_ty,
             generic_context,
             specialize,
-        )
+        );
+
+        if let Some(previously_disabled_int_float_special_case) =
+            previously_disabled_int_float_special_case
+        {
+            self.context.inference_flags.set(
+                InferenceFlags::DISABLE_INT_FLOAT_SPECIAL_CASE,
+                previously_disabled_int_float_special_case,
+            );
+        }
+
+        result
     }
 
     pub(super) fn infer_explicit_type_alias_type_specialization(
