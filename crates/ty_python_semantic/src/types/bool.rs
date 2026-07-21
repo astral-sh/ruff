@@ -418,15 +418,15 @@ impl<'db> BoolError<'db> {
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`",
-                    not_boolable_type.display(&ctx)
+                    not_boolable_type.display(ctx)
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     "`__bool__` methods must only have a `self` parameter",
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
-                    .member(&ctx, "__bool__")
-                    .into_lookup_result(&ctx)
+                    .member(ctx, "__bool__")
+                    .into_lookup_result(ctx)
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -443,18 +443,18 @@ impl<'db> BoolError<'db> {
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{not_boolable}`",
-                    not_boolable = not_boolable_type.display(&ctx),
+                    not_boolable = not_boolable_type.display(ctx),
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "`{return_type}` is not assignable to `bool`",
-                        return_type = return_type.display(&ctx),
+                        return_type = return_type.display(ctx),
                     ),
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
-                    .member(&ctx, "__bool__")
-                    .into_lookup_result(&ctx)
+                    .member(ctx, "__bool__")
+                    .into_lookup_result(ctx)
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))
@@ -469,13 +469,13 @@ impl<'db> BoolError<'db> {
             Self::NotCallable { not_boolable_type } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`",
-                    not_boolable_type.display(&ctx)
+                    not_boolable_type.display(ctx)
                 ));
                 let sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "`__bool__` on `{}` must be callable",
-                        not_boolable_type.display(&ctx)
+                        not_boolable_type.display(ctx)
                     ),
                 );
                 // TODO: It would be nice to create an annotation here for
@@ -487,14 +487,14 @@ impl<'db> BoolError<'db> {
                 let first_error = union
                     .elements(context.db())
                     .iter()
-                    .find_map(|element| element.try_bool(&ctx).err())
+                    .find_map(|element| element.try_bool(ctx).err())
                     .unwrap();
 
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
-                    Type::Union(*union).display(&ctx),
-                    first_error.not_boolable_type().display(&ctx),
+                    Type::Union(*union).display(ctx),
+                    first_error.not_boolable_type().display(ctx),
                 ));
             }
 
@@ -502,7 +502,7 @@ impl<'db> BoolError<'db> {
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`; \
                      it incorrectly implements `__bool__`",
-                    not_boolable_type.display(&ctx)
+                    not_boolable_type.display(ctx)
                 ));
             }
         }

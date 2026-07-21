@@ -1284,7 +1284,7 @@ impl<'db> Bindings<'db> {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
-                    self.callable_type().display(&ctx)
+                    self.callable_type().display(ctx)
                 ));
             }
             return;
@@ -1339,7 +1339,7 @@ impl<'db> Bindings<'db> {
 
             // Construct the intersection type from the bindings
             let intersection_type = IntersectionType::from_elements(
-                &ctx,
+                ctx,
                 element.items.iter().map(CallableItem::callable_type),
             );
 
@@ -4177,10 +4177,10 @@ impl<'db> CallableBinding<'db> {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
-                    self.callable_type.display(&ctx),
+                    self.callable_type.display(ctx),
                 ));
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
             }
             return;
@@ -4191,10 +4191,10 @@ impl<'db> CallableBinding<'db> {
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly missing `__call__` method)",
-                    self.callable_type.display(&ctx),
+                    self.callable_type.display(ctx),
                 ));
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
             }
             return;
@@ -4353,7 +4353,7 @@ impl<'db> CallableBinding<'db> {
                     ));
 
                     for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
-                        diag.info(format_args!("  {}", overload.signature(&ctx).display(&ctx)));
+                        diag.info(format_args!("  {}", overload.signature(ctx).display(ctx)));
                     }
                     if possible_overloads.len() > MAXIMUM_OVERLOADS {
                         diag.info(format_args!(
@@ -4375,7 +4375,7 @@ impl<'db> CallableBinding<'db> {
                 }
 
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
             }
         }
@@ -5020,7 +5020,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 }
 
 struct ArgumentTypeChecker<'a, 'db> {
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     signature_type: Type<'db>,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
@@ -5089,7 +5089,7 @@ fn validate_keyword_unpack_key_type<'db>(
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         signature_type: Type<'db>,
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a, 'db>,
@@ -5100,7 +5100,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx,
             signature_type,
             signature,
             arguments,
@@ -5179,9 +5179,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        self.inferable_typevars = generic_context.inferable_typevars(&self.ctx);
+        self.inferable_typevars = generic_context.inferable_typevars(self.ctx);
         let mut builder =
-            SpecializationBuilder::new(&self.ctx, constraints, self.inferable_typevars);
+            SpecializationBuilder::new(self.ctx, constraints, self.inferable_typevars);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -5211,18 +5211,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 if !tcx
-                    .filter_union(&self.ctx, |ty| ty.may_prefer_declared_type(&self.ctx))
-                    .may_prefer_declared_type(&self.ctx)
+                    .filter_union(self.ctx, |ty| ty.may_prefer_declared_type(self.ctx))
+                    .may_prefer_declared_type(self.ctx)
                 {
                     return None;
                 }
 
                 let return_ty =
-                    return_ty.filter_disjoint_elements(&self.ctx, tcx, self.inferable_typevars);
+                    return_ty.filter_disjoint_elements(self.ctx, tcx, self.inferable_typevars);
                 let tcx =
-                    tcx.filter_disjoint_elements(&self.ctx, return_ty, self.inferable_typevars);
+                    tcx.filter_disjoint_elements(self.ctx, return_ty, self.inferable_typevars);
                 let path_bounds = return_ty.assignable_solutions_with_inferable(
-                    &self.ctx,
+                    self.ctx,
                     tcx,
                     self.inferable_typevars,
                 );
@@ -5237,7 +5237,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(&self.ctx, constraints, path_bound)
+                    PathBounds::default_solve(self.ctx, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -5270,14 +5270,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 binding.bound_typevar,
                                 binding.solution,
                             )
-                            .filter_union(&self.ctx, |ty| {
-                                if ty.has_unspecialized_type_var(&self.ctx) {
+                            .filter_union(self.ctx, |ty| {
+                                if ty.has_unspecialized_type_var(self.ctx) {
                                     partially_specialized_declared_type.insert(identity);
                                     return false;
                                 }
                                 true
                             });
-                        if inferred_ty.has_unspecialized_type_var(&self.ctx) {
+                        if inferred_ty.has_unspecialized_type_var(self.ctx) {
                             continue;
                         }
 
@@ -5286,15 +5286,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // `T@h | list[T@h]` from an outer generic scope) don't provide
                         // useful concrete information and would cause over-expansion.
                         let concrete_content =
-                            inferred_ty.filter_union(&self.ctx, |ty| !ty.has_typevar(&self.ctx));
-                        if concrete_content.is_never() && inferred_ty.has_typevar(&self.ctx) {
+                            inferred_ty.filter_union(self.ctx, |ty| !ty.has_typevar(self.ctx));
+                        if concrete_content.is_never() && inferred_ty.has_typevar(self.ctx) {
                             continue;
                         }
 
                         preferred
                             .entry(identity)
                             .and_modify(|existing| {
-                                existing.add(&self.ctx, inferred_ty);
+                                existing.add(self.ctx, inferred_ty);
                             })
                             .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                     }
@@ -5302,7 +5302,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 let preferred: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> = preferred
                     .into_iter()
-                    .map(|(identity, accumulator)| (identity, accumulator.into_type(&self.ctx)))
+                    .map(|(identity, accumulator)| (identity, accumulator.into_type(self.ctx)))
                     .collect();
 
                 // Add preferred types to the builder so they serve as the base mapping
@@ -5338,7 +5338,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new(&self.ctx, constraints, self.inferable_typevars);
+            builder = SpecializationBuilder::new(self.ctx, constraints, self.inferable_typevars);
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
 
@@ -5358,7 +5358,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
             let bound_or_constraints = typevar
                 .typevar(self.ctx.db())
-                .bound_or_constraints(&self.ctx);
+                .bound_or_constraints(self.ctx);
 
             // For constrained TypeVars, the inferred type is already one of the
             // constraints. Promoting literals would produce a type that doesn't
@@ -5374,7 +5374,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // Find all occurrences of the type variable in the return type.
             self.return_ty
-                .visit_specialization(&self.ctx, |ty, variance| {
+                .visit_specialization(self.ctx, |ty, variance| {
                     if ty != Type::TypeVar(typevar) {
                         return;
                     }
@@ -5389,12 +5389,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             let lower = bounds.lower?;
-            let promoted = lower.promote(&self.ctx);
+            let promoted = lower.promote(self.ctx);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
             if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(&self.ctx, bound) {
+                if !promoted.is_assignable_to(self.ctx, bound) {
                     return None;
                 }
             }
@@ -5407,7 +5407,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(lower) = bounds.lower
                 && let Some(&preferred_ty) =
                     preferred_type_mappings.get(&typevar.identity(self.ctx.db()))
-                && lower.is_assignable_to(&self.ctx, preferred_ty)
+                && lower.is_assignable_to(self.ctx, preferred_ty)
             {
                 return Some(preferred_ty);
             }
@@ -5441,7 +5441,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.return_ty = self
             .return_ty
-            .apply_specialization(&self.ctx, specialization);
+            .apply_specialization(self.ctx, specialization);
         self.inference = Some(inference);
     }
 
@@ -5523,8 +5523,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
-            argument_type = argument_type.apply_specialization(&self.ctx, specialization);
-            expected_ty = expected_ty.apply_specialization(&self.ctx, specialization);
+            argument_type = argument_type.apply_specialization(self.ctx, specialization);
+            expected_ty = expected_ty.apply_specialization(self.ctx, specialization);
         }
 
         // Some typing special forms are valid class-info arguments at runtime but are not
@@ -5561,8 +5561,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
             && argument_type
-                .when_assignable_to(&self.ctx, expected_ty, constraints, self.inferable_typevars)
-                .is_never_satisfied(&self.ctx)
+                .when_assignable_to(self.ctx, expected_ty, constraints, self.inferable_typevars)
+                .is_never_satisfied(self.ctx)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,
@@ -5598,7 +5598,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             builder.add_in_place(argument_type);
         } else if let Some(existing) = self.parameter_tys[parameter_index] {
-            let mut builder = UnionBuilder::new(&self.ctx);
+            let mut builder = UnionBuilder::new(self.ctx);
             builder.add_in_place(existing);
             builder.add_in_place(argument_type);
             if self.parameter_ty_builders.is_empty() {
@@ -5629,13 +5629,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         expected_type: Type<'db>,
         argument_type: Type<'db>,
     ) -> bool {
-        let Some(declared_callables) = declared_type.try_upcast_to_callable(&self.ctx) else {
+        let Some(declared_callables) = declared_type.try_upcast_to_callable(self.ctx) else {
             return false;
         };
         let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
             callable.signatures(self.ctx.db()).iter().any(|signature| {
                 signature.parameters().iter().any(|parameter| {
-                    any_over_type(&self.ctx, parameter.annotated_type(), false, |ty| {
+                    any_over_type(self.ctx, parameter.annotated_type(), false, |ty| {
                         matches!(
                             ty,
                             Type::TypeVar(typevar) if typevar.is_typevartuple(self.ctx.db())
@@ -5648,7 +5648,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        let Some(argument_callables) = argument_type.try_upcast_to_callable(&self.ctx) else {
+        let Some(argument_callables) = argument_type.try_upcast_to_callable(self.ctx) else {
             return false;
         };
         if argument_callables
@@ -5666,7 +5666,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         });
         argument_is_generic
             && expected_type
-                .try_upcast_to_callable(&self.ctx)
+                .try_upcast_to_callable(self.ctx)
                 .is_some_and(|callables| {
                     callables.iter().any(|callable| {
                         callable.signatures(self.ctx.db()).iter().any(|signature| {
@@ -5838,9 +5838,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
         let bindings = match Bindings::from(callable_binding)
-            .match_parameters(&self.ctx, &sub_arguments)
+            .match_parameters(self.ctx, &sub_arguments)
             .check_types(
-                &self.ctx,
+                self.ctx,
                 constraints,
                 &sub_arguments,
                 self.call_expression_tcx,
@@ -5935,7 +5935,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_type: Type<'db>,
         paramspec_component_start: Option<usize>,
     ) {
-        if extract_unpacked_typed_dict_from_value_type(&self.ctx, argument_type).is_some() {
+        if extract_unpacked_typed_dict_from_value_type(self.ctx, argument_type).is_some() {
             self.check_variadic_argument_type(
                 constraints,
                 argument_index,
@@ -5951,7 +5951,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Some(paramspec)
             } else {
                 match validate_keyword_unpack_key_type(
-                    &self.ctx,
+                    self.ctx,
                     constraints,
                     argument_type,
                     self.inferable_typevars,
@@ -5983,7 +5983,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .map(Name::as_str);
 
                 argument_type
-                    .getitem_dunder_call(&self.ctx, parameter_name)
+                    .getitem_dunder_call(self.ctx, parameter_name)
                     .unwrap_or(Type::unknown())
             };
 
@@ -6163,9 +6163,9 @@ impl<'db> ArgumentTypeContext<'db> {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct UnknownParameterNameError;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct ParamSpecArgumentContext<'a, 'call, 'db> {
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     constraints: &'a ConstraintSetBuilder<'db>,
     binding: &'a CallableBinding<'db>,
     callable: CallableType<'db>,
@@ -6391,7 +6391,7 @@ impl<'db> Binding<'db> {
     /// ```
     fn paramspec_argument_context(
         &self,
-        context: ParamSpecArgumentContext<'_, '_, 'db>,
+        context: &ParamSpecArgumentContext<'_, '_, 'db>,
     ) -> Option<Type<'db>> {
         let ParamSpecArgumentContext {
             ctx,
@@ -6401,7 +6401,7 @@ impl<'db> Binding<'db> {
             arguments_types,
             argument_index,
             call_expression_tcx,
-        } = context;
+        } = *context;
         let db = ctx.db();
         let (prefix, _) = self.signature.parameters().as_paramspec_with_prefix()?;
         let paramspec_argument_indices =
@@ -6421,9 +6421,9 @@ impl<'db> Binding<'db> {
         sub_arguments.clear_types(sub_argument_index);
 
         let mut specialized_bindings =
-            Bindings::from(specialized_binding).match_parameters(&ctx, &sub_arguments);
+            Bindings::from(specialized_binding).match_parameters(ctx, &sub_arguments);
         let _ = specialized_bindings.check_types_impl(
-            &ctx,
+            ctx,
             constraints,
             &sub_arguments,
             call_expression_tcx,
@@ -6451,10 +6451,10 @@ impl<'db> Binding<'db> {
         let parameter_type = specialized_overload
             .specialization(db)
             .map_or(parameter_type, |specialization| {
-                parameter_type.apply_specialization(&ctx, specialization)
+                parameter_type.apply_specialization(ctx, specialization)
             });
 
-        (!parameter_type.has_dynamic(&ctx) && !parameter_type.has_typevar_or_typevar_instance(&ctx))
+        (!parameter_type.has_dynamic(ctx) && !parameter_type.has_typevar_or_typevar_instance(ctx))
             .then_some(parameter_type)
     }
 
@@ -6534,8 +6534,8 @@ impl<'db> Binding<'db> {
             if let Some(paramspec) = paramspec
                 && let Some(callable) = paramspec_callable(paramspec)
                 && let Some(specialized_parameter_type) =
-                    self.paramspec_argument_context(ParamSpecArgumentContext {
-                        ctx: *ctx,
+                    self.paramspec_argument_context(&ParamSpecArgumentContext {
+                        ctx,
                         constraints,
                         binding,
                         callable,
@@ -7611,12 +7611,10 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-                    &ctx,
-                    [provided_ty, expected_ty],
-                );
-                let provided_ty_display = provided_ty.display_with(&ctx, display_settings.clone());
-                let expected_ty_display = expected_ty.display_with(&ctx, display_settings);
+                let display_settings =
+                    DisplaySettings::from_possibly_ambiguous_types(ctx, [provided_ty, expected_ty]);
+                let provided_ty_display = provided_ty.display_with(ctx, display_settings.clone());
+                let expected_ty_display = expected_ty.display_with(ctx, display_settings);
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
@@ -7638,8 +7636,8 @@ impl<'db> BindingError<'db> {
                     ));
                 }
 
-                let error_context = provided_ty.assignability_error_context(&ctx, *expected_ty);
-                error_context.attach_to(&ctx, &mut diag);
+                let error_context = provided_ty.assignability_error_context(ctx, *expected_ty);
+                error_context.attach_to(ctx, &mut diag);
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some(overload_literal) = matching_overload.get(context.db()) {
@@ -7669,7 +7667,7 @@ impl<'db> BindingError<'db> {
                             if overload_index == matching_overload.index {
                                 continue;
                             }
-                            diag.info(format_args!("  {}", overload.signature(&ctx).display(&ctx)));
+                            diag.info(format_args!("  {}", overload.signature(ctx).display(ctx)));
                         }
                         if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {
                             diag.info(format_args!(
@@ -7694,20 +7692,20 @@ impl<'db> BindingError<'db> {
                 }
 
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
 
                 // If the type comes from first-party code, the user may have some control over
                 // the parameter annotation; provide additional context to help them fix it.
                 if callable_ty
-                    .definition(&ctx)
+                    .definition(ctx)
                     .and_then(|definition| definition.file(context.db()))
                     .is_some_and(|file| context.db().should_check_file(file))
                 {
-                    note_numbers_module_not_supported(&ctx, &mut diag, *expected_ty, *provided_ty);
+                    note_numbers_module_not_supported(ctx, &mut diag, *expected_ty, *provided_ty);
                 }
 
-                add_invariant_generic_hints(&ctx, &mut diag, *expected_ty, *provided_ty);
+                add_invariant_generic_hints(ctx, &mut diag, *expected_ty, *provided_ty);
             }
 
             Self::InvalidKeyType {
@@ -7718,14 +7716,14 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let provided_ty_display = provided_ty.display(&ctx);
+                let provided_ty_display = provided_ty.display(ctx);
                 let mut diag = builder.into_diagnostic(
                     "Argument expression after ** must be a mapping with `str` key type",
                 );
                 diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
 
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
             }
 
@@ -7744,7 +7742,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -7770,7 +7768,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     } else {
                         let span = callable_ty.parameter_span(
                             context.db(),
@@ -7812,7 +7810,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -7834,7 +7832,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -7861,7 +7859,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -7886,7 +7884,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     }
                 }
             }
@@ -7900,7 +7898,7 @@ impl<'db> BindingError<'db> {
                     return;
                 };
                 let argument_type = error.argument_type();
-                let argument_ty_display = argument_type.display(&ctx);
+                let argument_ty_display = argument_type.display(ctx);
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
@@ -7917,11 +7915,11 @@ impl<'db> BindingError<'db> {
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy upper bound `{}` of type variable `{typevar_name}`",
                             typevar
-                                .upper_bound(&ctx)
+                                .upper_bound(ctx)
                                 .expect(
                                     "type variable should have an upper bound if this error occurs"
                                 )
-                                .display(&ctx)
+                                .display(ctx)
                         ));
                     }
                     SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
@@ -7931,14 +7929,14 @@ impl<'db> BindingError<'db> {
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy constraints ({}) of type variable `{typevar_name}`",
                             typevar
-                                .constraints(&ctx)
+                                .constraints(ctx)
                                 .expect(
                                     "type variable should have constraints if this error occurs"
                                 )
                                 .iter()
                                 .format_with(", ", |ty, f| f(&format_args!(
                                     "`{}`",
-                                    ty.display(&ctx)
+                                    ty.display(ctx)
                                 )))
                         ));
                     }
@@ -7962,7 +7960,7 @@ impl<'db> BindingError<'db> {
                 }
 
                 if let Some(compound_diag) = compound_diag {
-                    compound_diag.add_context(&ctx, &mut diag);
+                    compound_diag.add_context(ctx, &mut diag);
                 }
             }
 
@@ -8000,7 +7998,7 @@ impl<'db> BindingError<'db> {
                             .unwrap_or_default()
                     ));
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     }
                 }
             }
@@ -8010,7 +8008,7 @@ impl<'db> BindingError<'db> {
             Self::CalledTopCallable(callable_ty) => {
                 let node = Self::get_node(node, None);
                 if let Some(builder) = context.report_lint(&CALL_TOP_CALLABLE, node) {
-                    let callable_ty_display = callable_ty.display(&ctx);
+                    let callable_ty_display = callable_ty.display(ctx);
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Object of type `{callable_ty_display}` is not safe to call; \
                         its signature is not known"
@@ -8020,7 +8018,7 @@ impl<'db> BindingError<'db> {
                         because there is no valid set of arguments for it",
                     );
                     if let Some(compound_diag) = compound_diag {
-                        compound_diag.add_context(&ctx, &mut diag);
+                        compound_diag.add_context(ctx, &mut diag);
                     }
                 }
             }

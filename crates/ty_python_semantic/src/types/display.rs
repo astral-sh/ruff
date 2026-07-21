@@ -605,46 +605,46 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub fn display(self, ctx: &SemanticContext<'db>) -> DisplayType<'db> {
+    pub fn display<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> DisplayType<'ctx, 'db> {
         DisplayType {
             ty: self,
             settings: DisplaySettings::from_possibly_ambiguous_types(ctx, [self]),
-            ctx: *ctx,
+            ctx,
         }
     }
 
-    pub fn display_with(
+    pub fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayType<'db> {
+    ) -> DisplayType<'ctx, 'db> {
         DisplayType {
             ty: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 
-    fn representation(
+    fn representation<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayRepresentation<'db> {
+    ) -> DisplayRepresentation<'ctx, 'db> {
         DisplayRepresentation {
-            ctx: *ctx,
+            ctx,
             ty: self,
             settings,
         }
     }
 }
 
-pub struct DisplayType<'db> {
+pub struct DisplayType<'ctx, 'db> {
     ty: Type<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> DisplayType<'db> {
+impl<'db> DisplayType<'_, 'db> {
     pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
         let mut f = TypeWriter::Details(TypeDetailsWriter::new());
         self.fmt_detailed(&mut f).unwrap();
@@ -656,9 +656,9 @@ impl<'db> DisplayType<'db> {
     }
 }
 
-impl<'db> FmtDetailed<'db> for DisplayType<'db> {
+impl<'db> FmtDetailed<'db> for DisplayType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let representation = self.ty.representation(&self.ctx, self.settings.clone());
+        let representation = self.ty.representation(self.ctx, self.settings.clone());
         match self.ty.as_literal_value_kind() {
             Some(
                 LiteralValueTypeKind::Int(_)
@@ -678,13 +678,13 @@ impl<'db> FmtDetailed<'db> for DisplayType<'db> {
     }
 }
 
-impl Display for DisplayType<'_> {
+impl Display for DisplayType<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
-impl fmt::Debug for DisplayType<'_> {
+impl fmt::Debug for DisplayType<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
@@ -818,10 +818,10 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration(self, ctx: &SemanticContext<'db>) -> impl Display + 'db {
+    pub fn display_declaration<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> impl Display + 'ctx {
         let value_ty = self.raw_value_type(ctx.db());
         DisplayTypeAliasDeclaration {
-            ctx: *ctx,
+            ctx,
             type_alias: self,
             value_ty,
             settings: DisplaySettings::from_possibly_ambiguous_types(
@@ -876,14 +876,14 @@ impl Display for TypeAliasDisplay<'_> {
 }
 
 /// A source-style display of a type alias declaration.
-struct DisplayTypeAliasDeclaration<'db> {
-    ctx: SemanticContext<'db>,
+struct DisplayTypeAliasDeclaration<'ctx, 'db> {
+    ctx: &'ctx SemanticContext<'db>,
     type_alias: TypeAliasType<'db>,
     value_ty: Type<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
+impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let generic_context = self.type_alias.generic_context(self.ctx.db());
         let settings = self
@@ -901,12 +901,12 @@ impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
         }
         f.write_str(" = ")?;
         self.value_ty
-            .display_with(&self.ctx, settings)
+            .display_with(self.ctx, settings)
             .fmt_detailed(f)
     }
 }
 
-impl Display for DisplayTypeAliasDeclaration<'_> {
+impl Display for DisplayTypeAliasDeclaration<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -938,9 +938,9 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
-struct DisplayRepresentation<'db> {
+struct DisplayRepresentation<'ctx, 'db> {
     ty: Type<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -952,13 +952,13 @@ fn property_display_name(db: &dyn Db, property: PropertyInstanceType<'_>) -> &'s
     }
 }
 
-impl Display for DisplayRepresentation<'_> {
+impl Display for DisplayRepresentation<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
-impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
+impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
             Type::Dynamic(dynamic) => {
@@ -970,7 +970,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
-                let class = instance.class(&self.ctx);
+                let class = instance.class(self.ctx);
 
                 match (class, class.known(self.ctx.db())) {
                     (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
@@ -979,12 +979,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .specialization(self.ctx.db())
                         .tuple(self.ctx.db())
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f),
                     (ClassType::NonGeneric(class), _) => {
                         class.display_with(self.ctx.db(), self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(&self.ctx, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias.display_with(self.ctx, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -993,7 +993,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.ctx.db(), self.settings.clone())
                         .fmt_detailed(f),
                     ClassType::Generic(alias) => alias
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
@@ -1021,7 +1021,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::ModuleType.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::ModuleType.to_class_literal(self.ctx))
                     .write_str("module")?;
                 f.write_str(" '")?;
                 f.with_type(self.ty)
@@ -1042,13 +1042,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
-                    .display_with(&self.ctx, self.settings.clone())
+                    .display_with(self.ctx, self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
@@ -1057,33 +1057,33 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Protocol(protocol) => {
-                    f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                         .write_str("type")?;
                     f.write_char('[')?;
                     Type::ProtocolInstance(protocol)
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(
@@ -1101,13 +1101,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "<special-form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
             Type::FunctionLiteral(function) => function
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
             Type::Callable(callable) => callable
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.ctx.db());
@@ -1116,7 +1116,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let hide_unused_self = signature.should_hide_self_from_display(&self.ctx);
+                        let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: signature.generic_context.as_ref(),
                             db: self.ctx.db(),
@@ -1136,7 +1136,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .write_str(function.name(self.ctx.db()))?;
                         type_parameters.fmt_detailed(f)?;
                         signature
-                            .display_with(&self.ctx, self.settings.disallow_signature_name())
+                            .display_with(self.ctx, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
                     signatures => {
@@ -1150,7 +1150,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(&signature.display_with(&self.ctx, self.settings.clone()));
+                            join.entry(&signature.display_with(self.ctx, self.settings.clone()));
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1249,13 +1249,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 };
 
-                let class_ty = cls.to_class_literal(&self.ctx);
+                let class_ty = cls.to_class_literal(self.ctx);
                 f.write_char('<')?;
-                f.with_type(KnownClass::MethodWrapperType.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.ctx))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
                 if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
-                    class_ty.member(&self.ctx, member_name).place
+                    class_ty.member(self.ctx, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
                 } else {
@@ -1288,12 +1288,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 };
                 f.write_char('<')?;
-                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.ctx))
                     .write_str("wrapper-descriptor")?;
                 f.write_str(" '")?;
                 f.write_str(method)?;
                 f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(&self.ctx))
+                f.with_type(cls.to_class_literal(self.ctx))
                     .write_str(object)?;
                 f.write_str("' objects>")
             }
@@ -1306,14 +1306,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
             Type::Intersection(intersection) => intersection
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
             Type::EnumComplement(complement) => {
                 if let Some(literals) =
-                    complement.remaining_literal_types_for_display(&self.ctx, LITERAL_POLICY.max)
+                    complement.remaining_literal_types_for_display(self.ctx, LITERAL_POLICY.max)
                 {
                     DisplayLiteralGroup {
                         literals,
@@ -1323,8 +1323,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)
                 } else {
                     complement
-                        .to_intersection(&self.ctx)
-                        .display_with(&self.ctx, self.settings.clone())
+                        .to_intersection(self.ctx)
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)
                 }
             }
@@ -1389,19 +1389,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.ctx.db()))
-                    .display_with(&self.ctx, self.settings.singleline())
+                    .display_with(self.ctx, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
                 bound_super
                     .owner(self.ctx.db())
                     .owner_type()
-                    .display_with(&self.ctx, self.settings.singleline())
+                    .display_with(self.ctx, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(&self.ctx, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => fmt_type_guard_like(self.ctx, type_is, &self.settings, f),
             Type::TypeGuard(type_guard) => {
-                fmt_type_guard_like(&self.ctx, type_guard, &self.settings, f)
+                fmt_type_guard_like(self.ctx, type_guard, &self.settings, f)
             }
             Type::TypeForm(typeform) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
@@ -1409,7 +1409,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_char('[')?;
                 typeform
                     .type_argument(self.ctx.db())
-                    .display_with(&self.ctx, self.settings.clone())
+                    .display_with(self.ctx, self.settings.clone())
                     .fmt_detailed(f)?;
                 f.write_char(']')
             }
@@ -1418,7 +1418,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.ctx.db(), self.settings.clone())
                     .fmt_detailed(f),
                 ClassType::Generic(alias) => alias
-                    .display_with(&self.ctx, self.settings.clone())
+                    .display_with(self.ctx, self.settings.clone())
                     .fmt_detailed(f),
             },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
@@ -1446,7 +1446,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 match alias.specialization(self.ctx.db()) {
                     None => Ok(()),
                     Some(specialization) => specialization
-                        .display_short(&self.ctx, TupleSpecialization::No, self.settings.clone())
+                        .display_short(self.ctx, TupleSpecialization::No, self.settings.clone())
                         .fmt_detailed(f),
                 }
             }
@@ -1501,12 +1501,12 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
 impl<'db> TupleSpec<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTuple<'a, 'db> {
         DisplayTuple {
             tuple: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -1514,13 +1514,13 @@ impl<'db> TupleSpec<'db> {
 
 struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        f.with_type(KnownClass::Tuple.to_class_literal(&self.ctx))
+        f.with_type(KnownClass::Tuple.to_class_literal(self.ctx))
             .write_str("tuple")?;
         f.write_char('[')?;
         match self.tuple {
@@ -1530,7 +1530,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(&self.ctx, self.settings.singleline())
+                        .display_with(self.ctx, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1553,7 +1553,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(&self.ctx, self.settings.singleline())
+                        .display_with(self.ctx, self.settings.singleline())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
@@ -1561,7 +1561,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     VariableSegment::TypeVarTuple(typevar) => {
                         f.write_char('*')?;
                         Type::TypeVar(typevar)
-                            .display_with(&self.ctx, self.settings.singleline())
+                            .display_with(self.ctx, self.settings.singleline())
                             .fmt_detailed(f)?;
                     }
                     VariableSegment::Homogeneous(variable) => {
@@ -1570,12 +1570,12 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         {
                             f.write_char('*')?;
                             // Might as well link the type again here too
-                            f.with_type(KnownClass::Tuple.to_class_literal(&self.ctx))
+                            f.with_type(KnownClass::Tuple.to_class_literal(self.ctx))
                                 .write_str("tuple")?;
                             f.write_char('[')?;
                         }
                         variable
-                            .display_with(&self.ctx, self.settings.singleline())
+                            .display_with(self.ctx, self.settings.singleline())
                             .fmt_detailed(f)?;
                         f.write_str(", ...")?;
                         if !tuple.prefix_elements().is_empty()
@@ -1589,7 +1589,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(&self.ctx, self.settings.singleline())
+                        .display_with(self.ctx, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1607,33 +1607,36 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display(self, ctx: &SemanticContext<'db>) -> DisplayOverloadLiteral<'db> {
+    pub(crate) fn display<'ctx>(
+        self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> DisplayOverloadLiteral<'ctx, 'db> {
         Self::display_with(self, ctx, DisplaySettings::default())
     }
 
-    fn display_with(
+    fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayOverloadLiteral<'db> {
+    ) -> DisplayOverloadLiteral<'ctx, 'db> {
         DisplayOverloadLiteral {
             literal: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
-pub(crate) struct DisplayOverloadLiteral<'db> {
+pub(crate) struct DisplayOverloadLiteral<'ctx, 'db> {
     literal: OverloadLiteral<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
+impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let signature = self.literal.signature(&self.ctx);
-        let hide_unused_self = signature.should_hide_self_from_display(&self.ctx);
+        let signature = self.literal.signature(self.ctx);
+        let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.ctx.db(),
@@ -1646,38 +1649,38 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
         write!(f, "{}", self.literal.name(self.ctx.db()))?;
         type_parameters.fmt_detailed(f)?;
         signature
-            .display_with(&self.ctx, self.settings.disallow_signature_name())
+            .display_with(self.ctx, self.settings.disallow_signature_name())
             .fmt_detailed(f)
     }
 }
 
-impl Display for DisplayOverloadLiteral<'_> {
+impl Display for DisplayOverloadLiteral<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
 impl<'db> FunctionType<'db> {
-    fn display_with(
+    fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayFunctionType<'db> {
+    ) -> DisplayFunctionType<'ctx, 'db> {
         DisplayFunctionType {
             ty: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
-struct DisplayFunctionType<'db> {
+struct DisplayFunctionType<'ctx, 'db> {
     ty: FunctionType<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
+impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         // Detect self-referential function types to prevent infinite recursion,
         // and limit display depth for chains of different function types
@@ -1701,7 +1704,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
 
         match signature.overloads.as_slice() {
             [signature] => {
-                let hide_unused_self = signature.should_hide_self_from_display(&self.ctx);
+                let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
 
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
@@ -1714,7 +1717,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.ctx.db()))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(&self.ctx, settings.disallow_signature_name())
+                    .display_with(self.ctx, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
@@ -1728,7 +1731,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(&self.ctx, settings.clone()));
+                    join.entry(&signature.display_with(self.ctx, settings.clone()));
                 }
                 join.finish()?;
                 if !settings.multiline {
@@ -1740,44 +1743,47 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     }
 }
 
-impl Display for DisplayFunctionType<'_> {
+impl Display for DisplayFunctionType<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
 impl<'db> GenericAlias<'db> {
-    pub(crate) fn display(self, ctx: &SemanticContext<'db>) -> DisplayGenericAlias<'db> {
+    pub(crate) fn display<'ctx>(
+        self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> DisplayGenericAlias<'ctx, 'db> {
         self.display_with(ctx, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with(
+    pub(crate) fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayGenericAlias<'db> {
+    ) -> DisplayGenericAlias<'ctx, 'db> {
         let db = ctx.db();
         DisplayGenericAlias {
             origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
-pub(crate) struct DisplayGenericAlias<'db> {
+pub(crate) struct DisplayGenericAlias<'ctx, 'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
+impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(tuple) = self.specialization.tuple(self.ctx.db()) {
             tuple
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)
         } else {
             let prefix_details = match self.specialization.materialization_kind(self.ctx.db()) {
@@ -1798,7 +1804,7 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 .fmt_detailed(f)?;
             self.specialization
                 .display_short(
-                    &self.ctx,
+                    self.ctx,
                     TupleSpecialization::from_class(self.ctx.db(), self.origin),
                     self.settings.clone(),
                 )
@@ -1808,7 +1814,7 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
     }
 }
 
-impl Display for DisplayGenericAlias<'_> {
+impl Display for DisplayGenericAlias<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -1959,10 +1965,13 @@ impl Display for DisplayGenericContext<'_, '_> {
 }
 
 impl<'db> Specialization<'db> {
-    fn display_full(self, ctx: &SemanticContext<'db>) -> DisplaySpecialization<'db> {
+    fn display_full<'ctx>(
+        self,
+        ctx: &'ctx SemanticContext<'db>,
+    ) -> DisplaySpecialization<'ctx, 'db> {
         DisplaySpecialization {
             specialization: self,
-            ctx: *ctx,
+            ctx,
             tuple_specialization: TupleSpecialization::No,
             settings: DisplaySettings::default(),
             full: true,
@@ -1970,15 +1979,15 @@ impl<'db> Specialization<'db> {
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
-    fn display_short(
+    fn display_short<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
-    ) -> DisplaySpecialization<'db> {
+    ) -> DisplaySpecialization<'ctx, 'db> {
         DisplaySpecialization {
             specialization: self,
-            ctx: *ctx,
+            ctx,
             tuple_specialization,
             settings,
             full: false,
@@ -1986,15 +1995,15 @@ impl<'db> Specialization<'db> {
     }
 }
 
-struct DisplaySpecialization<'db> {
+struct DisplaySpecialization<'ctx, 'db> {
     specialization: Specialization<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
     full: bool,
 }
 
-impl<'db> DisplaySpecialization<'db> {
+impl<'db> DisplaySpecialization<'_, 'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_char('[')?;
         let variables = self
@@ -2010,7 +2019,7 @@ impl<'db> DisplaySpecialization<'db> {
                     if wrote_any {
                         f.write_str(", ")?;
                     }
-                    ty.display_with(&self.ctx, self.settings.clone())
+                    ty.display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                     wrote_any = true;
                     continue;
@@ -2031,7 +2040,7 @@ impl<'db> DisplaySpecialization<'db> {
                                 f.write_str(", ")?;
                             }
                             element
-                                .display_with(&self.ctx, self.settings.clone())
+                                .display_with(self.ctx, self.settings.clone())
                                 .fmt_detailed(f)?;
                             wrote_any = true;
                         }
@@ -2041,7 +2050,7 @@ impl<'db> DisplaySpecialization<'db> {
                             f.write_str(", ")?;
                         }
                         f.write_char('*')?;
-                        ty.display_with(&self.ctx, self.settings.clone())
+                        ty.display_with(self.ctx, self.settings.clone())
                             .fmt_detailed(f)?;
                         wrote_any = true;
                     }
@@ -2052,7 +2061,7 @@ impl<'db> DisplaySpecialization<'db> {
             if wrote_any {
                 f.write_str(", ")?;
             }
-            ty.display_with(&self.ctx, self.settings.clone())
+            ty.display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)?;
             wrote_any = true;
         }
@@ -2080,14 +2089,14 @@ impl<'db> DisplaySpecialization<'db> {
                 bound_typevar.identity(self.ctx.db()).display(self.ctx.db())
             )?;
             f.write_str(" = ")?;
-            ty.display_with(&self.ctx, self.settings.clone())
+            ty.display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         f.write_char(']')
     }
 }
 
-impl<'db> FmtDetailed<'db> for DisplaySpecialization<'db> {
+impl<'db> FmtDetailed<'db> for DisplaySpecialization<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if self.full {
             self.fmt_full(f)
@@ -2097,7 +2106,7 @@ impl<'db> FmtDetailed<'db> for DisplaySpecialization<'db> {
     }
 }
 
-impl Display for DisplaySpecialization<'_> {
+impl Display for DisplaySpecialization<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -2126,21 +2135,21 @@ impl TupleSpecialization {
 impl<'db> CallableType<'db> {
     pub(crate) fn display<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
     ) -> DisplayCallableType<'a, 'db> {
         Self::display_with(self, ctx, DisplaySettings::default())
     }
 
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'a, 'db> {
         let db = ctx.db();
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -2149,7 +2158,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2163,14 +2172,14 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     }
                     signature
                         .parameters()
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
                         f.write_str("]")?;
                     }
                 } else {
                     signature
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                 }
             }
@@ -2185,7 +2194,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(&self.ctx, self.settings.clone()));
+                    join.entry(&signature.display_with(self.ctx, self.settings.clone()));
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -2205,13 +2214,16 @@ impl Display for DisplayCallableType<'_, '_> {
 }
 
 impl<'db> Signature<'db> {
-    pub(crate) fn display<'a>(&'a self, ctx: &SemanticContext<'db>) -> DisplaySignature<'a, 'db> {
+    pub(crate) fn display<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
+    ) -> DisplaySignature<'a, 'db> {
         Self::display_with(self, ctx, DisplaySettings::default())
     }
 
     pub(crate) fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
@@ -2219,7 +2231,7 @@ impl<'db> Signature<'db> {
             generic_context: self.generic_context.as_ref(),
             parameters: self.parameters(),
             return_ty: self.return_ty,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -2230,7 +2242,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     generic_context: Option<&'a GenericContext<'db>>,
     parameters: &'a Parameters<'db>,
     return_ty: Type<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2290,7 +2302,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .signature_name_display
             .allows_type_parameters()
         {
-            let hide_unused_self = self.should_hide_self_from_display(&self.ctx);
+            let hide_unused_self = self.should_hide_self_from_display(self.ctx);
 
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
@@ -2307,7 +2319,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             ..settings.clone()
         };
         self.parameters
-            .display_with(&self.ctx, param_settings)
+            .display_with(self.ctx, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type
@@ -2320,7 +2332,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
                 f.write_char('(')?;
             }
             self.return_ty
-                .display_with(&self.ctx, settings.singleline())
+                .display_with(self.ctx, settings.singleline())
                 .fmt_detailed(&mut f)?;
             if should_parenthesize_return_type {
                 f.write_char(')')?;
@@ -2355,12 +2367,12 @@ pub(crate) struct SignatureDisplayDetails {
 impl<'db> Parameters<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameters<'a, 'db> {
         DisplayParameters {
             parameters: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -2368,7 +2380,7 @@ impl<'db> Parameters<'db> {
 
 struct DisplayParameters<'a, 'db> {
     parameters: &'a Parameters<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2421,7 +2433,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .map(|name| name.to_string())
                     .unwrap_or_default();
                 parameter
-                    .display_with(&display.ctx, display.settings.singleline())
+                    .display_with(display.ctx, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
                 after_synthetic_unpack |= is_synthetic_unpack;
@@ -2518,12 +2530,12 @@ impl Display for DisplayParameters<'_, '_> {
 impl<'db> Parameter<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameter<'a, 'db> {
         DisplayParameter {
             param: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -2531,7 +2543,7 @@ impl<'db> Parameter<'db> {
 
 struct DisplayParameter<'a, 'db> {
     param: &'a Parameter<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2544,7 +2556,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             f.write_str("*")?;
             self.param
                 .annotated_type()
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)?;
             return Ok(());
         }
@@ -2555,7 +2567,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
                 annotated_type
-                    .display_with(&self.ctx, self.settings.clone())
+                    .display_with(self.ctx, self.settings.clone())
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
@@ -2578,12 +2590,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
-                            default_type.representation(&self.ctx, self.settings.clone());
+                            default_type.representation(self.ctx, self.settings.clone());
                         representation.fmt_detailed(f)?;
                     }
                     Type::NominalInstance(instance) => {
                         // Some key default types like `None` are worth showing
-                        let class = instance.class(&self.ctx);
+                        let class = instance.class(self.ctx);
 
                         match (class, class.known(self.ctx.db())) {
                             (_, Some(KnownClass::NoneType)) => {
@@ -2604,7 +2616,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             // have something visible in the parameter slot.
             self.param
                 .annotated_type()
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2665,11 +2677,11 @@ impl Display for DisplayOmitted {
 impl<'db> UnionType<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayUnionType<'a, 'db> {
         DisplayUnionType {
-            ctx: *ctx,
+            ctx,
             ty: self,
             settings,
         }
@@ -2678,7 +2690,7 @@ impl<'db> UnionType<'db> {
 
 struct DisplayUnionType<'a, 'db> {
     ty: &'a UnionType<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2761,14 +2773,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             .iter()
             .copied()
             .map(|element| {
-                (condensable_literals(&self.ctx, element).is_none() && !element.is_subclass_of())
-                    .then(|| singleline_union_element_label(&self.ctx, element, &self.settings))
+                (condensable_literals(self.ctx, element).is_none() && !element.is_subclass_of())
+                    .then(|| singleline_union_element_label(self.ctx, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if let Some(literals) = condensable_literals(&self.ctx, element) {
+            if let Some(literals) = condensable_literals(self.ctx, element) {
                 condensed_element_count += 1;
                 for literal in literals {
                     if !condensed_types.contains(&literal) {
@@ -2801,7 +2813,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if condensable_literals(&self.ctx, *element).is_some() {
+            if condensable_literals(self.ctx, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
@@ -2863,13 +2875,13 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
     }
 }
 
-struct DisplaySubclassOfGroup<'db> {
+struct DisplaySubclassOfGroup<'ctx, 'db> {
     types: Vec<SubclassOfType<'db>>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
+impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_str("type[")?;
         let total_entries = self.types.len();
@@ -2882,21 +2894,21 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                     join.entry(&class.display_with(self.ctx.db(), self.settings.singleline()));
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    join.entry(&alias.display_with(&self.ctx, self.settings.singleline()));
+                    join.entry(&alias.display_with(self.ctx, self.settings.singleline()));
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    let rep = Type::Dynamic(dynamic)
-                        .representation(&self.ctx, self.settings.singleline());
+                    let rep =
+                        Type::Dynamic(dynamic).representation(self.ctx, self.settings.singleline());
                     join.entry(&rep);
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     let rep = Type::ProtocolInstance(protocol)
-                        .representation(&self.ctx, self.settings.singleline());
+                        .representation(self.ctx, self.settings.singleline());
                     join.entry(&rep);
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let rep = Type::TypeVar(bound_typevar)
-                        .representation(&self.ctx, self.settings.singleline());
+                        .representation(self.ctx, self.settings.singleline());
                     join.entry(&rep);
                 }
             }
@@ -2916,15 +2928,15 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
     }
 }
 
-impl Display for DisplaySubclassOfGroup<'_> {
+impl Display for DisplaySubclassOfGroup<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
-struct DisplayLiteralGroup<'db> {
+struct DisplayLiteralGroup<'ctx, 'db> {
     literals: Vec<Type<'db>>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2933,7 +2945,7 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
     max_when_elided: 5,
 };
 
-impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
+impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.with_type(Type::SpecialForm(SpecialFormType::Literal))
             .write_str("Literal")?;
@@ -2947,7 +2959,7 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
         let mut join = f.join(", ");
 
         for lit in self.literals.iter().take(display_limit) {
-            let rep = lit.representation(&self.ctx, self.settings.singleline());
+            let rep = lit.representation(self.ctx, self.settings.singleline());
             join.entry(&rep);
         }
 
@@ -2967,7 +2979,7 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     }
 }
 
-impl Display for DisplayLiteralGroup<'_> {
+impl Display for DisplayLiteralGroup<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -2976,11 +2988,11 @@ impl Display for DisplayLiteralGroup<'_> {
 impl<'db> IntersectionType<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayIntersectionType<'a, 'db> {
         DisplayIntersectionType {
-            ctx: *ctx,
+            ctx,
             ty: self,
             settings,
         }
@@ -2989,7 +3001,7 @@ impl<'db> IntersectionType<'db> {
 
 struct DisplayIntersectionType<'a, 'db> {
     ty: &'a IntersectionType<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'a SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3034,14 +3046,14 @@ impl fmt::Debug for DisplayIntersectionType<'_, '_> {
     }
 }
 
-struct DisplayMaybeNegatedType<'db> {
+struct DisplayMaybeNegatedType<'ctx, 'db> {
     ty: Type<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     negated: bool,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
+impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if self.negated {
             f.write_str("~")?;
@@ -3055,7 +3067,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
     }
 }
 
-impl Display for DisplayMaybeNegatedType<'_> {
+impl Display for DisplayMaybeNegatedType<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -3077,19 +3089,19 @@ fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
     }
 }
 
-struct DisplayMaybeParenthesizedType<'db> {
+struct DisplayMaybeParenthesizedType<'ctx, 'db> {
     ty: Type<'db>,
-    ctx: SemanticContext<'db>,
+    ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
+impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let write_parentheses = |f: &mut TypeWriter<'_, '_, 'db>| {
             f.set_invalid_type_annotation();
             f.write_char('(')?;
             self.ty
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f)?;
             f.write_char(')')
         };
@@ -3104,63 +3116,63 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             }
             _ => self
                 .ty
-                .display_with(&self.ctx, self.settings.clone())
+                .display_with(self.ctx, self.settings.clone())
                 .fmt_detailed(f),
         }
     }
 }
 
-impl Display for DisplayMaybeParenthesizedType<'_> {
+impl Display for DisplayMaybeParenthesizedType<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
 trait TypeArrayDisplay<'db> {
-    fn display_with(
-        &self,
-        ctx: &SemanticContext<'db>,
+    fn display_with<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayTypeArray<'_, 'db>;
+    ) -> DisplayTypeArray<'a, 'db>;
 }
 
 impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
-    fn display_with(
-        &self,
-        ctx: &SemanticContext<'db>,
+    fn display_with<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayTypeArray<'_, 'db> {
+    ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
-    fn display_with(
-        &self,
-        ctx: &SemanticContext<'db>,
+    fn display_with<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayTypeArray<'_, 'db> {
+    ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
-    fn display_with(
-        &self,
-        ctx: &SemanticContext<'db>,
+    fn display_with<'a>(
+        &'a self,
+        ctx: &'a SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayTypeArray<'_, 'db> {
+    ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
@@ -3168,7 +3180,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
 
 struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
-    ctx: SemanticContext<'db>,
+    ctx: &'b SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3178,7 +3190,7 @@ impl<'db> FmtDetailed<'db> for DisplayTypeArray<'_, 'db> {
             .entries(
                 self.types
                     .iter()
-                    .map(|ty| ty.display_with(&self.ctx, self.settings.singleline())),
+                    .map(|ty| ty.display_with(self.ctx, self.settings.singleline())),
             )
             .finish()
     }
@@ -3224,33 +3236,33 @@ impl Display for DisplayStringLiteralType<'_> {
     }
 }
 
-pub(crate) struct DisplayKnownInstanceRepr<'db> {
+pub(crate) struct DisplayKnownInstanceRepr<'ctx, 'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
-    pub(crate) ctx: SemanticContext<'db>,
+    pub(crate) ctx: &'ctx SemanticContext<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
-    pub(crate) fn display_with(
+    pub(crate) fn display_with<'ctx>(
         self,
-        ctx: &SemanticContext<'db>,
+        ctx: &'ctx SemanticContext<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayKnownInstanceRepr<'db> {
+    ) -> DisplayKnownInstanceRepr<'ctx, 'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
-            ctx: *ctx,
+            ctx,
             settings,
         }
     }
 }
 
-impl Display for DisplayKnownInstanceRepr<'_> {
+impl Display for DisplayKnownInstanceRepr<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
 }
 
-impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
+impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let ty = Type::KnownInstance(self.known_instance);
         match self.known_instance {
@@ -3277,7 +3289,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     f.with_type(ty).write_str(alias.name(self.ctx.db()))?;
                     specialization
                         .display_short(
-                            &self.ctx,
+                            self.ctx,
                             TupleSpecialization::No,
                             DisplaySettings::default(),
                         )
@@ -3310,7 +3322,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
 
                 if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(field_ty), "{}", field_ty.display(&self.ctx))?;
+                    write!(f.with_type(field_ty), "{}", field_ty.display(self.ctx))?;
                     f.write_char(']')?;
                 }
                 Ok(())
@@ -3318,12 +3330,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::ConstraintSet(interned_set) => {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
-                let set = constraints.load(&self.ctx, interned_set.constraints(self.ctx.db()));
+                let set = constraints.load(self.ctx, interned_set.constraints(self.ctx.db()));
                 if interned_set.detailed_display(self.ctx.db()) {
-                    write!(f, "[{}]", set.display(&self.ctx))
-                } else if set.is_always_satisfied(&self.ctx) {
+                    write!(f, "[{}]", set.display(self.ctx))
+                } else if set.is_always_satisfied(self.ctx) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(&self.ctx) {
+                } else if set.is_never_satisfied(self.ctx) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")
@@ -3339,7 +3351,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     write!(f, "{}=", binding.bound_typevar.name(self.ctx.db()))?;
                     binding
                         .solution
-                        .display_with(&self.ctx, self.settings.clone())
+                        .display_with(self.ctx, self.settings.clone())
                         .fmt_detailed(f)?;
                 }
                 f.write_char(']')
@@ -3353,17 +3365,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 // Normalize for consistent output across CI platforms
                 f.with_type(ty)
                     .write_str("ty_extensions._internal.Specialization")?;
-                write!(f, "{}", specialization.display_full(&self.ctx))
+                write!(f, "{}", specialization.display_full(self.ctx))
             }
             KnownInstanceType::UnionType(union) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::UnionType.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::UnionType.to_class_literal(self.ctx))
                     .write_str("types.UnionType")?;
                 f.write_str(" special-form")?;
                 if let Ok(ty) = union.union_type(self.ctx.db()) {
                     f.write_str(" '")?;
-                    ty.display(&self.ctx).fmt_detailed(f)?;
+                    ty.display(self.ctx).fmt_detailed(f)?;
                     f.write_char('\'')?;
                 }
                 f.write_char('>')
@@ -3373,7 +3385,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_str("<special-form '")?;
                 inner
                     .inner(self.ctx.db())
-                    .display(&self.ctx)
+                    .display(self.ctx)
                     .fmt_detailed(f)?;
                 f.write_str("'>")
             }
@@ -3385,7 +3397,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_char('[')?;
                 inner
                     .inner(self.ctx.db())
-                    .display(&self.ctx)
+                    .display(self.ctx)
                     .fmt_detailed(f)?;
                 f.write_str(", <metadata>]'>")
             }
@@ -3399,28 +3411,28 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("Callable")?;
                 f.write_str(" special-form '")?;
-                callable.display(&self.ctx).fmt_detailed(f)?;
+                callable.display(self.ctx).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                f.with_type(KnownClass::Type.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::Type.to_class_literal(self.ctx))
                     .write_str("type")?;
                 f.write_char('[')?;
                 inner
                     .inner(self.ctx.db())
-                    .display(&self.ctx)
+                    .display(self.ctx)
                     .fmt_detailed(f)?;
                 f.write_str("]'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f
-                .with_type(KnownClass::Str.to_class_literal(&self.ctx))
+                .with_type(KnownClass::Str.to_class_literal(self.ctx))
                 .write_str("str"),
             KnownInstanceType::NewType(declaration) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::NewType.to_class_literal(&self.ctx))
+                f.with_type(KnownClass::NewType.to_class_literal(self.ctx))
                     .write_str("NewType")?;
                 f.write_str(" pseudo-class '")?;
                 f.with_type(ty).write_str(declaration.name(self.ctx.db()))?;
@@ -3433,16 +3445,16 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::FunctoolsPartial(partial) => {
                 f.write_str("partial[")?;
                 Type::Callable(partial.partial(self.ctx.db()))
-                    .display_with(&self.ctx, DisplaySettings::default().singleline())
+                    .display_with(self.ctx, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
             KnownInstanceType::Range { .. } => f
-                .with_type(KnownClass::Range.to_class_literal(&self.ctx))
+                .with_type(KnownClass::Range.to_class_literal(self.ctx))
                 .write_str("range"),
             KnownInstanceType::FunctoolsPartialCall(partial) => {
                 Type::Callable(partial.partial(self.ctx.db()))
-                    .display_with(&self.ctx, DisplaySettings::default().singleline())
+                    .display_with(self.ctx, DisplaySettings::default().singleline())
                     .fmt_detailed(f)
             }
         }

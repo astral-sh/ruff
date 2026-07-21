@@ -33,10 +33,11 @@ pub(crate) fn all_end_of_scope_members<'db>(
     ctx: &SemanticContext<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let ctx = *ctx;
+    let ctx = ctx.clone();
     let db = ctx.db();
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
+    let bindings_ctx = ctx.clone();
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
@@ -62,7 +63,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let PlaceWithDefinition {
                     place,
                     first_definition,
-                } = place_from_bindings(&ctx, bindings);
+                } = place_from_bindings(&bindings_ctx, bindings);
 
                 let first_reachable_definition = first_definition?;
                 let ty = place.ignore_possibly_undefined()?;
@@ -86,7 +87,7 @@ pub(crate) fn all_reachable_members<'db>(
     ctx: &SemanticContext<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let ctx = *ctx;
+    let ctx = ctx.clone();
     let db = ctx.db();
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);

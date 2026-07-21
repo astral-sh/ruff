@@ -31,6 +31,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        let ctx = self.semantic_context();
         let db = self.db();
 
         let ast::Arguments {
@@ -49,7 +50,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let arg_type = self.infer_expression(single, TypeContext::default());
 
                 return if keywords.is_empty() {
-                    arg_type.dunder_class(&self.semantic_context())
+                    arg_type.dunder_class(ctx)
                 } else {
                     if keywords.iter().any(|keyword| keyword.arg.is_some())
                         && let Some(builder) =
@@ -175,13 +176,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if !matches!(namespace_type, Type::TypedDict(_))
             && {
                 !namespace_type.is_assignable_to(
-                    &self.semantic_context(),
+                    ctx,
                     KnownClass::Dict.to_specialized_instance(
-                        &self.semantic_context(),
-                        &[
-                            KnownClass::Str.to_instance(&self.semantic_context()),
-                            Type::any(),
-                        ],
+                        ctx,
+                        &[KnownClass::Str.to_instance(ctx), Type::any()],
                     ),
                 )
             }
@@ -193,7 +191,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
             diagnostic.set_primary_message(format_args!(
                 "Expected `dict[str, Any]`, found `{}`",
-                namespace_type.display(&self.semantic_context())
+                namespace_type.display(ctx)
             ));
         }
 
@@ -201,16 +199,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = if let Some(literal) = name_type.as_string_literal() {
             literal.value(db)
         } else {
-            if !name_type.is_assignable_to(
-                &self.semantic_context(),
-                KnownClass::Str.to_instance(&self.semantic_context()),
-            ) && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
+            if !name_type.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
+                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
                 let mut diagnostic =
                     builder.into_diagnostic("Invalid argument to parameter 1 (`name`) of `type()`");
                 diagnostic.set_primary_message(format_args!(
                     "Expected `str`, found `{}`",
-                    name_type.display(&self.semantic_context())
+                    name_type.display(ctx)
                 ));
             }
             "<unknown>"
@@ -280,7 +276,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
 
                 // MRO succeeded, check for instance-layout-conflict.
-                disjoint_bases.remove_redundant_entries(&self.semantic_context());
+                disjoint_bases.remove_redundant_entries(ctx);
                 if disjoint_bases.len() > 1 {
                     report_instance_layout_conflict(
                         &self.context,
@@ -297,16 +293,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base1,
                 metaclass2,
                 base2,
-            }) = dynamic_class.try_metaclass(&self.semantic_context())
+            }) = dynamic_class.try_metaclass(ctx)
             {
                 report_conflicting_metaclass_from_bases(
                     &self.context,
                     call_expr.into(),
                     dynamic_class.name(db),
                     metaclass1,
-                    base1.display(&self.semantic_context()),
+                    base1.display(ctx),
                     metaclass2,
-                    base2.display(&self.semantic_context()),
+                    base2.display(ctx),
                 );
             }
         }

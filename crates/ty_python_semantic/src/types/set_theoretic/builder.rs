@@ -610,7 +610,7 @@ impl<'db> UnionAccumulator<'db> {
 impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(ctx: &SemanticContext<'db>) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
@@ -1217,14 +1217,14 @@ pub(crate) struct IntersectionBuilder<'db> {
 impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(ctx: &SemanticContext<'db>) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
         }
     }
 
     fn empty(ctx: &SemanticContext<'db>) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             intersections: vec![],
         }
     }

@@ -1671,7 +1671,7 @@ fn check_classinfo_in_isinstance<'db>(
             );
         }
         Type::NominalInstance(nominal)
-            if let Some(tuple_spec) = nominal.tuple_spec(&context.semantic_context()) =>
+            if let Some(tuple_spec) = nominal.tuple_spec(context.semantic_context()) =>
         {
             let element_exprs = match classinfo_expr {
                 Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
@@ -1736,7 +1736,7 @@ fn report_invalid_union_type_elements<'db>(
 
     let mut invalid_elements = vec![];
     let ctx = context.semantic_context();
-    find_invalid_elements(&ctx, function, union_type, &mut invalid_elements);
+    find_invalid_elements(ctx, function, union_type, &mut invalid_elements);
 
     let Some((first_invalid_element, other_invalid_elements)) = invalid_elements.split_first()
     else {
@@ -1768,7 +1768,7 @@ fn report_invalid_union_type_elements<'db>(
     let union_suffix = match (&union_type_expr, union_type) {
         (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
             match instance.union_type(db) {
-                Ok(ty) => format!(" `{}`", ty.display(&ctx)),
+                Ok(ty) => format!(" `{}`", ty.display(ctx)),
                 Err(_) => String::new(),
             }
         }
@@ -1778,16 +1778,16 @@ fn report_invalid_union_type_elements<'db>(
     match other_invalid_elements {
         [] => diagnostic.info(format_args!(
             "Element `{}` in the union{union_suffix} is not a class object",
-            first_invalid_element.display(&ctx)
+            first_invalid_element.display(ctx)
         )),
         [single] => diagnostic.info(format_args!(
             "Elements `{}` and `{}` in the union{union_suffix} are not class objects",
-            first_invalid_element.display(&ctx),
-            single.display(&ctx),
+            first_invalid_element.display(ctx),
+            single.display(ctx),
         )),
         _ => diagnostic.info(format_args!(
             "Element `{}` in the union{union_suffix}, and {} more elements, are not class objects",
-            first_invalid_element.display(&ctx),
+            first_invalid_element.display(ctx),
             other_invalid_elements.len(),
         )),
     }
@@ -2325,7 +2325,7 @@ impl KnownFunction {
                 let ctx = context.semantic_context();
                 let revealed_type = overload
                     .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(&ctx), |builder, (_, ty)| builder.add(ty))
+                    .fold(UnionBuilder::new(ctx), |builder, (_, ty)| builder.add(ty))
                     .build();
                 report_revealed_type(
                     context,
@@ -2343,7 +2343,7 @@ impl KnownFunction {
                     return;
                 };
                 let ctx = context.semantic_context();
-                let ty_members = all_members(&ctx, *ty);
+                let ty_members = all_members(ctx, *ty);
                 overload.set_return_type(Type::bool_literal(
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
@@ -2354,12 +2354,12 @@ impl KnownFunction {
                     return;
                 };
                 let ctx = context.semantic_context();
-                let asserted_ty = asserted_ty.project_type_form(&ctx);
-                if actual_ty.is_equivalent_to(&ctx, asserted_ty) {
+                let asserted_ty = asserted_ty.project_type_form(ctx);
+                if actual_ty.is_equivalent_to(ctx, asserted_ty) {
                     return;
                 }
                 let diagnostic =
-                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(&ctx, asserted_ty) {
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(ctx, asserted_ty) {
                         &TYPE_ASSERTION_FAILURE
                     } else {
                         &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
@@ -2367,7 +2367,7 @@ impl KnownFunction {
                 if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
-                        asserted_ty.display(&ctx),
+                        asserted_ty.display(ctx),
                     ));
 
                     diagnostic.annotate(
@@ -2379,28 +2379,28 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type is `{}`",
-                            actual_ty.display(&ctx)
+                            actual_ty.display(ctx)
                         )),
                     );
 
-                    if actual_ty.is_subtype_of(&ctx, asserted_ty) {
+                    if actual_ty.is_subtype_of(ctx, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display(&ctx),
-                            inferred_type = actual_ty.display(&ctx),
+                            asserted_type = asserted_ty.display(ctx),
+                            inferred_type = actual_ty.display(ctx),
                         ));
                     } else {
                         diagnostic.info(format_args!(
                             "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display(&ctx),
-                            inferred_type = actual_ty.display(&ctx),
+                            asserted_type = asserted_ty.display(ctx),
+                            inferred_type = actual_ty.display(ctx),
                         ));
                     }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display(&ctx),
-                        asserted_ty.display(&ctx),
+                        actual_ty.display(ctx),
+                        asserted_ty.display(ctx),
                     ));
                 }
             }
@@ -2410,7 +2410,7 @@ impl KnownFunction {
                     return;
                 };
                 let ctx = context.semantic_context();
-                if actual_ty.is_equivalent_to(&ctx, Type::Never) {
+                if actual_ty.is_equivalent_to(ctx, Type::Never) {
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
@@ -2426,17 +2426,17 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type of argument is `{}`",
-                            actual_ty.display(&ctx)
+                            actual_ty.display(ctx)
                         )),
                     );
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
-                        inferred_type = actual_ty.display(&ctx),
+                        inferred_type = actual_ty.display(ctx),
                     ));
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` is not equivalent to `Never`",
-                        actual_ty.display(&ctx),
+                        actual_ty.display(ctx),
                     ));
                 }
             }
@@ -2446,7 +2446,7 @@ impl KnownFunction {
                     return;
                 };
                 let ctx = context.semantic_context();
-                let truthiness = match parameter_ty.try_bool(&ctx) {
+                let truthiness = match parameter_ty.try_bool(ctx) {
                     Ok(truthiness) => truthiness,
                     Err(err) => {
                         err.report_diagnostic(
@@ -2476,20 +2476,20 @@ impl KnownFunction {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             is always falsy",
-                            parameter_ty = parameter_ty.display(&ctx)
+                            parameter_ty = parameter_ty.display(ctx)
                         ))
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
-                            parameter_ty = parameter_ty.display(&ctx)
+                            parameter_ty = parameter_ty.display(ctx)
                         ))
                     };
                     if let Some(condition) = call_argument_node(call_expression, "condition", 0) {
                         diagnostic.annotate(
                             Annotation::secondary(context.span(condition)).message(format_args!(
                                 "Inferred type of argument is `{}`",
-                                parameter_ty.display(&ctx)
+                                parameter_ty.display(ctx)
                             )),
                         );
                     }
@@ -2501,14 +2501,14 @@ impl KnownFunction {
                     return;
                 };
                 let ctx = context.semantic_context();
-                let casted_type = casted_type.project_type_form(&ctx);
-                if source_type.is_equivalent_to(&ctx, casted_type)
-                    && non_any_dynamic_content(&ctx, *source_type).is_absent()
-                    && non_any_dynamic_content(&ctx, casted_type).is_absent()
+                let casted_type = casted_type.project_type_form(ctx);
+                if source_type.is_equivalent_to(ctx, casted_type)
+                    && non_any_dynamic_content(ctx, *source_type).is_absent()
+                    && non_any_dynamic_content(ctx, casted_type).is_absent()
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        let source_display = source_type.display(&ctx).to_string();
-                        let casted_display = casted_type.display(&ctx).to_string();
+                        let source_display = source_type.display(ctx).to_string();
+                        let casted_display = casted_type.display(ctx).to_string();
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Value is already of type `{casted_display}`",
                         ));
@@ -2562,7 +2562,7 @@ impl KnownFunction {
                 };
                 let ctx = context.semantic_context();
                 let Some(protocol_class) = param_type
-                    .to_class_type(&ctx)
+                    .to_class_type(ctx)
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(
@@ -2582,7 +2582,7 @@ impl KnownFunction {
                     );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
-                        protocol_class.interface(db).display(&ctx)
+                        protocol_class.interface(db).display(ctx)
                     )));
                 }
             }
@@ -2643,18 +2643,18 @@ impl KnownFunction {
                     );
                     let mut message = String::new();
                     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-                        &ctx,
+                        ctx,
                         classes
                             .iter()
-                            .flat_map(|class| class.iter_mro(&ctx))
+                            .flat_map(|class| class.iter_mro(ctx))
                             .filter_map(ClassBase::into_class),
                     );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
-                        for class in class.iter_mro(&ctx) {
+                        for class in class.iter_mro(ctx) {
                             message.push_str(
                                 &class
-                                    .display_with(&ctx, display_settings.clone())
+                                    .display_with(ctx, display_settings.clone())
                                     .to_string(),
                             );
                             // Omit the comma for the last element (which is always `object`)
@@ -2699,26 +2699,26 @@ impl KnownFunction {
                     let ctx = context.semantic_context();
                     let truthiness = match second_argument {
                         Type::ClassLiteral(class) => {
-                            is_instance_truthiness(&ctx, *first_arg, *class)
+                            is_instance_truthiness(ctx, *first_arg, *class)
                         }
                         Type::SpecialForm(
                             SpecialFormType::TypingCallable
                             | SpecialFormType::CollectionsAbcCallable,
                         ) => {
                             let callable_top =
-                                Type::Callable(CallableType::unknown(db)).top_materialization(&ctx);
-                            if first_arg.is_subtype_of(&ctx, callable_top) {
+                                Type::Callable(CallableType::unknown(db)).top_materialization(ctx);
+                            if first_arg.is_subtype_of(ctx, callable_top) {
                                 Truthiness::AlwaysTrue
                             } else {
                                 Truthiness::Ambiguous
                             }
                         }
-                        _ if is_instance_tuple_exhaustive(&ctx, *first_arg, *second_argument) => {
+                        _ if is_instance_tuple_exhaustive(ctx, *first_arg, *second_argument) => {
                             Truthiness::AlwaysTrue
                         }
                         _ => Truthiness::Ambiguous,
                     };
-                    overload.set_return_type(Type::from_truthiness(&ctx, truthiness));
+                    overload.set_return_type(Type::from_truthiness(ctx, truthiness));
                 }
             }
 
@@ -2768,7 +2768,7 @@ impl KnownFunction {
                 };
 
                 let ctx = context.semantic_context();
-                if !class.has_ordering_method_in_mro(&ctx) {
+                if !class.has_ordering_method_in_mro(ctx) {
                     report_invalid_total_ordering_call(
                         context,
                         class.class_literal(db),
@@ -2798,7 +2798,7 @@ pub(super) fn report_revealed_type<'db>(
         diag.annotate(
             Annotation::primary(context.span(argument_node)).message(format_args!(
                 "`{}`",
-                revealed_type.display_with(&ctx, DisplaySettings::default().preserve_long_unions())
+                revealed_type.display_with(ctx, DisplaySettings::default().preserve_long_unions())
             )),
         );
     }

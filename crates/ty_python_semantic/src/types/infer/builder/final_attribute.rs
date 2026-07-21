@@ -51,9 +51,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Definition<'db>> {
         let db = self.db();
         let ctx = self.semantic_context();
-        let class_ty = object_ty.nominal_class(&ctx)?;
+        let class_ty = object_ty.nominal_class(ctx)?;
 
-        for base in class_ty.iter_mro(&ctx) {
+        for base in class_ty.iter_mro(ctx) {
             let Some(class) = base.into_class() else {
                 continue;
             };
@@ -71,7 +71,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let use_def = class_index.use_def_map(class_scope_id);
             let place_and_quals_result =
-                place_from_declarations(&ctx, use_def.end_of_scope_symbol_declarations(symbol_id));
+                place_from_declarations(ctx, use_def.end_of_scope_symbol_declarations(symbol_id));
 
             let Some(declaration) = place_and_quals_result.first_declaration else {
                 continue;
@@ -183,6 +183,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
+        let ctx = self.semantic_context();
         let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
@@ -197,10 +198,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
 
         let report_not_in_init = || {
-            let ctx = self.semantic_context();
             let is_dataclass_like = object_ty
-                .nominal_class(&ctx)
-                .or_else(|| object_ty.to_class_type(&ctx))
+                .nominal_class(ctx)
+                .or_else(|| object_ty.to_class_type(ctx))
                 .and_then(|cls| cls.static_class_literal(db))
                 .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
             let Some(builder) = self
@@ -211,7 +211,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
-                object_ty.display(&ctx)
+                object_ty.display(ctx)
             ));
             diagnostic.set_primary_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
@@ -238,12 +238,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(&self.semantic_context(), class_ty)
-            .top_materialization(&self.semantic_context());
-        let object_instance_ty =
-            object_ty.bind_self_typevars(&self.semantic_context(), class_instance_ty);
-        let is_current_class_instance = is_self_parameter
-            && object_instance_ty.is_subtype_of(&self.semantic_context(), class_instance_ty);
+        let class_instance_ty = Type::instance(ctx, class_ty).top_materialization(ctx);
+        let object_instance_ty = object_ty.bind_self_typevars(ctx, class_instance_ty);
+        let is_current_class_instance =
+            is_self_parameter && object_instance_ty.is_subtype_of(ctx, class_instance_ty);
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -300,7 +298,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(&self.semantic_context())
+                    object_ty.display(self.semantic_context())
                 ));
                 diagnostic.set_primary_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
@@ -319,7 +317,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) {
         let Some(members) =
-            assignment_attribute_members(&self.semantic_context(), object_ty, attribute)
+            assignment_attribute_members(self.semantic_context(), object_ty, attribute)
         else {
             return;
         };
@@ -344,7 +342,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let Some(members) =
-            assignment_attribute_members(&self.semantic_context(), object_ty, attribute)
+            assignment_attribute_members(self.semantic_context(), object_ty, attribute)
         else {
             return false;
         };

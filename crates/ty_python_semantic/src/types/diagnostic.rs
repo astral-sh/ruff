@@ -1599,7 +1599,7 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(&context.semantic_context(), target_ty, value_node.into())
+        && is_invalid_typed_dict_literal(context.semantic_context(), target_ty, value_node.into())
     {
         return;
     }
@@ -3987,7 +3987,7 @@ pub(super) fn report_incompatible_base_method<'db>(
             contract_decorator.description(),
         ));
     }
-    error_context().attach_to(&context.semantic_context(), &mut diagnostic);
+    error_context().attach_to(context.semantic_context(), &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 
     for (definition, owner_name) in [

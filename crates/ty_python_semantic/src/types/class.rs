@@ -2639,7 +2639,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
     pub(super) fn new(ctx: &SemanticContext<'db>, mro_iter: I) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             mro_iter,
         }
     }

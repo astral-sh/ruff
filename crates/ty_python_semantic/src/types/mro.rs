@@ -601,7 +601,7 @@ impl<'db> MroIterator<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         Self {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             class,
             specialization,
             first_element_yielded: false,

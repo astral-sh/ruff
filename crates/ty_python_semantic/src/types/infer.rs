@@ -147,8 +147,10 @@ pub(crate) fn infer_definition_types<'db>(
 
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::Definition(definition),
         python_file.file(db),
         python_file,
@@ -197,8 +199,10 @@ pub(crate) fn function_known_decorators<'db>(
     let module = parsed_module(db, python_file).load(db);
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::FunctionDecorators(definition),
         python_file.file(db),
         python_file,
@@ -293,8 +297,10 @@ pub(crate) fn infer_deferred_types<'db>(
 
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::Deferred(definition),
         python_file.file(db),
         python_file,
@@ -371,8 +377,10 @@ pub(crate) fn infer_scope_types_impl<'db>(
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::Scope(scope, tcx),
         python_file.file(db),
         python_file,
@@ -422,8 +430,10 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::Expression(expression, tcx),
         python_file.file(db),
         python_file,
@@ -539,8 +549,10 @@ fn infer_statement_types_impl<'db>(
 
     let index = semantic_index(db, python_file);
 
+    let ctx = SemanticContext::from_file(db, python_file);
+
     TypeInferenceBuilder::new(
-        db,
+        &ctx,
         InferenceRegion::Statement(statement),
         python_file.file(db),
         python_file,
@@ -726,7 +738,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     )
     .entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), python_file, &module);
+    let ctx = SemanticContext::from_file(db, python_file);
+    let mut unpacker = Unpacker::new(&ctx, unpack.target_scope(db), python_file, &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }

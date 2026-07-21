@@ -106,16 +106,16 @@ impl<'db> BoundSuperError<'db> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "`{owner}` is a type variable with an abstract/structural type as \
                             its bounds or constraints, in `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(&ctx),
-                            owner = owner_type.display(&ctx),
+                            pivot_class = pivot_class.display(ctx),
+                            owner = owner_type.display(ctx),
                         ));
-                        Self::describe_typevar(&ctx, &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(ctx, &mut diagnostic, *typevar_context);
                     } else {
                         builder.into_diagnostic(format_args!(
                             "`{owner}` is an abstract/structural type in \
                             `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(&ctx),
-                            owner = owner_type.display(&ctx),
+                            pivot_class = pivot_class.display(ctx),
+                            owner = owner_type.display(ctx),
                         ));
                     }
                 }
@@ -127,7 +127,7 @@ impl<'db> BoundSuperError<'db> {
                         Type::GenericAlias(alias) => {
                             builder.into_diagnostic(format_args!(
                                 "`types.GenericAlias` instance `{}` is not a valid class",
-                                alias.display_with(&ctx, DisplaySettings::default(),),
+                                alias.display_with(ctx, DisplaySettings::default(),),
                             ));
                         }
                         _ => {
@@ -135,11 +135,11 @@ impl<'db> BoundSuperError<'db> {
                                 builder.into_diagnostic("Argument is not a valid class");
                             diagnostic.set_primary_message(format_args!(
                                 "Argument has type `{}`",
-                                pivot_class.display(&ctx)
+                                pivot_class.display(ctx)
                             ));
                             diagnostic.set_concise_message(format_args!(
                                 "`{}` is not a valid class",
-                                pivot_class.display(&ctx),
+                                pivot_class.display(ctx),
                             ));
                         }
                     }
@@ -155,19 +155,19 @@ impl<'db> BoundSuperError<'db> {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "`{owner}` is not an instance or subclass of \
                         `{pivot_class}` in `super({pivot_class}, {owner})` call",
-                        pivot_class = pivot_class.display(&ctx),
-                        owner = owner.display(&ctx),
+                        pivot_class = pivot_class.display(ctx),
+                        owner = owner.display(ctx),
                     ));
                     if let Some(typevar_context) = typevar_context {
-                        Self::describe_typevar(&ctx, &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(ctx, &mut diagnostic, *typevar_context);
                         diagnostic.info(format_args!(
                             "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
                             bounds_or_constraints =
-                                typevar_context.bound_or_constraints_type(&ctx).display(&ctx),
-                            pivot_class = pivot_class.display(&ctx),
+                                typevar_context.bound_or_constraints_type(ctx).display(ctx),
+                            pivot_class = pivot_class.display(ctx),
                         ));
                         let typevar = typevar_context.typevar(context.db());
-                        if typevar_context.has_implicit_upper_bound(&ctx) {
+                        if typevar_context.has_implicit_upper_bound(ctx) {
                             diagnostic.help(format_args!(
                                 "Consider adding an upper bound to type variable `{}`",
                                 typevar.name(context.db())

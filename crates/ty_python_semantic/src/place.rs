@@ -1771,7 +1771,7 @@ struct PublicTypeBuilder<'db> {
 impl<'db> PublicTypeBuilder<'db> {
     fn new(ctx: &SemanticContext<'db>) -> Self {
         PublicTypeBuilder {
-            ctx: *ctx,
+            ctx: ctx.clone(),
             queue: None,
             builder: UnionBuilder::new(ctx),
         }
