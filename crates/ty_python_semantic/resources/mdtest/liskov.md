@@ -827,22 +827,21 @@ class ReturnsInt:
 class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
 ```
 
-### Functions assigned in a class body
+### Properties
 
-A function assigned in a class body is bound as a method. It can conflict with a method definition
-in either base order.
+Incompatible properties inherited from different bases are not yet checked.
 
 ```pyi
-def returns_str(self) -> str: ...
+class ReturnsStr:
+    @property
+    def value(self) -> str: ...
 
-class Assigned:
-    method = returns_str
+class ReturnsInt:
+    @property
+    def value(self) -> int: ...
 
-class Defined:
-    def method(self) -> int: ...
-
-class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
-class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
+# TODO: Incompatible inherited properties should be reported here.
+class PropertyConflict(ReturnsStr, ReturnsInt): ...
 ```
 
 ### Enum mixins
@@ -1641,6 +1640,24 @@ class DataSub(DataSuper):
     def __post_init__(self, x: int, y: str) -> None:
         self.y = y
         super().__post_init__(x)
+```
+
+## Functions assigned in a class body
+
+A function assigned in a class body is bound as a method. It can conflict with a method definition
+in either base order.
+
+```pyi
+def returns_str(self) -> str: ...
+
+class Assigned:
+    method = returns_str
+
+class Defined:
+    def method(self) -> int: ...
+
+class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
+class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
 ```
 
 ## Edge case: function defined in another module and then assigned in a class body

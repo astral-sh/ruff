@@ -306,6 +306,19 @@ fn source_method_contract<'db>(
     receiver: Type<'db>,
     name: &Name,
 ) -> Option<(MethodDecorator, Type<'db>)> {
+    // TODO: Check inherited conflicts involving properties and other attributes. For example:
+    //
+    // ```python
+    // class ReturnsStr:
+    //     @property
+    //     def value(self) -> str: ...
+    //
+    // class ReturnsInt:
+    //     @property
+    //     def value(self) -> int: ...
+    //
+    // class Conflict(ReturnsStr, ReturnsInt): ...
+    // ```
     let Type::FunctionLiteral(function) = owner
         .own_class_member(db, None, name)
         .inner
