@@ -227,8 +227,6 @@ def f(x):
 
 ## Markdown code formatting
 
-*This feature is currently only available in [preview mode](preview.md#preview).*
-
 The Ruff formatter can also format Python code blocks in Markdown files.
 In these files, Ruff will format any CommonMark [fenced code blocks][] with
 the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`. The
