@@ -25,7 +25,7 @@ const exampleDocument = `print('hello'); print("world")`;
 
 await init(); // Initializes WASM module
 
-// These are default settings just to illustrate configuring Ruff
+// These settings illustrate configuring Ruff
 // Settings info: https://docs.astral.sh/ruff/settings
 const workspace = new Workspace(
   {
