@@ -162,12 +162,13 @@ Defaults to `true`.
 
 ### `strict-equality-narrowing`
 
-Whether equality-based checks should preserve union members that could compare equal through
-a subclass overriding a comparison method.
+Whether equality-based checks should account for subclasses with different equality
+behavior.
 
 By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
-`__ne__` when narrowing. This allows equality and membership checks to remove otherwise
-incompatible union members:
+`__ne__`. This allows equality, inequality, and equality-driven membership or match checks
+to remove otherwise incompatible union members. This behavior is shared by type narrowing,
+equality-result inference, and reachability:
 
 ```python
 from typing import reveal_type
@@ -179,96 +180,32 @@ class AlwaysEqual(Foo):
         return True
 
 def narrow(value: Foo | None, other: Foo) -> None:
+    reveal_type(None == other)  # Literal[False] (but can still be True!)
     if value == other:
         reveal_type(value)  # Foo (but can still be None!)
 
 narrow(None, AlwaysEqual())
 ```
 
-This narrowing is unsound if an instance reaches the function through a subclass that
-overrides equality to compare equal to an incompatible value. Enable this option to
-preserve all possible union members instead.
-
-Defaults to `false`.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.analysis]
-    # Preserve union members that could compare equal through a subclass
-    strict-equality-narrowing = true
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [analysis]
-    # Preserve union members that could compare equal through a subclass
-    strict-equality-narrowing = true
-    ```
-
----
-
-### `strict-literal-narrowing`
-
-Whether equality-based checks should preserve broad builtin types rather than narrow them to
-literal types.
-
-By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-membership tests and literal match patterns, which use equality comparisons.
+ty also narrows broad builtin types to literal types. Broad builtin types include
+subclasses, while literal types distinguish values by both their runtime type and value.
+This makes the narrowing unsound even for subclasses that inherit builtin equality:
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` in strict mode.
+        return value
     return None
-```
 
-Broad builtin types include subclasses, but literal types distinguish values by both their
-runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-builtin equality. For example:
-
-```python
 class StringSubclass(str): ...
-
 result = parse(StringSubclass("a"))
 # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
 ```
 
-The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-respectively. This means enum members can encounter the same unsoundness:
-
-```python
-from enum import StrEnum
-
-class Choice(StrEnum):
-    A = "a"
-
-result = parse(Choice.A)
-# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
-```
-
-A subclass can also override `__eq__` to compare equal to a literal with a different value:
-
-```python
-class MisleadingStr(str):
-    def __eq__(self, other: object) -> bool:
-        return True
-
-result = parse(MisleadingStr("b"))
-# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-```
-
-Enable this option to preserve the broader builtin type instead.
+Enable this option to preserve all possible union members and broad builtin types instead.
+`strict-literal-narrowing` is an alias for this option.
 
 Defaults to `false`.
 
@@ -282,16 +219,16 @@ Defaults to `false`.
 
     ```toml
     [tool.ty.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Preserve values that could compare equal through a subclass
+    strict-equality-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
     [analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Preserve values that could compare equal through a subclass
+    strict-equality-narrowing = true
     ```
 
 ---
@@ -792,12 +729,13 @@ Defaults to `true`.
 
 #### `strict-equality-narrowing`
 
-Whether equality-based checks should preserve union members that could compare equal through
-a subclass overriding a comparison method.
+Whether equality-based checks should account for subclasses with different equality
+behavior.
 
 By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
-`__ne__` when narrowing. This allows equality and membership checks to remove otherwise
-incompatible union members:
+`__ne__`. This allows equality, inequality, and equality-driven membership or match checks
+to remove otherwise incompatible union members. This behavior is shared by type narrowing,
+equality-result inference, and reachability:
 
 ```python
 from typing import reveal_type
@@ -809,96 +747,32 @@ class AlwaysEqual(Foo):
         return True
 
 def narrow(value: Foo | None, other: Foo) -> None:
+    reveal_type(None == other)  # Literal[False] (but can still be True!)
     if value == other:
         reveal_type(value)  # Foo (but can still be None!)
 
 narrow(None, AlwaysEqual())
 ```
 
-This narrowing is unsound if an instance reaches the function through a subclass that
-overrides equality to compare equal to an incompatible value. Enable this option to
-preserve all possible union members instead.
-
-Defaults to `false`.
-
-**Default value**: `false`
-
-**Type**: `bool`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.overrides.analysis]
-    # Preserve union members that could compare equal through a subclass
-    strict-equality-narrowing = true
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [overrides.analysis]
-    # Preserve union members that could compare equal through a subclass
-    strict-equality-narrowing = true
-    ```
-
----
-
-#### `strict-literal-narrowing`
-
-Whether equality-based checks should preserve broad builtin types rather than narrow them to
-literal types.
-
-By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-membership tests and literal match patterns, which use equality comparisons.
+ty also narrows broad builtin types to literal types. Broad builtin types include
+subclasses, while literal types distinguish values by both their runtime type and value.
+This makes the narrowing unsound even for subclasses that inherit builtin equality:
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` in strict mode.
+        return value
     return None
-```
 
-Broad builtin types include subclasses, but literal types distinguish values by both their
-runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-builtin equality. For example:
-
-```python
 class StringSubclass(str): ...
-
 result = parse(StringSubclass("a"))
 # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
 ```
 
-The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-respectively. This means enum members can encounter the same unsoundness:
-
-```python
-from enum import StrEnum
-
-class Choice(StrEnum):
-    A = "a"
-
-result = parse(Choice.A)
-# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
-```
-
-A subclass can also override `__eq__` to compare equal to a literal with a different value:
-
-```python
-class MisleadingStr(str):
-    def __eq__(self, other: object) -> bool:
-        return True
-
-result = parse(MisleadingStr("b"))
-# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-```
-
-Enable this option to preserve the broader builtin type instead.
+Enable this option to preserve all possible union members and broad builtin types instead.
+`strict-literal-narrowing` is an alias for this option.
 
 Defaults to `false`.
 
@@ -912,16 +786,16 @@ Defaults to `false`.
 
     ```toml
     [tool.ty.overrides.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Preserve values that could compare equal through a subclass
+    strict-equality-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
     [overrides.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Preserve values that could compare equal through a subclass
+    strict-equality-narrowing = true
     ```
 
 ---

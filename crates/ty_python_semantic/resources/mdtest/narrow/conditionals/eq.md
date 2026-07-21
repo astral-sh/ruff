@@ -1155,7 +1155,7 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
 ```
 
-## Narrowing unions against broad types
+## Narrowing unions and inferring comparisons against broad types
 
 When comparing against a broad type, we assume that its subclasses do not override equality. This
 allows union members with incompatible builtin comparison semantics to be removed:
@@ -1168,6 +1168,9 @@ class AlwaysEqual:
         return True
 
 def strings(value: str | None, other: str):
+    reveal_type(None == other)  # revealed: Literal[False]
+    reveal_type(None != other)  # revealed: Literal[True]
+
     if value == other:
         reveal_type(value)  # revealed: str
     else:
@@ -1179,6 +1182,9 @@ def strings(value: str | None, other: str):
         reveal_type(value)  # revealed: str
 
 def classes(value: Foo | None, other: Foo):
+    reveal_type(None == other)  # revealed: Literal[False]
+    reveal_type(None != other)  # revealed: Literal[True]
+
     if value == other:
         reveal_type(value)  # revealed: Foo
 
@@ -1688,14 +1694,15 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-## Enabling strict literal narrowing
+## Enabling strict equality narrowing
 
-The `strict-literal-narrowing` option can be enabled to preserve broad builtin types after equality
-comparisons. Narrowing types that are already literal unions remains safe and is unaffected.
+The `strict-equality-narrowing` option can be enabled to preserve broad builtin types and union
+members that a subclass could compare equal to. Narrowing types that are already literal unions
+remains safe and is unaffected.
 
 ```toml
 [analysis]
-strict-literal-narrowing = true
+strict-equality-narrowing = true
 ```
 
 ```py
@@ -1720,18 +1727,20 @@ def literal(value: Literal["a", "b"]):
 class Foo: ...
 
 def union(value: Foo | None, other: Foo):
+    reveal_type(None == other)  # revealed: bool
+    reveal_type(None != other)  # revealed: bool
+
     if value == other:
-        reveal_type(value)  # revealed: Foo
+        reveal_type(value)  # revealed: Foo | None
 ```
 
-## Enabling strict equality narrowing
+## The strict literal narrowing alias
 
-The `strict-equality-narrowing` option can be enabled to preserve union members when comparing
-against a non-final class. It does not affect builtin-to-literal narrowing.
+The `strict-literal-narrowing` option remains an alias for `strict-equality-narrowing`.
 
 ```toml
 [analysis]
-strict-equality-narrowing = true
+strict-literal-narrowing = true
 ```
 
 ```py
@@ -1743,5 +1752,5 @@ def union(value: Foo | None, other: Foo):
 
 def literal(value: str):
     if value == "a":
-        reveal_type(value)  # revealed: Literal["a"]
+        reveal_type(value)  # revealed: str
 ```

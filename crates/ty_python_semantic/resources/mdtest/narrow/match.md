@@ -2860,7 +2860,7 @@ def _(x: Literal["foo"] | int):
 
 In the first `match`, the broad `int` arm is assumed to use builtin equality and cannot compare
 equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabling
-`strict-literal-narrowing` disables this optimistic treatment of broad builtin types.
+`strict-equality-narrowing` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
 disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:

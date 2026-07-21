@@ -148,10 +148,8 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
-    /// Whether equality comparisons should only narrow to literals when it is safe to do so.
-    pub(crate) strict_literal_narrowing: Option<bool>,
-
-    /// Whether equality comparisons should preserve possible subclass overrides.
+    /// Whether equality-based checks should preserve possible subclass behavior.
+    #[serde(alias = "strict-literal-narrowing")]
     pub(crate) strict_equality_narrowing: Option<bool>,
 
     /// Whether ty should support `type: ignore` comments.

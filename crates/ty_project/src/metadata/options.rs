@@ -1472,76 +1472,13 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether equality-based checks should preserve broad builtin types rather than narrow them to
-    /// literal types.
-    ///
-    /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-    /// `value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-    /// membership tests and literal match patterns, which use equality comparisons.
-    ///
-    /// ```python
-    /// from typing import Literal
-    ///
-    /// def parse(value: str) -> Literal["a"] | None:
-    ///     if value == "a":
-    ///         return value  # Accepted by default; `value` remains `str` in strict mode.
-    ///     return None
-    /// ```
-    ///
-    /// Broad builtin types include subclasses, but literal types distinguish values by both their
-    /// runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-    /// builtin equality. For example:
-    ///
-    /// ```python
-    /// class StringSubclass(str): ...
-    ///
-    /// result = parse(StringSubclass("a"))
-    /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
-    /// ```
-    ///
-    /// The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-    /// respectively. This means enum members can encounter the same unsoundness:
-    ///
-    /// ```python
-    /// from enum import StrEnum
-    ///
-    /// class Choice(StrEnum):
-    ///     A = "a"
-    ///
-    /// result = parse(Choice.A)
-    /// # Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
-    /// ```
-    ///
-    /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
-    ///
-    /// ```python
-    /// class MisleadingStr(str):
-    ///     def __eq__(self, other: object) -> bool:
-    ///         return True
-    ///
-    /// result = parse(MisleadingStr("b"))
-    /// # Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-    /// ```
-    ///
-    /// Enable this option to preserve the broader builtin type instead.
-    ///
-    /// Defaults to `false`.
-    #[option(
-        default = r#"false"#,
-        value_type = "bool",
-        example = r#"
-        # Preserve broad builtin types instead of narrowing them to literals
-        strict-literal-narrowing = true
-        "#
-    )]
-    pub strict_literal_narrowing: Option<bool>,
-
-    /// Whether equality-based checks should preserve union members that could compare equal through
-    /// a subclass overriding a comparison method.
+    /// Whether equality-based checks should account for subclasses with different equality
+    /// behavior.
     ///
     /// By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
-    /// `__ne__` when narrowing. This allows equality and membership checks to remove otherwise
-    /// incompatible union members:
+    /// `__ne__`. This allows equality, inequality, and equality-driven membership or match checks
+    /// to remove otherwise incompatible union members. This behavior is shared by type narrowing,
+    /// equality-result inference, and reachability:
     ///
     /// ```python
     /// from typing import reveal_type
@@ -1553,25 +1490,43 @@ pub struct AnalysisOptions {
     ///         return True
     ///
     /// def narrow(value: Foo | None, other: Foo) -> None:
+    ///     reveal_type(None == other)  # Literal[False] (but can still be True!)
     ///     if value == other:
     ///         reveal_type(value)  # Foo (but can still be None!)
     ///
     /// narrow(None, AlwaysEqual())
     /// ```
     ///
-    /// This narrowing is unsound if an instance reaches the function through a subclass that
-    /// overrides equality to compare equal to an incompatible value. Enable this option to
-    /// preserve all possible union members instead.
+    /// ty also narrows broad builtin types to literal types. Broad builtin types include
+    /// subclasses, while literal types distinguish values by both their runtime type and value.
+    /// This makes the narrowing unsound even for subclasses that inherit builtin equality:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     if value == "a":
+    ///         return value
+    ///     return None
+    ///
+    /// class StringSubclass(str): ...
+    /// result = parse(StringSubclass("a"))
+    /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+    /// ```
+    ///
+    /// Enable this option to preserve all possible union members and broad builtin types instead.
+    /// `strict-literal-narrowing` is an alias for this option.
     ///
     /// Defaults to `false`.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Preserve union members that could compare equal through a subclass
+        # Preserve values that could compare equal through a subclass
         strict-equality-narrowing = true
         "#
     )]
+    #[serde(alias = "strict-literal-narrowing")]
     pub strict_equality_narrowing: Option<bool>,
 
     /// Whether ty should respect `type: ignore` comments.
@@ -1650,7 +1605,6 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
-            strict_literal_narrowing,
             strict_equality_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
@@ -1658,7 +1612,6 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
-            strict_literal_narrowing: strict_literal_narrowing_default,
             strict_equality_narrowing: strict_equality_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
@@ -1688,8 +1641,6 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
-            strict_literal_narrowing: strict_literal_narrowing
-                .unwrap_or(strict_literal_narrowing_default),
             strict_equality_narrowing: strict_equality_narrowing
                 .unwrap_or(strict_equality_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments

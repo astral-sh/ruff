@@ -217,17 +217,17 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Literal["a", "c"]
 ```
 
-## Enabling strict literal narrowing for membership
+## Enabling strict equality narrowing for membership
 
-With strict literal narrowing enabled, a broad union arm is preserved when a membership test
-succeeds, while literal arms are still narrowed safely:
+With strict equality narrowing enabled, a broad union arm and a broad element type are preserved
+when a membership test succeeds, while literal arms are still narrowed safely:
 
 ```toml
 [environment]
 python-version = "3.12"
 
 [analysis]
-strict-literal-narrowing = true
+strict-equality-narrowing = true
 ```
 
 ```py
@@ -255,29 +255,7 @@ class Bar: ...
 
 def broad_element(x: Bar | None, values: list[Bar]):
     if x in values:
-        reveal_type(x)  # revealed: Bar
-```
-
-## Enabling strict equality narrowing for membership
-
-With strict equality narrowing enabled, a broad element type cannot remove a union member that a
-subclass could compare equal to. Builtin-to-literal narrowing remains enabled.
-
-```toml
-[analysis]
-strict-equality-narrowing = true
-```
-
-```py
-class Bar: ...
-
-def broad_element(x: Bar | None, values: list[Bar]):
-    if x in values:
         reveal_type(x)  # revealed: Bar | None
-
-def inline_list(x: str):
-    if x in ["a", "b"]:
-        reveal_type(x)  # revealed: Literal["a", "b"]
 ```
 
 ## `in` for `str` and literal strings

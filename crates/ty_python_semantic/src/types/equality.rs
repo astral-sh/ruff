@@ -281,8 +281,15 @@ pub(crate) fn equality_truthiness<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Equality)
+    comparison_truthiness(
+        db,
+        left,
+        right,
+        ComparisonOperator::Equality,
+        soundness_policy,
+    )
 }
 
 /// Return the truthiness of `left != right` when it is known for every represented runtime value.
@@ -292,8 +299,15 @@ pub(super) fn inequality_truthiness<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Inequality)
+    comparison_truthiness(
+        db,
+        left,
+        right,
+        ComparisonOperator::Inequality,
+        soundness_policy,
+    )
 }
 
 fn comparison_truthiness<'db>(
@@ -301,8 +315,9 @@ fn comparison_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Truthiness {
-    match ComparisonEvaluator::for_truthiness(db).evaluate(
+    match ComparisonEvaluator::for_truthiness(db, soundness_policy).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
@@ -345,21 +360,18 @@ enum ComparisonGoal {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(super) struct ComparisonSoundnessPolicy {
-    allow_unsafe_literal_narrowing: bool,
-    allow_unsafe_equality_narrowing: bool,
+pub(crate) struct ComparisonSoundnessPolicy {
+    allow_unsafe_equality: bool,
 }
 
 impl ComparisonSoundnessPolicy {
     const CONSERVATIVE: Self = Self {
-        allow_unsafe_literal_narrowing: false,
-        allow_unsafe_equality_narrowing: false,
+        allow_unsafe_equality: false,
     };
 
-    pub(super) fn from_analysis_settings(settings: &AnalysisSettings) -> Self {
+    pub(crate) fn from_analysis_settings(settings: &AnalysisSettings) -> Self {
         Self {
-            allow_unsafe_literal_narrowing: !settings.strict_literal_narrowing,
-            allow_unsafe_equality_narrowing: !settings.strict_equality_narrowing,
+            allow_unsafe_equality: !settings.strict_equality_narrowing,
         }
     }
 }
@@ -397,12 +409,12 @@ impl<'db> ComparisonEvaluator<'db> {
         Self::new(db, ComparisonSoundnessPolicy::CONSERVATIVE)
     }
 
-    fn for_truthiness(db: &'db dyn Db) -> Self {
+    fn for_truthiness(db: &'db dyn Db, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
             db,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
-            soundness_policy: ComparisonSoundnessPolicy::CONSERVATIVE,
+            soundness_policy,
         }
     }
 
@@ -412,21 +424,6 @@ impl<'db> ComparisonEvaluator<'db> {
         operator: ComparisonOperator,
     ) -> Option<KnownComparisonSemantics> {
         KnownComparisonSemantics::of_type_with_policy(self.db, ty, operator, self.soundness_policy)
-    }
-
-    /// Preserve strict literal narrowing even when equality narrowing is enabled.
-    fn comparison_semantics_for_literal(
-        &self,
-        ty: Type<'db>,
-        operator: ComparisonOperator,
-    ) -> Option<KnownComparisonSemantics> {
-        if !self.soundness_policy.allow_unsafe_literal_narrowing
-            && unsafe_narrowable_builtin_semantics(self.db, ty).is_some()
-        {
-            KnownComparisonSemantics::of_type(self.db, ty, operator)
-        } else {
-            self.comparison_semantics(ty, operator)
-        }
     }
 
     /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
@@ -1230,7 +1227,7 @@ fn narrow_literal_string_against_enum<'db>(
     ComparisonResult::CanNarrow(narrowed)
 }
 
-/// Return the builtin comparison semantics assumed by unsafe literal narrowing.
+/// Return the builtin comparison semantics assumed by unsafe equality narrowing.
 fn unsafe_narrowable_builtin_semantics(db: &dyn Db, ty: Type) -> Option<KnownComparisonSemantics> {
     let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
         return None;
@@ -1263,7 +1260,7 @@ fn compare_literal_to_other<'db>(
     let db = evaluator.db;
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
-        return match evaluator.comparison_semantics_for_literal(other, operator) {
+        return match evaluator.comparison_semantics(other, operator) {
             Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
             Some(_) => ComparisonResult::from_bool(operator == ComparisonOperator::Inequality),
             None => ComparisonResult::Ambiguous,
@@ -1279,7 +1276,7 @@ fn compare_literal_to_other<'db>(
     // Treat broad builtin types as if they exclude subclasses with custom equality. This is
     // intentionally unsafe: an instance of such a subclass can compare equal to the literal
     // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
-    if evaluator.soundness_policy.allow_unsafe_literal_narrowing
+    if evaluator.soundness_policy.allow_unsafe_equality
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
         && let Some(equal_to_literal) = builtin_literals_equal_to(db, literal_type, literal)
@@ -1292,7 +1289,7 @@ fn compare_literal_to_other<'db>(
         };
     }
 
-    match evaluator.comparison_semantics_for_literal(other, operator) {
+    match evaluator.comparison_semantics(other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
@@ -1444,7 +1441,7 @@ impl KnownComparisonSemantics {
             Type::NominalInstance(instance)
                 if instance.class(db).is_final(db)
                     || instance.tuple_spec(db).is_some()
-                    || soundness_policy.allow_unsafe_equality_narrowing
+                    || soundness_policy.allow_unsafe_equality
                         // `object` can contain values whose classes define their own comparison
                         // method, so treating it as exact would incorrectly eliminate those values.
                         && !instance.has_known_class(db, KnownClass::Object) =>

@@ -2100,8 +2100,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             let key_ty = key_ty.resolve_type_alias(self.db);
             let typed_dict_key_ty = typed_dict.key_type(self.db);
             if typed_dict_key_ty.is_never()
-                || equality_truthiness(self.db, typed_dict_key_ty, key_ty)
-                    == Truthiness::AlwaysFalse
+                || equality_truthiness(
+                    self.db,
+                    typed_dict_key_ty,
+                    key_ty,
+                    self.comparison_soundness_policy(),
+                ) == Truthiness::AlwaysFalse
             {
                 return None;
             }

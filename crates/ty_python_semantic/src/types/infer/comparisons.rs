@@ -7,7 +7,9 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
-use crate::types::equality::{equality_truthiness, inequality_truthiness};
+use crate::types::equality::{
+    ComparisonSoundnessPolicy, equality_truthiness, inequality_truthiness,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -172,9 +174,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
+    let soundness_policy =
+        ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
     let comparison_truthiness = match op {
-        ast::CmpOp::Eq => equality_truthiness(db, left, right),
-        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+        ast::CmpOp::Eq => equality_truthiness(db, left, right, soundness_policy),
+        ast::CmpOp::NotEq => inequality_truthiness(db, left, right, soundness_policy),
         _ => Truthiness::Ambiguous,
     };
     if comparison_truthiness != Truthiness::Ambiguous {
