@@ -3144,13 +3144,20 @@ impl<'db> CallableBinding<'db> {
         let Some(bound_self) = self.bound_type.take() else {
             return;
         };
+        let typing_self = match self.callable_type {
+            Type::BoundMethod(bound_method) => bound_method.typing_self_type(db),
+            _ => bound_self,
+        };
         for overload in &mut self.overloads {
             let removed_receiver = overload
                 .signature
                 .parameters()
                 .get(0)
                 .is_some_and(Parameter::is_positional);
-            overload.signature = overload.signature.bind_self(db, Some(bound_self));
+            overload.signature =
+                overload
+                    .signature
+                    .bind_self_with_receiver(db, Some(bound_self), Some(typing_self));
             overload.return_ty = overload.initial_return_type(db);
             overload.source_parameter_index_offset += usize::from(removed_receiver);
         }
