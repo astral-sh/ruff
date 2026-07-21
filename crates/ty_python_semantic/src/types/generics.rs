@@ -2210,6 +2210,8 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
+    pub(crate) python_version: PythonVersion,
+    #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     types: Box<[Option<Type<'db>>]>,
@@ -2226,7 +2228,7 @@ impl<'db> TypeVarInference<'db> {
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
         ) -> Specialization<'db> {
-            let ctx = SemanticContext::from_primary(db);
+            let ctx = SemanticContext::from_version(db, inference.python_version(db));
             inference.specialization_with(&ctx, |_, _| None)
         }
 
@@ -2366,7 +2368,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .map(|identity| types.get(identity).copied())
             .collect();
 
-        TypeVarInference::new(self.ctx.db(), generic_context, inferred)
+        TypeVarInference::new(
+            self.ctx.db(),
+            self.ctx.python_version(),
+            generic_context,
+            inferred,
+        )
     }
 
     fn solve_pending_with(

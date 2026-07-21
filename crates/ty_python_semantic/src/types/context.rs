@@ -41,11 +41,6 @@ pub struct SemanticContext<'db> {
 }
 
 impl<'db> SemanticContext<'db> {
-    /// Creates a context for the primary environment.
-    pub(crate) fn from_primary(db: &'db dyn Db) -> Self {
-        Self::from_version(db, crate::Program::get(db).python_version(db))
-    }
-
     /// Creates a context that lazily obtains its Python version from `file`.
     pub const fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {

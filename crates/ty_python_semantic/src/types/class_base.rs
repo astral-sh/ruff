@@ -308,7 +308,7 @@ impl<'db> ClassBase<'db> {
                             db,
                             fields.values().map(|field| field.declared_ty),
                         )?
-                        .to_class_type(db)
+                        .to_class_type(db, ctx.python_version())
                         .into(),
                         subclass,
                     )
