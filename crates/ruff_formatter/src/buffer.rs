@@ -1,6 +1,6 @@
 use super::{Arguments, FormatElement, write};
 use crate::format_element::Interned;
-use crate::prelude::{LineMode, Tag};
+use crate::prelude::LineMode;
 use crate::{FormatResult, FormatState};
 use rustc_hash::FxHashMap;
 use std::any::{Any, TypeId};
@@ -532,14 +532,14 @@ impl RemoveSoftLineBreaksState {
 
                 // `BestFitting` is resolved to its most-flat entry by this buffer, so we can drop
                 // the start and end tags, leaving only their contents.
-                FormatElement::Tag(Tag::StartBestFittingEntry | Tag::EndBestFittingEntry) => true,
+                FormatElement::StartBestFittingEntry | FormatElement::EndBestFittingEntry => true,
 
                 // Entered the start of an `if_group_breaks` or `if_group_fits`
                 // For `if_group_breaks`: Remove the start and end tag and all content in between.
                 // For `if_group_fits_on_line`: Unwrap the content. This is important because the enclosing group
                 // might still *expand* if the content exceeds the line width limit, in which case the
                 // `if_group_fits_on_line` content would be removed.
-                FormatElement::Tag(Tag::StartConditionalContent(condition)) => {
+                FormatElement::StartConditionalContent(condition) => {
                     if condition.mode.is_expanded() {
                         *self = Self::InIfGroupBreaks {
                             conditional_content_level: NonZeroUsize::new(1).unwrap(),
@@ -547,7 +547,7 @@ impl RemoveSoftLineBreaksState {
                     }
                     true
                 }
-                FormatElement::Tag(Tag::EndConditionalContent) => true,
+                FormatElement::EndConditionalContent => true,
                 _ => false,
             },
             Self::InIfGroupBreaks {
@@ -555,11 +555,11 @@ impl RemoveSoftLineBreaksState {
             } => {
                 match element {
                     // A nested `if_group_breaks` or `if_group_fits_on_line`
-                    FormatElement::Tag(Tag::StartConditionalContent(_)) => {
+                    FormatElement::StartConditionalContent(_) => {
                         *conditional_content_level = conditional_content_level.saturating_add(1);
                     }
                     // The end of an `if_group_breaks` or `if_group_fits_on_line`.
-                    FormatElement::Tag(Tag::EndConditionalContent) => {
+                    FormatElement::EndConditionalContent => {
                         if let Some(level) = NonZeroUsize::new(conditional_content_level.get() - 1)
                         {
                             *conditional_content_level = level;

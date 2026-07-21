@@ -908,11 +908,9 @@ where
 
 impl Format<PyFormatContext<'_>> for VerbatimText {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.verbatim_range.len(),
-            },
-        )));
+        f.write_element(FormatElement::StartVerbatim(tag::VerbatimKind::Verbatim {
+            length: self.verbatim_range.len(),
+        }));
 
         match normalize_newlines(&f.context().source()[self.verbatim_range], ['\r']) {
             Cow::Borrowed(_) => {
@@ -923,7 +921,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
             }
         }
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
+        f.write_element(FormatElement::EndVerbatim);
         Ok(())
     }
 }

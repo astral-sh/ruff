@@ -9,9 +9,12 @@ use std::ops::Deref;
 use std::rc::Rc;
 use unicode_width::UnicodeWidthChar;
 
-use crate::format_element::tag::{GroupMode, LabelId, Tag};
+use crate::format_element::tag::{
+    Align, Condition, ConditionalGroup, DedentMode, FitsExpanded, Group, GroupMode, LabelId,
+    VerbatimKind,
+};
 use crate::source_code::SourceCodeSlice;
-use crate::{IndentWidth, TagKind};
+use crate::{GroupId, IndentWidth, TagKind};
 use ruff_text_size::TextSize;
 
 /// Language agnostic IR for formatting source code.
@@ -34,7 +37,9 @@ pub enum FormatElement {
     SourcePosition(TextSize),
 
     /// A ASCII only Token that contains no line breaks or tab characters.
-    Token { text: &'static str },
+    Token {
+        text: &'static str,
+    },
 
     /// An arbitrary text that can contain tabs, newlines, and unicode characters.
     Text {
@@ -64,17 +69,68 @@ pub enum FormatElement {
         mode: BestFittingMode,
     },
 
-    /// A [Tag] that marks the start/end of some content to which some special formatting is applied.
-    Tag(Tag),
+    StartIndent,
+    EndIndent,
+    StartAlign(Align),
+    EndAlign,
+    StartDedent(DedentMode),
+    EndDedent,
+    StartGroup(Group),
+    EndGroup,
+    StartConditionalGroup(ConditionalGroup),
+    EndConditionalGroup,
+    StartConditionalContent(Condition),
+    EndConditionalContent,
+    StartIndentIfGroupBreaks(GroupId),
+    EndIndentIfGroupBreaks,
+    StartFill,
+    EndFill,
+    StartEntry,
+    EndEntry,
+    StartLineSuffix {
+        reserved_width: u32,
+    },
+    EndLineSuffix,
+    StartVerbatim(VerbatimKind),
+    EndVerbatim,
+    StartLabelled(LabelId),
+    EndLabelled,
+    StartFitsExpanded(FitsExpanded),
+    EndFitsExpanded,
+    StartBestFittingEntry,
+    EndBestFittingEntry,
+    StartBestFitParenthesize {
+        id: Option<GroupId>,
+    },
+    EndBestFitParenthesize,
 }
 
 impl FormatElement {
     pub fn tag_kind(&self) -> Option<TagKind> {
-        if let FormatElement::Tag(tag) = self {
-            Some(tag.kind())
-        } else {
-            None
-        }
+        Some(match self {
+            Self::StartIndent | Self::EndIndent => TagKind::Indent,
+            Self::StartAlign(_) | Self::EndAlign => TagKind::Align,
+            Self::StartDedent(_) | Self::EndDedent => TagKind::Dedent,
+            Self::StartGroup(_) | Self::EndGroup => TagKind::Group,
+            Self::StartConditionalGroup(_) | Self::EndConditionalGroup => TagKind::ConditionalGroup,
+            Self::StartConditionalContent(_) | Self::EndConditionalContent => {
+                TagKind::ConditionalContent
+            }
+            Self::StartIndentIfGroupBreaks(_) | Self::EndIndentIfGroupBreaks => {
+                TagKind::IndentIfGroupBreaks
+            }
+            Self::StartFill | Self::EndFill => TagKind::Fill,
+            Self::StartEntry | Self::EndEntry => TagKind::Entry,
+            Self::StartLineSuffix { .. } | Self::EndLineSuffix => TagKind::LineSuffix,
+            Self::StartVerbatim(_) | Self::EndVerbatim => TagKind::Verbatim,
+            Self::StartLabelled(_) | Self::EndLabelled => TagKind::Labelled,
+            Self::StartFitsExpanded(_) | Self::EndFitsExpanded => TagKind::FitsExpanded,
+            Self::StartBestFittingEntry | Self::EndBestFittingEntry => TagKind::BestFittingEntry,
+            Self::StartBestFitParenthesize { .. } | Self::EndBestFitParenthesize => {
+                TagKind::BestFitParenthesize
+            }
+            _ => return None,
+        })
     }
 }
 
@@ -98,10 +154,14 @@ impl std::fmt::Debug for FormatElement {
                 .field("mode", &mode)
                 .finish(),
             FormatElement::Interned(interned) => fmt.debug_list().entries(&**interned).finish(),
-            FormatElement::Tag(tag) => fmt.debug_tuple("Tag").field(tag).finish(),
             FormatElement::SourcePosition(position) => {
                 fmt.debug_tuple("SourcePosition").field(position).finish()
             }
+            element => fmt
+                .debug_struct("Tag")
+                .field("kind", &element.tag_kind())
+                .field("start", &element.is_start_tag())
+                .finish(),
         }
     }
 }
@@ -224,25 +284,65 @@ pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) ->
 }
 
 impl FormatElement {
-    /// Returns `true` if self is a [`FormatElement::Tag`]
     pub const fn is_tag(&self) -> bool {
-        matches!(self, FormatElement::Tag(_))
+        matches!(
+            self,
+            Self::StartIndent
+                | Self::EndIndent
+                | Self::StartAlign(_)
+                | Self::EndAlign
+                | Self::StartDedent(_)
+                | Self::EndDedent
+                | Self::StartGroup(_)
+                | Self::EndGroup
+                | Self::StartConditionalGroup(_)
+                | Self::EndConditionalGroup
+                | Self::StartConditionalContent(_)
+                | Self::EndConditionalContent
+                | Self::StartIndentIfGroupBreaks(_)
+                | Self::EndIndentIfGroupBreaks
+                | Self::StartFill
+                | Self::EndFill
+                | Self::StartEntry
+                | Self::EndEntry
+                | Self::StartLineSuffix { .. }
+                | Self::EndLineSuffix
+                | Self::StartVerbatim(_)
+                | Self::EndVerbatim
+                | Self::StartLabelled(_)
+                | Self::EndLabelled
+                | Self::StartFitsExpanded(_)
+                | Self::EndFitsExpanded
+                | Self::StartBestFittingEntry
+                | Self::EndBestFittingEntry
+                | Self::StartBestFitParenthesize { .. }
+                | Self::EndBestFitParenthesize
+        )
     }
 
-    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
     pub const fn is_start_tag(&self) -> bool {
-        match self {
-            FormatElement::Tag(tag) => tag.is_start(),
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::StartIndent
+                | Self::StartAlign(_)
+                | Self::StartDedent(_)
+                | Self::StartGroup(_)
+                | Self::StartConditionalGroup(_)
+                | Self::StartConditionalContent(_)
+                | Self::StartIndentIfGroupBreaks(_)
+                | Self::StartFill
+                | Self::StartEntry
+                | Self::StartLineSuffix { .. }
+                | Self::StartVerbatim(_)
+                | Self::StartLabelled(_)
+                | Self::StartFitsExpanded(_)
+                | Self::StartBestFittingEntry
+                | Self::StartBestFitParenthesize { .. }
+        )
     }
 
-    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
     pub const fn is_end_tag(&self) -> bool {
-        match self {
-            FormatElement::Tag(tag) => tag.is_end(),
-            _ => false,
-        }
+        self.is_tag() && !self.is_start_tag()
     }
 
     pub const fn is_text(&self) -> bool {
@@ -263,7 +363,7 @@ impl FormatElements for FormatElement {
     fn will_break(&self) -> bool {
         match self {
             FormatElement::ExpandParent => true,
-            FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
+            FormatElement::StartGroup(group) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
             FormatElement::Text { text_width, .. } => text_width.is_multiline(),
             FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
@@ -274,29 +374,25 @@ impl FormatElements for FormatElement {
                 variants: best_fitting,
                 ..
             } => best_fitting.most_flat().will_break(),
-            FormatElement::LineSuffixBoundary
-            | FormatElement::Space
-            | FormatElement::Tag(_)
-            | FormatElement::Token { .. }
-            | FormatElement::SourcePosition(_) => false,
+            _ => false,
         }
     }
 
     fn has_label(&self, label_id: LabelId) -> bool {
         match self {
-            FormatElement::Tag(Tag::StartLabelled(actual)) => *actual == label_id,
+            FormatElement::StartLabelled(actual) => *actual == label_id,
             FormatElement::Interned(interned) => interned.deref().has_label(label_id),
             _ => false,
         }
     }
 
-    fn start_tag(&self, _: TagKind) -> Option<&Tag> {
+    fn start_tag(&self, _: TagKind) -> Option<&FormatElement> {
         None
     }
 
-    fn end_tag(&self, kind: TagKind) -> Option<&Tag> {
+    fn end_tag(&self, kind: TagKind) -> Option<&FormatElement> {
         match self {
-            FormatElement::Tag(tag) if tag.kind() == kind && tag.is_end() => Some(tag),
+            element if element.tag_kind() == Some(kind) && element.is_end_tag() => Some(element),
             _ => None,
         }
     }
@@ -343,7 +439,7 @@ impl BestFittingVariants {
         debug_assert!(
             variants
                 .iter()
-                .filter(|element| matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry)))
+                .filter(|element| matches!(element, FormatElement::StartBestFittingEntry))
                 .count()
                 >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -360,7 +456,7 @@ impl BestFittingVariants {
         assert!(
             self.as_slice()
                 .iter()
-                .filter(|element| matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry)))
+                .filter(|element| matches!(element, FormatElement::StartBestFittingEntry))
                 .count()
                 >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -381,7 +477,7 @@ impl BestFittingVariants {
         assert!(
             self.as_slice()
                 .iter()
-                .filter(|element| matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry)))
+                .filter(|element| matches!(element, FormatElement::StartBestFittingEntry))
                 .count()
                 >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -416,13 +512,11 @@ impl<'a> Iterator for BestFittingVariantsIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.elements.first()? {
-            FormatElement::Tag(Tag::StartBestFittingEntry) => {
+            FormatElement::StartBestFittingEntry => {
                 let end = self
                     .elements
                     .iter()
-                    .position(|element| {
-                        matches!(element, FormatElement::Tag(Tag::EndBestFittingEntry))
-                    })
+                    .position(|element| matches!(element, FormatElement::EndBestFittingEntry))
                     .map_or(self.elements.len(), |position| position + 1);
 
                 let (variant, rest) = self.elements.split_at(end);
@@ -444,9 +538,10 @@ impl<'a> Iterator for BestFittingVariantsIter<'a> {
 
 impl DoubleEndedIterator for BestFittingVariantsIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let start_position = self.elements.iter().rposition(|element| {
-            matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry))
-        })?;
+        let start_position = self
+            .elements
+            .iter()
+            .rposition(|element| matches!(element, FormatElement::StartBestFittingEntry))?;
 
         let (rest, variant) = self.elements.split_at(start_position);
         self.elements = rest;
@@ -472,11 +567,11 @@ pub trait FormatElements {
     /// Returns the start tag of `kind` if:
     /// - the last element is an end tag of `kind`.
     /// - there's a matching start tag in this document (may not be true if this slice is an interned element and the `start` is in the document storing the interned element).
-    fn start_tag(&self, kind: TagKind) -> Option<&Tag>;
+    fn start_tag(&self, kind: TagKind) -> Option<&FormatElement>;
 
     /// Returns the end tag if:
     /// - the last element is an end tag of `kind`
-    fn end_tag(&self, kind: TagKind) -> Option<&Tag>;
+    fn end_tag(&self, kind: TagKind) -> Option<&FormatElement>;
 }
 
 /// New-type wrapper for a single-line text unicode width.
@@ -613,7 +708,7 @@ mod sizes {
     assert_eq_size!(crate::SourceCodeSlice, [u8; 8]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(super::Tag, [u8; 16]);
+    assert_eq_size!(super::tag::Tag, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
     assert_eq_size!(super::FormatElement, [u8; 24]);

@@ -94,8 +94,8 @@ impl Default for PrintElementArgs {
 
 /// Call stack that stores the [`PrintElementCallArgs`].
 ///
-/// New [`PrintElementCallArgs`] are pushed onto the stack for every [`start`](Tag::is_start) [`Tag`](FormatElement::Tag)
-/// and popped when reaching the corresponding [`end`](Tag::is_end) [`Tag`](FormatElement::Tag).
+/// New [`PrintElementCallArgs`] are pushed onto the stack for every [`start tag`](crate::FormatElement::is_start_tag)
+/// and popped when reaching the corresponding [`end tag`](crate::FormatElement::is_end_tag).
 pub(super) trait CallStack {
     type Stack: Stack<StackFrame> + Debug;
 
@@ -179,7 +179,7 @@ pub(super) trait CallStack {
         }
     }
 
-    /// Creates a new stack frame for a [`FormatElement::Tag`] of `kind` with `args` as the call arguments.
+    /// Creates a new stack frame for a [`crate::FormatElement`] tag of `kind` with `args` as the call arguments.
     fn push(&mut self, kind: TagKind, args: PrintElementArgs) {
         self.stack_mut().push(StackFrame {
             kind: StackFrameKind::Tag(kind),

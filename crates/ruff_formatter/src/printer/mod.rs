@@ -9,7 +9,7 @@ use ruff_text_size::{TextLen, TextSize};
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
 use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
-use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
+use crate::prelude::tag::{DedentMode, TagKind, VerbatimKind};
 use crate::prelude::{TextWidth, tag};
 use crate::printer::call_stack::{
     CallStack, FitsCallStack, PrintCallStack, PrintElementArgs, StackFrame,
@@ -90,6 +90,7 @@ impl<'a> Printer<'a> {
     /// Prints a single element and push the following elements to queue
     // LLVM considers this function too large to inline on its own, but it is called for every
     // element visited by the printing loop.
+    #[expect(clippy::inline_always, reason = "called for every printed element")]
     #[inline(always)]
     fn print_element(
         &mut self,
@@ -97,9 +98,6 @@ impl<'a> Printer<'a> {
         queue: &mut PrintQueue<'a>,
         element: &'a FormatElement,
     ) -> PrintResult<()> {
-        #[allow(clippy::enum_glob_use)]
-        use Tag::*;
-
         let args = stack.top();
 
         match element {
@@ -167,7 +165,7 @@ impl<'a> Printer<'a> {
                 queue.extend_back(content);
             }
 
-            FormatElement::Tag(StartGroup(group)) => {
+            FormatElement::StartGroup(group) => {
                 let print_mode = match group.mode() {
                     GroupMode::Expand | GroupMode::Propagated => PrintMode::Expanded,
                     GroupMode::Flat => {
@@ -182,9 +180,9 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::Group, args.with_print_mode(print_mode));
             }
 
-            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+            FormatElement::StartBestFitParenthesize { id } => {
                 const OPEN_PAREN: FormatElement = FormatElement::Token { text: "(" };
-                const INDENT: FormatElement = FormatElement::Tag(Tag::StartIndent);
+                const INDENT: FormatElement = FormatElement::StartIndent;
                 const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
 
                 let fits_flat = self.flat_group_print_mode(
@@ -238,7 +236,7 @@ impl<'a> Printer<'a> {
                 );
             }
 
-            FormatElement::Tag(EndBestFitParenthesize) => {
+            FormatElement::EndBestFitParenthesize => {
                 if args.mode().is_expanded() {
                     const HARD_LINE_BREAK: FormatElement = FormatElement::Line(LineMode::Hard);
                     const CLOSE_PAREN: FormatElement = FormatElement::Token { text: ")" };
@@ -251,7 +249,7 @@ impl<'a> Printer<'a> {
                 stack.pop(TagKind::BestFitParenthesize)?;
             }
 
-            FormatElement::Tag(StartConditionalGroup(group)) => {
+            FormatElement::StartConditionalGroup(group) => {
                 let condition = group.condition();
                 let expected_mode = match condition.group_id {
                     None => args.mode(),
@@ -277,18 +275,18 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            FormatElement::Tag(StartFill) => {
+            FormatElement::StartFill => {
                 self.print_fill_entries(queue, stack)?;
             }
 
-            FormatElement::Tag(StartIndent) => {
+            FormatElement::StartIndent => {
                 stack.push(
                     TagKind::Indent,
                     args.increment_indent_level(self.options.indent_style()),
                 );
             }
 
-            FormatElement::Tag(StartDedent(mode)) => {
+            FormatElement::StartDedent(mode) => {
                 let args = match mode {
                     DedentMode::Level => args.decrement_indent(),
                     DedentMode::Root => args.reset_indent(),
@@ -296,11 +294,11 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::Dedent, args);
             }
 
-            FormatElement::Tag(StartAlign(align)) => {
+            FormatElement::StartAlign(align) => {
                 stack.push(TagKind::Align, args.set_indent_align(align.count()));
             }
 
-            FormatElement::Tag(StartConditionalContent(Condition { mode, group_id })) => {
+            FormatElement::StartConditionalContent(Condition { mode, group_id }) => {
                 let group_mode = match group_id {
                     None => args.mode(),
                     Some(id) => self.state.group_modes.get_print_mode(*id)?,
@@ -313,7 +311,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            FormatElement::Tag(StartIndentIfGroupBreaks(group_id)) => {
+            FormatElement::StartIndentIfGroupBreaks(group_id) => {
                 let group_mode = self.state.group_modes.get_print_mode(*group_id)?;
 
                 let args = match group_mode {
@@ -324,14 +322,14 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::IndentIfGroupBreaks, args);
             }
 
-            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
+            FormatElement::StartLineSuffix { reserved_width } => {
                 self.state.line_width += reserved_width;
                 self.state
                     .line_suffixes
                     .extend(args, queue.iter_content(TagKind::LineSuffix));
             }
 
-            FormatElement::Tag(StartVerbatim(kind)) => {
+            FormatElement::StartVerbatim(kind) => {
                 if let VerbatimKind::Verbatim { length } = kind {
                     // SAFETY: Ruff only supports formatting files <= 4GB
                     #[expect(clippy::cast_possible_truncation)]
@@ -344,7 +342,7 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::Verbatim, args);
             }
 
-            FormatElement::Tag(StartFitsExpanded(tag::FitsExpanded { condition, .. })) => {
+            FormatElement::StartFitsExpanded(tag::FitsExpanded { condition, .. }) => {
                 let condition_met = match condition {
                     Some(condition) => {
                         let group_mode = match condition.group_id {
@@ -365,27 +363,27 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry)) => {
-                stack.push(tag.kind(), args);
+            tag @ (FormatElement::StartLabelled(_)
+            | FormatElement::StartEntry
+            | FormatElement::StartBestFittingEntry) => {
+                stack.push(tag.tag_kind().expect("matched a start tag"), args);
             }
 
-            FormatElement::Tag(
-                tag @ (EndLabelled
-                | EndEntry
-                | EndGroup
-                | EndConditionalGroup
-                | EndIndent
-                | EndDedent
-                | EndAlign
-                | EndConditionalContent
-                | EndIndentIfGroupBreaks
-                | EndFitsExpanded
-                | EndVerbatim
-                | EndLineSuffix
-                | EndBestFittingEntry
-                | EndFill),
-            ) => {
-                stack.pop(tag.kind())?;
+            tag @ (FormatElement::EndLabelled
+            | FormatElement::EndEntry
+            | FormatElement::EndGroup
+            | FormatElement::EndConditionalGroup
+            | FormatElement::EndIndent
+            | FormatElement::EndDedent
+            | FormatElement::EndAlign
+            | FormatElement::EndConditionalContent
+            | FormatElement::EndIndentIfGroupBreaks
+            | FormatElement::EndFitsExpanded
+            | FormatElement::EndVerbatim
+            | FormatElement::EndLineSuffix
+            | FormatElement::EndBestFittingEntry
+            | FormatElement::EndFill) => {
+                stack.pop(tag.tag_kind().expect("matched an end tag"))?;
             }
         }
 
@@ -530,8 +528,7 @@ impl<'a> Printer<'a> {
                         queue.push(suffix);
                     }
                     LineSuffixEntry::Args(args) => {
-                        const LINE_SUFFIX_END: &FormatElement =
-                            &FormatElement::Tag(Tag::EndLineSuffix);
+                        const LINE_SUFFIX_END: &FormatElement = &FormatElement::EndLineSuffix;
 
                         stack.push(TagKind::LineSuffix, args);
 
@@ -568,10 +565,7 @@ impl<'a> Printer<'a> {
                 // variant.
 
                 // Try to fit only the first variant on a single line
-                if !matches!(
-                    current.first(),
-                    Some(&FormatElement::Tag(Tag::StartBestFittingEntry))
-                ) {
+                if !matches!(current.first(), Some(&FormatElement::StartBestFittingEntry)) {
                     return invalid_start_tag(TagKind::BestFittingEntry, current.first());
                 }
 
@@ -652,7 +646,7 @@ impl<'a> Printer<'a> {
 
         stack.push(TagKind::Fill, args);
 
-        while matches!(queue.top(), Some(FormatElement::Tag(Tag::StartEntry))) {
+        while matches!(queue.top(), Some(FormatElement::StartEntry)) {
             let mut measurer = FitsMeasurer::new_flat(queue, stack, self);
 
             // The number of item/separator pairs that fit on the same line.
@@ -666,10 +660,7 @@ impl<'a> Printer<'a> {
                 // * A second time when measuring if *next-item*, *separator*, *next-next-item* fit.
                 loop {
                     // Item that fits without a following separator.
-                    if !matches!(
-                        measurer.queue.top(),
-                        Some(FormatElement::Tag(Tag::StartEntry))
-                    ) {
+                    if !matches!(measurer.queue.top(), Some(FormatElement::StartEntry)) {
                         break FillPairLayout::Flat;
                     }
 
@@ -681,10 +672,7 @@ impl<'a> Printer<'a> {
                     }
 
                     // Last item/separator pair that both fit
-                    if !matches!(
-                        measurer.queue.top(),
-                        Some(FormatElement::Tag(Tag::StartEntry))
-                    ) {
+                    if !matches!(measurer.queue.top(), Some(FormatElement::StartEntry)) {
                         break FillPairLayout::Flat;
                     }
 
@@ -735,7 +723,7 @@ impl<'a> Printer<'a> {
 
             self.print_fill_item(queue, stack, args.with_print_mode(item_mode))?;
 
-            if matches!(queue.top(), Some(FormatElement::Tag(Tag::StartEntry))) {
+            if matches!(queue.top(), Some(FormatElement::StartEntry)) {
                 let separator_mode = match last_pair_layout {
                     FillPairLayout::Flat => PrintMode::Flat,
                     FillPairLayout::ItemFlatSeparatorExpanded
@@ -751,7 +739,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if queue.top() == Some(&FormatElement::Tag(Tag::EndFill)) {
+        if queue.top() == Some(&FormatElement::EndFill) {
             Ok(())
         } else {
             invalid_end_tag(TagKind::Fill, stack.top_kind())
@@ -804,14 +792,14 @@ impl<'a> Printer<'a> {
 
         while let Some(element) = queue.pop() {
             match element {
-                FormatElement::Tag(Tag::StartEntry | Tag::StartBestFittingEntry) => {
+                FormatElement::StartEntry | FormatElement::StartBestFittingEntry => {
                     depth += 1;
                 }
-                FormatElement::Tag(end_tag @ (Tag::EndEntry | Tag::EndBestFittingEntry)) => {
+                end_tag @ (FormatElement::EndEntry | FormatElement::EndBestFittingEntry) => {
                     depth -= 1;
                     // Reached the end entry, pop the entry from the stack and return.
                     if depth == 0 {
-                        stack.pop(end_tag.kind())?;
+                        stack.pop(end_tag.tag_kind().expect("matched an end tag"))?;
                         return Ok(());
                     }
                 }
@@ -1121,7 +1109,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     /// Tests if the content of a `Fill` item fits in [`PrintMode::Flat`].
     ///
-    /// Returns `Err` if the top element of the queue is not a [`Tag::StartEntry`]
+    /// Returns `Err` if the top element of the queue is not a [`crate::Tag::StartEntry`]
     /// or if the document has any mismatching start/end tags.
     fn fill_item_fits(&mut self) -> PrintResult<bool> {
         self.fill_entry_fits(PrintMode::Flat)
@@ -1129,21 +1117,21 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     /// Tests if the content of a `Fill` separator fits with `mode`.
     ///
-    /// Returns `Err` if the top element of the queue is not a [`Tag::StartEntry`]
+    /// Returns `Err` if the top element of the queue is not a [`crate::Tag::StartEntry`]
     /// or if the document has any mismatching start/end tags.
     fn fill_separator_fits(&mut self, mode: PrintMode) -> PrintResult<bool> {
         self.fill_entry_fits(mode)
     }
 
-    /// Tests if the elements between the [`Tag::StartEntry`] and [`Tag::EndEntry`]
+    /// Tests if the elements between the [`crate::Tag::StartEntry`] and [`crate::Tag::EndEntry`]
     /// of a fill item or separator fits with `mode`.
     ///
-    /// Returns `Err` if the queue isn't positioned at a [`Tag::StartEntry`] or if
-    /// the matching [`Tag::EndEntry`] is missing.
+    /// Returns `Err` if the queue isn't positioned at a [`crate::Tag::StartEntry`] or if
+    /// the matching [`crate::Tag::EndEntry`] is missing.
     fn fill_entry_fits(&mut self, mode: PrintMode) -> PrintResult<bool> {
         let start_entry = self.queue.top();
 
-        if !matches!(start_entry, Some(&FormatElement::Tag(Tag::StartEntry))) {
+        if !matches!(start_entry, Some(&FormatElement::StartEntry)) {
             return invalid_start_tag(TagKind::Entry, start_entry);
         }
 
@@ -1162,11 +1150,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     /// Tests if the passed element fits on the current line or not.
     // LLVM considers this function too large to inline on its own, but it is called for every
     // element visited by the fitting loop.
+    #[expect(clippy::inline_always, reason = "called for every measured element")]
     #[inline(always)]
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
-        #[allow(clippy::enum_glob_use)]
-        use Tag::*;
-
         let args = self.stack.top();
 
         match element {
@@ -1247,10 +1233,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     PrintMode::Expanded => (variants.most_expanded(), args),
                 };
 
-                if !matches!(
-                    slice.first(),
-                    Some(FormatElement::Tag(Tag::StartBestFittingEntry))
-                ) {
+                if !matches!(slice.first(), Some(FormatElement::StartBestFittingEntry)) {
                     return invalid_start_tag(TagKind::BestFittingEntry, slice.first());
                 }
 
@@ -1260,14 +1243,14 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::Interned(content) => self.queue.extend_back(content),
 
-            FormatElement::Tag(StartIndent) => {
+            FormatElement::StartIndent => {
                 self.stack.push(
                     TagKind::Indent,
                     args.increment_indent_level(self.options().indent_style()),
                 );
             }
 
-            FormatElement::Tag(StartDedent(mode)) => {
+            FormatElement::StartDedent(mode) => {
                 let args = match mode {
                     DedentMode::Level => args.decrement_indent(),
                     DedentMode::Root => args.reset_indent(),
@@ -1275,16 +1258,16 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.stack.push(TagKind::Dedent, args);
             }
 
-            FormatElement::Tag(StartAlign(align)) => {
+            FormatElement::StartAlign(align) => {
                 self.stack
                     .push(TagKind::Align, args.set_indent_align(align.count()));
             }
 
-            FormatElement::Tag(StartGroup(group)) => {
+            FormatElement::StartGroup(group) => {
                 return Ok(self.fits_group(TagKind::Group, group.mode(), group.id(), args));
             }
 
-            FormatElement::Tag(StartBestFitParenthesize { id }) => {
+            FormatElement::StartBestFitParenthesize { id } => {
                 if let Some(id) = id {
                     self.printer
                         .state
@@ -1297,7 +1280,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.stack.push(TagKind::BestFitParenthesize, args);
             }
 
-            FormatElement::Tag(EndBestFitParenthesize) => {
+            FormatElement::EndBestFitParenthesize => {
                 // If this is the end tag of the outer most parentheses for which we measure if it fits,
                 // pop the indent.
                 if args.mode().is_expanded() && self.stack.top_kind() == Some(TagKind::Indent) {
@@ -1316,7 +1299,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.stack.pop(TagKind::BestFitParenthesize)?;
             }
 
-            FormatElement::Tag(StartConditionalGroup(group)) => {
+            FormatElement::StartConditionalGroup(group) => {
                 let condition = group.condition();
 
                 let print_mode = match condition.group_id {
@@ -1335,7 +1318,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.stack.push(TagKind::ConditionalGroup, args);
             }
 
-            FormatElement::Tag(StartConditionalContent(condition)) => {
+            FormatElement::StartConditionalContent(condition) => {
                 let print_mode = match condition.group_id {
                     None => args.mode(),
                     Some(group_id) => self.group_modes().get_print_mode(group_id)?,
@@ -1348,7 +1331,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartIndentIfGroupBreaks(id)) => {
+            FormatElement::StartIndentIfGroupBreaks(id) => {
                 let print_mode = self.group_modes().get_print_mode(*id)?;
 
                 match print_mode {
@@ -1364,7 +1347,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
+            FormatElement::StartLineSuffix { reserved_width } => {
                 if *reserved_width > 0 {
                     self.state.line_width += reserved_width;
                     if self.state.line_width > self.options().line_width.into() {
@@ -1375,14 +1358,14 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 self.state.has_line_suffix = true;
             }
 
-            FormatElement::Tag(EndLineSuffix) => {
+            FormatElement::EndLineSuffix => {
                 return invalid_end_tag(TagKind::LineSuffix, self.stack.top_kind());
             }
 
-            FormatElement::Tag(StartFitsExpanded(tag::FitsExpanded {
+            FormatElement::StartFitsExpanded(tag::FitsExpanded {
                 condition,
                 propagate_expand,
-            })) => {
+            }) => {
                 match args.mode() {
                     PrintMode::Expanded => {
                         // As usual, nothing to measure
@@ -1422,32 +1405,30 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(
-                tag @ (StartFill
-                | StartVerbatim(_)
-                | StartLabelled(_)
-                | StartEntry
-                | StartBestFittingEntry),
-            ) => {
-                self.stack.push(tag.kind(), args);
+            tag @ (FormatElement::StartFill
+            | FormatElement::StartVerbatim(_)
+            | FormatElement::StartLabelled(_)
+            | FormatElement::StartEntry
+            | FormatElement::StartBestFittingEntry) => {
+                self.stack
+                    .push(tag.tag_kind().expect("matched a start tag"), args);
             }
 
-            FormatElement::Tag(
-                tag @ (EndFill
-                | EndVerbatim
-                | EndLabelled
-                | EndEntry
-                | EndGroup
-                | EndConditionalGroup
-                | EndIndentIfGroupBreaks
-                | EndConditionalContent
-                | EndAlign
-                | EndDedent
-                | EndIndent
-                | EndBestFittingEntry
-                | EndFitsExpanded),
-            ) => {
-                self.stack.pop(tag.kind())?;
+            tag @ (FormatElement::EndFill
+            | FormatElement::EndVerbatim
+            | FormatElement::EndLabelled
+            | FormatElement::EndEntry
+            | FormatElement::EndGroup
+            | FormatElement::EndConditionalGroup
+            | FormatElement::EndIndentIfGroupBreaks
+            | FormatElement::EndConditionalContent
+            | FormatElement::EndAlign
+            | FormatElement::EndDedent
+            | FormatElement::EndIndent
+            | FormatElement::EndBestFittingEntry
+            | FormatElement::EndFitsExpanded) => {
+                self.stack
+                    .pop(tag.tag_kind().expect("matched an end tag"))?;
             }
         }
 
@@ -1580,11 +1561,13 @@ fn invalid_end_tag<R>(end_tag: TagKind, start_tag: Option<TagKind>) -> PrintResu
 fn invalid_start_tag<R>(expected: TagKind, actual: Option<&FormatElement>) -> PrintResult<R> {
     let start = match actual {
         None => ActualStart::EndOfDocument,
-        Some(FormatElement::Tag(tag)) => {
-            if tag.is_start() {
-                ActualStart::Start(tag.kind())
+        Some(tag) if tag.is_tag() => {
+            let kind = tag.tag_kind().expect("matched a tag");
+
+            if tag.is_start_tag() {
+                ActualStart::Start(kind)
             } else {
-                ActualStart::End(tag.kind())
+                ActualStart::End(kind)
             }
         }
         Some(_) => ActualStart::Content,

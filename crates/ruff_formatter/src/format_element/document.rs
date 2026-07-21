@@ -12,8 +12,6 @@ use crate::{
     IndentStyle, IndentWidth, LineWidth, PrinterOptions, format, write,
 };
 
-use super::tag::Tag;
-
 /// A formatted document.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct Document {
@@ -62,31 +60,31 @@ impl Document {
             let mut expands = false;
             for element in elements {
                 let element_expands = match element {
-                    FormatElement::Tag(Tag::StartGroup(group)) => {
+                    FormatElement::StartGroup(group) => {
                         enclosing.push(Enclosing::Group(group));
                         false
                     }
-                    FormatElement::Tag(Tag::EndGroup) => match enclosing.pop() {
+                    FormatElement::EndGroup => match enclosing.pop() {
                         Some(Enclosing::Group(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
-                    FormatElement::Tag(Tag::StartBestFitParenthesize { .. }) => {
+                    FormatElement::StartBestFitParenthesize { .. } => {
                         enclosing.push(Enclosing::BestFitParenthesize { expanded: expands });
                         expands = false;
                         continue;
                     }
 
-                    FormatElement::Tag(Tag::EndBestFitParenthesize) => {
+                    FormatElement::EndBestFitParenthesize => {
                         if let Some(Enclosing::BestFitParenthesize { expanded }) = enclosing.pop() {
                             expands = expanded;
                         }
                         continue;
                     }
-                    FormatElement::Tag(Tag::StartConditionalGroup(group)) => {
+                    FormatElement::StartConditionalGroup(group) => {
                         enclosing.push(Enclosing::ConditionalGroup(group));
                         false
                     }
-                    FormatElement::Tag(Tag::EndConditionalGroup) => match enclosing.pop() {
+                    FormatElement::EndConditionalGroup => match enclosing.pop() {
                         Some(Enclosing::ConditionalGroup(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
@@ -107,14 +105,14 @@ impl Document {
                         enclosing.pop();
                         continue;
                     }
-                    FormatElement::Tag(Tag::StartFitsExpanded(fits_expanded)) => {
+                    FormatElement::StartFitsExpanded(fits_expanded) => {
                         enclosing.push(Enclosing::FitsExpanded {
                             tag: fits_expanded,
                             expands_before: expands,
                         });
                         false
                     }
-                    FormatElement::Tag(Tag::EndFitsExpanded) => {
+                    FormatElement::EndFitsExpanded => {
                         if let Some(Enclosing::FitsExpanded { expands_before, .. }) =
                             enclosing.pop()
                         {
@@ -255,7 +253,7 @@ impl FormatOptions for IrFormatOptions {
 impl Format<IrFormatContext<'_>> for &[FormatElement] {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         #[allow(clippy::enum_glob_use)]
-        use Tag::*;
+        use FormatElement::*;
 
         write!(f, [ContentArrayStart])?;
 
@@ -362,7 +360,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
 
                     write!(f, [token("[")])?;
                     f.write_elements([
-                        FormatElement::Tag(StartIndent),
+                        FormatElement::StartIndent,
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
@@ -371,7 +369,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     }
 
                     f.write_elements([
-                        FormatElement::Tag(EndIndent),
+                        FormatElement::EndIndent,
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
@@ -401,10 +399,12 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     }
                 }
 
-                FormatElement::Tag(tag) => {
-                    if tag.is_start() {
+                tag => {
+                    let kind = tag.tag_kind().expect("matched a tag");
+
+                    if tag.is_start_tag() {
                         first_element = true;
-                        tag_stack.push(tag.kind());
+                        tag_stack.push(kind);
                     }
                     // Handle documents with mismatching start/end or superfluous end tags
                     else {
@@ -415,14 +415,14 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                     f,
                                     [
                                         token("<END_TAG_WITHOUT_START<"),
-                                        text(&std::format!("{:?}", tag.kind())),
+                                        text(&std::format!("{kind:?}")),
                                         token(">>"),
                                     ]
                                 )?;
                                 first_element = false;
                                 continue;
                             }
-                            Some(start_kind) if start_kind != tag.kind() => {
+                            Some(start_kind) if start_kind != kind => {
                                 write!(
                                     f,
                                     [
@@ -432,7 +432,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                         token("ERROR<START_END_TAG_MISMATCH<start: "),
                                         text(&std::format!("{start_kind:?}")),
                                         token(", end: "),
-                                        text(&std::format!("{:?}", tag.kind())),
+                                        text(&std::format!("{kind:?}")),
                                         token(">>")
                                     ]
                                 )?;
@@ -630,9 +630,10 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndVerbatim => {
                             write!(f, [ContentArrayEnd, token(")")])?;
                         }
+                        _ => {}
                     }
 
-                    if tag.is_start() {
+                    if tag.is_start_tag() {
                         write!(f, [ContentArrayStart])?;
                     }
                 }
@@ -659,13 +660,11 @@ struct ContentArrayStart;
 
 impl Format<IrFormatContext<'_>> for ContentArrayStart {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        use Tag::{StartGroup, StartIndent};
-
         write!(f, [token("[")])?;
 
         f.write_elements([
-            FormatElement::Tag(StartGroup(tag::Group::new())),
-            FormatElement::Tag(StartIndent),
+            FormatElement::StartGroup(tag::Group::new()),
+            FormatElement::StartIndent,
             FormatElement::Line(LineMode::Soft),
         ]);
 
@@ -677,11 +676,10 @@ struct ContentArrayEnd;
 
 impl Format<IrFormatContext<'_>> for ContentArrayEnd {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        use Tag::{EndGroup, EndIndent};
         f.write_elements([
-            FormatElement::Tag(EndIndent),
+            FormatElement::EndIndent,
             FormatElement::Line(LineMode::Soft),
-            FormatElement::Tag(EndGroup),
+            FormatElement::EndGroup,
         ]);
 
         write!(f, [token("]")])
@@ -696,12 +694,11 @@ impl FormatElements for [FormatElement] {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(
-                    Tag::StartLineSuffix { reserved_width: _ } | Tag::StartFitsExpanded(_),
-                ) => {
+                FormatElement::StartLineSuffix { reserved_width: _ }
+                | FormatElement::StartFitsExpanded(_) => {
                     ignore_depth += 1;
                 }
-                FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {
+                FormatElement::EndLineSuffix | FormatElement::EndFitsExpanded => {
                     ignore_depth = ignore_depth.saturating_sub(1);
                 }
                 FormatElement::Interned(interned) if ignore_depth == 0 => {
@@ -727,16 +724,16 @@ impl FormatElements for [FormatElement] {
             .is_some_and(|element| element.has_label(expected))
     }
 
-    fn start_tag(&self, kind: TagKind) -> Option<&Tag> {
+    fn start_tag(&self, kind: TagKind) -> Option<&FormatElement> {
         fn traverse_slice<'a>(
             slice: &'a [FormatElement],
             kind: TagKind,
             depth: &mut usize,
-        ) -> Option<&'a Tag> {
+        ) -> Option<&'a FormatElement> {
             for element in slice.iter().rev() {
                 match element {
-                    FormatElement::Tag(tag) if tag.kind() == kind => {
-                        if tag.is_start() {
+                    tag if tag.tag_kind() == Some(kind) => {
+                        if tag.is_start_tag() {
                             if *depth == 0 {
                                 // Invalid document
                                 return None;
@@ -776,7 +773,7 @@ impl FormatElements for [FormatElement] {
         traverse_slice(self, kind, &mut depth)
     }
 
-    fn end_tag(&self, kind: TagKind) -> Option<&Tag> {
+    fn end_tag(&self, kind: TagKind) -> Option<&FormatElement> {
         self.last().and_then(|element| element.end_tag(kind))
     }
 }
@@ -907,23 +904,21 @@ mod tests {
 
     #[test]
     fn display_invalid_document() {
-        use Tag::*;
-
         let document = Document::from(vec![
             FormatElement::Token { text: "[" },
-            FormatElement::Tag(StartGroup(tag::Group::new())),
-            FormatElement::Tag(StartIndent),
+            FormatElement::StartGroup(tag::Group::new()),
+            FormatElement::StartIndent,
             FormatElement::Line(LineMode::Soft),
             FormatElement::Token { text: "a" },
             // Close group instead of indent
-            FormatElement::Tag(EndGroup),
+            FormatElement::EndGroup,
             FormatElement::Line(LineMode::Soft),
-            FormatElement::Tag(EndIndent),
+            FormatElement::EndIndent,
             FormatElement::Token { text: "]" },
             // End tag without start
-            FormatElement::Tag(EndIndent),
+            FormatElement::EndIndent,
             // Start tag without an end
-            FormatElement::Tag(StartIndent),
+            FormatElement::StartIndent,
         ]);
 
         assert_eq!(

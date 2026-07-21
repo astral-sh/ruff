@@ -1,5 +1,4 @@
 use crate::format_element::tag::TagKind;
-use crate::prelude::Tag;
 use crate::printer::{invalid_end_tag, invalid_start_tag};
 use crate::{FormatElement, PrintResult};
 use std::fmt::Debug;
@@ -228,8 +227,8 @@ where
             }
 
             match top.expect("Missing end signal.") {
-                element @ FormatElement::Tag(tag) if tag.kind() == self.kind => {
-                    if tag.is_start() {
+                element if element.tag_kind() == Some(self.kind) => {
+                    if element.is_start_tag() {
                         self.depth += 1;
                     } else {
                         self.depth -= 1;
@@ -267,7 +266,7 @@ impl FitsEndPredicate for AllPredicate {
     }
 }
 
-/// Filter that takes all elements between two matching [`Tag::StartEntry`] and [`Tag::EndEntry`] tags.
+/// Filter that takes all elements between two matching [`crate::Tag::StartEntry`] and [`crate::Tag::EndEntry`] tags.
 #[derive(Debug)]
 pub(super) enum SingleEntryPredicate {
     Entry { depth: usize },
@@ -291,12 +290,12 @@ impl FitsEndPredicate for SingleEntryPredicate {
         let result = match self {
             SingleEntryPredicate::Done => true,
             SingleEntryPredicate::Entry { depth } => match element {
-                FormatElement::Tag(Tag::StartEntry) => {
+                FormatElement::StartEntry => {
                     *depth += 1;
 
                     false
                 }
-                FormatElement::Tag(Tag::EndEntry) => {
+                FormatElement::EndEntry => {
                     if *depth == 0 {
                         return invalid_end_tag(TagKind::Entry, None);
                     }
@@ -327,15 +326,13 @@ impl FitsEndPredicate for SingleEntryPredicate {
 mod tests {
     use crate::FormatElement;
     use crate::format_element::LineMode;
-    use crate::prelude::Tag;
     use crate::printer::queue::{PrintQueue, Queue};
 
     #[test]
     fn extend_back_pop_last() {
-        let mut queue =
-            PrintQueue::new(&[FormatElement::Tag(Tag::StartEntry), FormatElement::Space]);
+        let mut queue = PrintQueue::new(&[FormatElement::StartEntry, FormatElement::Space]);
 
-        assert_eq!(queue.pop(), Some(&FormatElement::Tag(Tag::StartEntry)));
+        assert_eq!(queue.pop(), Some(&FormatElement::StartEntry));
 
         queue.extend_back(&[FormatElement::Line(LineMode::SoftOrSpace)]);
 
@@ -350,10 +347,9 @@ mod tests {
 
     #[test]
     fn extend_back_empty_queue() {
-        let mut queue =
-            PrintQueue::new(&[FormatElement::Tag(Tag::StartEntry), FormatElement::Space]);
+        let mut queue = PrintQueue::new(&[FormatElement::StartEntry, FormatElement::Space]);
 
-        assert_eq!(queue.pop(), Some(&FormatElement::Tag(Tag::StartEntry)));
+        assert_eq!(queue.pop(), Some(&FormatElement::StartEntry));
         assert_eq!(queue.pop(), Some(&FormatElement::Space));
 
         queue.extend_back(&[FormatElement::Line(LineMode::SoftOrSpace)]);
