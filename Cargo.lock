@@ -1317,6 +1317,7 @@ dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
  "ordermap",
+ "parking_lot",
  "smallvec",
  "thin-vec",
 ]
@@ -4790,6 +4791,7 @@ dependencies = [
  "insta",
  "notify",
  "ordermap",
+ "parking_lot",
  "pep440_rs",
  "rayon",
  "regex",
