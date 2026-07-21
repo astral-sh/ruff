@@ -2114,7 +2114,7 @@ mod tests {
     fn select_linter_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2127,7 +2127,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2135,7 +2135,7 @@ mod tests {
                 ..PreviewOptions::default()
             }),
         )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        let expected = RuleSet::from_rule(Rule::PreviewTestRule);
         assert_eq!(actual, expected);
         Ok(())
     }
@@ -2144,7 +2144,7 @@ mod tests {
     fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2157,7 +2157,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
+                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2165,7 +2165,7 @@ mod tests {
                 ..PreviewOptions::default()
             }),
         )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
+        let expected = RuleSet::from_rule(Rule::PreviewTestRule);
         assert_eq!(actual, expected);
         Ok(())
     }
