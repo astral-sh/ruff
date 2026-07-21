@@ -262,6 +262,9 @@ fn format_options() -> Result<()> {
 indent-width = 8
 line-length = 84
 
+[lint]
+isort.split-on-trailing-comma = false
+
 [format]
 indent-style = "tab"
 quote-style = "single"

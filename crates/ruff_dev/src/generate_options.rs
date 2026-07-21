@@ -131,7 +131,11 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
 
     output.push_str(field.doc);
     output.push_str("\n\n");
-    let _ = writeln!(output, "**Default value**: `{}`", field.default);
+    if parents_anchor == "lint" && name == "select" {
+        output.push_str("**Default value**: See [Default Rules](default-rules.md).\n");
+    } else {
+        let _ = writeln!(output, "**Default value**: `{}`", field.default);
+    }
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
