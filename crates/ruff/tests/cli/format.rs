@@ -577,7 +577,11 @@ from module import =
     exit_code: 2
     ----- stdout -----
     invalid-syntax: Expected an import name
-    --> main.py:1:1
+     --> main.py:2:20
+      |
+    2 | from module import =
+      |                    ^
+      |
 
 
     ----- stderr -----
@@ -1944,9 +1948,8 @@ fn test_notebook_trailing_semicolon() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn syntax_error_in_notebooks() -> Result<()> {
-    let test = CliTest::with_files([
+fn notebook_with_syntax_error() -> Result<CliTest> {
+    CliTest::with_files([
         (
             "ruff.toml",
             r#"
@@ -2004,7 +2007,12 @@ include = ["*.ipy"]
    }
 "#,
         ),
-    ])?;
+    ])
+}
+
+#[test]
+fn syntax_error_in_notebooks() -> Result<()> {
+    let test = notebook_with_syntax_error()?;
 
     assert_cmd_snapshot!(test.format_command()
         .args(["--config", "ruff.toml"])
@@ -2017,6 +2025,36 @@ include = ["*.ipy"]
     ----- stderr -----
     error: Failed to parse main.ipy:2:3:24: Expected an expression
     ");
+    Ok(())
+}
+
+#[test]
+fn syntax_error_in_notebooks_check() -> Result<()> {
+    let test = notebook_with_syntax_error()?;
+
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--config", "ruff.toml"])
+            .args(["--extension", "ipy:ipynb"])
+            .arg("--check")
+            .arg("."),
+        @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    invalid-syntax: Expected an expression
+     --> main.ipy:cell 2:3:24
+      |
+    1 | for i in range(iterations):
+    2 |     # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint
+    3 |     j = # ваш код здесь
+      |                        ^
+      |
+
+
+    ----- stderr -----
+    "
+    );
     Ok(())
 }
 
