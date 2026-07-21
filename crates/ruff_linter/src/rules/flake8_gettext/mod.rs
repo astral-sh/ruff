@@ -1,8 +1,6 @@
 //! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_extended_i18n_function_matching_enabled, is_plural_ngettext_check_enabled,
-};
+use crate::preview::is_plural_ngettext_check_enabled;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
@@ -42,10 +40,6 @@ pub(crate) fn is_gettext_func_call(
         .is_some_and(|id| functions_names.contains(id))
     {
         return true;
-    }
-
-    if !is_extended_i18n_function_matching_enabled(checker.settings()) {
-        return false;
     }
 
     let semantic = checker.semantic();
