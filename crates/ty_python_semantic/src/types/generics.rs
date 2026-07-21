@@ -2206,44 +2206,69 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         let mut types = FxHashMap::default();
         for solution in solutions {
-            for binding in solution {
-                let identity = binding.bound_typevar.identity(self.db);
+            let mut path_types: FxHashMap<_, _> = solution
+                .into_iter()
+                .map(|binding| (binding.bound_typevar.identity(self.db), binding.solution))
+                .collect();
+
+            // Sequent-map transitivity can add relationships between inferable typevars to path
+            // bounds. Those relationships are important while solving, but should not become
+            // recursive specialization outputs when concrete bounds are available. (This is
+            // tested in "Generic callable chains" in the call/function.md mdtest.)
+            //
+            // TODO: This is a solution-level projection. A more principled version would live in
+            // the constraint-set solution extraction layer, taking an explicit domain of typevars
+            // to solve for and existentially quantifying away the other typevars in that domain.
+            for (identity, variable) in generic_context.variables_inner(self.db) {
+                if let Some(ty) = path_types.get_mut(identity) {
+                    *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
+                }
+            }
+
+            // Resolve relationships while the type mappings still belong to the same BDD path.
+            // Combining paths first can manufacture an expanding cycle by mixing unrelated
+            // solutions for different type variables. An expanding cycle within a single path
+            // still cannot reach a fixed point and must use the legacy solver for now.
+            if path_types.iter().any(|(identity, ty)| {
+                self.has_expanding_cycle(generic_context, &path_types, *identity, *ty)
+            }) {
+                return self.solve_hash_map_with(generic_context, choose);
+            }
+
+            let path_specialization = generic_context.specialize_recursive(
+                self.db,
+                generic_context
+                    .variables_inner(self.db)
+                    .iter()
+                    .map(|(identity, variable)| {
+                        Some(
+                            path_types
+                                .get(identity)
+                                .copied()
+                                .unwrap_or(Type::TypeVar(*variable)),
+                        )
+                    }),
+            );
+
+            for ((identity, _), solution) in generic_context
+                .variables_inner(self.db)
+                .iter()
+                .zip(path_specialization.types(self.db))
+            {
+                if !path_types.contains_key(identity) {
+                    continue;
+                }
+
                 types
-                    .entry(identity)
+                    .entry(*identity)
                     .and_modify(|existing| {
-                        *existing =
-                            UnionType::from_two_elements(self.db, *existing, binding.solution);
+                        *existing = UnionType::from_two_elements(self.db, *existing, *solution);
                     })
-                    .or_insert(binding.solution);
+                    .or_insert(*solution);
             }
         }
 
-        // Sequent-map transitivity can add relationships between inferable typevars to path
-        // bounds. Those relationships are important while solving, but should not become recursive
-        // specialization outputs when concrete bounds are available. (This is tested in "Generic
-        // callable chains" in the call/function.md mdtest.)
-        //
-        // TODO: This is a solution-level projection. A more principled version would live in the
-        // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
-        // for and existentially quantifying away the other typevars in that domain.
-        for (identity, variable) in generic_context.variables_inner(self.db) {
-            if let Some(ty) = types.get_mut(identity) {
-                *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
-            }
-        }
-
-        // TODO: Replace this fallback with expanding-cycle detection in the constraint-set
-        // solution layer.
-        if types
-            .iter()
-            .any(|(identity, ty)| self.has_expanding_cycle(generic_context, &types, *identity, *ty))
-        {
-            // Recursive specialization cannot reach a fixed point when a cycle grows through an
-            // embedded generic type, such as `SupportsAdd[T, S]`.
-            self.solve_hash_map_with(generic_context, choose)
-        } else {
-            types
-        }
+        types
     }
 
     fn has_expanding_cycle(
