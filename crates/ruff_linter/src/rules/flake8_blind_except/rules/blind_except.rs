@@ -8,9 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_ble001_exc_info_suppression_enabled;
 use crate::rules::flake8_logging::helpers::is_logger_method_name;
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for `except` clauses that catch all exceptions.  This includes
@@ -122,11 +120,7 @@ pub(crate) fn blind_except(
     }
 
     // If the exception is logged, don't flag an error.
-    let mut visitor = LogExceptionVisitor::new(
-        semantic,
-        &checker.settings().logger_objects,
-        checker.settings(),
-    );
+    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings().logger_objects);
     visitor.visit_body(body);
     if visitor.seen() {
         return;
@@ -191,43 +185,26 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
 }
 
 /// Returns `true` if the `exc_info` keyword argument is truthy.
-fn is_exc_info_enabled(
-    method_name: &str,
-    arguments: &ast::Arguments,
-    semantic: &SemanticModel,
-    settings: &LinterSettings,
-) -> bool {
-    if is_ble001_exc_info_suppression_enabled(settings)
-        || matches!(method_name, "error" | "critical")
-    {
-        arguments.find_keyword("exc_info").is_some_and(|keyword| {
-            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
-                != Some(false)
-        })
-    } else {
-        false
-    }
+fn is_exc_info_enabled(arguments: &ast::Arguments, semantic: &SemanticModel) -> bool {
+    arguments.find_keyword("exc_info").is_some_and(|keyword| {
+        Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
+            != Some(false)
+    })
 }
 
 /// A visitor to detect whether the exception was logged.
 struct LogExceptionVisitor<'a> {
     semantic: &'a SemanticModel<'a>,
     logger_objects: &'a [String],
-    settings: &'a LinterSettings,
     seen: bool,
 }
 
 impl<'a> LogExceptionVisitor<'a> {
     /// Create a new [`LogExceptionVisitor`] with the given exception name.
-    fn new(
-        semantic: &'a SemanticModel<'a>,
-        logger_objects: &'a [String],
-        settings: &'a LinterSettings,
-    ) -> Self {
+    fn new(semantic: &'a SemanticModel<'a>, logger_objects: &'a [String]) -> Self {
         Self {
             semantic,
             logger_objects,
-            settings,
             seen: false,
         }
     }
@@ -257,12 +234,9 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 self.logger_objects,
                             ) && match attr.as_str() {
                                 "exception" => true,
-                                _ if is_logger_method_name(attr) => is_exc_info_enabled(
-                                    attr,
-                                    arguments,
-                                    self.semantic,
-                                    self.settings,
-                                ),
+                                _ if is_logger_method_name(attr) => {
+                                    is_exc_info_enabled(arguments, self.semantic)
+                                }
                                 _ => false,
                             } =>
                         {
@@ -273,12 +247,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
                                     ["logging", method] if is_logger_method_name(method) => {
-                                        is_exc_info_enabled(
-                                            method,
-                                            arguments,
-                                            self.semantic,
-                                            self.settings,
-                                        )
+                                        is_exc_info_enabled(arguments, self.semantic)
                                     }
                                     _ => false,
                                 },
