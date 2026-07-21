@@ -444,7 +444,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
-        self.negate(db, self.builder).is_never_satisfied(db)
+        self.node.is_always_satisfied(db, self.builder)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -2413,67 +2413,19 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> bool {
-        self.negate(builder).is_never_satisfied(db, builder)
+        match self.node() {
+            Node::AlwaysTrue => true,
+            Node::AlwaysFalse => false,
+            Node::Interior(interior) => {
+                let mut path = interior.path_assignments(builder);
+                path.visit_negated(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                    .is_continue()
+            }
+        }
     }
 
     /// Returns whether this BDD represent the constant function `false`.
     fn is_never_satisfied<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> bool {
-        /// A [`PathVisitor`] that breaks early if we ever encounter a satisfied path.
-        struct IsNeverSatisfiedVisitor;
-
-        impl PathVisitor for IsNeverSatisfiedVisitor {
-            type Result = ();
-            type Interior = ();
-            type Break = ();
-
-            fn visit_satisfied(
-                &mut self,
-                _path: Option<&PathAssignments>,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Break(())
-            }
-
-            fn visit_unsatisfied(
-                &mut self,
-                _path: Option<&PathAssignments>,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn enter_interior(
-                &mut self,
-                _interior_node: InteriorNode,
-            ) -> ControlFlow<Self::Break, Self::Interior> {
-                ControlFlow::Continue(())
-            }
-
-            fn extend_path(
-                &mut self,
-                _interior_node: InteriorNode,
-                _interior_value: &Self::Interior,
-                _subtree: Self::Result,
-                _path: &PathAssignments,
-                _new_range: Range<usize>,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn leave_interior(
-                &mut self,
-                _interior_node: InteriorNode,
-                _interior_value: &Self::Interior,
-                _if_true: Self::Result,
-                _if_uncertain: Self::Result,
-                _if_false: Self::Result,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-        }
-
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -6416,10 +6368,12 @@ trait PathVisitor {
         path: Option<&PathAssignments>,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
-    /// Called once for each impossible path in the BDD.
+    /// Called once for each impossible path in the BDD. A path can be impossible because its
+    /// assignments contradict each other, or because an edge is structurally absent (such as the
+    /// uncertain edge when visiting a negated BDD).
     ///
-    /// TODO: Provide a path, and make sure it includes all of the assignments that led to a
-    /// contradiction.
+    /// TODO: Provide a path for contradictions, and make sure it includes all of the assignments
+    /// that led to the contradiction.
     fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called on the way down as we enter each interior node. You can create a
@@ -6453,6 +6407,64 @@ trait PathVisitor {
         if_uncertain: Self::Result,
         if_false: Self::Result,
     ) -> ControlFlow<Self::Break, Self::Result>;
+}
+
+/// A [`PathVisitor`] that breaks early if it encounters a satisfied path. When applying this
+/// visitor, a `Continue` result indicates that no satisfied path was found, and the BDD was
+/// therefore unsatisfiable. A `Break` result indicates the opposite.
+struct IsNeverSatisfiedVisitor;
+
+impl PathVisitor for IsNeverSatisfiedVisitor {
+    type Result = ();
+    type Interior = ();
+    type Break = ();
+
+    fn visit_satisfied(
+        &mut self,
+        _path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Break(())
+    }
+
+    fn visit_unsatisfied(
+        &mut self,
+        _path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn enter_interior(
+        &mut self,
+        _interior_node: InteriorNode,
+    ) -> ControlFlow<Self::Break, Self::Interior> {
+        ControlFlow::Continue(())
+    }
+
+    fn extend_path(
+        &mut self,
+        _interior_node: InteriorNode,
+        _interior_value: &Self::Interior,
+        _subtree: Self::Result,
+        _path: &PathAssignments,
+        _new_range: Range<usize>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn leave_interior(
+        &mut self,
+        _interior_node: InteriorNode,
+        _interior_value: &Self::Interior,
+        _if_true: Self::Result,
+        _if_uncertain: Self::Result,
+        _if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
 }
 
 /// The collection of constraints that we know to be true or false at a certain point when
@@ -6589,118 +6601,136 @@ impl PathAssignments {
     where
         V: PathVisitor,
     {
-        fn visit_paths_inner<'db, V>(
-            db: &'db dyn Db,
-            builder: &ConstraintSetBuilder<'db>,
-            node: NodeId,
-            path: &mut PathAssignments,
-            visitor: &mut V,
-        ) -> ControlFlow<V::Break, V::Result>
-        where
-            V: PathVisitor,
-        {
-            match node.node() {
-                Node::AlwaysTrue => visitor.visit_satisfied(Some(path)),
-                Node::AlwaysFalse => visitor.visit_unsatisfied(Some(path)),
-                Node::Interior(interior) => {
-                    let interior_value = visitor.enter_interior(interior)?;
-                    let interior_data = builder.interior_node_data(node);
-                    let if_true = path
-                        .walk_edge(
-                            db,
-                            builder,
-                            interior_data.constraint.when_true(),
-                            interior_data.source_order,
-                            |path, new_range| {
-                                let subtree = visit_paths_inner(
-                                    db,
-                                    builder,
-                                    interior_data.if_true,
-                                    path,
-                                    visitor,
-                                );
-                                match subtree {
-                                    ControlFlow::Continue(subtree) => visitor.extend_path(
-                                        interior,
-                                        &interior_value,
-                                        subtree,
-                                        path,
-                                        new_range,
-                                    ),
-                                    ControlFlow::Break(b) => ControlFlow::Break(b),
-                                }
-                            },
-                        )
-                        .unwrap_or_else(|| visitor.visit_impossible())?;
+        self.visit_inner(db, builder, node, visitor, false)
+    }
 
-                    let if_uncertain = path
-                        .walk_edge(
-                            db,
-                            builder,
-                            interior_data.constraint.when_unconstrained(),
-                            interior_data.source_order,
-                            |path, new_range| {
-                                let subtree = visit_paths_inner(
-                                    db,
-                                    builder,
-                                    interior_data.if_uncertain,
-                                    path,
-                                    visitor,
-                                );
-                                match subtree {
-                                    ControlFlow::Continue(subtree) => visitor.extend_path(
-                                        interior,
-                                        &interior_value,
-                                        subtree,
-                                        path,
-                                        new_range,
-                                    ),
-                                    ControlFlow::Break(b) => ControlFlow::Break(b),
-                                }
-                            },
-                        )
-                        .unwrap_or_else(|| visitor.visit_impossible())?;
+    /// Visits the paths of the negation of `node`, without constructing that negation eagerly.
+    fn visit_negated<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+    ) -> ControlFlow<V::Break, V::Result>
+    where
+        V: PathVisitor,
+    {
+        self.visit_inner(db, builder, node, visitor, true)
+    }
 
-                    let if_false = path
-                        .walk_edge(
-                            db,
-                            builder,
-                            interior_data.constraint.when_false(),
-                            interior_data.source_order,
-                            |path, new_range| {
-                                let subtree = visit_paths_inner(
-                                    db,
-                                    builder,
-                                    interior_data.if_false,
+    fn visit_inner<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+        negated: bool,
+    ) -> ControlFlow<V::Break, V::Result>
+    where
+        V: PathVisitor,
+    {
+        match node.node() {
+            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(Some(self)),
+            Node::AlwaysTrue => visitor.visit_satisfied(Some(self)),
+            Node::AlwaysFalse if negated => visitor.visit_satisfied(Some(self)),
+            Node::AlwaysFalse => visitor.visit_unsatisfied(Some(self)),
+            Node::Interior(interior) => {
+                let interior_value = visitor.enter_interior(interior)?;
+                let interior_data = builder.interior_node_data(node);
+                let true_subtree = if negated {
+                    interior_data
+                        .if_true
+                        .or(builder, interior_data.if_uncertain)
+                } else {
+                    interior_data.if_true
+                };
+                let if_true = self
+                    .walk_edge(
+                        db,
+                        builder,
+                        interior_data.constraint.when_true(),
+                        interior_data.source_order,
+                        |path, new_range| {
+                            let subtree =
+                                path.visit_inner(db, builder, true_subtree, visitor, negated);
+                            match subtree {
+                                ControlFlow::Continue(subtree) => visitor.extend_path(
+                                    interior,
+                                    &interior_value,
+                                    subtree,
                                     path,
-                                    visitor,
-                                );
-                                match subtree {
-                                    ControlFlow::Continue(subtree) => visitor.extend_path(
-                                        interior,
-                                        &interior_value,
-                                        subtree,
-                                        path,
-                                        new_range,
-                                    ),
-                                    ControlFlow::Break(b) => ControlFlow::Break(b),
-                                }
-                            },
-                        )
-                        .unwrap_or_else(|| visitor.visit_impossible())?;
-
-                    visitor.leave_interior(
-                        interior,
-                        &interior_value,
-                        if_true,
-                        if_uncertain,
-                        if_false,
+                                    new_range,
+                                ),
+                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                            }
+                        },
                     )
-                }
+                    .unwrap_or_else(|| visitor.visit_impossible())?;
+
+                let if_uncertain = if negated {
+                    visitor.visit_impossible()?
+                } else {
+                    self.walk_edge(
+                        db,
+                        builder,
+                        interior_data.constraint.when_unconstrained(),
+                        interior_data.source_order,
+                        |path, new_range| {
+                            let subtree = path.visit_inner(
+                                db,
+                                builder,
+                                interior_data.if_uncertain,
+                                visitor,
+                                false,
+                            );
+                            match subtree {
+                                ControlFlow::Continue(subtree) => visitor.extend_path(
+                                    interior,
+                                    &interior_value,
+                                    subtree,
+                                    path,
+                                    new_range,
+                                ),
+                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                            }
+                        },
+                    )
+                    .unwrap_or_else(|| visitor.visit_impossible())?
+                };
+
+                let false_subtree = if negated {
+                    interior_data
+                        .if_false
+                        .or(builder, interior_data.if_uncertain)
+                } else {
+                    interior_data.if_false
+                };
+                let if_false = self
+                    .walk_edge(
+                        db,
+                        builder,
+                        interior_data.constraint.when_false(),
+                        interior_data.source_order,
+                        |path, new_range| {
+                            let subtree =
+                                path.visit_inner(db, builder, false_subtree, visitor, negated);
+                            match subtree {
+                                ControlFlow::Continue(subtree) => visitor.extend_path(
+                                    interior,
+                                    &interior_value,
+                                    subtree,
+                                    path,
+                                    new_range,
+                                ),
+                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                            }
+                        },
+                    )
+                    .unwrap_or_else(|| visitor.visit_impossible())?;
+
+                visitor.leave_interior(interior, &interior_value, if_true, if_uncertain, if_false)
             }
         }
-
-        visit_paths_inner(db, builder, node, self, visitor)
     }
 
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
