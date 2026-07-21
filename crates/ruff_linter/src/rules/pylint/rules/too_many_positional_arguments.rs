@@ -55,7 +55,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
+#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,
