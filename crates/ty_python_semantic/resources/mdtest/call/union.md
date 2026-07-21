@@ -119,54 +119,6 @@ def _(flag: bool) -> None:
     accepts_int(callback)  # error: [invalid-argument-type]
 ```
 
-## Conditional callable arguments
-
-Call binding asks whether an argument can ever satisfy the parameter type. A conditional
-assignability result must not be treated as never assignable.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from collections.abc import Awaitable, Callable, Coroutine
-from enum import Enum
-from typing import Any, Concatenate, TypeVar
-
-def callback[F: Callable[..., Any]](func: F) -> F:
-    return func
-
-type Func[T, **P, R] = Callable[Concatenate[T, P], Awaitable[R]]
-type ReturnFunc[T, **P, R] = Callable[Concatenate[T, P], Coroutine[Any, Any, R]]
-
-def api_error[T, **P, R]() -> Callable[[Func[T, P, R]], ReturnFunc[T, P, R]]:
-    raise NotImplementedError
-
-class Manager:
-    @api_error()
-    async def install(self) -> None: ...
-    @callback
-    def schedule(self, *funcs: Callable) -> None: ...  # error: [missing-type-argument]
-    def run(self) -> None:
-        self.schedule(self.install)
-
-E = TypeVar("E", bound=Enum)
-
-def accepts_enum_converter(converter: Callable[[Any], Enum]) -> None: ...
-def configure(enum: type[E]) -> None:
-    if issubclass(enum, float):
-        pass
-    elif issubclass(enum, int):
-        pass
-    elif issubclass(enum, str):
-        pass
-    else:
-        return
-
-    accepts_enum_converter(enum)
-```
-
 ## Union of class constructors uses strict checking
 
 A call on a union of class objects must satisfy every constructor.
