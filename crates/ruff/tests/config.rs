@@ -21,7 +21,7 @@ fn lint_select() {
     specific prefixes. `ignore` takes precedence over `select` if the
     same prefix appears in both.
 
-    Default value: See https://docs.astral.sh/ruff/default-rules/
+    Default value: See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`
     Type: list[RuleSelector]
     Example usage:
     ```toml
@@ -43,7 +43,7 @@ fn lint_select_json() {
     ----- stdout -----
     {
       "doc": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
-      "default": "See https://docs.astral.sh/ruff/default-rules/",
+      "default": "See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`",
       "value_type": "list[RuleSelector]",
       "scope": null,
       "example": "# On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).\nextend-select = [\"B\", \"Q\"]",

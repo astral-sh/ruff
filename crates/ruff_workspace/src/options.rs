@@ -882,7 +882,7 @@ pub struct LintCommonOptions {
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
     #[option(
-        default = r#"See https://docs.astral.sh/ruff/default-rules/"#,
+        default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
         example = r#"
             # On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
