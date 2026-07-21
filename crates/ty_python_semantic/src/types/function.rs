@@ -1837,10 +1837,10 @@ fn is_instance_truthiness<'db>(
                 } else if let Type::TypeVar(tvar) = positive {
                     match tvar.typevar(db).bound_or_constraints(ctx) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            effective = effective.add_positive(bound);
+                            effective.add_positive_in_place(bound);
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            effective = effective.add_positive(constraints.as_type(ctx));
+                            effective.add_positive_in_place(constraints.as_type(ctx));
                         }
                         // A typevar without bounds/constraints has `object` as its implicit upper bound,
                         // and adding `object` to an intersection is a no-op
@@ -1849,9 +1849,9 @@ fn is_instance_truthiness<'db>(
                     found_tvars_or_newtypes = true;
                 } else if let Type::NewTypeInstance(newtype) = positive {
                     found_tvars_or_newtypes = true;
-                    effective = effective.add_positive(newtype.concrete_base_type(ctx));
+                    effective.add_positive_in_place(newtype.concrete_base_type(ctx));
                 } else {
-                    effective = effective.add_positive(positive);
+                    effective.add_positive_in_place(positive);
                 }
             }
 
@@ -1863,7 +1863,7 @@ fn is_instance_truthiness<'db>(
                 if is_instance_truthiness(ctx, negative, class).is_always_true() {
                     return Truthiness::AlwaysFalse;
                 }
-                effective = effective.add_negative(negative);
+                effective.add_negative_in_place(negative);
             }
 
             let effective = effective.build();

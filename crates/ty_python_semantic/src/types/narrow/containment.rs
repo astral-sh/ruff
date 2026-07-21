@@ -182,7 +182,7 @@ pub(super) fn narrow_string_membership<'db>(
     {
         let mut builder = IntersectionBuilder::new(ctx).add_positive(narrowed);
         for character in haystack.chars() {
-            builder = builder.add_negative(Type::single_char_string_literal(db, character));
+            builder.add_negative_in_place(Type::single_char_string_literal(db, character));
         }
         narrowed = builder.build();
     }

@@ -80,7 +80,7 @@ fn split_truthiness_guarded_intersection<'db>(
 
     let mut core = IntersectionBuilder::new(ctx);
     for positive in intersection.positive(db) {
-        core = core.add_positive(*positive);
+        core.add_positive_in_place(*positive);
     }
     for negative in negative {
         if (guard == falsy && *negative == Type::AlwaysTruthy)
@@ -88,7 +88,7 @@ fn split_truthiness_guarded_intersection<'db>(
         {
             continue;
         }
-        core = core.add_negative(*negative);
+        core.add_negative_in_place(*negative);
     }
     Some((core.build(), guard))
 }
@@ -275,13 +275,13 @@ fn normalize_enum_complement_unions<'db>(
             let mut builder =
                 IntersectionBuilder::new(ctx).add_positive(enum_class.to_non_generic_instance(ctx));
             for rest in complement.rest(db) {
-                builder = builder.add_positive(*rest);
+                builder.add_positive_in_place(*rest);
             }
             for name in enum_class_literal
                 .member_names(db)
                 .filter(|name| shared_excluded_names.contains(*name))
             {
-                builder = builder.add_negative(Type::enum_literal(EnumLiteralType::new(
+                builder.add_negative_in_place(Type::enum_literal(EnumLiteralType::new(
                     db,
                     enum_class_literal,
                     name,
@@ -1240,15 +1240,16 @@ impl<'db> IntersectionBuilder<'db> {
         );
     }
 
-    pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
-        self.add_positive_impl(ty, &mut vec![])
+    pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
+        self.add_positive_in_place(ty);
+        self
     }
 
-    pub(crate) fn add_positive_impl(
-        mut self,
-        ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
-    ) -> Self {
+    pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
+        self.add_positive_impl(ty, &mut vec![]);
+    }
+
+    pub(crate) fn add_positive_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         match ty {
             Type::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
@@ -1256,11 +1257,11 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
-                    return self;
+                    return;
                 }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(&self.ctx);
-                self.add_positive_impl(value_type, seen_aliases)
+                self.add_positive_impl(value_type, seen_aliases);
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1271,29 +1272,27 @@ impl<'db> IntersectionBuilder<'db> {
                 // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
                 // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
                 // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-                union
-                    .elements(self.ctx.db())
-                    .iter()
-                    .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
-                    .fold(IntersectionBuilder::empty(&self.ctx), |mut builder, sub| {
-                        builder.extend(sub);
-                        builder
-                    })
+                let mut distributed = IntersectionBuilder::empty(&self.ctx);
+                for elem in union.elements(self.ctx.db()) {
+                    let mut branch = self.clone();
+                    branch.add_positive_impl(*elem, seen_aliases);
+                    distributed.extend(branch);
+                }
+                self.intersections = distributed.intersections;
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
                 let db = self.ctx.db();
                 for pos in other.positive(db) {
-                    self = self.add_positive_impl(*pos, seen_aliases);
+                    self.add_positive_impl(*pos, seen_aliases);
                 }
                 for neg in other.negative(db) {
-                    self = self.add_negative_impl(*neg, seen_aliases);
+                    self.add_negative_impl(*neg, seen_aliases);
                 }
-                self
             }
             Type::EnumComplement(complement) => {
                 let intersection = complement.to_intersection(&self.ctx);
-                self.add_positive_impl(intersection, seen_aliases)
+                self.add_positive_impl(intersection, seen_aliases);
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
@@ -1301,20 +1300,20 @@ impl<'db> IntersectionBuilder<'db> {
                 for inner in &mut self.intersections {
                     inner.add_positive(&self.ctx, ty);
                 }
-                self
             }
         }
     }
 
-    pub(crate) fn add_negative(self, ty: Type<'db>) -> Self {
-        self.add_negative_impl(ty, &mut vec![])
+    pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
+        self.add_negative_in_place(ty);
+        self
     }
 
-    pub(crate) fn add_negative_impl(
-        mut self,
-        ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
-    ) -> Self {
+    pub(crate) fn add_negative_in_place(&mut self, ty: Type<'db>) {
+        self.add_negative_impl(ty, &mut vec![]);
+    }
+
+    pub(crate) fn add_negative_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
@@ -1323,17 +1322,16 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
-                    return self;
+                    return;
                 }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(&self.ctx);
-                self.add_negative_impl(value_type, seen_aliases)
+                self.add_negative_impl(value_type, seen_aliases);
             }
             Type::Union(union) => {
                 for elem in union.elements(self.ctx.db()) {
-                    self = self.add_negative_impl(*elem, seen_aliases);
+                    self.add_negative_impl(*elem, seen_aliases);
                 }
-                self
             }
             Type::Intersection(intersection) => {
                 // (A | B) & ~(C & ~D)
@@ -1343,41 +1341,29 @@ impl<'db> IntersectionBuilder<'db> {
                 // and negative constraints D, then our new intersection
                 // is (existing & ~C) | (existing & D)
 
-                let positive_side = intersection
-                    .positive(self.ctx.db())
-                    .iter()
-                    // we negate all the positive constraints while distributing
-                    .map(|elem| {
-                        self.clone()
-                            .add_negative_impl(*elem, &mut seen_aliases.clone())
-                    });
-
-                let negative_side = intersection
-                    .negative(self.ctx.db())
-                    .iter()
-                    // all negative constraints end up becoming positive constraints
-                    .map(|elem| {
-                        self.clone()
-                            .add_positive_impl(*elem, &mut seen_aliases.clone())
-                    });
-
-                positive_side.chain(negative_side).fold(
-                    IntersectionBuilder::empty(&self.ctx),
-                    |mut builder, sub| {
-                        builder.extend(sub);
-                        builder
-                    },
-                )
+                let mut distributed = IntersectionBuilder::empty(&self.ctx);
+                // We negate all the positive constraints while distributing.
+                for elem in intersection.positive(self.ctx.db()) {
+                    let mut branch = self.clone();
+                    branch.add_negative_impl(*elem, &mut seen_aliases.clone());
+                    distributed.extend(branch);
+                }
+                // All negative constraints end up becoming positive constraints.
+                for elem in intersection.negative(self.ctx.db()) {
+                    let mut branch = self.clone();
+                    branch.add_positive_impl(*elem, &mut seen_aliases.clone());
+                    distributed.extend(branch);
+                }
+                self.intersections = distributed.intersections;
             }
             Type::EnumComplement(complement) => {
                 let intersection = complement.to_intersection(&self.ctx);
-                self.add_negative_impl(intersection, seen_aliases)
+                self.add_negative_impl(intersection, seen_aliases);
             }
             _ => {
                 for inner in &mut self.intersections {
                     inner.add_negative(&self.ctx, ty);
                 }
-                self
             }
         }
     }
@@ -1388,7 +1374,7 @@ impl<'db> IntersectionBuilder<'db> {
         T: Into<Type<'db>>,
     {
         for element in elements {
-            self = self.add_positive(element.into());
+            self.add_positive_in_place(element.into());
         }
         self
     }

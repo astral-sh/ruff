@@ -827,7 +827,7 @@ fn infer_binary_intersection_type_comparison<'db>(
     //
     let mut builder = IntersectionBuilder::new(&ctx);
 
-    builder = builder.add_positive(KnownClass::Bool.to_instance(&ctx));
+    builder.add_positive_in_place(KnownClass::Bool.to_instance(&ctx));
 
     let mut state = State::NoPositiveElements;
 
@@ -844,7 +844,7 @@ fn infer_binary_intersection_type_comparison<'db>(
         match result {
             Ok(ty) => {
                 state = State::Supported;
-                builder = builder.add_positive(ty);
+                builder.add_positive_in_place(ty);
             }
             Err(error) => {
                 match state {

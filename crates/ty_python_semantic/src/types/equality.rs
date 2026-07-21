@@ -1137,7 +1137,7 @@ fn evaluate_intersection_left<'db>(
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
                 any_narrowing = true;
-                builder = builder.add_positive(narrowed);
+                builder.add_positive_in_place(narrowed);
             }
             ComparisonResult::Ambiguous => any_ambiguous = true,
         }

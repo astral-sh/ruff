@@ -745,7 +745,7 @@ impl<'db> BoundSuperType<'db> {
                 for positive in intersection.positive(db) {
                     if let Ok(good_element) = delegate_to(*positive) {
                         one_good_element_found = true;
-                        builder = builder.add_positive(good_element);
+                        builder.add_positive_in_place(good_element);
                     }
                 }
                 if !one_good_element_found {
@@ -757,7 +757,7 @@ impl<'db> BoundSuperType<'db> {
                 }
                 for negative in intersection.negative(db) {
                     if let Ok(good_element) = delegate_to(*negative) {
-                        builder = builder.add_negative(good_element);
+                        builder.add_negative_in_place(good_element);
                     }
                 }
                 return Ok(builder.build());
