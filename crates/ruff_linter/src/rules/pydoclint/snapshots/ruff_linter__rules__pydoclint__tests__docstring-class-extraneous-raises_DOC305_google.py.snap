@@ -1,0 +1,16 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC305 Class docstring has a `Raises` section
+  --> DOC305_google.py:7:1
+   |
+ 5 |       Docstring of the class
+ 6 |
+ 7 | /     Raises:
+ 8 | |         ValueError
+ 9 | |     """
+   | |____^
+10 |
+11 |       def __init__(self, a: int, b: int) -> None:
+   |
+help: Please put `Raises` section in the __init__() docstring
