@@ -422,7 +422,7 @@ jobs:
     strategy:
       matrix:
         platform:
-          - ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
+          - ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-windows-2022-x86-64-16x32' || 'windows-latest' }}
           - ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-macos-15' || 'macos-latest' }}
     name: "cargo test (${{ matrix.platform }})"
     runs-on: ${{ matrix.platform }}
