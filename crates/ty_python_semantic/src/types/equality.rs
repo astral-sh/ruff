@@ -490,13 +490,38 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
+    match (left, right) {
+        (Type::Dynamic(_), other) => {
+            return if !operator.condition_expects_equality(branch)
+                && all_values_compare_equal(evaluator, other, operator)
+            {
+                let excluded = if other.is_enum(db)
+                    && let Some(alternatives) = finite_alternatives(db, other, operator)
+                    && let [alternative] = alternatives.as_slice()
+                {
+                    *alternative
+                } else {
+                    other
+                };
+                ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(db)
+                        .add_positive(left)
+                        .add_negative(excluded)
+                        .build(),
+                )
+            } else {
+                ComparisonResult::Ambiguous
+            };
+        }
+        (_, Type::Dynamic(_)) => return ComparisonResult::Ambiguous,
+        _ => {}
+    }
+
     // Expand a union containing its enum peer before expanding that enum into individual members.
-    // Gradual unions must retain their normal evaluation order to preserve dynamic narrowing.
     match (left, right) {
         (Type::Union(union), other)
             if other.is_enum(db)
                 && union.elements(db).contains(&other)
-                && !left.has_dynamic(db)
                 && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
         {
             return evaluate_union_left(evaluator, union.elements(db), other, branch, operator);
@@ -504,7 +529,6 @@ fn evaluate_comparison_once<'db>(
         (other, Type::Union(union))
             if other.is_enum(db)
                 && union.elements(db).contains(&other)
-                && !right.has_dynamic(db)
                 && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
         {
             return evaluate_union_right(evaluator, other, union.elements(db), branch, operator);
@@ -542,22 +566,6 @@ fn evaluate_comparison_once<'db>(
             | Type::TypeGuard(_)
             | Type::TypeIs(_),
         ) => ComparisonResult::Ambiguous,
-
-        (Type::Dynamic(_), other) => {
-            if !operator.condition_expects_equality(branch)
-                && all_values_compare_equal(evaluator, other, operator)
-            {
-                ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(left)
-                        .add_negative(other)
-                        .build(),
-                )
-            } else {
-                ComparisonResult::Ambiguous
-            }
-        }
-        (_, Type::Dynamic(_)) => ComparisonResult::Ambiguous,
 
         (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
             None => ComparisonResult::Ambiguous,

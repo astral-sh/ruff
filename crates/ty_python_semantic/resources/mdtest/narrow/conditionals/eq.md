@@ -126,7 +126,7 @@ members allowed by both. If the restrictions do not overlap, the comparison is a
 
 ```py
 from enum import Enum, IntEnum, StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 class Choice(StrEnum):
     FIRST = "first"
@@ -208,6 +208,22 @@ def compare_multi_arm_union(left: Choice | int | None, right: Choice):
     else:
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice
+
+def compare_nested_dynamic_union_left(left: Choice | dict[str, Any], right: Choice):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice | dict[str, Any]
+        reveal_type(right)  # revealed: Choice
+
+def compare_nested_dynamic_union_right(left: Choice, right: Choice | dict[str, Any]):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice | dict[str, Any]
 
 def compare_optional_singleton(left: Choice | None, right: Literal[Choice.FIRST]):
     if left == right:
@@ -1543,6 +1559,21 @@ def gradual_enum_union_against_enum(value: Color | Any, other: Color):
     if value == other:
         reveal_type(value)  # revealed: Color | Any
         assert_type(value, Color | Any)
+
+def gradual_enum_union_inequality(value: Color | Any, other: Color):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+        assert_type(value, Color | Any)
+
+def enum_against_any(value: Color, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+        assert_type(other, Any)
+
+def any_against_enum(value: Any, other: Color):
+    if value != other:
+        reveal_type(value)  # revealed: Any
+        assert_type(value, Any)
 
 def custom_equality_enum_union(value: NonReflexive | int, other: NonReflexive):
     if value == other:
