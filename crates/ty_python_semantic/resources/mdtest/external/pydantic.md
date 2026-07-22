@@ -1047,6 +1047,7 @@ A model derived from `BaseSettings` can use environment variables, so we assume 
 to provide their values:
 
 ```py
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -1062,10 +1063,35 @@ Settings(host=None)  # error: [invalid-argument-type]
 
 # `BaseSettings` accepts underscore-prefixed parameters that override settings configuration.
 Settings(_secrets_dir="./secrets")
-Settings(_secrets_dir=1)  # error: [invalid-argument-type]
+# An unknown leading-underscore keyword is not a control argument and is still rejected.
+Settings(_not_a_control_kwarg=1)  # error: [unknown-argument]
+
+class AliasedSettings(BaseSettings):
+    env_file: int = Field(alias="_env_file")
+
+# `_env_file` binds the control argument (not the `int` field).
+AliasedSettings(_env_file=".env")
+AliasedSettings(_env_file=1)  # error: [invalid-argument-type]
 
 # `BaseSettings` defines a specialized constructor and forbids extra values by default.
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
+```
+
+A custom initializer continues to control the accepted arguments:
+
+```py
+from pydantic_settings import BaseSettings
+
+class CustomInit(BaseSettings):
+    def __init__(self, value: int) -> None: ...
+
+class DerivedSettings(CustomInit):
+    host: str
+
+DerivedSettings(1)
+
+# `CustomInit.__init__` overrides the constructor, so `_secrets_dir` is not accepted.
+DerivedSettings(_secrets_dir="./secrets")  # error: [unknown-argument]
 ```
 
 ## Root models
