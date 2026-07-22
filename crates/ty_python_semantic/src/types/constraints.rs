@@ -3571,24 +3571,25 @@ impl<'db> PathBounds<'db> {
 
             fn satisfied(
                 &mut self,
-                path: Option<&PathAssignments>,
+                path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
-                if let Some(path) = path {
-                    let mut path: Vec<_> = path.positive_constraints().collect();
-                    path.sort_by_key(|(_, source_order)| *source_order);
-                    self.sorted_paths.push(path);
-                }
+                let mut path: Vec<_> = path.positive_constraints().collect();
+                path.sort_by_key(|(_, source_order)| *source_order);
+                self.sorted_paths.push(path);
                 ControlFlow::Continue(())
             }
 
             fn unsatisfied(
                 &mut self,
-                _path: Option<&PathAssignments>,
+                _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+            fn impossible(
+                &mut self,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
@@ -4273,19 +4274,22 @@ impl InteriorNode {
 
             fn visit_satisfied(
                 &mut self,
-                _path: Option<&PathAssignments>,
+                _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_TRUE)
             }
 
             fn visit_unsatisfied(
                 &mut self,
-                _path: Option<&PathAssignments>,
+                _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_FALSE)
             }
 
-            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+            fn visit_impossible(
+                &mut self,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_FALSE)
             }
 
@@ -6330,27 +6334,25 @@ trait PathVisitor {
     /// Called when we reach the end of a satisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
-    fn visit_satisfied(
-        &mut self,
-        path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Result>;
+    fn visit_satisfied(&mut self, path: &PathAssignments)
+    -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called when we reach the end of an unsatisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
     fn visit_unsatisfied(
         &mut self,
-        path: Option<&PathAssignments>,
+        path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called when we determine that a path is impossible, either because its assignments
     /// contradict each other, or because an edge is structurally absent (such as the uncertain
     /// edge when visiting a negated BDD). The `Result` value that you return will be propagated
     /// back up as we "unwind" this path.
-    ///
-    /// TODO: Provide a path for contradictions, and make sure it includes all of the assignments
-    /// that led to the contradiction.
-    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result>;
+    fn visit_impossible(
+        &mut self,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called on the way down as we enter each interior node. You can create a
     /// [`Interior`][Self::Interior] value that will be passed to the
@@ -6393,19 +6395,13 @@ trait PathFold {
     type Break;
 
     /// Returns the base case value that represents a satisfied path.
-    fn satisfied(
-        &mut self,
-        path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Result>;
+    fn satisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Returns the base case value that represents an unsatisfied path.
-    fn unsatisfied(
-        &mut self,
-        path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Result>;
+    fn unsatisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Returns the base case value that represents an impossible path.
-    fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result>;
+    fn impossible(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Combines the values for each subtree of an interior node, returning a value that represents
     /// the subtree rooted at that node.
@@ -6427,20 +6423,23 @@ where
 
     fn visit_satisfied(
         &mut self,
-        path: Option<&PathAssignments>,
+        path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
         PathFold::satisfied(self, path)
     }
 
     fn visit_unsatisfied(
         &mut self,
-        path: Option<&PathAssignments>,
+        path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
         PathFold::unsatisfied(self, path)
     }
 
-    fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::impossible(self)
+    fn visit_impossible(
+        &mut self,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::impossible(self, path)
     }
 
     fn enter_interior(
@@ -6480,21 +6479,15 @@ impl PathFold for IsNeverSatisfiedVisitor {
     type Result = ();
     type Break = ();
 
-    fn satisfied(
-        &mut self,
-        _path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Result> {
+    fn satisfied(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
         ControlFlow::Break(())
     }
 
-    fn unsatisfied(
-        &mut self,
-        _path: Option<&PathAssignments>,
-    ) -> ControlFlow<Self::Break, Self::Result> {
+    fn unsatisfied(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
         ControlFlow::Continue(())
     }
 
-    fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+    fn impossible(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
         ControlFlow::Continue(())
     }
 
@@ -6671,11 +6664,11 @@ impl PathAssignments {
         V: PathVisitor,
     {
         match node.node() {
-            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(Some(self)),
-            Node::AlwaysTrue => visitor.visit_satisfied(Some(self)),
+            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(self),
+            Node::AlwaysTrue => visitor.visit_satisfied(self),
 
-            Node::AlwaysFalse if negated => visitor.visit_satisfied(Some(self)),
-            Node::AlwaysFalse => visitor.visit_unsatisfied(Some(self)),
+            Node::AlwaysFalse if negated => visitor.visit_satisfied(self),
+            Node::AlwaysFalse => visitor.visit_unsatisfied(self),
 
             Node::Interior(interior) => {
                 let interior_value = visitor.enter_interior(interior)?;
@@ -6693,7 +6686,7 @@ impl PathAssignments {
                     interior.source_order,
                     |path, new_range, found_conflict| {
                         let subtree = if found_conflict {
-                            visitor.visit_impossible()
+                            visitor.visit_impossible(path)
                         } else {
                             path.visit_inner(db, builder, true_subtree, visitor, negated)
                         };
@@ -6707,7 +6700,7 @@ impl PathAssignments {
                 )?;
 
                 let if_uncertain = if negated {
-                    let subtree = visitor.visit_impossible()?;
+                    let subtree = visitor.visit_impossible(self)?;
                     visitor.visit_edge(&interior_value, subtree, self, 0..0)?
                 } else {
                     self.walk_edge(
@@ -6717,7 +6710,7 @@ impl PathAssignments {
                         interior.source_order,
                         |path, new_range, found_conflict| {
                             let subtree = if found_conflict {
-                                visitor.visit_impossible()
+                                visitor.visit_impossible(path)
                             } else {
                                 path.visit_inner(db, builder, interior.if_uncertain, visitor, false)
                             };
@@ -6743,7 +6736,7 @@ impl PathAssignments {
                     interior.source_order,
                     |path, new_range, found_conflict| {
                         let subtree = if found_conflict {
-                            visitor.visit_impossible()
+                            visitor.visit_impossible(path)
                         } else {
                             path.visit_inner(db, builder, false_subtree, visitor, negated)
                         };
