@@ -157,13 +157,10 @@ fn inferable_typevars_from_tuple<'db>(
     db: &'db dyn Db,
     instance: &NominalInstanceType<'db>,
 ) -> Option<InferableTypeVars<'db>> {
-    let typevars: Option<FxOrderSet<_>> = instance
+    let typevars: Option<Vec<_>> = instance
         .tuple_spec(db)?
         .fixed_elements()
-        .map(|ty| {
-            ty.as_typevar()
-                .map(|bound_typevar| bound_typevar.identity(db))
-        })
+        .map(|ty| ty.as_typevar())
         .collect();
     typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
 }

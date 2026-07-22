@@ -244,9 +244,9 @@ pub(crate) fn typing_self<'db>(
 
 /// The set of bound typevar occurrences that can be solved by the current inference context.
 ///
-/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
-/// fresh generic-callable occurrence be inferable without making the surrounding source-level
-/// typevar inferable.
+/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce, while the first
+/// bound instance encountered for each identity is retained. This lets a fresh generic-callable
+/// occurrence be inferable without making the surrounding source-level typevar inferable.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -256,21 +256,25 @@ pub(crate) enum InferableTypeVars<'db> {
 impl<'db> InferableTypeVars<'db> {
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
-        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        if typevars.is_empty() {
+        let mut inferable = FxOrderMap::default();
+        for typevar in typevars {
+            inferable.entry(typevar.identity(db)).or_insert(typevar);
+        }
+        if inferable.is_empty() {
             return InferableTypeVars::None;
         }
 
-        typevars.shrink_to_fit();
-        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
+        inferable.shrink_to_fit();
+        Self::Some(InferableTypeVarsInner::new_internal(db, inferable))
     }
 }
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct InferableTypeVarsInner<'db> {
     #[returns(ref)]
-    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
+    inferable: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -280,7 +284,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
         match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
+            InferableTypeVars::Some(inner) => inner.inferable(db).contains_key(&self),
         }
     }
 }
@@ -298,8 +302,14 @@ impl<'db> InferableTypeVars<'db> {
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+                Self::from_typevars(
+                    db,
+                    self_inner
+                        .inferable(db)
+                        .values()
+                        .chain(other_inner.inferable(db).values())
+                        .copied(),
+                )
             }
         }
     }
@@ -309,20 +319,20 @@ impl<'db> InferableTypeVars<'db> {
     pub(crate) fn iter(
         self,
         db: &'db dyn Db,
-    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + 'db {
         match self {
             InferableTypeVars::None => Either::Left(std::iter::empty()),
-            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
+            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).values().copied()),
         }
     }
 
     // Keep this around for debugging purposes
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
         format!(
             "[{}]",
             self.iter(db)
-                .map(|identity| identity.display(db))
+                .map(|typevar| typevar.identity(db).display(db))
                 .format(", ")
         )
     }
@@ -473,7 +483,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
+            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
@@ -489,7 +499,8 @@ impl<'db> GenericContext<'db> {
             ) {
                 self.typevars
                     .borrow_mut()
-                    .insert(bound_typevar.identity(db));
+                    .entry(bound_typevar.identity(db))
+                    .or_insert(bound_typevar);
                 let typevar = bound_typevar.typevar(db);
                 if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
                     walk_type_var_bounds(db, bound_or_constraints, self);
@@ -514,7 +525,7 @@ impl<'db> GenericContext<'db> {
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
             }
-            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
+            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner().into_values())
         }
 
         inferable_typevars_inner(db, self)
@@ -3507,5 +3518,166 @@ impl<'db> SpecializationError<'db> {
             Self::MismatchedBound { argument, .. } => *argument,
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
+    use ruff_python_ast::name::Name;
+
+    use crate::db::tests::setup_db;
+    use crate::types::typevar::{
+        ParamSpecAttrKind, TypeVarBoundOrConstraintsEvaluation, TypeVarNonce,
+    };
+
+    fn bound_typevar<'db>(
+        db: &'db dyn Db,
+        name: &'static str,
+        kind: TypeVarKind,
+        bound_or_constraints: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
+        freshness: TypeVarNonce,
+    ) -> BoundTypeVarInstance<'db> {
+        let identity = TypeVarIdentity::new(db, Name::new_static(name), None, kind);
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            bound_or_constraints,
+            Some(TypeVarVariance::Invariant),
+            None,
+        );
+        BoundTypeVarInstance::new(db, typevar, BindingContext::Synthetic, None, freshness)
+    }
+
+    #[test]
+    fn inferable_typevars_empty_set_is_none() {
+        let db = setup_db();
+        let typevar =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let inferable = InferableTypeVars::from_typevars(&db, []);
+
+        assert_eq!(inferable, InferableTypeVars::None);
+        assert_eq!(inferable.iter(&db).count(), 0);
+        assert!(!typevar.is_inferable(&db, inferable));
+        assert!(!typevar.identity(&db).is_inferable(&db, inferable));
+    }
+
+    #[test]
+    fn inferable_typevars_keep_first_instance_for_each_identity() {
+        let mut db = setup_db();
+        db.clear_salsa_events();
+
+        // The synthetic lazy bound has no definition, so it is equivalent to the implicit
+        // `object` upper bound represented eagerly below.
+        let lazy = bound_typevar(
+            &db,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+            TypeVarNonce::NONE,
+        );
+        let eager = bound_typevar(
+            &db,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::object()).into()),
+            TypeVarNonce::NONE,
+        );
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let v =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("V"), TypeVarVariance::Invariant);
+
+        assert_ne!(lazy, eager);
+        assert_eq!(lazy.identity(&db), eager.identity(&db));
+
+        let left = InferableTypeVars::from_typevars(&db, [lazy, u, eager]);
+        let right = InferableTypeVars::from_typevars(&db, [eager, v, lazy]);
+        let merged = left.merge(&db, right);
+
+        assert_eq!(left.iter(&db).collect::<Vec<_>>(), [lazy, u]);
+        assert_eq!(right.iter(&db).collect::<Vec<_>>(), [eager, v]);
+        assert_eq!(merged.iter(&db).collect::<Vec<_>>(), [lazy, u, v]);
+        assert_eq!(merged, InferableTypeVars::from_typevars(&db, [lazy, u, v]));
+        assert!(lazy.is_inferable(&db, merged));
+        assert!(eager.is_inferable(&db, merged));
+        assert_eq!(merged.display(&db).to_string(), "[T, U, V]");
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "lazy_bound_unchecked", None, &events);
+    }
+
+    #[test]
+    fn inferable_typevars_distinguish_fresh_and_paramspec_identities() {
+        let db = setup_db();
+        let typevar = bound_typevar(
+            &db,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            None,
+            TypeVarNonce::NONE,
+        );
+        let fresh = bound_typevar(
+            &db,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            None,
+            TypeVarNonce::NONE.increment(),
+        );
+        let paramspec = bound_typevar(
+            &db,
+            "P",
+            TypeVarKind::Pep695ParamSpec,
+            None,
+            TypeVarNonce::NONE,
+        );
+        let args = paramspec.with_paramspec_attr(&db, ParamSpecAttrKind::Args);
+        let kwargs = paramspec.with_paramspec_attr(&db, ParamSpecAttrKind::Kwargs);
+
+        let inferable = InferableTypeVars::from_typevars(&db, [typevar, fresh, args, kwargs]);
+        assert_eq!(
+            inferable.iter(&db).collect::<Vec<_>>(),
+            [typevar, fresh, args, kwargs]
+        );
+        assert!(typevar.is_inferable(&db, inferable));
+        assert!(fresh.is_inferable(&db, inferable));
+        assert!(args.is_inferable(&db, inferable));
+        assert!(kwargs.is_inferable(&db, inferable));
+        assert!(!paramspec.is_inferable(&db, inferable));
+
+        let paramspec_only = InferableTypeVars::from_typevars(&db, [paramspec]);
+        assert!(
+            args.identity(&db)
+                .without_paramspec_attr(&db)
+                .is_inferable(&db, paramspec_only)
+        );
+        assert!(
+            kwargs
+                .identity(&db)
+                .without_paramspec_attr(&db)
+                .is_inferable(&db, paramspec_only)
+        );
+    }
+
+    #[test]
+    fn generic_context_inferable_typevars_retain_instances_from_bounds() {
+        let db = setup_db();
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let t = bound_typevar(
+            &db,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)).into()),
+            TypeVarNonce::NONE,
+        );
+        let context = GenericContext::from_typevar_instances(&db, [t]);
+
+        let inferable = context.inferable_typevars(&db);
+        assert_eq!(inferable.iter(&db).collect::<Vec<_>>(), [t, u]);
+        assert!(t.is_inferable(&db, inferable));
+        assert!(u.is_inferable(&db, inferable));
     }
 }
