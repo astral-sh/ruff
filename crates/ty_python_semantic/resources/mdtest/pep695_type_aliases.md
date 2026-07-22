@@ -938,7 +938,8 @@ steps. Giving up on the relation also cannot prove its negation: both TypedDicts
 `{"item": 1}`, so they are not disjoint.
 
 ```py
-from typing import TypedDict
+from typing import Never, TypedDict
+from typing_extensions import TypeIs
 
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
@@ -973,6 +974,18 @@ class IntField(TypedDict):
     item: int
 
 static_assert(not is_disjoint_from(DelayedField, IntField))
+
+def is_int_field(value: object) -> TypeIs[IntField]:
+    return isinstance(value, dict) and isinstance(value.get("item"), int)
+
+def expect_never(value: Never) -> None: ...
+def narrow_delayed_field(value: DelayedField) -> None:
+    if is_int_field(value):
+        reveal_type(value)  # revealed: DelayedField & IntField
+        # This branch is reachable because both TypedDicts can contain `{"item": 1}`.
+        expect_never(value)  # error: [invalid-argument-type]
+    else:
+        reveal_type(value)  # revealed: DelayedField & ~IntField
 ```
 
 ### Non-recursive nested generic aliases

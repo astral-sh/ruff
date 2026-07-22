@@ -505,7 +505,7 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| OwnedRelationConstraintSet::always(),
+            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(
@@ -515,7 +515,7 @@ impl<'db> Type<'db> {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
             let constraints = ConstraintSetBuilder::new();
-            constraints.into_owned_relation(|constraints| {
+            constraints.into_owned(|constraints| {
                 let source = types.first(db);
                 let target = types.second(db);
 

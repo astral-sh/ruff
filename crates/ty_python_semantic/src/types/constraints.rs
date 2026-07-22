@@ -384,20 +384,6 @@ impl Default for OwnedRelationConstraintSet<'_> {
 }
 
 impl<'db> OwnedRelationConstraintSet<'db> {
-    pub(crate) fn always() -> Self {
-        Self {
-            positive_evidence: OwnedConstraintSet::always(),
-            negative_evidence: OwnedConstraintSet::default(),
-        }
-    }
-
-    // TODO: Remove this projection after cached constraint-set consumers can carry an
-    // `OwnedRelationConstraintSet`; it preserves the old solver API by discarding negative
-    // evidence.
-    pub(crate) fn positive_evidence(&self) -> &OwnedConstraintSet<'db> {
-        &self.positive_evidence
-    }
-
     pub(crate) fn query<F, R>(&self, f: F) -> R
     where
         F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, RelationConstraintSet<'db, 'c>) -> R,
