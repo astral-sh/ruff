@@ -55,13 +55,14 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
                 return value
 
             seen_code = True
-            # ty: ignore[]
+            # ty: ignore[unresolved-reference]
             values = [
                 # ty: ignore[blanket-ignore-comment]
                 # ty: ignore
                 f("bad"),
                 # ty: ignore
                 missing,
+                absent,
             ]
             "#,
     )?;
@@ -88,13 +89,14 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
         return value
 
     seen_code = True
-    # ty: ignore[blanket-ignore-comment]
+    # ty: ignore[unresolved-reference]
     values = [
         # ty: ignore[blanket-ignore-comment]
         # ty: ignore
         f("bad"),
-        # ty: ignore
+        # ty: ignore  # ty:ignore[blanket-ignore-comment]
         missing,
+        absent,
     ]
     "#);
 
