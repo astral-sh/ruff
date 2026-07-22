@@ -1568,6 +1568,22 @@ def id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
 f5_paramspec: Callable[[int], int] = id_callable(lambda x: reveal_type(x))  # revealed: int
 reveal_type(f5_paramspec)  # revealed: (x: int) -> int
 
+# The inner call's concrete ParamSpec specialization should propagate to the outer call.
+def outer_id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
+    return x
+
+def outermost_id_callable[**P, R](x: Callable[P, R]) -> Callable[P, R]:
+    return x
+
+def target(value: str, count: int = 1) -> int:
+    return count
+
+nested_paramspec = outer_id_callable(id_callable(target))
+reveal_type(nested_paramspec)  # revealed: (value: str, count: int = 1) -> int
+
+triply_nested_paramspec = outermost_id_callable(outer_id_callable(id_callable(target)))
+reveal_type(triply_nested_paramspec)  # revealed: (value: str, count: int = 1) -> int
+
 # TODO: This should not error once we support `Unpack`.
 # error: [invalid-assignment]
 f6: Callable[[*tuple[int, ...]], None] = lambda x, y, z: None

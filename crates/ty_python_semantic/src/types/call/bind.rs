@@ -5272,6 +5272,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(self.db);
                         if let Some(&ty) = preferred.get(&identity) {
+                            // Defer preferred `ParamSpec` mappings until after argument inference
+                            // so that a concrete argument-derived mapping is propagated through
+                            // the return type to an outer generic call.
+                            if binding.bound_typevar.is_paramspec(self.db) {
+                                continue;
+                            }
+
                             builder.add_type_mapping(
                                 binding.bound_typevar,
                                 ty,
@@ -5449,6 +5456,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         error,
                         argument_index: adjusted_argument_index,
                     });
+                }
+            }
+        }
+
+        // The legacy solver keeps the first `ParamSpec` mapping. Add the type-context preference
+        // last so that it acts as a fallback when no argument inferred a specialization.
+        if let Some(generic_context) = self.signature.generic_context {
+            for typevar in generic_context
+                .variables(self.db)
+                .filter(|typevar| typevar.is_paramspec(self.db))
+            {
+                if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(self.db))
+                {
+                    builder.add_type_mapping(typevar, preferred_ty, TypeVarVariance::Invariant);
                 }
             }
         }
