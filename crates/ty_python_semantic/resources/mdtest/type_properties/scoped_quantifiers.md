@@ -1,11 +1,11 @@
 # Scoped quantifiers
 
-These tests establish a small behavior basis for eliminating callable-local type variables. An
-existential is written using the currently exposed universal-quantification hook and Boolean
-duality: `∃X.C = ¬∀X.¬C`. This exercises the semantics without depending on how a future scoped
-quantifier is represented internally. Revealed solution expectations use the stable default
-constraint ordering; path and binding order can still vary when `TY_CONSTRAINT_SET_ORDER` is
-perturbed (as documented in `regression/constraint_set_ordering.md`).
+These tests establish a small behavior basis for eliminating callable-local type variables. The
+internal `ConstraintSet.exists` and `ConstraintSet.for_all` hooks express the intended existential
+and universal scopes without depending on how future scoped quantifiers are represented internally.
+Revealed solution expectations use the stable default constraint ordering; path and binding order
+can still vary when `TY_CONSTRAINT_SET_ORDER` is perturbed (as documented in
+`regression/constraint_set_ordering.md`).
 
 | Case | Formula                          | Expected result                   |
 | ---- | -------------------------------- | --------------------------------- |
@@ -40,7 +40,7 @@ class Invariant[T]:
 
 def grounded[X, A]() -> None:
     body = ConstraintSet.range(int, X, int) & ConstraintSet.range(Never, A, Invariant[X])
-    projected = ~((~body).for_all(tuple[X]))
+    projected = body.exists(tuple[X])
     expected = ConstraintSet.range(Never, A, Invariant[int])
 
     static_assert(projected == expected)
@@ -64,7 +64,7 @@ from ty_extensions._internal import ConstraintSet
 
 def relational_bridge[X, U, V]() -> None:
     body = ConstraintSet.range(Never, U, X) & ConstraintSet.range(V, X, V)
-    projected = ~((~body).for_all(tuple[X]))
+    projected = body.exists(tuple[X])
     expected = ConstraintSet.range(Never, U, V)
 
     # TODO: These exact-cover assertions currently fail for some perturbed constraint orders,
@@ -96,7 +96,7 @@ class Invariant[T]:
 
 def inverse_image[X, A, B]() -> None:
     body = ConstraintSet.range(Never, A, Invariant[X]) & ConstraintSet.range(Never, X, B)
-    projected = ~((~body).for_all(tuple[X]))
+    projected = body.exists(tuple[X])
     invalid = ConstraintSet.range(Invariant[str], A, object) & ConstraintSet.range(Never, B, int)
 
     # revealed: tuple[Solution[A=Never, B=X@inverse_image, X=Never]]
@@ -137,7 +137,7 @@ class Invariant[T]:
 
 def witness_sensitive[X, A, B]() -> None:
     body = ConstraintSet.range(A, X, object) & ConstraintSet.range(Invariant[X], B, object)
-    projected = ~((~body).for_all(tuple[X]))
+    projected = body.exists(tuple[X])
     invalid = ConstraintSet.range(int, A, object) & ConstraintSet.range(Never, B, Invariant[str])
 
     # The visible bound for B still refers to the local witness on the complete path.
@@ -187,7 +187,7 @@ def correlated_outputs[X, Y, Z]() -> None:
         & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
     body = int_family | str_family
-    projected = ~((~body).for_all(tuple[X]))
+    projected = body.exists(tuple[X])
     expected = (ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
@@ -208,8 +208,8 @@ def correlated_outputs[X, Y, Z]() -> None:
 ## E5: finite domain
 
 A finite constrained domain permits an exact disjunctive cover with branch-local witnesses. The
-domain is included explicitly because the current `for_all` hook does not implicitly apply declared
-TypeVar constraints. As in E4, the visible solutions remain paired after `X` is eliminated.
+domain is included explicitly because the current quantification hooks do not implicitly apply
+declared TypeVar constraints. As in E4, the visible solutions remain paired after `X` is eliminated.
 
 ```py
 from ty_extensions import static_assert
@@ -228,7 +228,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     body = (x_int & ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         x_str & ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
-    projected = ~((~(domain & body)).for_all(tuple[X]))
+    projected = (domain & body).exists(tuple[X])
     expected = (ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
@@ -266,21 +266,21 @@ def alternation[S, T]() -> None:
     target_domain = t_int | t_str
     relation = (s_int & t_int) | (s_str & t_str)
 
-    source_exists = ~((~(source_domain & relation)).for_all(tuple[S]))
+    source_exists = (source_domain & relation).exists(tuple[S])
     forall_target_exists_source = target_domain.satisfies(source_exists).for_all(tuple[T])
-    exists_source_forall_target = ~((~(source_domain & target_domain.satisfies(relation).for_all(tuple[T]))).for_all(tuple[S]))
+    exists_source_forall_target = (source_domain & target_domain.satisfies(relation).for_all(tuple[T])).exists(tuple[S])
 
     static_assert(forall_target_exists_source == ConstraintSet.always())
     static_assert(~forall_target_exists_source == ConstraintSet.never())
     static_assert(exists_source_forall_target == ConstraintSet.never())
 
     source_has_no_witness = (~(source_domain & relation)).for_all(tuple[S])
-    target_counterexample = ~((~(target_domain & source_has_no_witness)).for_all(tuple[T]))
+    target_counterexample = (target_domain & source_has_no_witness).exists(tuple[T])
     static_assert(target_counterexample == ConstraintSet.never())
     static_assert(target_counterexample == ~forall_target_exists_source)
 
     int_only = s_int & t_int
-    int_source_exists = ~((~(source_domain & int_only)).for_all(tuple[S]))
+    int_source_exists = (source_domain & int_only).exists(tuple[S])
     missing_str = target_domain.satisfies(int_source_exists).for_all(tuple[T])
     static_assert(missing_str == ConstraintSet.never())
 ```
