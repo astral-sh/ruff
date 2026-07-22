@@ -669,7 +669,9 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
 fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    let mut code =
+        "from enum import StrEnum\nfrom typing import Any\n\nclass LargeEnum(StrEnum):\n"
+            .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
     }
@@ -684,6 +686,20 @@ fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
         criterion,
         "ty_micro[mixed_str_enum_comparison]",
         &mixed_code,
+    );
+
+    let nested_dynamic_code = code.replace("LargeEnum | None", "LargeEnum | dict[str, Any]");
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[nested_dynamic_str_enum_comparison]",
+        &nested_dynamic_code,
+    );
+
+    let dynamic_code = code.replace("LargeEnum | None", "LargeEnum | Any");
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[dynamic_str_enum_comparison]",
+        &dynamic_code,
     );
 }
 
