@@ -523,6 +523,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
+        if generic_type_alias.specialization(db).is_some() {
+            if !self.in_string_annotation() {
+                self.infer_expression(&subscript.slice, TypeContext::default());
+            }
+            if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                let mut diagnostic =
+                    builder.into_diagnostic("Cannot specialize non-generic type alias");
+                diagnostic.set_primary_message("Double specialization is not allowed");
+            }
+            return Type::unknown();
+        }
+
         let specialize = &|types: &[Option<Type<'db>>]| {
             let type_alias = generic_type_alias.apply_specialization(db, |_| {
                 generic_context.specialize_partial(db, types.iter().copied())

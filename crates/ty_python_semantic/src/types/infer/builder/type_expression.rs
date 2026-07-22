@@ -1593,19 +1593,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
-                    if type_alias.specialization(self.db()).is_some() {
-                        if !self.in_string_annotation() {
-                            self.infer_expression(slice, TypeContext::default());
-                        }
-                        if let Some(builder) =
-                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
-                        {
-                            let mut diagnostic =
-                                builder.into_diagnostic("Cannot specialize non-generic type alias");
-                            diagnostic.set_primary_message("Double specialization is not allowed");
-                        }
-                        return Type::unknown();
-                    }
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
