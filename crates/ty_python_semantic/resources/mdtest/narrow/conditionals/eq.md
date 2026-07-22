@@ -1155,6 +1155,35 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
 ```
 
+Custom comparison methods also remain visible when an `isinstance` check intersects a builtin type
+with a mixin. Ignoring the mixin would incorrectly treat the builtin comparison as authoritative:
+
+```py
+from typing import Literal
+
+class NeMixin:
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class EqMixin:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_intersection_inequality(value: Literal["x", 1], other: str):
+    if isinstance(other, NeMixin):
+        if value != other:
+            reveal_type(value)  # revealed: Literal["x", 1]
+        else:
+            reveal_type(value)  # revealed: Literal["x", 1]
+
+def custom_intersection_equality(value: Literal["x", 1], other: str):
+    if isinstance(other, EqMixin):
+        if value == other:
+            reveal_type(value)  # revealed: Literal["x", 1]
+        else:
+            reveal_type(value)  # revealed: Literal["x", 1]
+```
+
 ## Narrowing unions and inferring comparisons against broad types
 
 When comparing against a broad type, we assume that its subclasses do not override equality. This

@@ -1428,12 +1428,12 @@ impl KnownComparisonSemantics {
                 Self::of_instance(db, instance, operator)
             }
             Type::Intersection(intersection) => {
-                let mut semantics = intersection.positive(db).iter().filter_map(|element| {
+                let mut semantics = intersection.positive(db).iter().map(|element| {
                     Self::of_type_with_policy(db, *element, operator, soundness_policy)
                 });
-                let first = semantics.next()?;
+                let first = semantics.next().flatten()?;
                 semantics
-                    .all(|semantics| semantics == first)
+                    .all(|semantics| semantics == Some(first))
                     .then_some(first)
             }
             Type::NominalInstance(instance)
