@@ -104,14 +104,16 @@ use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance,
+};
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
+    CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
+    Parameters, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
     TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
     any_over_type, binding_type, extract_fixed_length_iterable_element_types,
@@ -3763,11 +3765,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for keyword in &arguments.keywords {
             self.infer_expression(&keyword.value, TypeContext::default());
 
-            if !keyword
-                .arg
-                .as_ref()
-                .is_some_and(|name| name.id == "type_params")
-            {
+            if keyword.arg.as_deref() != Some("type_params") {
                 continue;
             }
 
@@ -3786,26 +3784,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let db = self.db();
             let mut typevar_with_default = None;
+            let mut typevar_tuple: Option<TypeVarInstance> = None;
+            let mut reported_default_order_error = false;
 
             for element in &tuple.elts {
                 let bound_typevar = match self.expression_type(element) {
-                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                        typevar.with_binding_context(db, definition)
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
+                        db,
+                        self.index,
+                        definition.file_scope(db),
+                        Some(definition),
+                        typevar,
+                    ),
+                    _ => None,
+                };
+                let Some(bound_typevar) = bound_typevar else {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(
+                            "Each `type_params` entry for `TypeAliasType` must be a type variable",
+                        );
                     }
-                    Type::TypeVar(typevar) => typevar,
-                    _ => {
-                        valid_type_params = false;
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
-                        {
-                            builder.into_diagnostic(
-                                "Each `type_params` entry for `TypeAliasType` must be a type variable",
-                            );
-                        }
-                        continue;
-                    }
+                    continue;
                 };
                 let typevar = bound_typevar.typevar(db);
+
+                if bound_typevar.binding_context(db) != BindingContext::Definition(definition) {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` is bound in an outer scope and cannot be used in `type_params`",
+                            typevar.name(db),
+                        ));
+                    }
+                    continue;
+                }
 
                 if !type_params.insert(bound_typevar.identity(db)) {
                     valid_type_params = false;
@@ -3820,20 +3837,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if typevar.default_type(db).is_some() {
+                    if let Some(typevar_tuple) = typevar_tuple {
+                        valid_type_params = false;
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Type parameter `{}` with a default follows TypeVarTuple `{}`",
+                                typevar.name(db),
+                                typevar_tuple.name(db),
+                            ));
+                        }
+                    }
                     typevar_with_default.get_or_insert(typevar);
                 } else if let Some(typevar_with_default) = typevar_with_default {
                     valid_type_params = false;
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                    if !reported_default_order_error
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
                     {
+                        reported_default_order_error = true;
                         builder.into_diagnostic(format_args!(
                             "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
                             typevar.name(db),
                             typevar_with_default.name(db),
                         ));
                     }
-                    break;
+                }
+
+                if typevar.is_typevartuple(db) {
+                    if typevar_tuple.is_some() {
+                        valid_type_params = false;
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                        {
+                            builder.into_diagnostic(
+                                "Only one `TypeVarTuple` parameter is allowed in `type_params`",
+                            );
+                        }
+                    } else {
+                        typevar_tuple = Some(typevar);
+                    }
                 }
             }
         }

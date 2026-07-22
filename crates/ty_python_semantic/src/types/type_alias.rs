@@ -3,10 +3,11 @@ use std::fmt::Write;
 use crate::{
     Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, KnownInstanceType, Type,
-        TypeContext, TypeMapping, TypeVarVariance, definition_expression_type,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext,
+        KnownInstanceType, Type, TypeContext, TypeMapping, TypeVarVariance,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization},
+        generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
         visitor,
     },
@@ -227,16 +228,23 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             .arguments
             .find_argument_value("type_params", 2)?
             .as_tuple_expr()?;
+        let index = semantic_index(db, file);
 
         let mut variables = FxOrderSet::default();
         for element in &type_params.elts {
             let typevar = match definition_expression_type(db, definition, element) {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                    typevar.with_binding_context(db, definition)
-                }
-                Type::TypeVar(typevar) => typevar,
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
+                    db,
+                    index,
+                    definition.file_scope(db),
+                    Some(definition),
+                    typevar,
+                )?,
                 _ => return None,
             };
+            if typevar.binding_context(db) != BindingContext::Definition(definition) {
+                return None;
+            }
             variables.insert(typevar);
         }
 

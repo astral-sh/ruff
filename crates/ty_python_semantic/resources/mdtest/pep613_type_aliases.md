@@ -271,7 +271,7 @@ MyList = TypeAliasType("MyList", list[T], type_params=(T,))
 MyAlias5 = Callable[[MyList[T]], int]
 
 def _(c: MyAlias5[int]):
-    reveal_type(c)  # revealed: (list[int], /) -> int
+    reveal_type(c)  # revealed: (MyList[int], /) -> int
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -281,7 +281,7 @@ MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
 MyAlias6 = Callable[[MyDict[K, V]], int]
 
 def _(c: MyAlias6[str, bytes]):
-    reveal_type(c)  # revealed: (dict[str, bytes], /) -> int
+    reveal_type(c)  # revealed: (MyDict[str, bytes], /) -> int
 
 ListOrDict: TypeAlias = MyList[T] | dict[str, T]
 

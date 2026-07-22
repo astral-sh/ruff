@@ -507,7 +507,7 @@ def recursive(value: Recursive[int]) -> None:
     reveal_type(value)  # revealed: int | list[Recursive[int]]
 
 def recursive_callable(value: RecursiveCallable[int]) -> None:
-    reveal_type(value)  # revealed: (int | list[Divergent], /) -> None
+    reveal_type(value)  # revealed: (Recursive[int], /) -> None
 ```
 
 ### Generic specialization errors
@@ -543,10 +543,12 @@ def non_generic(value: NonGenericAlias[int]) -> None:
 ### Invalid type parameters
 
 ```py
-from typing_extensions import TypeAliasType, TypeVar
+from typing_extensions import TypeAliasType, TypeVar, TypeVarTuple, Union, Unpack
 
 T = TypeVar("T")
 U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
 
 # error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
 InvalidList = TypeAliasType("InvalidList", list[T], type_params=[T])
@@ -559,16 +561,10 @@ InvalidTupleVariable = TypeAliasType("InvalidTupleVariable", list[T], type_param
 InvalidUnpack = TypeAliasType("InvalidUnpack", list[T], type_params=(*params,))
 
 # error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
-InvalidInt = TypeAliasType("InvalidInt", list[int], type_params=(int,))
-
-# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
 InvalidNested = TypeAliasType("InvalidNested", list[T], type_params=(list[T],))
 
 # error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
 InvalidMixed = TypeAliasType("InvalidMixed", list[T], type_params=(int, T))
-
-# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
-InvalidString = TypeAliasType("InvalidString", list[int], type_params=("T",))
 
 # error: [invalid-type-alias-type] "Type parameter `U` used in the alias value must be included in `type_params`"
 Missing = TypeAliasType("Missing", dict[T, U], type_params=(T,))
@@ -578,6 +574,69 @@ MissingAll = TypeAliasType("MissingAll", list[T])
 
 # error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
 Duplicate = TypeAliasType("Duplicate", list[T], type_params=(T, T))
+
+MultipleTypeVarTuples = TypeAliasType(
+    "MultipleTypeVarTuples",
+    Union[tuple[Unpack[Ts]], tuple[Unpack[Us]]],
+    # error: [invalid-type-alias-type] "Only one `TypeVarTuple` parameter is allowed in `type_params`"
+    type_params=(Ts, Us),
+)
+
+DefaultedT = TypeVar("DefaultedT", default=int)
+
+DefaultAfterTypeVarTuple = TypeAliasType(
+    "DefaultAfterTypeVarTuple",
+    tuple[Unpack[Ts], DefaultedT],
+    # error: [invalid-type-variable-default] "Type parameter `DefaultedT` with a default follows TypeVarTuple `Ts`"
+    type_params=(Ts, DefaultedT),
+)
+
+InvalidOrderAndEntries = TypeAliasType(
+    "InvalidOrderAndEntries",
+    tuple[DefaultedT, T],
+    # error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+    # error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
+    # error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+    type_params=(DefaultedT, T, T, "V"),
+)
+```
+
+### Scoped type parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType, TypeVar
+
+LegacyT = TypeVar("LegacyT")
+
+def pep695_outer[T]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `T` is bound in an outer scope and cannot be used in `type_params`"
+    Pep695Alias = TypeAliasType("Pep695Alias", list[T], type_params=(T,))
+    # error: [not-subscriptable] "Cannot specialize non-generic type alias `Pep695Alias`"
+    def check(value: Pep695Alias[int]) -> None: ...
+
+def legacy_outer(value: LegacyT) -> None:
+    # error: [invalid-type-alias-type] "Type parameter `LegacyT` is bound in an outer scope and cannot be used in `type_params`"
+    LegacyAlias = TypeAliasType("LegacyAlias", list[LegacyT], type_params=(LegacyT,))
+    # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyAlias`"
+    def check(value: LegacyAlias[int]) -> None: ...
+
+class Pep695Outer[T]:
+    # error: [invalid-type-alias-type] "Type parameter `T` is bound in an outer scope and cannot be used in `type_params`"
+    ClassAlias = TypeAliasType("ClassAlias", list[T], type_params=(T,))
+
+def paramspec_outer[**P]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `P` is bound in an outer scope and cannot be used in `type_params`"
+    ParamSpecAlias = TypeAliasType("ParamSpecAlias", Callable[P, int], type_params=(P,))
+
+def variadic_outer[*Ts]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `Ts` is bound in an outer scope and cannot be used in `type_params`"
+    VariadicAlias = TypeAliasType("VariadicAlias", tuple[*Ts], type_params=(Ts,))
 ```
 
 ### Generic alias from `typing`
@@ -596,6 +655,35 @@ MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
 
 def generic_from_typing(value: MyDict[str, int]) -> None:
     reveal_type(value)  # revealed: dict[str, int]
+```
+
+### PEP 695 aliases in `Callable`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+type Pep695List[A] = list[A]
+Pep695ConcreteCallable = Callable[[Pep695List[int]], None]
+Pep695GenericCallable = Callable[[Pep695List[T]], None]
+
+type Recursive[A] = A | list[Recursive[A]]
+RecursiveCallable = Callable[[Recursive[int]], None]
+
+def _(
+    concrete: Pep695ConcreteCallable,
+    generic: Pep695GenericCallable[str],
+    recursive: RecursiveCallable,
+) -> None:
+    reveal_type(concrete)  # revealed: (Pep695List[int], /) -> None
+    reveal_type(generic)  # revealed: (Pep695List[str], /) -> None
+    reveal_type(recursive)  # revealed: (Recursive[int], /) -> None
 ```
 
 ### Generic value binds type variables to alias definition
