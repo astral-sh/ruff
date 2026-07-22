@@ -1655,10 +1655,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         GenericContext::from_typevar_instances(self.db(), variables);
                     Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
-                KnownInstanceType::LiteralStringAlias(_) => {
-                    self.infer_expression(slice, TypeContext::default());
-                    todo_type!("Generic stringified PEP-613 type alias")
-                }
                 KnownInstanceType::Literal(ty) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());
@@ -1695,7 +1691,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::unknown()
                     }
                 }
-                KnownInstanceType::UnionType(_)
+                KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
                 | KnownInstanceType::TypeGenericAlias(_) => {

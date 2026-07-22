@@ -463,6 +463,13 @@ impl<'db> KnownInstanceType<'db> {
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )))
             }
+            KnownInstanceType::LiteralStringAlias(ty) => {
+                Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
+                    db,
+                    ty.inner(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
 
             KnownInstanceType::SubscriptedProtocol(_)
             | KnownInstanceType::SubscriptedGeneric(_)
@@ -474,7 +481,6 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::GenericContext(_)
             | KnownInstanceType::Specialization(_)
             | KnownInstanceType::Literal(_)
-            | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
             | KnownInstanceType::NewType(_)
             | KnownInstanceType::Sentinel(_) => {
