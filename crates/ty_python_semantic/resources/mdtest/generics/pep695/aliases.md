@@ -103,6 +103,14 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(List[int][str])  # revealed: Unknown
+
+SpecializedList = List[int]
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(SpecializedList[str])  # revealed: Unknown
+
 # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
