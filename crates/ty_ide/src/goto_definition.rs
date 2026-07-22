@@ -1561,13 +1561,8 @@ a: float<CURSOR> = 3.14
         LL | a: float = 3.14
            |    ^^^^^ Clicking here
            |
-        info: Found 2 definitions
+        info: Found 1 definition
           --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ---
-           |
-          ::: stdlib/builtins.pyi:LL:7
            |
         LL | class float:
            |       -----
@@ -1593,18 +1588,8 @@ a: complex<CURSOR> = 3.14
         LL | a: complex = 3.14
            |    ^^^^^^^ Clicking here
            |
-        info: Found 3 definitions
+        info: Found 1 definition
           --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ---
-           |
-          ::: stdlib/builtins.pyi:LL:7
-           |
-        LL | class float:
-           |       -----
-           |
-          ::: stdlib/builtins.pyi:LL:7
            |
         LL | class complex:
            |       -------
