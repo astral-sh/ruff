@@ -1091,7 +1091,7 @@ class DerivedSettings(CustomInit):
 DerivedSettings(1)
 
 # `CustomInit.__init__` overrides the constructor, so `_secrets_dir` is not accepted.
-DerivedSettings(_secrets_dir="./secrets")  # error: [unknown-argument]
+DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
 ```
 
 ## Root models

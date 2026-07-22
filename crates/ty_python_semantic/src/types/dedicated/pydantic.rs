@@ -996,8 +996,13 @@ fn lax_alias<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ModelInitBehavior {
+    /// The model inherits Pydantic's ordinary `BaseModel` initializer.
     BaseModel,
+    /// The first custom initializer in the MRO accepts arbitrary keyword arguments.
     CustomVariadic,
+    /// The first custom initializer in the MRO has a fixed parameter list.
+    CustomFixed,
+    /// The model has a specialized Pydantic initializer or no recognized initializer.
     Other,
 }
 
@@ -1031,12 +1036,24 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
                 }) {
                 ModelInitBehavior::CustomVariadic
             } else {
-                ModelInitBehavior::Other
+                ModelInitBehavior::CustomFixed
             };
         }
     }
 
     ModelInitBehavior::Other
+}
+
+/// Return `true` if `class` should synthesize a field-derived constructor signature.
+///
+/// A fixed custom initializer on an intermediate base class controls the constructor accepted by
+/// its subclasses. A variadic custom initializer still allows Pydantic to validate field values
+/// passed via keyword arguments.
+pub(in crate::types) fn synthesizes_constructor_signature_from_fields(
+    db: &dyn Db,
+    class: StaticClassLiteral<'_>,
+) -> bool {
+    model_init_behavior(db, class) != ModelInitBehavior::CustomFixed
 }
 
 /// Return `true` if `class` should accept extra keywords in its synthesized constructor.
