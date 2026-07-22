@@ -643,11 +643,12 @@ impl<'db> Conjunctions<'db> {
             return self.conjuncts[0];
         }
 
-        let mut intersection = IntersectionBuilder::new(db);
-        for conjunct in self.conjuncts {
-            intersection = intersection.add_positive(conjunct);
-        }
-        intersection.build()
+        // Collapse shared union arms before distributing the next constraint over them.
+        self.conjuncts
+            .into_iter()
+            .fold(Type::object(), |accumulated, conjunct| {
+                IntersectionType::from_two_elements(db, accumulated, conjunct)
+            })
     }
 }
 
