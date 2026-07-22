@@ -1492,6 +1492,7 @@ def tagged_union_with_unrelated_assignment(value: A | B):
 import sys
 from enum import Enum, IntEnum
 from typing import Any, Literal, TypeVar
+from typing_extensions import assert_type
 
 T = TypeVar("T", bound=object)
 U = TypeVar("U")
@@ -1515,6 +1516,26 @@ class Marker: ...
 
 class SingleIntEnum(IntEnum):
     VALUE = 1
+
+def optional_enum_against_any(value: Color | None, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+        assert_type(other, Any)
+
+def any_against_optional_enum(value: Any, other: Color | None):
+    if value != other:
+        reveal_type(value)  # revealed: Any
+        assert_type(value, Any)
+
+def optional_bool_against_any(value: bool | None, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+        assert_type(other, Any)
+
+def gradual_enum_union(value: Color | Any, other: Color | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+        assert_type(value, Color | Any)
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
