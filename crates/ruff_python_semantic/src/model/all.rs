@@ -107,6 +107,9 @@ impl SemanticModel<'_> {
             Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
             _ => None,
         } {
+            let is_augmented_string = matches!(stmt, Stmt::AugAssign(_))
+                && matches!(value.as_ref(), Expr::StringLiteral(_));
+
             if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {
                 let mut current_left = left;
                 let mut current_right = right;
@@ -132,7 +135,7 @@ impl SemanticModel<'_> {
                         break;
                     }
                 }
-            } else {
+            } else if !is_augmented_string {
                 let (elts, new_flags) = self.extract_dunder_all_elts(value);
                 flags |= new_flags;
                 if let Some(elts) = elts {

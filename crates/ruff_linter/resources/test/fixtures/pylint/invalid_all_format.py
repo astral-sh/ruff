@@ -47,3 +47,6 @@ __all__ = list[str](["Hello", "world"])
 __all__ = list[str](foo())
 
 __all__ = (foo := ["Hello", "world"])
+
+# https://github.com/astral-sh/ruff/issues/26817
+__all__ += "Hello"
