@@ -258,14 +258,15 @@ impl<'db> InferableTypeVars<'db> {
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
+        let mut typevars = typevars.into_iter().peekable();
+        if typevars.peek().is_none() {
+            return InferableTypeVars::None;
+        }
+
         let mut inferable = FxOrderMap::default();
         for typevar in typevars {
             inferable.entry(typevar.identity(db)).or_insert(typevar);
         }
-        if inferable.is_empty() {
-            return InferableTypeVars::None;
-        }
-
         inferable.shrink_to_fit();
         Self::Some(InferableTypeVarsInner::new_internal(db, inferable))
     }
