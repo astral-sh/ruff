@@ -200,6 +200,9 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
+    /// [pyspark](https://pypi.org/project/pyspark/)
+    #[prefix = "PSP"]
+    Pyspark,
     /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,

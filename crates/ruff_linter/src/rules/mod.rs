@@ -53,6 +53,7 @@ pub mod pydocstyle;
 pub mod pyflakes;
 pub mod pygrep_hooks;
 pub mod pylint;
+pub mod pyspark;
 pub mod pyupgrade;
 pub mod refurb;
 pub mod ruff;
