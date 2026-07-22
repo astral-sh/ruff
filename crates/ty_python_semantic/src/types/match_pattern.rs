@@ -1061,15 +1061,10 @@ pub(crate) fn definite_match_pattern_type<'db>(
             let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             // Only return the type if it's guaranteed to match itself.
             // Otherwise, we can't definitively exclude it from subsequent patterns.
-            if equality_truthiness(
-                db,
-                ty,
-                ty,
-                ComparisonSoundnessPolicy::from_analysis_settings(
-                    db.analysis_settings(value.file(db)),
-                ),
-            ) == Truthiness::AlwaysTrue
-            {
+            let policy = ComparisonSoundnessPolicy::from_analysis_settings(
+                db.analysis_settings(value.file(db)),
+            );
+            if equality_truthiness(db, ty, ty, policy) == Truthiness::AlwaysTrue {
                 ty
             } else {
                 Type::Never
