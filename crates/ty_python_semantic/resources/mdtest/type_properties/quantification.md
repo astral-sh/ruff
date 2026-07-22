@@ -1,21 +1,18 @@
-# Scoped quantifiers
+# Quantification
 
-These tests establish a small behavior basis for eliminating callable-local type variables. The
-internal `ConstraintSet.exists` and `ConstraintSet.for_all` hooks express the intended existential
-and universal scopes without depending on how future scoped quantifiers are represented internally.
-Revealed solution expectations use the stable default constraint ordering; path and binding order
-can still vary when `TY_CONSTRAINT_SET_ORDER` is perturbed (as documented in
-`regression/constraint_set_ordering.md`).
+Quantification describes when an expression involving some type variables holds for the type
+variables that remain. `exists` requires at least one valid assignment to the quantified variables;
+`for_all` requires every valid assignment to satisfy the expression.
 
-| Case | Formula                          | Expected result                   |
-| ---- | -------------------------------- | --------------------------------- |
-| C0   | `∃X. X = int ∧ A ≤ Invariant[X]` | Exact substitution                |
-| E1   | `∃X. U ≤ X ∧ X = V`              | Exact relational cover            |
-| E2   | `∃X. A ≤ Invariant[X] ∧ X ≤ B`   | Residual invariant relation       |
-| E3   | `∃X. A ≤ X ∧ Invariant[X] ≤ B`   | Witness-sensitive residual        |
-| E4   | `∃X. C₁(X, Y) ∧ C₂(X, Z)`        | Correlated visible solutions      |
-| E5   | `∃X ∈ {int, str}. C(X, Y, Z)`    | Finite disjunctive cover          |
-| E6   | `∀T ∈ Dₜ. ∃S ∈ Dₛ. R(S, T)`      | Preserve alternation and polarity |
+| Case | Formula                          | Expected result                             |
+| ---- | -------------------------------- | ------------------------------------------- |
+| C0   | `∃X. X = int ∧ A ≤ Invariant[X]` | Equivalent to `A ≤ Invariant[int]`          |
+| E1   | `∃X. U ≤ X ∧ X = V`              | Equivalent to `U ≤ V`                       |
+| E2   | `∃X. A ≤ Invariant[X] ∧ X ≤ B`   | `A` and `B` must admit a common `X`         |
+| E3   | `∃X. A ≤ X ∧ Invariant[X] ≤ B`   | `A` and `B` must admit a common `X`         |
+| E4   | `∃X. C₁(X, Y) ∧ C₂(X, Z)`        | Solutions for `Y` and `Z` remain correlated |
+| E5   | `∃X ∈ {int, str}. C(X, Y, Z)`    | Solutions remain paired with each choice    |
+| E6   | `∀T ∈ Dₜ. ∃S ∈ Dₛ. R(S, T)`      | `S` may depend on the choice of `T`         |
 
 ```toml
 [environment]
@@ -24,8 +21,8 @@ python-version = "3.13"
 
 ## C0: grounded invariant
 
-An exact equality for the local witness permits substitution through an invariant constructor. The
-result is an ordinary constraint on the visible variable, and negation preserves that cover.
+If `X` must equal `int`, then `∃X. X = int ∧ A ≤ Invariant[X]` is equivalent to
+`A ≤ Invariant[int]`. The negated expressions are equivalent as well.
 
 ```py
 from typing import Never
@@ -40,22 +37,22 @@ class Invariant[T]:
 
 def grounded[X, A]() -> None:
     body = ConstraintSet.range(int, X, int) & ConstraintSet.range(Never, A, Invariant[X])
-    projected = body.exists(tuple[X])
+    quantified = body.exists(tuple[X])
     expected = ConstraintSet.range(Never, A, Invariant[int])
 
-    static_assert(projected == expected)
-    static_assert(~projected == ~expected)
+    static_assert(quantified == expected)
+    static_assert(~quantified == ~expected)
 
     # revealed: tuple[Solution[X=int, A=Never]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
     # revealed: tuple[Solution[A=Never]]
-    reveal_type(projected.solutions(inferable=tuple[A]))
+    reveal_type(quantified.solutions(inferable=tuple[A]))
 ```
 
 ## E1: relational bridge
 
-A local witness between two visible variables has an exact cover: `U ≤ X ∧ X = V` projects to
-`U ≤ V`. No invariant residual is necessary.
+There is an `X` satisfying `U ≤ X ∧ X = V` exactly when `U ≤ V`. The negated expressions are
+equivalent as well.
 
 ```py
 from typing import Never
@@ -64,24 +61,21 @@ from ty_extensions._internal import ConstraintSet
 
 def relational_bridge[X, U, V]() -> None:
     body = ConstraintSet.range(Never, U, X) & ConstraintSet.range(V, X, V)
-    projected = body.exists(tuple[X])
+    quantified = body.exists(tuple[X])
     expected = ConstraintSet.range(Never, U, V)
 
-    # TODO: These exact-cover assertions currently fail for some perturbed constraint orders,
-    # despite both sides displaying as `U ≤ V`.
-    static_assert(projected == expected)
-    static_assert(~projected == ~expected)
+    static_assert(quantified == expected)
+    static_assert(~quantified == ~expected)
 
     # revealed: tuple[Solution[V=U@relational_bridge, U=Never]]
-    reveal_type(projected.solutions(inferable=tuple[U, V]))
+    reveal_type(quantified.solutions(inferable=tuple[U, V]))
 ```
 
 ## E2: open invariant inverse image
 
-There is no known finite ordinary cover for `A ≤ Invariant[X] ∧ X ≤ B`. Keeping the relation scoped
-is necessary: choosing `A = Invariant[str]` and `B ≤ int` cannot have a valid witness. Eager
-projection currently drops both constraints involving `X`, admits the invalid specialization, and
-also loses its negative-polarity counterpart.
+A specialization satisfies `∃X. A ≤ Invariant[X] ∧ X ≤ B` only if there is some `X` compatible with
+both `A` and `B`. `A = Invariant[str]` and `B ≤ int` cannot satisfy the expression, so they must
+satisfy its negation.
 
 ```py
 from typing import Never
@@ -96,33 +90,32 @@ class Invariant[T]:
 
 def inverse_image[X, A, B]() -> None:
     body = ConstraintSet.range(Never, A, Invariant[X]) & ConstraintSet.range(Never, X, B)
-    projected = body.exists(tuple[X])
+    quantified = body.exists(tuple[X])
     invalid = ConstraintSet.range(Invariant[str], A, object) & ConstraintSet.range(Never, B, int)
 
     # revealed: tuple[Solution[A=Never, B=X@inverse_image, X=Never]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
-    # TODO: A scoped residual should retain the relationship between A and B.
+    # TODO: Quantifying X should leave restrictions on A and B.
     # revealed: tuple[()]
-    reveal_type(projected.solutions(inferable=tuple[A, B]))
+    reveal_type(quantified.solutions(inferable=tuple[A, B]))
 
-    # Keeping X until the visible constraints are known correctly rejects the path.
+    # The original expression has no solution for this specialization.
     # revealed: None
     reveal_type((body & invalid).solutions(inferable=tuple[X, A, B]))
-    # TODO: This should be `None`; eager projection incorrectly admits the path.
+    # TODO: The quantified expression should also have no solution for this specialization.
     # revealed: tuple[Solution[A=Invariant[str], B=Never]]
-    reveal_type((projected & invalid).solutions(inferable=tuple[A, B]))
+    reveal_type((quantified & invalid).solutions(inferable=tuple[A, B]))
 
-    # TODO: Both assertions should pass once the positive and negative residuals are preserved.
-    static_assert((projected & invalid) == ConstraintSet.never())  # error: [static-assert-error]
-    static_assert((~projected & invalid) == invalid)  # error: [static-assert-error]
+    # TODO: The positive expression should reject this specialization, and its negation should accept it.
+    static_assert((quantified & invalid) == ConstraintSet.never())  # error: [static-assert-error]
+    static_assert((~quantified & invalid) == invalid)  # error: [static-assert-error]
 ```
 
 ## E3: witness-sensitive image
 
-For `A ≤ X ∧ Invariant[X] ≤ B`, the chosen local witness determines the compatible visible upper
-bound. The constraint layer must preserve that family until inference policy chooses a witness.
-`A ≥ int` and `B ≤ Invariant[str]` demonstrate the same loss under eager projection and under its
-negation.
+For `∃X. A ≤ X ∧ Invariant[X] ≤ B`, each choice of `X` determines which values of `A` and `B` can
+satisfy the expression. `A ≥ int` and `B ≤ Invariant[str]` cannot satisfy it, so they must satisfy
+its negation.
 
 ```py
 from typing import Never
@@ -137,33 +130,32 @@ class Invariant[T]:
 
 def witness_sensitive[X, A, B]() -> None:
     body = ConstraintSet.range(A, X, object) & ConstraintSet.range(Invariant[X], B, object)
-    projected = body.exists(tuple[X])
+    quantified = body.exists(tuple[X])
     invalid = ConstraintSet.range(int, A, object) & ConstraintSet.range(Never, B, Invariant[str])
 
-    # The visible bound for B still refers to the local witness on the complete path.
+    # A solution for B depends on the compatible choice of X.
     # revealed: tuple[Solution[X=A@witness_sensitive, A=X@witness_sensitive, B=Invariant[X@witness_sensitive]]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
-    # TODO: A scoped residual should preserve the witness-sensitive relationship.
+    # TODO: Quantifying X should leave restrictions on A and B.
     # revealed: tuple[()]
-    reveal_type(projected.solutions(inferable=tuple[A, B]))
+    reveal_type(quantified.solutions(inferable=tuple[A, B]))
 
     # revealed: None
     reveal_type((body & invalid).solutions(inferable=tuple[X, A, B]))
-    # TODO: This should be `None`; eager projection incorrectly admits the path.
+    # TODO: The quantified expression should also have no solution for this specialization.
     # revealed: tuple[Solution[A=int, B=Never]]
-    reveal_type((projected & invalid).solutions(inferable=tuple[A, B]))
+    reveal_type((quantified & invalid).solutions(inferable=tuple[A, B]))
 
-    # TODO: Both assertions should pass once the positive and negative residuals are preserved.
-    static_assert((projected & invalid) == ConstraintSet.never())  # error: [static-assert-error]
-    static_assert((~projected & invalid) == invalid)  # error: [static-assert-error]
+    # TODO: The positive expression should reject this specialization, and its negation should accept it.
+    static_assert((quantified & invalid) == ConstraintSet.never())  # error: [static-assert-error]
+    static_assert((~quantified & invalid) == invalid)  # error: [static-assert-error]
 ```
 
 ## E4: correlated visible outputs
 
-Eliminating a common witness must not solve visible variables independently. The two valid families
-are `(Y = int, Z = Invariant[int])` and `(Y = str, Z = Invariant[str])`; the cross-pairing
-`(Y = int, Z = Invariant[str])` is invalid. The disjunctive cover and its negation retain that
-correlation.
+The two valid solution families are `(Y = int, Z = Invariant[int])` and
+`(Y = str, Z = Invariant[str])`. The cross-pairing `(Y = int, Z = Invariant[str])` is invalid, so
+quantifying `X` and negating the result must both retain the correlation between `Y` and `Z`.
 
 ```py
 from ty_extensions import static_assert
@@ -187,29 +179,28 @@ def correlated_outputs[X, Y, Z]() -> None:
         & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
     body = int_family | str_family
-    projected = body.exists(tuple[X])
+    quantified = body.exists(tuple[X])
     expected = (ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
     invalid_cross = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
 
-    static_assert(projected == expected)
-    static_assert(~projected == ~expected)
-    static_assert((projected & invalid_cross) == ConstraintSet.never())
+    static_assert(quantified == expected)
+    static_assert(~quantified == ~expected)
+    static_assert((quantified & invalid_cross) == ConstraintSet.never())
 
     # revealed: tuple[Solution[X=int | Y@correlated_outputs, Y=int, Z=Invariant[int]], Solution[X=str | Y@correlated_outputs, Y=str, Z=Invariant[str]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
-    reveal_type(projected.solutions(inferable=tuple[Y, Z]))
+    reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
     # revealed: None
-    reveal_type((projected & invalid_cross).solutions(inferable=tuple[Y, Z]))
+    reveal_type((quantified & invalid_cross).solutions(inferable=tuple[Y, Z]))
 ```
 
 ## E5: finite domain
 
-A finite constrained domain permits an exact disjunctive cover with branch-local witnesses. The
-domain is included explicitly because the current quantification hooks do not implicitly apply
-declared TypeVar constraints. As in E4, the visible solutions remain paired after `X` is eliminated.
+When `X` is either `int` or `str`, each choice gives a separate valid solution family. After `X` is
+quantified, `Y` and `Z` must remain paired with the same choice; the cross-pairing is invalid.
 
 ```py
 from ty_extensions import static_assert
@@ -228,30 +219,30 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     body = (x_int & ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         x_str & ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
-    projected = (domain & body).exists(tuple[X])
+    quantified = (domain & body).exists(tuple[X])
     expected = (ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])) | (
         ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
     )
     invalid_cross = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
 
-    static_assert(projected == expected)
-    static_assert(~projected == ~expected)
-    static_assert((projected & invalid_cross) == ConstraintSet.never())
+    static_assert(quantified == expected)
+    static_assert(~quantified == ~expected)
+    static_assert((quantified & invalid_cross) == ConstraintSet.never())
 
     # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
     reveal_type((domain & body).solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
-    reveal_type(projected.solutions(inferable=tuple[Y, Z]))
+    reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
     # revealed: None
-    reveal_type((projected & invalid_cross).solutions(inferable=tuple[Y, Z]))
+    reveal_type((quantified & invalid_cross).solutions(inferable=tuple[Y, Z]))
 ```
 
 ## E6: alternation and negative polarity
 
-For each valid target specialization, a matching source witness exists. Reversing the quantifiers
-would require one source specialization to work for every target specialization and is therefore
-false. The explicit counterexample formula checks the negative polarity of the same nested relation,
-and an `int`-only relation confirms that a missing target case is rejected.
+For every valid choice of `T`, there is a matching choice of `S`. Reversing the quantifiers would
+require one choice of `S` to work for every `T` and is therefore false. Negating the relation asks
+whether there is a `T` with no matching `S`; an `int`-only relation shows that a missing `str` case
+is rejected.
 
 ```py
 from ty_extensions import static_assert
