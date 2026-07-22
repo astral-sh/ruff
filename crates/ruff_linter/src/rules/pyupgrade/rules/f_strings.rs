@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
@@ -37,6 +37,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// f"{foo}"
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked unsafe when the conversion may change runtime behavior: when it
+/// drops an argument that has a side effect or can raise, or when a format-time accessor
+/// (`{[k]}`, `{.attr}`) is evaluated alongside a side-effecting argument, since an f-string
+/// interleaves evaluation and formatting while `str.format` evaluates all arguments first.
+///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
@@ -65,6 +71,9 @@ struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
     auto_index: usize,
+    args_used: Vec<u32>,
+    kwargs_used: FxHashMap<&'a str, u32>,
+    field_has_accessors: bool,
 }
 
 impl<'a> FormatSummaryValues<'a> {
@@ -99,10 +108,16 @@ impl<'a> FormatSummaryValues<'a> {
             return None;
         }
 
+        let args_used = vec![0; extracted_args.len()];
+        let kwargs_used = extracted_kwargs.keys().map(|key| (*key, 0)).collect();
+
         Some(Self {
             args: extracted_args,
             kwargs: extracted_kwargs,
             auto_index: 0,
+            args_used,
+            kwargs_used,
+            field_has_accessors: false,
         })
     }
 
@@ -113,14 +128,36 @@ impl<'a> FormatSummaryValues<'a> {
         idx
     }
 
-    /// Return the positional argument at the given index.
-    fn arg_positional(&self, index: usize) -> Option<&Expr> {
-        self.args.get(index).copied()
+    /// Return the positional argument at the given index, recording the reference.
+    fn arg_positional(&mut self, index: usize) -> Option<&'a Expr> {
+        let arg = *self.args.get(index)?;
+        if let Some(count) = self.args_used.get_mut(index) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
     }
 
-    /// Return the keyword argument with the given name.
-    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
-        self.kwargs.get(key).copied()
+    /// Return the keyword argument with the given name, recording the reference.
+    fn arg_keyword(&mut self, key: &str) -> Option<&'a Expr> {
+        let arg = *self.kwargs.get(key)?;
+        if let Some(count) = self.kwargs_used.get_mut(key) {
+            *count = count.saturating_add(1);
+        }
+        Some(arg)
+    }
+
+    /// Iterate over the arguments that no field interpolates.
+    fn unreferenced_args(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+        let positional = self
+            .args
+            .iter()
+            .zip(&self.args_used)
+            .filter_map(|(arg, count)| (*count == 0).then_some(*arg));
+        let keyword = self
+            .kwargs
+            .iter()
+            .filter_map(|(key, value)| (self.kwargs_used.get(key) == Some(&0)).then_some(*value));
+        positional.chain(keyword)
     }
 }
 
@@ -302,6 +339,10 @@ impl FStringConversion {
                     converted.push('{');
 
                     let field = FieldName::parse(&field_name)?;
+
+                    if !field.parts.is_empty() {
+                        summary.field_has_accessors = true;
+                    }
 
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
@@ -531,17 +572,38 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
-        if contents.is_empty() {
+        let is_builtin = |id: &str| checker.semantic().has_builtin_binding(id);
+
+        // `BinOp`/`UnaryOp` on literals are side-effect-free but can still raise, e.g. `1 / 0`.
+        let dropped_side_effect = summary.unreferenced_args().any(|arg| {
+            contains_effect(arg, is_builtin)
+                || any_over_expr(arg, &|expr: &Expr| {
+                    matches!(expr, Expr::BinOp(_) | Expr::UnaryOp(_))
+                })
+        });
+
+        let total_references =
+            summary.args_used.iter().sum::<u32>() + summary.kwargs_used.values().sum::<u32>();
+        let accessor_eval_order = summary.field_has_accessors
+            && total_references > 1
+            && summary
+                .args
+                .iter()
+                .chain(summary.kwargs.values())
+                .any(|arg| contains_effect(arg, is_builtin));
+
+        let edit = if contents.is_empty() {
             // Ex) `''.format(self.project)`
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker.locator().slice(literal).to_string(),
-                call.range(),
-            )));
+            Edit::range_replacement(checker.locator().slice(literal).to_string(), call.range())
         } else {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                contents,
-                call.range(),
-            )));
-        }
+            Edit::range_replacement(contents, call.range())
+        };
+
+        let fix = if dropped_side_effect || accessor_eval_order {
+            Fix::unsafe_edit(edit)
+        } else {
+            Fix::safe_edit(edit)
+        };
+        diagnostic.set_fix(fix);
     }
 }
