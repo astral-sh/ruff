@@ -371,6 +371,7 @@ fn swap_cells() -> anyhow::Result<()> {
 #[test]
 fn auto_import() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .with_auto_import_completion_command()
         .with_workspace(
             SystemPath::new("src"),
             Some(ClientOptions::default().with_auto_import(true)),
@@ -398,6 +399,13 @@ b: Litera
     server.collect_publish_diagnostic_notifications(2);
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
+
+    assert!(
+        completions
+            .iter()
+            .all(|completion| completion.command.is_none()),
+        "auto-import completions for notebook cells should not include commands"
+    );
 
     insta::with_settings!({
         filters => FILTERS.iter().copied(),

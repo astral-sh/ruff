@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::{Documentation, MarkupKind, Position};
+use lsp_types::{Command, Documentation, MarkupKind, Position};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -54,6 +54,44 @@ walktr
     Ok(())
 }
 
+#[test]
+fn auto_import_completion_command() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+walktr
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default())
+        .with_auto_import_completion_command()
+        .with_full_diagnostic_output()
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let foo_uri = server.file_uri(foo);
+    let completions = server.completion_request(&foo_uri, Position::new(0, 6));
+    let command = completions
+        .first()
+        .and_then(|completion| completion.command.as_ref());
+
+    assert_eq!(
+        command,
+        Some(&Command {
+            title: "Organize imports".to_string(),
+            tooltip: None,
+            command: "ty.organizeImportsAfterAutoImport".to_string(),
+            arguments: Some(vec![serde_json::json!(foo_uri.to_string())]),
+        })
+    );
+
+    Ok(())
+}
+
 /// Tests that disabling auto-import works.
 #[test]
 fn disable_auto_import() -> Result<()> {
@@ -91,6 +129,7 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default())
+        .with_auto_import_completion_command()
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?

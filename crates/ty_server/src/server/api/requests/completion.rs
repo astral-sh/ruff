@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
@@ -17,6 +17,8 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
+
+const ORGANIZE_IMPORTS_AFTER_AUTO_IMPORT_COMMAND: &str = "ty.organizeImportsAfterAutoImport";
 
 pub(crate) struct CompletionRequestHandler;
 
@@ -71,6 +73,9 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
         // Safety: we just checked that completions is not empty.
         let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
+        let supports_auto_import_completion_command = client_capabilities
+            .supports_auto_import_completion_command()
+            && !snapshot.document().is_cell_or_notebook();
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
@@ -87,6 +92,15 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
                     })
                 });
+                let command = (import_edit.is_some() && supports_auto_import_completion_command)
+                    .then(|| Command {
+                        title: "Organize imports".to_string(),
+                        tooltip: None,
+                        command: ORGANIZE_IMPORTS_AFTER_AUTO_IMPORT_COMMAND.to_string(),
+                        arguments: Some(vec![serde_json::Value::String(
+                            snapshot.uri().to_string(),
+                        )]),
+                    });
 
                 let label = comp.label().to_string();
                 let import_suffix = comp
@@ -138,6 +152,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text,
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    command,
                     documentation,
                     ..Default::default()
                 }

@@ -51,6 +51,7 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .with_full_diagnostic_output()
+        .with_auto_import_completion_command()
         .enable_pull_diagnostics(false)
         .build()
         .wait_until_workspaces_are_initialized();
