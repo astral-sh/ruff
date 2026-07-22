@@ -684,7 +684,7 @@ fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
     let mixed_code = code.replace("LargeEnum | None", "LargeEnum | int");
     benchmark_enum_comparison(
         criterion,
-        "ty_micro[mixed_str_enum_comparison]",
+        "ty_micro[mixed_union_str_enum_comparison]",
         &mixed_code,
     );
 
