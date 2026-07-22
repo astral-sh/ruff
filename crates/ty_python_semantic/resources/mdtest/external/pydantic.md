@@ -1060,6 +1060,10 @@ Settings(port=8000)
 Settings(host="localhost", port=8000)
 Settings(host=None)  # error: [invalid-argument-type]
 
+# `BaseSettings` accepts underscore-prefixed parameters that override settings configuration.
+Settings(_secrets_dir="./secrets")
+Settings(_secrets_dir=1)  # error: [invalid-argument-type]
+
 # `BaseSettings` defines a specialized constructor and forbids extra values by default.
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
 ```

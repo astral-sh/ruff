@@ -1400,6 +1400,10 @@ impl<'db> StaticClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
+            if name == "__init__" && field_policy.is_pydantic() {
+                parameters.extend(pydantic::settings_constructor_parameters(db, self));
+            }
+
             for (field_name, field) in self.fields(db, specialization, field_policy) {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
