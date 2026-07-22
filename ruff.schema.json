@@ -155,6 +155,20 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extend-type-form-callables": {
+      "description": "A mapping of callable names to the argument names or positions that should be treated as\ntype forms.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/CallArgument"
+        }
+      },
+      "deprecated": true
+    },
     "extend-unfixable": {
       "description": "A list of rule codes or prefixes to consider non-auto-fixable, in addition to those\nspecified by [`unfixable`](#lint_unfixable).",
       "type": [
@@ -862,6 +876,25 @@
       "type": "array",
       "items": {
         "type": "string"
+      }
+    },
+    "CallArgument": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        }
       }
     },
     "ConstantType": {
@@ -2206,6 +2239,19 @@
           ],
           "items": {
             "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "extend-type-form-callables": {
+          "description": "A mapping of callable names to the argument names or positions that should be treated as\ntype forms.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/CallArgument"
+            }
           }
         },
         "extend-unfixable": {

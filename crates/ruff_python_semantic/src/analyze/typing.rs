@@ -20,17 +20,6 @@ use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType}
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind, Modules};
 
-#[derive(Debug, Copy, Clone)]
-pub enum Callable {
-    Bool,
-    Cast,
-    NewType,
-    TypeVar,
-    NamedTuple,
-    TypedDict,
-    MypyExtension,
-    TypeAliasType,
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum SubscriptKind {

@@ -29,9 +29,9 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
-    FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
-    RequiredVersion, UnsafeFixes,
+    CallArgument, CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping,
+    FilePattern, FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion,
+    PreviewMode, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, PREVIEW_DEFAULT_SELECTORS, TASK_TAGS,
@@ -404,6 +404,7 @@ impl Configuration {
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
+                extend_type_form_callables: lint.extend_type_form_callables.unwrap_or_default(),
                 // Plugins
                 flake8_annotations: lint
                     .flake8_annotations
@@ -744,6 +745,7 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
+    pub extend_type_form_callables: Option<FxHashMap<String, Vec<CallArgument>>>,
     pub typing_extensions: Option<bool>,
     pub future_annotations: Option<bool>,
 
@@ -861,6 +863,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
+            extend_type_form_callables: options.common.extend_type_form_callables,
             typing_extensions: options.typing_extensions,
             future_annotations: options.future_annotations,
 
@@ -1270,6 +1273,9 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
+            extend_type_form_callables: self
+                .extend_type_form_callables
+                .or(config.extend_type_form_callables),
 
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
@@ -1504,6 +1510,7 @@ fn warn_about_deprecated_top_level_lint_options(
         explicit_preview_rules,
         task_tags,
         typing_modules,
+        extend_type_form_callables,
         unfixable,
         flake8_annotations,
         flake8_bandit,
@@ -1601,6 +1608,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if typing_modules.is_some() {
         used_options.push("typing-modules");
+    }
+
+    if extend_type_form_callables.is_some() {
+        used_options.push("extend-type-form-callables");
     }
 
     if unfixable.is_some() {

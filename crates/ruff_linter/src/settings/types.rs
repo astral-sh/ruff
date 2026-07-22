@@ -1011,6 +1011,13 @@ impl Display for CompiledPerFileTargetVersionList {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct CallArgument {
+    pub position: Option<usize>,
+    pub name: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::IdentifierPattern;

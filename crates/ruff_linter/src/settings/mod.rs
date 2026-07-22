@@ -3,7 +3,7 @@
 //! to external visibility or parsing.
 
 use regex::Regex;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -22,7 +22,9 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
+use crate::settings::types::{
+    CallArgument, CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet,
+};
 use crate::{RuleSelector, codes, fs};
 
 use super::line_width::IndentWidth;
@@ -251,6 +253,7 @@ pub struct LinterSettings {
     pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
+    pub extend_type_form_callables: FxHashMap<String, Vec<CallArgument>>,
     pub typing_extensions: bool,
     pub future_annotations: bool,
 
@@ -316,6 +319,7 @@ impl Display for LinterSettings {
                 self.line_length,
                 self.task_tags | array,
                 self.typing_modules | array,
+                self.extend_type_form_callables | debug,
                 self.typing_extensions,
             ]
         }
@@ -835,6 +839,7 @@ impl LinterSettings {
 
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
+            extend_type_form_callables: FxHashMap::default(),
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_boolean_trap: flake8_boolean_trap::settings::Settings::default(),
