@@ -1,16 +1,22 @@
+use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place_table, use_def_map,
+};
 
 use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
+use crate::reachability::DeclarationsIteratorExtension;
 use crate::types::call::Bindings;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
 use crate::types::ide_support::{ImportAliasResolution, definitions_for_name};
+use crate::types::infer::function_known_decorators;
 use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
@@ -759,15 +765,116 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    field_name: &Name,
     field_type: Type<'db>,
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
+    if has_before_field_validator(db, class, field_name.clone()) {
+        return Type::any();
+    }
+
     if field_strict.or(metadata.config(db).strict).is_enabled() {
         return field_type;
     }
 
     lax_input_type(db, field_type)
+}
+
+/// Return whether `field_name` has a Pydantic field validator that runs before normal validation.
+///
+/// A before validator receives the raw input and can transform arbitrary values before Pydantic
+/// validates them against the declared field type. We therefore cannot derive a useful input type
+/// from the field annotation alone.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(in crate::types) fn has_before_field_validator<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    field_name: Name,
+) -> bool {
+    let field_name = CharStr::from(field_name);
+
+    // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
+    let mut shadowed_symbols = FxHashSet::default();
+
+    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
+        if base.is_known(db, KnownClass::PydanticBaseModel) {
+            break;
+        }
+        let Some((base, _)) = base.static_class_literal(db) else {
+            continue;
+        };
+        let body_scope = base.body_scope(db);
+        let use_def = use_def_map(db, body_scope);
+        let table = place_table(db, body_scope);
+
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let name = table.symbol(symbol_id).name().clone();
+            if !shadowed_symbols.insert(name) {
+                continue;
+            }
+            if declarations.any_reachable(db, |declaration| {
+                declaration.is_defined_and(|definition| {
+                    function_has_before_field_validator(db, definition, field_name.as_str())
+                })
+            }) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn function_has_before_field_validator<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    field_name: &str,
+) -> bool {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return false;
+    };
+    let module = parsed_module(db, definition.file(db)).load(db);
+    let function_node = function.node(&module);
+    if function_node.decorator_list.is_empty() {
+        return false;
+    }
+    let decorators = function_known_decorators(db, definition);
+
+    function_node.decorator_list.iter().any(|decorator| {
+        let Some(call) = decorator.expression.as_call_expr() else {
+            return false;
+        };
+        let Some(Type::FunctionLiteral(function)) = decorators.expression_type(call.func.as_ref())
+        else {
+            return false;
+        };
+        if !function.is_known(db, KnownFunction::PydanticFieldValidator) {
+            return false;
+        }
+
+        let Some(mode) = call.arguments.find_keyword("mode") else {
+            return false;
+        };
+        if decorators
+            .expression_type(&mode.value)
+            .and_then(Type::as_string_literal)
+            .is_none_or(|mode| mode.value(db) != "before")
+        {
+            return false;
+        }
+
+        call.arguments.args.iter().any(|field| {
+            decorators
+                .expression_type(field)
+                .and_then(Type::as_string_literal)
+                .is_some_and(|field| {
+                    let field = field.value(db);
+                    field == "*" || field == field_name
+                })
+        })
+    })
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.
@@ -959,7 +1066,8 @@ fn root_model_input_type<'db>(
 /// Return the input type accepted for an ordinary Pydantic model field.
 ///
 /// By default, Pydantic accepts either an instance of the model or a mapping of string keys to
-/// input values. Custom validators can accept additional input types, which are not modeled here.
+/// input values. Other custom validators can accept additional input types, which are not modeled
+/// here.
 fn model_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Option<Type<'db>> {
     let (class, _) = field_type.nominal_class(db)?.static_class_literal(db)?;
     if !is_model(db, class) || is_root_model(db, class) {

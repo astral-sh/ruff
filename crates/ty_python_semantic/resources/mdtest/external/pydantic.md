@@ -497,6 +497,84 @@ Parent(child={"value": 1}, children=[Stranger(value=2)])  # error: [invalid-argu
 Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
 ```
 
+A "before" field validator can accept input of a different type, so for now, we widen the input
+types of affected fields to `Any`:
+
+```py
+from pydantic import field_validator
+
+class BeforeValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="before")
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: BeforeValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(BeforeValidatedParent.__init__)
+
+BeforeValidatedParent(child=1, untouched_child={"value": "2"})
+BeforeValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
+```
+
+"before" field validators are inherited:
+
+```py
+class BeforeValidatorBase(BaseModel):
+    @field_validator("child", mode="before", check_fields=False)
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+class InheritedBeforeValidatedParent(BeforeValidatorBase):
+    child: Child
+
+# revealed: (self: InheritedBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(InheritedBeforeValidatedParent.__init__)
+```
+
+A wildcard "before" validator applies to every field:
+
+```py
+class WildcardBeforeValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def coerce_fields(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: WildcardBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(WildcardBeforeValidatedParent.__init__)
+
+WildcardBeforeValidatedParent(child=1)
+```
+
+An "after" field validator does not change the raw input accepted by the field:
+
+```py
+class AfterValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("child", mode="after")
+    @classmethod
+    def validate_child(cls, value: Child) -> Child:
+        return value
+
+# revealed: (self: AfterValidatedParent, *, child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(AfterValidatedParent.__init__)
+
+AfterValidatedParent(child=1)  # error: [invalid-argument-type]
+```
+
 For fields that refer to generic models, we widen to a gradual specialization, since Pydantic
 revalidates same-origin generic model instances against the target specialization:
 

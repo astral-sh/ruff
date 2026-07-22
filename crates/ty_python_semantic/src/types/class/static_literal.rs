@@ -1507,7 +1507,9 @@ impl<'db> StaticClassLiteral<'db> {
                 if name == "__init__"
                     && let Some(metadata) = field_policy.pydantic_metadata()
                 {
-                    field_ty = pydantic::constructor_parameter_type(db, field_ty, strict, metadata);
+                    field_ty = pydantic::constructor_parameter_type(
+                        db, self, field_name, field_ty, strict, metadata,
+                    );
                 }
 
                 if pydantic_constructor_fields_are_optional && default_ty.is_none() {
