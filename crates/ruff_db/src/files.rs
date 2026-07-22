@@ -108,6 +108,13 @@ impl Files {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with the appropriate [`FileStatus`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
+        // All cache keys are normalized, absolute paths. However, an absolute path does not need
+        // to be fully normalized for this lookup: Camino's equality and hashing ignore redundant
+        // separators and `.` components, so `/foo/bar.py`, `/foo//bar.py`, and `/foo/./bar.py`
+        // all match the same cached `File`. A `..` component is not ignored, so a path such as
+        // `/foo/baz/../bar.py` misses the cache and falls through to full normalization. Since
+        // this fast path only returns an existing entry and never inserts one, it cannot create
+        // separate `File` identities for different spellings of the same path.
         if path.is_absolute()
             && let Some(file) = self.inner.system_by_path.get(path)
         {
@@ -159,6 +166,7 @@ impl Files {
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
     pub fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
+        // As in `system`, path equality normalizes redundant separators and `.`, but not `..`.
         if path.is_absolute()
             && let Some(file) = self.inner.system_by_path.get(path)
         {
@@ -718,7 +726,7 @@ mod tests {
 
     use crate::Db as _;
     use crate::file_revision::FileRevision;
-    use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
+    use crate::files::{File, FileError, system_path_to_file, vendored_path_to_file};
     use crate::source::source_text;
     use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
@@ -751,23 +759,24 @@ mod tests {
 
     #[test]
     fn system_normalize_paths() {
+        #[track_caller]
+        fn assert_normalized_path(db: &TestDb, path: &str, canonical: File) {
+            assert_eq!(system_path_to_file(db, path), Ok(canonical));
+            assert_eq!(
+                db.files().try_system(db, SystemPath::new(path)),
+                Some(canonical)
+            );
+        }
+
         let mut db = TestDb::new();
         db.write_file("/foo/bar.py", "x = 1").unwrap();
         db.write_file("/foo/baz/bar.py", "x = 2").unwrap();
 
         let canonical = system_path_to_file(&db, "/foo/bar.py").unwrap();
-        for path in [
-            "foo/bar.py",
-            "/foo//bar.py",
-            "/foo/./bar.py",
-            "/foo/baz/../bar.py",
-        ] {
-            assert_eq!(system_path_to_file(&db, path), Ok(canonical));
-            assert_eq!(
-                db.files().try_system(&db, SystemPath::new(path)),
-                Some(canonical)
-            );
-        }
+        assert_normalized_path(&db, "foo/bar.py", canonical);
+        assert_normalized_path(&db, "/foo//bar.py", canonical);
+        assert_normalized_path(&db, "/foo/./bar.py", canonical);
+        assert_normalized_path(&db, "/foo/baz/../bar.py", canonical);
 
         let distinct = system_path_to_file(&db, "/foo/baz/bar.py").unwrap();
         assert_ne!(canonical, distinct);
