@@ -469,6 +469,174 @@ Nested(value=[{"a": 1}, {"b": "2", "c": 3.0}])
 Nested(value=[{"a": 1}, {"b": None}])  # error: [invalid-argument-type]
 ```
 
+In lax mode, fields that refer to an ordinary Pydantic model accept either an instance of that model
+or a mapping:
+
+```py
+class Child(BaseModel):
+    value: int
+
+class Stranger(BaseModel):
+    value: int
+
+class Parent(BaseModel):
+    child: Child
+    children: list[Child]
+
+# revealed: (self: Parent, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
+reveal_type(Parent.__init__)
+
+child_input = {"value": "1"}
+
+Parent(child=Child(value=1), children=[Child(value=2), Child(value=3)])
+Parent(child={"value": "1"}, children=[{"value": "2"}, {"value": "3"}])
+
+Parent(child=Stranger(value=1), children=[])  # error: [invalid-argument-type]
+Parent(child=1, children=[])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[Stranger(value=2)])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
+```
+
+"before" and "plain" field validators can accept input of a different type, so for now, we widen the
+input types of affected fields to `Any`:
+
+```py
+from pydantic import field_validator
+
+class BeforeValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="before")
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: BeforeValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(BeforeValidatedParent.__init__)
+
+BeforeValidatedParent(child=1, untouched_child={"value": "2"})
+BeforeValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
+```
+
+"before" field validators are inherited:
+
+```py
+class BeforeValidatorBase(BaseModel):
+    @field_validator("child", mode="before", check_fields=False)
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+class InheritedBeforeValidatedParent(BeforeValidatorBase):
+    child: Child
+
+# revealed: (self: InheritedBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(InheritedBeforeValidatedParent.__init__)
+```
+
+A wildcard "before" validator applies to every field:
+
+```py
+class WildcardBeforeValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def coerce_fields(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: WildcardBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(WildcardBeforeValidatedParent.__init__)
+
+WildcardBeforeValidatedParent(child=1)
+```
+
+A "plain" field validator also bypasses Pydantic's validation against the field's declared type:
+
+```py
+class PlainValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="plain")
+    @classmethod
+    def accept_child(cls, value: object) -> object:
+        return value
+
+# revealed: (self: PlainValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(PlainValidatedParent.__init__)
+
+PlainValidatedParent(child=1, untouched_child={"value": "2"})
+PlainValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
+```
+
+An "after" field validator does not change the raw input accepted by the field:
+
+```py
+class AfterValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("child", mode="after")
+    @classmethod
+    def validate_child(cls, value: Child) -> Child:
+        return value
+
+# revealed: (self: AfterValidatedParent, *, child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(AfterValidatedParent.__init__)
+
+AfterValidatedParent(child=1)  # error: [invalid-argument-type]
+```
+
+For fields that refer to generic models, we widen to a gradual specialization, since Pydantic
+revalidates same-origin generic model instances against the target specialization:
+
+```py
+class Box[T](BaseModel):
+    value: T
+
+class HasBox(BaseModel):
+    box: Box[int]
+
+# revealed: (self: HasBox, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
+reveal_type(HasBox.__init__)
+
+HasBox(box=Box(value=1))
+HasBox(box=Box(value="1"))
+HasBox(box=1)  # error: [invalid-argument-type]
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasBox(box=Box(value=None))
+```
+
+Models configured to validate from attributes can accept arbitrary objects, so their field
+parameters remain `Any`:
+
+```py
+class AttributeChild(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    value: int
+
+class AttributeParent(BaseModel):
+    child: AttributeChild
+
+class AttributeSource:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+# revealed: (self: AttributeParent, *, child: Any, **extra: Any) -> None
+reveal_type(AttributeParent.__init__)
+
+AttributeParent(child=AttributeSource(1))
+```
+
 For enums, we currently fall back to a very permissive `Any`, because Pydantic allows certain
 conversions that are not further specified in the documentation.
 
@@ -1141,6 +1309,21 @@ Model(int_list=[1, 2, 3])
 Model(int_list=["1", "2", "3"])
 
 Model(int_list=1)  # error: [invalid-argument-type]
+```
+
+Generic root models can accept root models with a different specialization:
+
+```py
+class GenericRoot[T](RootModel[T]): ...
+
+class HasGenericRoot(BaseModel):
+    root: GenericRoot[int]
+
+HasGenericRoot(root=GenericRoot(1))
+HasGenericRoot(root=GenericRoot("1"))
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasGenericRoot(root=GenericRoot(None))
 ```
 
 ## Model configuration

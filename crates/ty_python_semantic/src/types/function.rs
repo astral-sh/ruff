@@ -2095,6 +2095,9 @@ pub enum KnownFunction {
     /// `pydantic.fields.Field`
     #[strum(serialize = "Field")]
     PydanticField,
+    /// `pydantic.functional_validators.field_validator`
+    #[strum(serialize = "field_validator")]
+    PydanticFieldValidator,
 
     /// `functools.total_ordering`
     TotalOrdering,
@@ -2215,6 +2218,9 @@ impl KnownFunction {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
+            Self::PydanticFieldValidator => {
+                matches!(module, KnownModule::PydanticFunctionalValidators)
+            }
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::StaticAssert => module.is_ty_extensions(),
@@ -2757,6 +2763,7 @@ pub(crate) mod tests {
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
+                KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
