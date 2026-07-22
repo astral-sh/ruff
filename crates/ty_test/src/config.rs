@@ -150,7 +150,7 @@ pub(crate) struct Environment {
 pub(crate) struct Analysis {
     /// Whether equality-based checks should preserve possible subclass behavior.
     #[serde(alias = "strict-literal-narrowing")]
-    pub(crate) strict_equality_narrowing: Option<bool>,
+    pub(crate) strict_equality_semantics: Option<bool>,
 
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,

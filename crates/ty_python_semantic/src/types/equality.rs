@@ -371,7 +371,7 @@ impl ComparisonSoundnessPolicy {
 
     pub(crate) fn from_analysis_settings(settings: &AnalysisSettings) -> Self {
         Self {
-            allow_unsafe_equality: !settings.strict_equality_narrowing,
+            allow_unsafe_equality: !settings.strict_equality_semantics,
         }
     }
 }

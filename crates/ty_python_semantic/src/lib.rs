@@ -92,7 +92,7 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
     /// Whether equality-based checks account for subclasses with different equality behavior.
-    pub strict_equality_narrowing: bool,
+    pub strict_equality_semantics: bool,
 
     /// Whether errors can be suppressed with `type: ignore` comments.
     ///
@@ -111,7 +111,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
-            strict_equality_narrowing: false,
+            strict_equality_semantics: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),

@@ -228,7 +228,7 @@ also preserved because their subclasses can override equality:
 python-version = "3.12"
 
 [analysis]
-strict-equality-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py

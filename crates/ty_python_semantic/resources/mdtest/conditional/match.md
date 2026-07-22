@@ -594,7 +594,7 @@ when narrowing the subject for later cases:
 
 ```toml
 [analysis]
-strict-equality-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py

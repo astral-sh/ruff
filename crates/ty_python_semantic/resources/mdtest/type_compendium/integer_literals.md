@@ -71,7 +71,7 @@ And this can be used for type-narrowing using equality comparisons:
 def f(x: int):
     if x == 54165:
         # By default, ty assumes that a broad `int` uses builtin equality.
-        # Enabling `strict-equality-narrowing` disables this narrowing.
+        # Enabling `strict-equality-semantics` disables this narrowing.
         reveal_type(x)  # revealed: Literal[54165]
 
     if x != 54165:

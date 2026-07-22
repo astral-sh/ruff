@@ -99,7 +99,7 @@
             "null"
           ]
         },
-        "strict-equality-narrowing": {
+        "strict-equality-semantics": {
           "description": "Whether equality-based checks should account for subclasses with different equality\nbehavior.\n\nBy default, ty assumes that subclasses of a non-final class do not override `__eq__` or\n`__ne__`. This allows equality, inequality, and equality-driven membership or match checks\nto remove otherwise incompatible union members. This behavior is shared by type narrowing,\nequality-result inference, and reachability:\n\n```python\nfrom typing import reveal_type\n\nclass Foo: ...\n\nclass AlwaysEqual(Foo):\n    def __eq__(self, other: object) -> bool:\n        return True\n\ndef narrow(value: Foo | None, other: Foo) -> None:\n    reveal_type(None == other)  # Literal[False] (but can still be True!)\n    if value == other:\n        reveal_type(value)  # Foo (but can still be None!)\n\nnarrow(None, AlwaysEqual())\n```\n\nty also narrows broad builtin types to literal types. Broad builtin types include\nsubclasses, while literal types distinguish values by both their runtime type and value.\nThis makes the narrowing unsound even for subclasses that inherit builtin equality:\n\n```python\nfrom typing import Literal\n\ndef parse(value: str) -> Literal[\"a\"] | None:\n    if value == \"a\":\n        return value\n    return None\n\nclass StringSubclass(str): ...\nresult = parse(StringSubclass(\"a\"))\n# Statically `Literal[\"a\"] | None`, but `result` has runtime type `StringSubclass`.\n```\n\nEnable this option to preserve all possible union members and broad builtin types instead.\n\nDefaults to `false`.",
           "type": [
             "boolean",

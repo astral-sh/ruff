@@ -1750,13 +1750,13 @@ def _(x: A | B):
 
 ## Enabling strict equality narrowing
 
-The `strict-equality-narrowing` option can be enabled to preserve broad builtin types and union
+The `strict-equality-semantics` option can be enabled to preserve broad builtin types and union
 members that a subclass could compare equal to. Narrowing types that are already literal unions
 remains safe and is unaffected. This also applies to tuples, whose subclasses can override equality.
 
 ```toml
 [analysis]
-strict-equality-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py
@@ -1806,7 +1806,7 @@ def tuple_union(value: Foo | None, other: tuple[int, ...]):
 
 ## The strict literal narrowing alias
 
-The `strict-literal-narrowing` option remains an alias for `strict-equality-narrowing`.
+The `strict-literal-narrowing` option remains an alias for `strict-equality-semantics`.
 
 ```toml
 [analysis]

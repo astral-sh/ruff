@@ -1522,11 +1522,11 @@ pub struct AnalysisOptions {
         value_type = "bool",
         example = r#"
         # Preserve values that could compare equal through a subclass
-        strict-equality-narrowing = true
+        strict-equality-semantics = true
         "#
     )]
     #[serde(alias = "strict-literal-narrowing")]
-    pub strict_equality_narrowing: Option<bool>,
+    pub strict_equality_semantics: Option<bool>,
 
     /// Whether ty should respect `type: ignore` comments.
     ///
@@ -1604,14 +1604,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
-            strict_equality_narrowing,
+            strict_equality_semantics,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
-            strict_equality_narrowing: strict_equality_narrowing_default,
+            strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1640,8 +1640,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
-            strict_equality_narrowing: strict_equality_narrowing
-                .unwrap_or(strict_equality_narrowing_default),
+            strict_equality_semantics: strict_equality_semantics
+                .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

@@ -160,7 +160,7 @@ Defaults to `true`.
 
 ---
 
-### `strict-equality-narrowing`
+### `strict-equality-semantics`
 
 Whether equality-based checks should account for subclasses with different equality
 behavior.
@@ -219,7 +219,7 @@ Defaults to `false`.
     ```toml
     [tool.ty.analysis]
     # Preserve values that could compare equal through a subclass
-    strict-equality-narrowing = true
+    strict-equality-semantics = true
     ```
 
 === "ty.toml"
@@ -227,7 +227,7 @@ Defaults to `false`.
     ```toml
     [analysis]
     # Preserve values that could compare equal through a subclass
-    strict-equality-narrowing = true
+    strict-equality-semantics = true
     ```
 
 ---
@@ -726,7 +726,7 @@ Defaults to `true`.
 
 ---
 
-#### `strict-equality-narrowing`
+#### `strict-equality-semantics`
 
 Whether equality-based checks should account for subclasses with different equality
 behavior.
@@ -785,7 +785,7 @@ Defaults to `false`.
     ```toml
     [tool.ty.overrides.analysis]
     # Preserve values that could compare equal through a subclass
-    strict-equality-narrowing = true
+    strict-equality-semantics = true
     ```
 
 === "ty.toml"
@@ -793,7 +793,7 @@ Defaults to `false`.
     ```toml
     [overrides.analysis]
     # Preserve values that could compare equal through a subclass
-    strict-equality-narrowing = true
+    strict-equality-semantics = true
     ```
 
 ---
