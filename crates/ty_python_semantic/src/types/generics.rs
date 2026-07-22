@@ -34,8 +34,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
-    UnionType, binding_type, infer_definition_types, inferred_declaration,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2664,7 +2664,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
-            ordered_types: &mut FxOrderSet<Option<Type<'db>>>,
+            ordered_types: &mut FxOrderSet<Type<'db>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
@@ -2674,7 +2674,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let result = match ty {
                 Type::TypedDict(_) => {
                     typed_dicts.insert(ty);
-                    ordered_types.insert(None);
+                    ordered_types.insert(ty);
                     true
                 }
                 Type::Union(union) => {
@@ -2703,11 +2703,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
                     // constraint-equivalence check below remains authoritative.
                     typed_dicts.insert(ty);
-                    ordered_types.insert(None);
+                    ordered_types.insert(ty);
                     true
                 }
                 _ => {
-                    ordered_types.insert(Some(ty));
+                    ordered_types.insert(ty);
                     true
                 }
             };
@@ -2718,7 +2718,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
-        // `None` keeps the shared TypedDict constraints at their first source position.
         let mut ordered_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
@@ -2736,30 +2735,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        // Equivalent constraints can still differ in whether their bounds retain gradual evidence.
-        // For `class TD(TypedDict): value: Any`, a `dict[str, Any] | TD` argument passed to a
-        // generic `__getitem__(Literal["value"]) -> T` protocol must infer `T = Any`; replacing
-        // `TD` with `Mapping[str, object]` would instead infer `T = object`.
-        let has_gradual_values = |typed_dict: TypedDictType<'db>| {
-            typed_dict
-                .items(self.db)
-                .values()
-                .any(|field| field.declared_ty.has_dynamic(self.db))
-                || typed_dict
-                    .explicit_extra_items(self.db)
-                    .is_some_and(|extra_items| extra_items.declared_ty.has_dynamic(self.db))
-        };
-        if typed_dicts.iter().any(|element| match element {
-            Type::TypedDict(typed_dict) => has_gradual_values(*typed_dict),
-            Type::Intersection(intersection) => intersection
-                .iter_positive(self.db)
-                .filter_map(|element| element.resolve_type_alias(self.db).as_typed_dict())
-                .any(has_gradual_values),
-            _ => false,
-        }) {
-            return None;
-        }
-
         // Use the read-only `Mapping[str, object]` as the fallback rather than `dict[str, object]`.
         // The current constraint solver can consider mutable protocol constraints equivalent even
         // when a `TypedDict` preserves more precise correlations between its keys and values.
@@ -2767,30 +2742,68 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
         let mapping_when = self.constraints.load(self.db, &mapping_when);
-        if !typed_dicts.into_iter().all(|element| {
+        let mapping_solutions = mapping_when.solutions(self.db, self.constraints, self.inferable);
+        let mut preserved_typed_dict_constraints = FxHashMap::default();
+        let mut gradual_typed_dicts = FxHashSet::default();
+        for element in typed_dicts.iter().copied() {
             let element_when = self.constraints.load(
                 self.db,
                 &element.when_constraint_set_assignable_to_owned(self.db, formal),
             );
-            element_when
+            let equivalent = element_when
                 .iff(self.db, self.constraints, mapping_when)
-                .is_always_satisfied(self.db)
-        }) {
-            return None;
+                .is_always_satisfied(self.db);
+            // Equivalent constraints can differ in their inferred solutions. For
+            // `class TD(TypedDict): value: Any`, replacing `TD` with `Mapping[str, object]` in a
+            // generic `__getitem__(Literal["value"]) -> T` protocol changes `T` from `Any` to
+            // `object`, while an unrelated `Any` field does not affect the protocol constraints.
+            let element_solutions =
+                element_when.solutions(self.db, self.constraints, self.inferable);
+            if !equivalent || element_solutions != mapping_solutions {
+                if let Solutions::Constrained(solutions) = &element_solutions
+                    && solutions.iter().flatten().any(|solution| {
+                        solution.solution.bottom_materialization(self.db)
+                            != solution.solution.top_materialization(self.db)
+                    })
+                {
+                    gradual_typed_dicts.insert(element);
+                }
+                preserved_typed_dict_constraints.insert(element, element_when);
+            }
         }
 
-        Some(
+        let mut included_mapping = false;
+        // Concrete bounds must precede gradual evidence so either source spelling retains `Any`.
+        let mut gradual_constraints = Vec::new();
+        let constraints =
             ordered_types
                 .into_iter()
                 .when_all(self.db, self.constraints, |element| {
-                    element.map_or(mapping_when, |element| {
+                    if let Some(constraints) = preserved_typed_dict_constraints.get(&element) {
+                        if gradual_typed_dicts.contains(&element) {
+                            gradual_constraints.push(*constraints);
+                            ConstraintSet::from_bool(self.constraints, true)
+                        } else {
+                            *constraints
+                        }
+                    } else if typed_dicts.contains(&element) {
+                        if std::mem::replace(&mut included_mapping, true) {
+                            ConstraintSet::from_bool(self.constraints, true)
+                        } else {
+                            mapping_when
+                        }
+                    } else {
                         self.constraints.load(
                             self.db,
                             &element.when_constraint_set_assignable_to_owned(self.db, formal),
                         )
-                    })
-                }),
-        )
+                    }
+                });
+        Some(constraints.and(self.db, self.constraints, || {
+            gradual_constraints
+                .into_iter()
+                .when_all(self.db, self.constraints, |constraints| constraints)
+        }))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
