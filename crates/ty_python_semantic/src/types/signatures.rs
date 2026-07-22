@@ -25,8 +25,7 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, TypeVarInference,
-    walk_generic_context,
+    ApplySpecialization, GenericContext, Specialization, TypeVarInference, walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
@@ -34,7 +33,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::typevar::{TypeVarSet, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -1499,10 +1498,10 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
     }
 
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
-            None => InferableTypeVars::None,
+            None => TypeVarSet::None,
         }
     }
 

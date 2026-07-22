@@ -5,7 +5,7 @@
 - [x] PR 0's C0/E1–E6 behavior basis already exists on the parent stack.
 - [x] PR 1B's visitor-driven `PathAssignments` implementation is already merged into `main`.
 - [x] Phase 1 — Introduce single-variant `Atom` as a standalone, pure-refactoring PR.
-- [x] Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances.
+- [x] Phase 2 — Refactor `TypeVarSet` to retain identity-keyed bound instances.
 - [ ] Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end.
 
 This document is the ground truth for phase ordering and dependencies. Phases should normally be completed in the order listed. An agent resuming this plan must read the relevant repository files and verify that the status markers accurately reflect the implementation before continuing.
@@ -23,17 +23,17 @@ struct ConstraintSet {
 }
 
 struct Existential<'db> {
-    locals: InferableTypeVars<'db>,
+    locals: TypeVarSet<'db>,
     domain: NodeId,
     body: NodeId,
 }
 ```
 
-For this implementation, omit **only** the companion domain on `ConstraintSet`. PR 1A is not a prerequisite, and `ConstraintSet` retains its existing single root. A quantified relation does need its own domain because latent restrictions, such as receiver-binding constraints, belong to the quantifier's domain rather than its body. Its binder is the existing compact, Salsa-interned `InferableTypeVars` representation:
+For this implementation, omit **only** the companion domain on `ConstraintSet`. PR 1A is not a prerequisite, and `ConstraintSet` retains its existing single root. A quantified relation does need its own domain because latent restrictions, such as receiver-binding constraints, belong to the quantifier's domain rather than its body. Its binder is the existing compact, Salsa-interned `TypeVarSet` representation:
 
 ```rust
 struct Existential<'db> {
-    locals: InferableTypeVars<'db>,
+    locals: TypeVarSet<'db>,
     domain: NodeId,
     body: NodeId,
 }
@@ -49,7 +49,7 @@ positive relation:  ∃X. Domain(X, Additional) ∧ Body(X, Y)
 negative relation:  ¬∃X. Domain(X, Additional) ∧ Body(X, Y)
 ```
 
-`X` is exactly the explicitly supplied `InferableTypeVars` set. If `x`'s declared bound mentions an outer variable `y`, the generated domain can contain the relationship `x ≤ y`, but **must not** recursively include `valid_specializations(y)` unless `y` was explicitly included in `X`. Outer/free variables mentioned by declared bounds or `additional_domain` remain free and belong to the enclosing scope.
+`X` is exactly the explicitly supplied `TypeVarSet`. If `x`'s declared bound mentions an outer variable `y`, the generated domain can contain the relationship `x ≤ y`, but **must not** recursively include `valid_specializations(y)` unless `y` was explicitly included in `X`. Outer/free variables mentioned by declared bounds or `additional_domain` remain free and belong to the enclosing scope.
 
 Latent constraints, such as receiver-binding constraints, are supplied as `additional_domain`. Keeping them in the stored quantifier domain is essential for universal quantification: a receiver restriction must be part of the implication's antecedent, not accidentally moved into its consequent. No domain is added to `ConstraintSet`.
 
@@ -72,24 +72,24 @@ PR 2A provides representation, persistence, and an explicit test-only eager-lowe
 
 ### The domain-construction obstacle
 
-`InferableTypeVars` in `crates/ty_python_semantic/src/types/generics.rs` currently contains only `BoundTypeVarIdentity`s. An identity deliberately excludes the declared bound/constraints, so it cannot provide the instance needed by the existing:
+Before Phase 2, the type-variable set in `crates/ty_python_semantic/src/types/generics.rs` contained only `BoundTypeVarIdentity`s. An identity deliberately excludes the declared bound/constraints, so it cannot provide the instance needed by the existing:
 
 ```rust
 BoundTypeVarInstance::valid_specializations(db, builder) -> NodeId
 ```
 
-Change the existing Salsa-interned set representation to retain bound instances while still using their identity for membership and deduplication:
+Phase 2 moves the renamed `TypeVarSet` definition into `crates/ty_python_semantic/src/types/typevar.rs` and changes the existing Salsa-interned set representation to retain bound instances while still using their identity for membership and deduplication:
 
 ```rust
 #[salsa::interned]
-struct InferableTypeVarsInner<'db> {
-    inferable: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+struct TypeVarSetInner<'db> {
+    typevars: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
 }
 ```
 
 This matches the existing representation of `GenericContext`. Instances with the same identity can be assumed to have equivalent bounds; differences can reflect whether bounds have been eagerly evaluated. When constructing or merging sets, deduplicate by identity with deterministic **first-wins** semantics. Keep lookup keyed by identity, rather than using an `FxOrderSet<BoundTypeVarInstance>` whose equality would incorrectly distinguish different instances of the same logical variable.
 
-With instances available directly in `InferableTypeVars`, a quantified variable need not already occur in the body, `additional_domain`, or a builder-local arena before its declared domain is constructed. No additional canonical-instance storage or recovery mechanism is needed in `ConstraintSetStorage` or `OwnedConstraintSetInner`. Preserve fresh occurrence identities, `ParamSpec` attribute distinctions, Salsa sharing, insertion ordering, and existing identity-based membership.
+With instances available directly in `TypeVarSet`, a quantified variable need not already occur in the body, `additional_domain`, or a builder-local arena before its declared domain is constructed. No additional canonical-instance storage or recovery mechanism is needed in `ConstraintSetStorage` or `OwnedConstraintSetInner`. Preserve fresh occurrence identities, `ParamSpec` attribute distinctions, Salsa sharing, insertion ordering, and existing identity-based membership.
 
 ### Existing range-only assumptions
 
@@ -138,7 +138,7 @@ enum Atom<'db> {
 }
 ```
 
-That refactoring must not add existential storage, change inference behavior, or modify mdtest expectations. A second independently reviewable refactoring PR changes `InferableTypeVars` to retain identity-keyed bound instances, but adds no declared-domain helpers, existential methods, or semantic behavior. Only after both prerequisites land does PR 2A add the existential variant and its compact payload:
+That refactoring must not add existential storage, change inference behavior, or modify mdtest expectations. A second independently reviewable refactoring PR changes `TypeVarSet` to retain identity-keyed bound instances, but adds no declared-domain helpers, existential methods, or semantic behavior. Only after both prerequisites land does PR 2A add the existential variant and its compact payload:
 
 ```rust
 enum Atom<'db> {
@@ -147,7 +147,7 @@ enum Atom<'db> {
 }
 
 struct Existential<'db> {
-    locals: InferableTypeVars<'db>,
+    locals: TypeVarSet<'db>,
     domain: NodeId,
     body: NodeId,
 }
@@ -157,9 +157,9 @@ The names can change to match neighboring code. The essential properties are:
 
 1. Existing range constraints remain cheap, copyable, and fast.
 1. `AtomId` continues to identify a TDD atom and retain its ordering/wobbling behavior.
-1. `InferableTypeVars` is already a compact, copyable, Salsa-interned set, so the quantified relation can be stored directly inside the existing interned atom arena; no `ExistentialId`, separate relation arena, boxed local slice, or parallel interning table is needed.
-1. Locals are exactly the supplied `InferableTypeVars`, which now retain bound instances while preserving identity-based membership, first-wins deduplication, freshness distinctions, Salsa sharing, and efficient set representation.
-1. The construction boundary accepts the authoritative `InferableTypeVars` set, an `additional_domain` constraint set, and a body. It stores that set unchanged and adds no variables discovered recursively in bounds.
+1. `TypeVarSet` is already a compact, copyable, Salsa-interned set, so the quantified relation can be stored directly inside the existing interned atom arena; no `ExistentialId`, separate relation arena, boxed local slice, or parallel interning table is needed.
+1. Locals are exactly the supplied `TypeVarSet`, which now retains bound instances while preserving identity-based membership, first-wins deduplication, freshness distinctions, Salsa sharing, and efficient set representation.
+1. The construction boundary accepts the authoritative `TypeVarSet`, an `additional_domain` constraint set, and a body. It stores that set unchanged and adds no variables discovered recursively in bounds.
 1. The relation stores a domain root equal to the conjunction of the selected variables' valid specializations and `additional_domain`. `ConstraintSet` itself never stores a companion domain.
 1. The relation stores **no free-variable interface**; compute it from the stored domain and body when required. Ephemeral builder-local support caches are permitted if measurements justify them.
 1. Nested quantified-relation domains and bodies remain separate TDDs. A relation's local variables do not become ordinary variables in its containing TDD merely because their graphs share the same builder arenas.
@@ -190,47 +190,47 @@ free interface = {Y}
 1. Migrate range-data access, TDD construction, sequent generation, path traversal, abstraction, solution extraction, type mapping, display, owned compaction, overlay queries, and cross-builder loading through exhaustive handling of `Atom::Range`.
 1. Preserve the existing strongly typed range APIs and avoid introducing unreachable branches, panic-based accessors, or speculative handling for nonexistent variants. The refactor should be easy to verify mechanically: every existing atom is still precisely the same range constraint.
 1. Verify existing unit tests, quantification mdtests, ordering/wobbling tests, graph-display tests, owned-storage tests, and the full crate suite without changing their expectations. Audit memory layout and hot-path behavior to avoid introducing measurable overhead for the one-variant enum.
-1. Keep this revision separate from the `InferableTypeVars` representation change and from existential construction, so it can be extracted or landed as a pure-refactoring PR.
+1. Keep this revision separate from the `TypeVarSet` representation change and from existential construction, so it can be extracted or landed as a pure-refactoring PR.
 
 **Exit criteria:** `Atom::Range` is the only possible TDD atom; generic arenas/caches/indexes use atom-oriented names while range-specific logic retains constraint-oriented names; all existing behavior, snapshots, ownership semantics, ordering, and tests are unchanged; the revision is independently mergeable as a pure refactor.
 
 **Validation note:** the normal full crate and mdtest suites pass. The reverse and XOR constraint-order wobble configurations retain pre-existing mdtest failures in `3954_recursive_protocol_structural_relation.md`, `constraint_set_ordering.md`, `constraints.md`, `quantification.md`, `implies_subtype_of.md`, and `typed_dict.md` (the affected subset varies by mask); both the failing-test sets and every normalized expected/actual diagnostic line were compared with the Phase 1 parent and are identical. No snapshot expectations changed.
 
-## Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances
+## Phase 2 — Refactor `TypeVarSet` to retain identity-keyed bound instances
 
 **Status:** complete.
 
 **Dependency:** Phase 1 in the implementation stack; this representation change is logically independent of the pure `Atom::Range` refactoring and should likewise be independently reviewable as a behavior-preserving prerequisite PR.
 
-1. Change `InferableTypeVarsInner` from an ordered set of `BoundTypeVarIdentity`s to an ordered map from identity to `BoundTypeVarInstance`, following `GenericContext::variables_inner`.
+1. Change `TypeVarSetInner` from an ordered set of `BoundTypeVarIdentity`s to an ordered map from identity to `BoundTypeVarInstance`, following `GenericContext::variables_inner`.
 1. Update the generic-context collector and mdtest tuple extraction to retain the instances they already encounter. Update the existing constraint-unit-test constructors to pass instances rather than first discarding them.
 1. Preserve identity-based membership for both `BoundTypeVarIdentity::is_inferable` and `BoundTypeVarInstance::is_inferable`, including the caller that explicitly normalizes `ParamSpec` attributes before checking membership.
-1. Update the existing `InferableTypeVars::merge` implementation to combine maps with stable insertion order and identity-keyed first-wins semantics. Test equivalent eager/lazy instances with the same identity, distinct freshness nonces, and distinct `P.args`/`P.kwargs` identities.
+1. Update the existing `TypeVarSet::merge` implementation to combine maps with stable insertion order and identity-keyed first-wins semantics. Test equivalent eager/lazy instances with the same identity, distinct freshness nonces, and distinct `P.args`/`P.kwargs` identities.
 1. Update existing iteration and debug-display behavior as needed, without forcing evaluation of lazily represented bounds merely to construct, merge, or inspect the set. Do not add declared-domain helpers, existential constructors, new type-variable-set methods, or any other functionality required only by later phases.
 1. Audit Salsa interning, tracked `merge`, existing cache keys such as `exists_cache`, identity-based ordering, and memory usage so equivalent instance representations do not introduce avoidable cache churn or behavior changes.
 1. Add focused regression coverage for empty sets, identity-keyed first-wins construction and merging, eager/lazy equivalent instances, fresh identities, `ParamSpec` components, and preservation of lazy bounds. Do not add quantifier-domain or existential-specific tests in this refactoring revision.
 1. Run the existing quantification and ordering mdtests without changing their expected behavior. Keep `ConstraintSetStorage`, `OwnedConstraintSetInner`, `Atom`, and existing existential-abstraction algorithms unchanged.
 
-**Exit criteria:** `InferableTypeVars` retains actual bound instances while preserving its existing identity-based membership, ordering, first-wins deduplication, laziness, Salsa/cache behavior, and observable inference results; no new existential-specific methods or domain computations have been introduced; the revision is independently mergeable as a pure refactor.
+**Exit criteria:** `TypeVarSet` retains actual bound instances while preserving its existing identity-based membership, ordering, first-wins deduplication, laziness, Salsa/cache behavior, and observable inference results; no new existential-specific methods or domain computations have been introduced; the revision is independently mergeable as a pure refactor.
 
-**Validation note:** the focused inferable-typevar unit tests, quantification and constraint-ordering mdtests, and full `ty_python_semantic` suite pass (769 passed, 35 skipped). No snapshot expectations changed.
+**Validation note:** the focused `TypeVarSet` and generic-context unit tests, quantification and constraint-ordering mdtests, and full `ty_python_semantic` suite pass (769 passed, 35 skipped). No snapshot expectations changed.
 
 ## Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end
 
 **Status:** pending.
 
-**Dependency:** the independently reviewable Phase 1 `Atom::Range` refactor and Phase 2 `InferableTypeVars` representation refactor.
+**Dependency:** the independently reviewable Phase 1 `Atom::Range` refactor and Phase 2 `TypeVarSet` representation refactor.
 
 Adding `Atom::Existential` immediately affects exhaustive matches, `ConstraintSet`, `OwnedConstraintSet`, type mapping, and display. Treat all of the workstreams below as one self-contained implementation phase and jj revision, not as independently passing revisions. If implementation reveals a genuinely self-contained intermediate boundary, update this plan before splitting the phase.
 
 ### Declared domains, existential atoms, and free interfaces
 
-1. Add an `InferableTypeVars`-level helper that computes the conjunction of `BoundTypeVarInstance::valid_specializations` for exactly its stored instances in the supplied builder. Reuse the existing single-typevar implementation for unbounded variables, upper bounds, finite constraints, gradual materialization, and `ParamSpec` components; do not recursively add domains for variables mentioned in those bounds.
-1. Support binders whose variables do not otherwise occur in the body, `additional_domain`, or builder. Their instances are available directly from `InferableTypeVars`; do not introduce canonical-instance recovery in builder or owned storage.
+1. Add a `TypeVarSet`-level helper that computes the conjunction of `BoundTypeVarInstance::valid_specializations` for exactly its stored instances in the supplied builder. Reuse the existing single-typevar implementation for unbounded variables, upper bounds, finite constraints, gradual materialization, and `ParamSpec` components; do not recursively add domains for variables mentioned in those bounds.
+1. Support binders whose variables do not otherwise occur in the body, `additional_domain`, or builder. Their instances are available directly from `TypeVarSet`; do not introduce canonical-instance recovery in builder or owned storage.
 1. Preserve deterministic source ordering when constructing declared-domain roots. Never add a companion domain field to `ConstraintSet` or a separate top-level domain field to `OwnedConstraintSet`.
-1. Extend the previously single-variant `Atom` with `Atom::Existential(Existential<'db>)`. Add a copyable `Existential<'db>` payload containing the supplied Salsa-interned `InferableTypeVars<'db>`, a stored domain `NodeId`, and a separate body `NodeId`. Intern it through the existing `Atom`/`AtomId` arena and cache, not through a separate quantified-relation arena.
+1. Extend the previously single-variant `Atom` with `Atom::Existential(Existential<'db>)`. Add a copyable `Existential<'db>` payload containing the supplied Salsa-interned `TypeVarSet<'db>`, a stored domain `NodeId`, and a separate body `NodeId`. Intern it through the existing `Atom`/`AtomId` arena and cache, not through a separate quantified-relation arena.
 1. Update existing range-specific consumers to distinguish `Atom::Range` from `Atom::Existential`. Keep ordinary range APIs strongly typed, handle existential atoms in structural operations, and panic with a clear invariant message if one unexpectedly reaches legacy satisfiability, validity, solution extraction, or other unsupported semantic consumers.
-1. Add a private/internal constructor that takes an explicitly supplied `InferableTypeVars`, an `additional_domain: ConstraintSet`, and a body; verifies all constraint-set inputs use the same builder; retains the supplied type-variable set unchanged; computes `valid_specializations(locals) ∧ additional_domain`; and interns one existential atom.
+1. Add a private/internal constructor that takes an explicitly supplied `TypeVarSet`, an `additional_domain: ConstraintSet`, and a body; verifies all constraint-set inputs use the same builder; retains the supplied type-variable set unchanged; computes `valid_specializations(locals) ∧ additional_domain`; and interns one existential atom.
 1. Preserve the correct empty-binder fast path: with no locals, the quantified relation is `additional_domain ∧ body`, not merely `body`. Avoid unsupported simplifications that would accidentally assume a nonempty binder's domain is inhabited or flatten a nested scope.
 1. Enforce binder invariants with debug assertions: stored bound instances match their identity keys, nested binder identities are fresh/disjoint where required, and scope is interpreted according to lexical nesting rather than TDD variable ordering.
 1. Compute free support recursively from both the stored domain and body. Remove only the current binder's locals; preserve outer variables referenced through declared bounds or `additional_domain`, and preserve only the free interface of nested relation atoms.
@@ -252,16 +252,16 @@ Adding `Atom::Existential` immediately affects exhaustive matches, `ConstraintSe
 ### Owned storage, compaction, overlays, and loading
 
 1. Extend the existing compacted atom storage to preserve inline quantified-relation payloads while retaining the existing terminal fast path, rank/index metadata, and `Arc` sharing. Do not introduce a separate quantified-relation arena or index space.
-1. Update `ConstraintSetBuilder::into_owned` reachability traversal to mark an outer quantified atom, both its stored-domain and body nodes/atoms, and all nested quantified relations. Bound instances remain directly available from the relation's Salsa-interned `InferableTypeVars`.
-1. Persist each relation's existing Salsa-interned `InferableTypeVars`, stored domain, and body directly in its atom, but never persist transient support caches or add a companion domain to `OwnedConstraintSet`.
+1. Update `ConstraintSetBuilder::into_owned` reachability traversal to mark an outer quantified atom, both its stored-domain and body nodes/atoms, and all nested quantified relations. Bound instances remain directly available from the relation's Salsa-interned `TypeVarSet`.
+1. Persist each relation's existing Salsa-interned `TypeVarSet`, stored domain, and body directly in its atom, but never persist transient support caches or add a companion domain to `OwnedConstraintSet`.
 1. Extend compacted-overlay atom access, retained-index lookup, identity-cache initialization, and atom interning so `OwnedConstraintSet::query` can read inline quantified relations and append new atoms after the existing overlay split.
-1. Update `ConstraintSetBuilder::load` to rebuild nested domains and bodies before their containing atoms, reuse each relation's globally valid `InferableTypeVars` unchanged, preserve source-order offsets, and preserve sharing for repeated relation/domain/body DAGs.
-1. Audit `OwnedConstraintSet::types`: it must expose types in quantified domains and bodies, bound instances retained directly by `InferableTypeVars`, and free interfaces introduced by declared bounds or `additional_domain`. If inspecting declarations requires `db`, update the small set of callers rather than losing mappings of relevant outer variables.
+1. Update `ConstraintSetBuilder::load` to rebuild nested domains and bodies before their containing atoms, reuse each relation's globally valid `TypeVarSet` unchanged, preserve source-order offsets, and preserve sharing for repeated relation/domain/body DAGs.
+1. Audit `OwnedConstraintSet::types`: it must expose types in quantified domains and bodies, bound instances retained directly by `TypeVarSet`, and free interfaces introduced by declared bounds or `additional_domain`. If inspecting declarations requires `db`, update the small set of callers rather than losing mappings of relevant outer variables.
 1. Add owned-storage tests for unreachable relation/domain/body compaction, nested scopes, shared domain/body subgraphs, sparse retained IDs, read-only overlay queries, mutation after overlay, cross-builder remapping, receiver-style additional domains, dependent declared bounds, fresh locals, and the storage-free terminal fast path.
 
 ### Type mapping, display, lexical scope, and deterministic ordering
 
-1. Extend `ConstraintSet::apply_type_mapping_impl` to recursively rebuild both quantified domains and bodies and, when a mapping actually renames binder variables, construct the corresponding mapped `InferableTypeVars` set instead of treating a quantified atom as a range constraint.
+1. Extend `ConstraintSet::apply_type_mapping_impl` to recursively rebuild both quantified domains and bodies and, when a mapping actually renames binder variables, construct the corresponding mapped `TypeVarSet` instead of treating a quantified atom as a range constraint.
 1. Specify capture-avoiding binder behavior explicitly. Free/interface variables must be mapped; deliberate freshness/typevar-to-typevar renaming must update binder, domain, and body together; mappings that would replace a bound local with a concrete type must have one documented, tested policy rather than silently capturing or freeing that variable.
 1. Ensure declared bounds of locals and additional-domain restrictions track mapped/freshened bound instances, including outer/free variables appearing only in the stored domain.
 1. Extend concise constraint display and full graph display to show existential binders, their separate domains and bodies, negated polarity, uncertain branches, source order, and shared graphs. Do not introduce a separate universal atom or suggest that the outer `ConstraintSet` itself owns a domain.
@@ -318,7 +318,7 @@ For a jj worktree, run the repository hooks through the installed wrapper and pa
 ## Explicit non-goals for PR 2A
 
 - Adding `ConstraintSet { domain, relation }` or reviving PR 1A.
-- Storing a companion domain on `ConstraintSet`, a globally deferred quantifier set, a boxed/builder-local binder set, a separate quantified-relation arena, or a cached free-interface field; storing the supplied `InferableTypeVars` and combined domain on `Existential` is required.
+- Storing a companion domain on `ConstraintSet`, a globally deferred quantifier set, a boxed/builder-local binder set, a separate quantified-relation arena, or a cached free-interface field; storing the supplied `TypeVarSet` and combined domain on `Existential` is required.
 - Recursively adding declared domains for variables mentioned in a quantified variable's bound.
 - Adding a `UniversalRelation` atom kind.
 - Switching production `reduce_inferable`, `for_all`, signature comparison, or mdtest quantifier methods to construct residual existential atoms in this PR; a later, smaller PR may opt into that behavior and explicitly invoke lowering where needed.
