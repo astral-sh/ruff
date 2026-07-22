@@ -2912,7 +2912,7 @@ impl NodeId {
             return self;
         }
 
-        let Node::Interior(_) = self.node() else {
+        let Node::Interior(interior) = self.node() else {
             return self;
         };
 
@@ -2923,24 +2923,11 @@ impl NodeId {
         }
         drop(storage);
 
-        let result = self.exists_inner(db, builder, bound_typevars);
+        let result = interior.exists_inner(db, builder, bound_typevars);
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_cache.insert(key, result);
         result
-    }
-
-    fn exists_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
-    ) -> Self {
-        match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_inner(db, builder, bound_typevars),
-        }
     }
 
     fn remove_noninferable<'db>(
