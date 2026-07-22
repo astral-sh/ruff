@@ -38,6 +38,19 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     1 / 0
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. In the original `try`-`except`
+/// block, the handled exception type is only evaluated lazily, once an
+/// exception is actually raised and needs to be matched against it. In the
+/// rewritten code, the exception type is passed as an argument to
+/// `contextlib.suppress`, so it's evaluated eagerly, as soon as the `with`
+/// statement is entered, regardless of whether an exception is ever raised.
+/// If evaluating the exception type can fail (for example, a name that's
+/// only defined later, or an attribute of a module that hasn't finished
+/// initializing), the fix can turn code that previously ran successfully
+/// into a `NameError` or `AttributeError`. The fix is only offered when the
+/// `try` statement contains no comments.
+///
 /// ## References
 /// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)

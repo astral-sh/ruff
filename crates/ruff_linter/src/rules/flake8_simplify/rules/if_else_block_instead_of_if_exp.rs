@@ -55,6 +55,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Ternary operators can also make it harder to measure [code coverage]
 /// with tools that use line profiling.
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. When the `if` test and the assigned
+/// value are the same (or negations of each other), the rule rewrites the
+/// block to a binary `or`/`and` expression, which evaluates that shared
+/// expression only once, whereas the original `if`-`else` block evaluates it
+/// twice (once for the condition and once more to compute the assigned
+/// value). If the expression doesn't return the same value on each
+/// evaluation (for example, because it accesses a property with side
+/// effects), the fix can change the value assigned to the target. The fix
+/// is only offered when the `if` statement contains no comments.
+///
 /// ## Options
 ///
 /// - `lint.pycodestyle.max-line-length`
