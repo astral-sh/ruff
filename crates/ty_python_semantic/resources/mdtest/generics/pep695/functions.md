@@ -340,6 +340,20 @@ def f(x: IntSource) -> None:
     if isinstance(x, StrSource):
         reveal_type(x)  # revealed: IntSource & StrSource
         reveal_type(element(x))  # revealed: Never
+
+# A constructor's synthetic `cls` argument can contain an inferable class type variable even
+# when its declared `cls` parameter is specialized to a concrete type.
+class FixedReceiverConstructor[T]:
+    item: T
+
+    def __new__(
+        cls: "type[FixedReceiverConstructor[B]]",
+        value: Source[T],
+    ) -> "FixedReceiverConstructor[T]":
+        return object.__new__(cls)
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[B]
 ```
 
 Generic constructors still reconstruct their return type from a single inferred specialization, so
