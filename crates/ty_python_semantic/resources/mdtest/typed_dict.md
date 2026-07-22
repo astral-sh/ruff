@@ -2612,30 +2612,30 @@ python-version = "3.12"
 ```py
 from typing import Any, Literal, TypedDict
 
-A = TypedDict("A", {"type": Literal["a"]})
-B = TypedDict("B", {"type": Literal["b"]})
-C = TypedDict("C", {"type": Literal["c"]})
-D = TypedDict("D", {"type": Literal["d"]})
-E = TypedDict("E", {"type": Literal["e"]})
-F = TypedDict("F", {"type": Literal["f"]})
-G = TypedDict("G", {"type": Literal["g"]})
-H = TypedDict("H", {"type": Literal["h"]})
-I = TypedDict("I", {"type": Literal["i"]})
-J = TypedDict("J", {"type": Literal["j"]})
-K = TypedDict("K", {"type": Literal["k"]})
-L = TypedDict("L", {"type": Literal["l"]})
-M = TypedDict("M", {"type": Literal["m"]})
-N = TypedDict("N", {"type": Literal["n"]})
-O = TypedDict("O", {"type": Literal["o"]})
-P = TypedDict("P", {"type": Literal["p"]})
-Q = TypedDict("Q", {"type": Literal["q"]})
-R = TypedDict("R", {"type": Literal["r"]})
-S = TypedDict("S", {"type": Literal["s"]})
-T = TypedDict("T", {"type": Literal["t"]})
-U = TypedDict("U", {"type": Literal["u"]})
-V = TypedDict("V", {"type": Literal["v"]})
-W = TypedDict("W", {"type": Literal["w"]})
-X = TypedDict("X", {"type": Literal["x"]})
+A = TypedDict("A", {"type": Literal["a"], "irrelevant": Any})
+B = TypedDict("B", {"type": Literal["b"], "irrelevant": Any})
+C = TypedDict("C", {"type": Literal["c"], "irrelevant": Any})
+D = TypedDict("D", {"type": Literal["d"], "irrelevant": Any})
+E = TypedDict("E", {"type": Literal["e"], "irrelevant": Any})
+F = TypedDict("F", {"type": Literal["f"], "irrelevant": Any})
+G = TypedDict("G", {"type": Literal["g"], "irrelevant": Any})
+H = TypedDict("H", {"type": Literal["h"], "irrelevant": Any})
+I = TypedDict("I", {"type": Literal["i"], "irrelevant": Any})
+J = TypedDict("J", {"type": Literal["j"], "irrelevant": Any})
+K = TypedDict("K", {"type": Literal["k"], "irrelevant": Any})
+L = TypedDict("L", {"type": Literal["l"], "irrelevant": Any})
+M = TypedDict("M", {"type": Literal["m"], "irrelevant": Any})
+N = TypedDict("N", {"type": Literal["n"], "irrelevant": Any})
+O = TypedDict("O", {"type": Literal["o"], "irrelevant": Any})
+P = TypedDict("P", {"type": Literal["p"], "irrelevant": Any})
+Q = TypedDict("Q", {"type": Literal["q"], "irrelevant": Any})
+R = TypedDict("R", {"type": Literal["r"], "irrelevant": Any})
+S = TypedDict("S", {"type": Literal["s"], "irrelevant": Any})
+T = TypedDict("T", {"type": Literal["t"], "irrelevant": Any})
+U = TypedDict("U", {"type": Literal["u"], "irrelevant": Any})
+V = TypedDict("V", {"type": Literal["v"], "irrelevant": Any})
+W = TypedDict("W", {"type": Literal["w"], "irrelevant": Any})
+X = TypedDict("X", {"type": Literal["x"], "irrelevant": Any})
 
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
 
@@ -2649,7 +2649,8 @@ def _(item: Item | str) -> None:
     if isinstance(item, dict):
         reveal_type(dict(item))  # revealed: dict[str, object]
 
-# A single plain-dict member must not make combining the shared `TypedDict` constraints exponential.
+# A single plain-dict member must not make combining the shared `TypedDict` constraints
+# exponential, even when the `TypedDict`s contain unrelated gradual fields.
 def _(item: Item | dict[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
     if isinstance(item, dict):
@@ -2772,6 +2773,7 @@ Mixed unions must retain gradual evidence from their `TypedDict` members:
 
 ```py
 from typing import Any, Literal, Protocol, TypeVar, TypedDict
+from typing_extensions import TypeAliasType
 
 GradualValueT = TypeVar("GradualValueT", covariant=True)
 GradualBoundedValueT = TypeVar("GradualBoundedValueT", bound=str, covariant=True)
@@ -2782,6 +2784,12 @@ class GradualGetValue(Protocol[GradualValueT]):
 
 class GradualValue(TypedDict):
     value: Any
+
+class StaticValue(TypedDict):
+    value: str
+
+class GenericValue[GenericItem](TypedDict):
+    value: GenericItem
 
 def get_gradual_value(value: GradualGetValue[GradualValueT]) -> GradualValueT:
     raise NotImplementedError
@@ -2799,6 +2807,54 @@ def _(value: dict[str, Any] | GradualValue) -> None:
     get_gradual_value(value).strip()
     reveal_type(get_bounded_value(value))  # revealed: Any
     reveal_type(get_constrained_value(value))  # revealed: Any
+
+def _(value: dict[str, str] | GradualValue | StaticValue) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: str | Any
+    get_bounded_value(value).strip()
+    get_constrained_value(value).strip()
+
+def _(value: dict[str, str] | GradualValue) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: str | Any
+    get_bounded_value(value).strip()
+    get_constrained_value(value).strip()
+
+def _(value: GradualValue | dict[str, str]) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: str | Any
+    get_bounded_value(value).strip()
+    get_constrained_value(value).strip()
+
+def _(value: GenericValue[int]) -> None:
+    reveal_type(value.__getitem__("value"))  # revealed: int
+
+def _(value: dict[str, str] | GenericValue[int]) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: str | int
+    get_gradual_value(value).strip()  # error: [unresolved-attribute]
+    get_bounded_value(value)  # error: [invalid-argument-type]
+    get_constrained_value(value)  # error: [invalid-argument-type]
+
+def _(value: GenericValue[int] | dict[str, str]) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: int | str
+    get_gradual_value(value).strip()  # error: [unresolved-attribute]
+    get_bounded_value(value)  # error: [invalid-argument-type]
+    get_constrained_value(value)  # error: [invalid-argument-type]
+
+type GradualValueAlias = Any
+
+class AliasedGradualValue(TypedDict):
+    value: GradualValueAlias
+
+def _(value: dict[str, Any] | AliasedGradualValue) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: Any
+    get_bounded_value(value).strip()
+
+ManualGradualValueAlias = TypeAliasType("ManualGradualValueAlias", Any)
+
+class ManuallyAliasedGradualValue(TypedDict):
+    value: ManualGradualValueAlias
+
+def _(value: dict[str, Any] | ManuallyAliasedGradualValue) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: Any
+    get_bounded_value(value).strip()
 ```
 
 Mixed-union protocol constraints must also preserve their original source ordering:
