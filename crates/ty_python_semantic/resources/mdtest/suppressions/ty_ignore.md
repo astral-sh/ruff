@@ -372,8 +372,8 @@ reveal_type(a)  # ty: ignore[revealed-type]
 
 ## Suppressing suppression diagnostics on an own line
 
-Unknown-rule and invalid-comment suppressions on an own line apply to following comment-only lines,
-but not to the following logical line.
+An own-line suppression covers its entire physical comment line and the following statement,
+including diagnostics emitted for ignore comments.
 
 ```py
 seen_code = True
@@ -390,8 +390,19 @@ value = 1
 value = 1  # ty: ignore[*-*]
 ```
 
-An `unused-ignore-comment` suppression retains normal own-line coverage so it can suppress an unused
-directive on the following logical line.
+An own-line suppression can also suppress an ignore-comment diagnostic on the following statement.
+
+```py
+seen_code = True
+# ty: ignore[ignore-comment-unknown-rule]
+value = 1  # ty: ignore[not-a-rule]
+
+# ty: ignore[invalid-ignore-comment]
+value = 1  # ty: ignore[*-*]
+```
+
+An `unused-ignore-comment` suppression can likewise suppress an unused directive on the following
+statement.
 
 ```py
 seen_code = True
@@ -408,11 +419,15 @@ def f():
     value = missing
 ```
 
-A nested `type: ignore` retains whole-line coverage and can suppress an earlier sub-comment.
+A rule-specific suppression covers every ignore comment on its physical line, regardless of
+sub-comment order.
 
 ```py
 def f():
     # ty: ignore[not-a-rule] # type: ignore[ty:ignore-comment-unknown-rule]
+    value = 1
+
+    # ty: ignore[first-not-a-rule] # ty: ignore[second-not-a-rule] # ty: ignore[ignore-comment-unknown-rule]
     value = 1
 ```
 

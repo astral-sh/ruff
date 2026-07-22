@@ -1259,21 +1259,31 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
         value = 1 / 0
         ```
 
         ## Diagnostics after applying fixes
 
-        warning[unused-ignore-comment]: Unused `ty: ignore` directive
-         --> test.py:2:68
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:2:1
           |
         1 | seen_code = True
-        2 | # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-          |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        2 | # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
+          | ^^^^^^^^^^^^^^^
         3 | value = 1 / 0
           |
         help: Remove the unused suppression comment
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'division-by-zero'
+         --> test.py:2:54
+          |
+        1 | seen_code = True
+        2 | # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
+          |                                                      ^^^^^^^^^^^^^^^^
+        3 | value = 1 / 0
+          |
+        help: Remove the unused suppression code
         "
         );
     }
@@ -1451,16 +1461,13 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference]
+        # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference, ignore-comment-unknown-rule]
         value = missing
-        # ty:ignore[invalid-ignore-comment]
-        # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        # ty: ignore[*-*]  # ty: ignore[unresolved-reference, invalid-ignore-comment]
         value = missing
-        # ty:ignore[invalid-ignore-comment]
-        # ty: ignore[#]
+        # ty: ignore[#]  # ty:ignore[invalid-ignore-comment]
         value = 1
-        # ty:ignore[invalid-ignore-comment]
-        # ty: ignore[unresolved-reference#]
+        # ty: ignore[unresolved-reference#]  # ty:ignore[invalid-ignore-comment]
         value = 1
         ```
         "
@@ -1484,36 +1491,33 @@ class B(A):
 
         ```py
         def f():
-            # ty:ignore[ignore-comment-unknown-rule]
-            # type: ignore[ty:division-by-zero, ty:not-a-rule]
+            # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
             value = 1
-            # ty:ignore[ignore-comment-unknown-rule]
-            # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
+            # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
             value = 1
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
-         --> test.py:3:20
+         --> test.py:2:20
           |
         1 | def f():
-        2 |     # ty:ignore[ignore-comment-unknown-rule]
-        3 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]
+        2 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
           |                    ^^^^^^^^^^^^^^^^^^^
-        4 |     value = 1
-        5 |     # ty:ignore[ignore-comment-unknown-rule]
+        3 |     value = 1
+        4 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
           |
         help: Remove the unused suppression code
 
         warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
-         --> test.py:6:31
+         --> test.py:4:31
           |
-        4 |     value = 1
-        5 |     # ty:ignore[ignore-comment-unknown-rule]
-        6 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
+        2 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        3 |     value = 1
+        4 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
           |                               ^^^^^^^^^^^^^^^^^^^
-        7 |     value = 1
+        5 |     value = 1
           |
         help: Remove the unused suppression code
         "
@@ -1539,13 +1543,43 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
+        # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
         value = 1
-        # ty:ignore[invalid-ignore-comment]
-        # ty: ignore[*-*]  # ty: ignore[*-*]
+        # ty: ignore[*-*]  # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
         value = 1
-        # ty:ignore[invalid-ignore-comment]
-        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[*-*]
+        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule, invalid-ignore-comment]  # ty: ignore[*-*]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_groups_suppression_comments_on_one_physical_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                value = 1  # ty: ignore[first-not-a-rule]  # ty: ignore[second-not-a-rule]
+                # ty: ignore[third-not-a-rule]  # type: ignore[ty:fourth-not-a-rule]
+                value = 1
+                #! notes # ty: ignore[fifth-not-a-rule]
+                value = 1
+                # ty: ignore[*-*]  # ty: ignore[sixth-not-a-rule] explanation
+                value = 1
+                "#),
+            @"
+        Added 7 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        value = 1  # ty: ignore[first-not-a-rule]  # ty: ignore[second-not-a-rule, ignore-comment-unknown-rule]
+        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule]  # type: ignore[ty:fourth-not-a-rule]
+        value = 1
+        #! notes # ty: ignore[fifth-not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        # ty: ignore[*-*]  # ty: ignore[sixth-not-a-rule] explanation  # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
         value = 1
         ```
         "
@@ -1604,14 +1638,32 @@ class B(A):
                 value = 1
                 "#),
             @"
-        Added 2 suppressions
+        Added 0 suppressions
 
         ## Fixed source
 
         ```py
-        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]  # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
+        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
         value = 1
         ```
+
+        ## Diagnostics after applying fixes
+
+        warning[ignore-comment-unknown-rule]: Unknown rule `not-a-rule`
+         --> test.py:1:43
+          |
+        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+          |                                           ^^^^^^^^^^
+        2 | value = 1
+          |
+
+        warning[invalid-ignore-comment]: Invalid `ty: ignore` comment: expected a alphanumeric character or `-` or `_` as code
+         --> test.py:1:69
+          |
+        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+          |                                                                     ^
+        2 | value = 1
+          |
         "
         );
     }

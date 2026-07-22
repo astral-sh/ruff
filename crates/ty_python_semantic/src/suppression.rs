@@ -95,7 +95,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
 
     for token in parsed.tokens() {
         if !token.kind().is_trivia() {
-            builder.set_first_non_trivia_token(token.start());
+            builder.set_seen_non_trivia_token();
         }
 
         match token.kind() {
@@ -318,9 +318,6 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
 /// The suppressions of a single file.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct Suppressions {
-    /// The start of the first non-trivia token, if any.
-    first_non_trivia_token: Option<TextSize>,
-
     /// Suppressions that apply to the entire file.
     ///
     /// The suppressions are sorted by [`Suppression::comment_range`] and the [`Suppression::suppressed_range`]
@@ -331,9 +328,7 @@ pub(crate) struct Suppressions {
     ///
     /// Comments with multiple codes create multiple [`Suppression`]s that all share the same [`Suppression::comment_range`].
     ///
-    /// The suppressions are indexed by [`Suppression::suppressed_range`] and sorted by interval
-    /// start. A nested `type: ignore` can cover an earlier sub-comment on the same line, so this
-    /// order isn't necessarily source order.
+    /// The suppressions are indexed by [`Suppression::suppressed_range`] and retain source order.
     /// Their range ends aren't necessarily sorted because own-line suppressions can be nested:
     ///
     /// ```py
@@ -487,7 +482,7 @@ impl Suppression {
 
     fn matches(&self, tested_id: LintId) -> bool {
         match self.target {
-            SuppressionTarget::All => true,
+            SuppressionTarget::All => !is_suppression_comment_lint(tested_id.name()),
             SuppressionTarget::Lint(suppressed_id) => tested_id == suppressed_id,
             SuppressionTarget::Empty => false,
         }
@@ -577,14 +572,8 @@ struct SuppressionsBuilder<'a> {
     source: &'a str,
 
     /// Ignore comments at the top of the file before any non-trivia code apply to the entire file.
-    /// This offset tracks whether there has been any non-trivia token.
-    first_non_trivia_token: Option<TextSize>,
-
-    /// The end of the most recently scanned run of comment-only lines.
-    comment_only_run_end: TextSize,
-
-    /// The suppression end shared by own-line comments in the most recent comment-only run.
-    own_line_suppression_end: TextSize,
+    /// This boolean tracks if there has been any non-trivia token.
+    seen_non_trivia_token: bool,
 
     inline: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
@@ -597,9 +586,7 @@ impl<'a> SuppressionsBuilder<'a> {
         Self {
             source,
             lint_registry,
-            first_non_trivia_token: None,
-            comment_only_run_end: TextSize::default(),
-            own_line_suppression_end: TextSize::default(),
+            seen_non_trivia_token: false,
             inline: Vec::new(),
             file: SmallVec::new_const(),
             unknown: Vec::new(),
@@ -607,19 +594,15 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn set_first_non_trivia_token(&mut self, start: TextSize) {
-        self.first_non_trivia_token.get_or_insert(start);
+    fn set_seen_non_trivia_token(&mut self) {
+        self.seen_non_trivia_token = true;
     }
 
     fn finish(mut self) -> Suppressions {
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
-        self.inline
-            .sort_by_key(|suppression| suppression.suppressed_range.start());
-
         Suppressions {
-            first_non_trivia_token: self.first_non_trivia_token,
             file: self.file,
             inline: IntervalIndex::from_sorted(self.inline),
             unknown: self.unknown,
@@ -635,32 +618,17 @@ impl<'a> SuppressionsBuilder<'a> {
         // > Blank lines and other comments, such as shebang lines and coding cookies,
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
-        let is_file_suppression = self.first_non_trivia_token.is_none();
-        let comment_token_range = tokens.token_range(comment.range().start());
-        let is_own_line_suppression = !comment.kind().is_type_ignore()
-            && indentation_at_offset(comment_token_range.start(), self.source).is_some();
+        let is_file_suppression = !self.seen_non_trivia_token;
+        let comment_token_start = tokens.token_range(comment.range().start()).start();
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
-        } else if is_own_line_suppression && comment_token_range.end() <= self.comment_only_run_end
+        } else if !comment.kind().is_type_ignore()
+            && indentation_at_offset(comment_token_start, self.source).is_some()
         {
-            TextRange::new(comment.range().start(), self.own_line_suppression_end)
-        } else if is_own_line_suppression {
-            let range = own_line_suppression_range(comment.range(), tokens);
-            self.own_line_suppression_end = range.end();
-            range
+            own_line_suppression_range(comment.range(), tokens)
         } else {
             line_range
-        };
-
-        let suppression_comment_range = if !is_file_suppression && is_own_line_suppression {
-            own_line_suppression_comment_range(
-                comment.range(),
-                tokens,
-                &mut self.comment_only_run_end,
-            )
-        } else {
-            suppressed_range
         };
 
         let mut push_ignore_suppression = |suppression: Suppression| {
@@ -712,17 +680,6 @@ impl<'a> SuppressionsBuilder<'a> {
 
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
-                            let suppressed_range = if !is_file_suppression
-                                && is_own_line_suppression
-                                && is_suppression_comment_lint(lint.name())
-                                && lint.name() != UNUSED_IGNORE_COMMENT.name()
-                                && lint.name() != BLANKET_IGNORE_COMMENT.name()
-                            {
-                                suppression_comment_range
-                            } else {
-                                suppressed_range
-                            };
-
                             push_ignore_suppression(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind(),
@@ -746,34 +703,6 @@ impl<'a> SuppressionsBuilder<'a> {
     fn add_invalid_comment(&mut self, kind: SuppressionKind, error: ParseError) {
         self.invalid.push(InvalidSuppression { kind, error });
     }
-}
-
-/// Returns the range covered by an own-line suppression for a suppression-comment diagnostic.
-///
-/// Following comment-only lines are included so an own-line suppression can cover a diagnostic
-/// emitted on the next ignore comment, without also suppressing one on the next logical line.
-fn own_line_suppression_comment_range(
-    range: TextRange,
-    tokens: &Tokens,
-    comment_only_run_end: &mut TextSize,
-) -> TextRange {
-    let comment_token_range = tokens.token_range(range.start());
-
-    if comment_token_range.end() <= *comment_only_run_end {
-        return TextRange::new(range.start(), *comment_only_run_end);
-    }
-
-    *comment_only_run_end = comment_token_range.end();
-
-    for token in tokens.after(comment_token_range.end()) {
-        match token.kind() {
-            TokenKind::Comment => *comment_only_run_end = token.end(),
-            TokenKind::NonLogicalNewline => {}
-            _ => break,
-        }
-    }
-
-    TextRange::new(range.start(), *comment_only_run_end)
 }
 
 /// Returns the range covered by an own-line suppression comment.
@@ -837,7 +766,7 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
         }
     }
 
-    TextRange::new(range.start(), end)
+    TextRange::new(comment_token_start, end)
 }
 
 /// Suppression for an unknown lint rule.
