@@ -6267,7 +6267,9 @@ impl<'db> Type<'db> {
 
                     Ok(instance.inner(db).to_meta_type(db))
                 }
-                KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
+                KnownInstanceType::Callable(callable) => {
+                    Ok(Type::Callable(*callable).expand_eagerly(db))
+                }
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Sentinel(sentinel) => {
                     Ok(Type::KnownInstance(KnownInstanceType::Sentinel(*sentinel)))
@@ -6793,11 +6795,17 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
-                    // detection rather than the visitor's cycle detection, because the visitor tracks
-                    // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                     TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(db).expand_eagerly(db)
+                        if matches!(alias, TypeAliasType::ManualPEP695(_))
+                            && alias.specialization(db).is_some()
+                        {
+                            alias.value_type(db).expand_eagerly(db)
+                        } else {
+                            // This path relies on Salsa's cycle detection rather than the visitor's
+                            // cycle detection, because the visitor tracks Type values and
+                            // `RecursiveList` is different from `RecursiveList[T]`.
+                            alias.raw_value_type(db).expand_eagerly(db)
+                        }
                     },
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.

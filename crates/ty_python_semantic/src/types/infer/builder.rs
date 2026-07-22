@@ -57,11 +57,12 @@ use crate::types::diagnostic::{
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE,
-    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
     report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -116,7 +117,7 @@ use crate::types::{
     any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -3741,7 +3742,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition)),
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition, None)),
         ))
     }
 
@@ -3755,10 +3756,104 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
 
-        self.infer_type_expression(&arguments.args[1]);
+        let value_ty = self.infer_type_expression(&arguments.args[1]);
+        let mut type_params = FxHashSet::default();
+        let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
         for keyword in &arguments.keywords {
             self.infer_expression(&keyword.value, TypeContext::default());
+
+            if !keyword
+                .arg
+                .as_ref()
+                .is_some_and(|name| name.id == "type_params")
+            {
+                continue;
+            }
+
+            let Some(tuple) = keyword.value.as_tuple_expr() else {
+                valid_type_params = false;
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, &keyword.value)
+                {
+                    builder.into_diagnostic(
+                        "The `type_params` argument to `TypeAliasType` must be a tuple literal",
+                    );
+                }
+                continue;
+            };
+
+            let db = self.db();
+            let mut typevar_with_default = None;
+
+            for element in &tuple.elts {
+                let bound_typevar = match self.expression_type(element) {
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                        typevar.with_binding_context(db, definition)
+                    }
+                    Type::TypeVar(typevar) => typevar,
+                    _ => {
+                        valid_type_params = false;
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                        {
+                            builder.into_diagnostic(
+                                "Each `type_params` entry for `TypeAliasType` must be a type variable",
+                            );
+                        }
+                        continue;
+                    }
+                };
+                let typevar = bound_typevar.typevar(db);
+
+                if !type_params.insert(bound_typevar.identity(db)) {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` is duplicated in `type_params`",
+                            typevar.name(db),
+                        ));
+                    }
+                }
+
+                if typevar.default_type(db).is_some() {
+                    typevar_with_default.get_or_insert(typevar);
+                } else if let Some(typevar_with_default) = typevar_with_default {
+                    valid_type_params = false;
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+                            typevar.name(db),
+                            typevar_with_default.name(db),
+                        ));
+                    }
+                    break;
+                }
+            }
+        }
+
+        if valid_type_params {
+            let mut value_typevars = FxOrderSet::default();
+            value_ty.find_legacy_typevars(self.db(), Some(definition), &mut value_typevars);
+
+            for typevar in value_typevars {
+                if !type_params.contains(&typevar.identity(self.db()))
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Type parameter `{}` used in the alias value must be included in `type_params`",
+                        typevar.name(self.db()),
+                    ));
+                }
+            }
         }
 
         self.typevar_binding_context = previous_context;

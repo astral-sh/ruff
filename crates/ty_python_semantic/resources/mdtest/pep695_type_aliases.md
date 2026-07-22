@@ -420,15 +420,182 @@ def f(x: IntOrStr) -> None:
 ### Generic example
 
 ```py
-from typing_extensions import TypeAliasType, TypeVar
+from typing import Callable, Concatenate, Generic
+from typing_extensions import ParamSpec, TypeAliasType, TypeVar, TypeVarTuple, Union, Unpack
 
 T = TypeVar("T")
 
 IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAndT[str]) -> None:
-    # TODO: This should be `tuple[int, str]`
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: tuple[int, str]
+
+reveal_type(IntAndT[str])  # revealed: <type alias 'IntAndT[str]'>
+
+def generic_meta(value: type[IntAndT[str]]) -> None:
+    reveal_type(value)  # revealed: type[tuple[int, str]]
+
+Nested = TypeAliasType("Nested", list[IntAndT[T]], type_params=(T,))
+
+def nested(value: Nested[str]) -> None:
+    reveal_type(value)  # revealed: list[IntAndT[str]]
+
+U = TypeVar("U", default=str)
+
+ListOrSet = TypeAliasType("ListOrSet", Union[list[U], set[U]], type_params=(U,))
+MyDict = TypeAliasType("MyDict", dict[T, U], type_params=(T, U))
+Reordered = TypeAliasType("Reordered", tuple[U, T], type_params=(T, U))
+
+def g(
+    list_or_set_of_int: ListOrSet[int],
+    list_or_set_of_str: ListOrSet,
+    dict_int_str: MyDict[int, str],
+    dict_unknown_str: MyDict,
+    reordered: Reordered[int, str],
+) -> None:
+    reveal_type(list_or_set_of_int)  # revealed: list[int] | set[int]
+    reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+    reveal_type(dict_int_str)  # revealed: dict[int, str]
+    reveal_type(dict_unknown_str)  # revealed: dict[Unknown, str]
+    reveal_type(reordered)  # revealed: tuple[str, int]
+
+ModelAlias = TypeAliasType("ModelAlias", type[T], type_params=(T,))
+
+class Model: ...
+
+class ViaAlias(Generic[T]):
+    def __init__(self, value: ModelAlias[T]) -> None: ...
+
+reveal_type(ViaAlias(Model))  # revealed: ViaAlias[Model]
+
+P = ParamSpec("P")
+R = TypeVar("R")
+WrappedMethod = TypeAliasType("WrappedMethod", Callable[Concatenate[T, P], R], type_params=(T, P, R))
+
+def wrapped_method(value: WrappedMethod[int, P, str]) -> None:
+    reveal_type(value)  # revealed: (int, /, *args: P@wrapped_method.args, **kwargs: P@wrapped_method.kwargs) -> str
+
+WrapsMethod = TypeAliasType("WrapsMethod", Callable[Concatenate[T, ...], R], type_params=(T, R))
+
+def decorate(value: WrapsMethod[T, R], /) -> WrappedMethod[T, P, R]:
+    return value
+
+@decorate
+def decorated(value: int) -> int:
+    return value
+
+reveal_type(decorated)  # revealed: [**P'return](int, /, *args: P'return.args, **kwargs: P'return.kwargs) -> int
+
+Ts = TypeVarTuple("Ts")
+Variadic = TypeAliasType("Variadic", tuple[Unpack[Ts]], type_params=(Ts,))
+
+def variadic(value: Variadic[int, str]) -> None:
+    reveal_type(value)  # revealed: tuple[int, str]
+```
+
+### Recursive generic example
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType, TypeVar, Union
+
+T = TypeVar("T")
+Recursive = TypeAliasType("Recursive", Union[T, list["Recursive[T]"]], type_params=(T,))
+RecursiveCallable = Callable[[Recursive[T]], None]
+
+def recursive(value: Recursive[int]) -> None:
+    reveal_type(value)  # revealed: int | list[Recursive[int]]
+
+def recursive_callable(value: RecursiveCallable[int]) -> None:
+    reveal_type(value)  # revealed: (int | list[Divergent], /) -> None
+```
+
+### Generic specialization errors
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+BoundedT = TypeVar("BoundedT", bound=int)
+
+GenericAlias = TypeAliasType("GenericAlias", list[T], type_params=(T,))
+BoundedAlias = TypeAliasType("BoundedAlias", list[BoundedT], type_params=(BoundedT,))
+NonGenericAlias = TypeAliasType("NonGenericAlias", list[int])
+DefaultedT = TypeVar("DefaultedT", default=str)
+
+# error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+InvalidOrder = TypeAliasType("InvalidOrder", tuple[DefaultedT, T], type_params=(DefaultedT, T))
+
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+reveal_type(GenericAlias[int, str])  # revealed: <type alias 'GenericAlias[Unknown]'>
+
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@BoundedAlias`"
+reveal_type(BoundedAlias[str])  # revealed: <type alias 'BoundedAlias[Unknown]'>
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `NonGenericAlias`"
+reveal_type(NonGenericAlias[int])  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `NonGenericAlias`"
+def non_generic(value: NonGenericAlias[int]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+### Invalid type parameters
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidList = TypeAliasType("InvalidList", list[T], type_params=[T])
+
+params = (T,)
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidTupleVariable = TypeAliasType("InvalidTupleVariable", list[T], type_params=params)
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidUnpack = TypeAliasType("InvalidUnpack", list[T], type_params=(*params,))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidInt = TypeAliasType("InvalidInt", list[int], type_params=(int,))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidNested = TypeAliasType("InvalidNested", list[T], type_params=(list[T],))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidMixed = TypeAliasType("InvalidMixed", list[T], type_params=(int, T))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidString = TypeAliasType("InvalidString", list[int], type_params=("T",))
+
+# error: [invalid-type-alias-type] "Type parameter `U` used in the alias value must be included in `type_params`"
+Missing = TypeAliasType("Missing", dict[T, U], type_params=(T,))
+
+# error: [invalid-type-alias-type] "Type parameter `T` used in the alias value must be included in `type_params`"
+MissingAll = TypeAliasType("MissingAll", list[T])
+
+# error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
+Duplicate = TypeAliasType("Duplicate", list[T], type_params=(T, T))
+```
+
+### Generic alias from `typing`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAliasType, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
+
+def generic_from_typing(value: MyDict[str, int]) -> None:
+    reveal_type(value)  # revealed: dict[str, int]
 ```
 
 ### Generic value binds type variables to alias definition

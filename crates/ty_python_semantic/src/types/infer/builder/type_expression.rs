@@ -23,9 +23,9 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
-    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
+    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
+    todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1357,9 +1357,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                         invalid_type_argument(self, slice)
                     }
-                    value_ty @ Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                        TypeAliasType::PEP695(_),
-                    )) => {
+                    value_ty @ Type::KnownInstance(KnownInstanceType::TypeAliasType(_)) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
                     }
@@ -1592,7 +1590,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                KnownInstanceType::TypeAliasType(type_alias) => {
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
@@ -1641,19 +1639,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::unknown()
                         }
                     }
-                }
-                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    // TODO: support generic "manual" PEP 695 type aliases
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    let mut variables = FxOrderSet::default();
-                    slice_ty.bind_and_find_all_legacy_typevars(
-                        self.db(),
-                        self.typevar_binding_context,
-                        &mut variables,
-                    );
-                    let generic_context =
-                        GenericContext::from_typevar_instances(self.db(), variables);
-                    Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
                 KnownInstanceType::Literal(ty) => {
                     if !self.in_string_annotation() {

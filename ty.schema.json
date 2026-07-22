@@ -959,7 +959,7 @@
         },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
-          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n```",
+          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType, TypeVar\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n\nT = TypeVar(\"T\")\nGenericAlias = TypeAliasType(\"GenericAlias\", list[T], type_params=(T,))  # okay\n# TypeAliasType type parameters must be type variables\nInvalidAlias = TypeAliasType(\"InvalidAlias\", list[T], type_params=(list[T],))  # error\n```",
           "default": "error",
           "oneOf": [
             {
