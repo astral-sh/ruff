@@ -3565,12 +3565,11 @@ impl<'db> PathBounds<'db> {
             sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
         }
 
-        impl PathVisitor for CollectVisitor {
+        impl PathFold for CollectVisitor {
             type Result = ();
-            type Interior = ();
             type Break = Infallible;
 
-            fn visit_satisfied(
+            fn satisfied(
                 &mut self,
                 path: Option<&PathAssignments>,
             ) -> ControlFlow<Self::Break, Self::Result> {
@@ -3582,37 +3581,19 @@ impl<'db> PathBounds<'db> {
                 ControlFlow::Continue(())
             }
 
-            fn visit_unsatisfied(
+            fn unsatisfied(
                 &mut self,
                 _path: Option<&PathAssignments>,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+            fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn enter_interior(
+            fn combine(
                 &mut self,
-                _interior_node: InteriorNode,
-            ) -> ControlFlow<Self::Break, Self::Interior> {
-                ControlFlow::Continue(())
-            }
-
-            fn extend_path(
-                &mut self,
-                _interior_value: &Self::Interior,
-                _subtree: Self::Result,
-                _path: &PathAssignments,
-                _new_range: Range<usize>,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn leave_interior(
-                &mut self,
-                _interior_value: &Self::Interior,
                 _if_true: Self::Result,
                 _if_uncertain: Self::Result,
                 _if_false: Self::Result,
@@ -4321,7 +4302,7 @@ impl InteriorNode {
                 ControlFlow::Continue((disposition, interior.constraint, interior.source_order))
             }
 
-            fn extend_path(
+            fn visit_edge(
                 &mut self,
                 interior: &Self::Interior,
                 subtree: Self::Result,
@@ -4392,7 +4373,7 @@ impl InteriorNode {
                     // If we are removing this node, then we replace it with the OR of all of its
                     // outgoing edges. That is, the result is true if there's any assignment of
                     // this node's constraint that is true. (We will have already added any
-                    // necessary derived facts in the `extend_path` method.)
+                    // necessary derived facts in the `visit_edge` method.)
                     Disposition::Remove => ControlFlow::Continue(
                         if_true
                             .or(self.builder, if_uncertain)
@@ -6310,48 +6291,62 @@ impl SequentMap {
 
 /// A visitor for walking the paths of a BDD.
 ///
-/// You can use this in one of two ways: bottom-up or top-down.
+/// **NOTE**: This trait gives you full control over the walking process: in particular, you have
+/// more opportunities to abort the walk early. If you want to perform a simple "fold" over all of
+/// the paths, the [`PathFold`] trait is easier to implement, and can also be used as a
+/// `PathVisitor`.
 ///
-/// You'll use a bottom-up visitor when you are doing something "fold-like" — generating a single
-/// value (of your `Result` type) that summarizes all of the paths. You implement
-/// `visit_satisfied`, `visit_unsatisfied`, and `visit_impossible` to define the "base" value for
-/// each path in the BDD. You implement `enter_interior`, `extend_path`, and `leave_interior` to
-/// define how that value should be updated as we unwind the path walk stack; they are given the
-/// values computed for each subtree, and must figure out how to combine them into the summary
-/// value for the subtree rooted at that node.
+/// Each path starts at the root node and ends at a terminal node, and represents one family of
+/// typevar assignments described by the BDD. Each path can be either _satisfied_, meaning that
+/// this family of assignments is accepted by the constraint set; _unsatisfied_, meaning that this
+/// family of assignments is _not_ accepted by the constraint set; or _impossible_, meaning that
+/// this family of assignments contains a contradiction, and cannot possibly ever occur.
 ///
-/// You'll use a top-down visitor when you are doing something "map-like" — generating a separate
-/// value for each path. You implement `visit_satisfied`, `visit_unsatisfied`, and
-/// `visit_impossible`, which will be called for each path, and process the corresponding
-/// [`PathAssignments`]. If you produce some data representing the path, you are responsible for
-/// storing that data somewhere. (You could use a collection like [`Vec`] as your `Result`, and
-/// concatenate subtree vecs in your `combine_interior` method; but it will typically be more
-/// efficient to maintain an accumulator yourself, and append into it directly in your leaf
-/// methods.)
+/// To visit the BDD paths:
 ///
-/// In either case, all of your methods can return [`ControlFlow::Break`] to abort the path walk.
+/// - We start at the root node.
+///
+/// - Each time we encounter an interior node, we call the visitor's `enter_interior` method. We
+///   then process walk the interior node's `true`, `uncertain`, and `false` outgoing edges.
+///
+/// - To process an edge, we recursively visit the node that the edge points to (getting a `Result`
+///   for that subtree), and then call the visitor's `visit_edge` method. This lets you modify the
+///   subtree's value based on the assignments that were added to the path by this edge. (This
+///   includes at least the constraint checked by the interior node containing this edge, and can
+///   also include any additional derived facts that we learn based on whatever other assignments
+///   currently hold on the path.)
+///
+/// - Once we have processed all of the edges for an interior node, we call the visitor's
+///   `leave_interior` method. This lets you combine the `Result`s from each outgoing edge into a
+///   single `Result` that represents the subtree rooted at this interior node.
+///
+/// Throughout this process, if any of your methods return [`ControlFlow::Break`], we will abort
+/// the path walk and immediately return that value.
 trait PathVisitor {
     type Result;
     type Interior;
     type Break;
 
-    /// Called once for each satisfied path in the BDD. `path` will contain all of the assignments
-    /// on this path.
+    /// Called when we reach the end of a satisfied path. `path` will contain all of the
+    /// assignments on this path. The `Result` value that you return will be propagated back up as
+    /// we "unwind" this path.
     fn visit_satisfied(
         &mut self,
         path: Option<&PathAssignments>,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
-    /// Called once for each unsatisfied path in the BDD. `path` will contain all of the
-    /// assignments on this path.
+    /// Called when we reach the end of an unsatisfied path. `path` will contain all of the
+    /// assignments on this path. The `Result` value that you return will be propagated back up as
+    /// we "unwind" this path.
     fn visit_unsatisfied(
         &mut self,
         path: Option<&PathAssignments>,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
-    /// Called once for each impossible path in the BDD. A path can be impossible because its
-    /// assignments contradict each other, or because an edge is structurally absent (such as the
-    /// uncertain edge when visiting a negated BDD).
+    /// Called when we determine that a path is impossible, either because its assignments
+    /// contradict each other, or because an edge is structurally absent (such as the uncertain
+    /// edge when visiting a negated BDD). The `Result` value that you return will be propagated
+    /// back up as we "unwind" this path.
     ///
     /// TODO: Provide a path for contradictions, and make sure it includes all of the assignments
     /// that led to the contradiction.
@@ -6359,7 +6354,7 @@ trait PathVisitor {
 
     /// Called on the way down as we enter each interior node. You can create a
     /// [`Interior`][Self::Interior] value that will be passed to the
-    /// [`extend_path`][Self::extend_path] and [`leave_interior`][Self::leave_interior] methods
+    /// [`visit_edge`][Self::visit_edge] and [`leave_interior`][Self::leave_interior] methods
     /// when we call them for this node.
     fn enter_interior(
         &mut self,
@@ -6369,7 +6364,7 @@ trait PathVisitor {
     /// Called once for each edge in the BDD. You are given the [`Result`][Self::Result] value
     /// of the subtree that the edge points to, as well as the origin and derived assignments that
     /// are added by the edge.
-    fn extend_path(
+    fn visit_edge(
         &mut self,
         interior_value: &Self::Interior,
         subtree: Self::Result,
@@ -6388,32 +6383,64 @@ trait PathVisitor {
     ) -> ControlFlow<Self::Break, Self::Result>;
 }
 
-/// A [`PathVisitor`] that breaks early if it encounters a satisfied path. When applying this
-/// visitor, a `Continue` result indicates that no satisfied path was found, and the BDD was
-/// therefore unsatisfiable. A `Break` result indicates the opposite.
-struct IsNeverSatisfiedVisitor;
+/// A visitor for "folding" over the paths in a BDD, producing a single value that summarizes all
+/// of them.
+///
+/// This is a simpler trait to implement when you don't need as much control over the path walk.
+/// Any type that implements this trait can also be used as a [`PathVisitor`].
+trait PathFold {
+    type Result;
+    type Break;
 
-impl PathVisitor for IsNeverSatisfiedVisitor {
-    type Result = ();
+    /// Returns the base case value that represents a satisfied path.
+    fn satisfied(
+        &mut self,
+        path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Returns the base case value that represents an unsatisfied path.
+    fn unsatisfied(
+        &mut self,
+        path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Returns the base case value that represents an impossible path.
+    fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Combines the values for each subtree of an interior node, returning a value that represents
+    /// the subtree rooted at that node.
+    fn combine(
+        &mut self,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+}
+
+impl<T> PathVisitor for T
+where
+    T: PathFold,
+{
+    type Result = <T as PathFold>::Result;
     type Interior = ();
-    type Break = ();
+    type Break = <T as PathFold>::Break;
 
     fn visit_satisfied(
         &mut self,
-        _path: Option<&PathAssignments>,
+        path: Option<&PathAssignments>,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Break(())
+        PathFold::satisfied(self, path)
     }
 
     fn visit_unsatisfied(
         &mut self,
-        _path: Option<&PathAssignments>,
+        path: Option<&PathAssignments>,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
+        PathFold::unsatisfied(self, path)
     }
 
     fn visit_impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
+        PathFold::impossible(self)
     }
 
     fn enter_interior(
@@ -6423,19 +6450,56 @@ impl PathVisitor for IsNeverSatisfiedVisitor {
         ControlFlow::Continue(())
     }
 
-    fn extend_path(
+    fn visit_edge(
         &mut self,
         _interior_value: &Self::Interior,
-        _subtree: Self::Result,
+        subtree: Self::Result,
         _path: &PathAssignments,
         _new_range: Range<usize>,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
+        ControlFlow::Continue(subtree)
     }
 
     fn leave_interior(
         &mut self,
         _interior_value: &Self::Interior,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::combine(self, if_true, if_uncertain, if_false)
+    }
+}
+
+/// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
+/// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
+/// unsatisfiable. A `Break` result indicates the opposite.
+struct IsNeverSatisfiedVisitor;
+
+impl PathFold for IsNeverSatisfiedVisitor {
+    type Result = ();
+    type Break = ();
+
+    fn satisfied(
+        &mut self,
+        _path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Break(())
+    }
+
+    fn unsatisfied(
+        &mut self,
+        _path: Option<&PathAssignments>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn impossible(&mut self) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn combine(
+        &mut self,
         _if_true: Self::Result,
         _if_uncertain: Self::Result,
         _if_false: Self::Result,
@@ -6630,7 +6694,7 @@ impl PathAssignments {
                                 path.visit_inner(db, builder, true_subtree, visitor, negated);
                             match subtree {
                                 ControlFlow::Continue(subtree) => {
-                                    visitor.extend_path(&interior_value, subtree, path, new_range)
+                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
                                 }
                                 ControlFlow::Break(b) => ControlFlow::Break(b),
                             }
@@ -6656,7 +6720,7 @@ impl PathAssignments {
                             );
                             match subtree {
                                 ControlFlow::Continue(subtree) => {
-                                    visitor.extend_path(&interior_value, subtree, path, new_range)
+                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
                                 }
                                 ControlFlow::Break(b) => ControlFlow::Break(b),
                             }
@@ -6681,7 +6745,7 @@ impl PathAssignments {
                                 path.visit_inner(db, builder, false_subtree, visitor, negated);
                             match subtree {
                                 ControlFlow::Continue(subtree) => {
-                                    visitor.extend_path(&interior_value, subtree, path, new_range)
+                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
                                 }
                                 ControlFlow::Break(b) => ControlFlow::Break(b),
                             }
