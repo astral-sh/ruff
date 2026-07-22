@@ -1463,6 +1463,8 @@ class A: ...
 class B: ...
 class ASource(Source[A]): ...
 class BSource(Source[B]): ...
+class IntSource(Source[int]): ...
+class StrSource(Source[str]): ...
 
 def element(x: Source[ElementT]) -> ElementT:
     return x.get()
@@ -1471,6 +1473,29 @@ def f(x: ASource) -> None:
     if isinstance(x, BSource):
         reveal_type(x)  # revealed: ASource & BSource
         reveal_type(element(x))  # revealed: A & B
+
+def f(x: IntSource) -> None:
+    if isinstance(x, StrSource):
+        reveal_type(x)  # revealed: IntSource & StrSource
+        reveal_type(element(x))  # revealed: Never
+```
+
+Generic constructors still reconstruct their return type from a single inferred specialization, so
+an iterable intersection does not yet refine the constructed list's element type:
+
+```py
+from typing import Sequence
+from ty_extensions import Intersection
+
+def explicit(x: Intersection[Sequence[int], str]) -> None:
+    # TODO: revealed: list[Never]
+    reveal_type(list(x))  # revealed: list[int]
+
+def narrowed(x: Sequence[int]) -> None:
+    if isinstance(x, str):
+        reveal_type(x)  # revealed: Sequence[int] & str
+        # TODO: revealed: list[Never]
+        reveal_type(list(x))  # revealed: list[int]
 ```
 
 An outer covariant generic in the return type remains outside the intersection. A meet-preserving

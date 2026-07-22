@@ -5044,6 +5044,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
+    ///
+    /// TODO: Once specialization inference fully owns generic argument validation, this field can
+    /// be removed.
     constraint_set_errors: Vec<bool>,
 }
 
@@ -5197,10 +5200,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let parameter = &self.signature.parameters()[parameter_index];
+                        let has_starred_annotation = parameter.has_starred_annotation();
                         let mut declared_type = parameter.annotated_type();
                         // An unpacked homogeneous tuple describes each matched argument, not the
                         // tuple containing those arguments.
-                        if parameter.has_starred_annotation()
+                        if has_starred_annotation
                             && let Some(TupleSpec::Variable(variable)) =
                                 declared_type.exact_tuple_instance_spec(self.db).as_deref()
                             && variable.prefix_elements().is_empty()
@@ -5217,11 +5221,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             adjusted_argument_index,
                             declared_type,
                             argument_type,
-                            has_starred_annotation: parameter.has_starred_annotation(),
+                            has_starred_annotation,
                         })
                     })
             },
         )
+    }
+
+    fn inference_argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + '_ {
+        self.argument_relations().filter(|relation| {
+            inferable_typevar_occurrences(self.db, relation.declared_type, self.inferable_typevars)
+                > 0
+        })
     }
 
     /// Returns `true` if every argument relation that contributes to specialization inference is
@@ -5233,16 +5244,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ///
     /// TODO: Replace this call-wide check with path-level gradual-evidence tracking.
     fn argument_relations_are_fully_static(&self) -> bool {
-        self.argument_relations().all(|relation| {
-            if inferable_typevar_occurrences(
-                self.db,
-                relation.declared_type,
-                self.inferable_typevars,
-            ) == 0
-            {
-                return true;
-            }
-
+        self.inference_argument_relations().all(|relation| {
             relation.argument_type.bottom_materialization(self.db)
                 == relation.argument_type.top_materialization(self.db)
                 && !relation.declared_type.has_dynamic(self.db)
@@ -5252,16 +5254,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// Returns `true` if `specialization` independently validates every argument relation that
     /// contributes to specialization inference.
     fn specialization_validates_arguments(&self, specialization: Specialization<'db>) -> bool {
-        self.argument_relations().all(|relation| {
-            if inferable_typevar_occurrences(
-                self.db,
-                relation.declared_type,
-                self.inferable_typevars,
-            ) == 0
-            {
-                return true;
-            }
-
+        self.inference_argument_relations().all(|relation| {
             relation
                 .argument_type
                 .apply_specialization(self.db, specialization)
@@ -5527,8 +5520,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // every retained `R[T]`, so their intersection is sound regardless of why
                 // `pending` is disjunctive.
                 let returns: Vec<_> = paths
-                    .iter()
-                    .copied()
+                    .into_iter()
                     .filter_map(|inference| {
                         if !inference.is_complete_for(self.db, original_return_ty)
                             || !inference.is_fully_static(self.db)
@@ -5706,8 +5698,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // where assignability holds; normally we want to check that assignability holds for
         // _all_ specializations.
         //
-        // Note that we silence diagnostics here if specialization inference already produced a
-        // sufficiently precise error for this argument.
+        // Note that we silence diagnostics here if we already got a SpecializationError from the
+        // new constraint set solver for this argument. The constraint-set solver is the authority
+        // for these parameters, and this assignability check would re-detect the same
+        // incompatibility against a less-informative fallback specialization.
         //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
