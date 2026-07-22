@@ -175,14 +175,12 @@ def compare_optional_left(left: Choice | None, right: Choice):
         reveal_type(right)  # revealed: Choice
     else:
         reveal_type(left)  # revealed: Choice | None
-        reveal_type(right)  # revealed: Choice
 
 def compare_optional_right(left: Choice, right: Choice | None):
     if left == right:
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice
     else:
-        reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice | None
 
 def compare_mixed_union_left(left: Choice | int, right: Choice):
@@ -191,20 +189,17 @@ def compare_mixed_union_left(left: Choice | int, right: Choice):
         reveal_type(right)  # revealed: Choice
     else:
         reveal_type(left)  # revealed: Choice | int
-        reveal_type(right)  # revealed: Choice
 
 def compare_mixed_union_right(left: Choice, right: Choice | int):
     if left == right:
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice
     else:
-        reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice | int
 
 def compare_multi_arm_union(left: Choice | int | None, right: Choice):
     if left != right:
         reveal_type(left)  # revealed: Choice | int | None
-        reveal_type(right)  # revealed: Choice
     else:
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice
@@ -215,14 +210,12 @@ def compare_nested_dynamic_union_left(left: Choice | dict[str, Any], right: Choi
         reveal_type(right)  # revealed: Choice
     else:
         reveal_type(left)  # revealed: Choice | dict[str, Any]
-        reveal_type(right)  # revealed: Choice
 
 def compare_nested_dynamic_union_right(left: Choice, right: Choice | dict[str, Any]):
     if left == right:
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice
     else:
-        reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice | dict[str, Any]
 
 def compare_optional_singleton(left: Choice | None, right: Literal[Choice.FIRST]):
@@ -473,14 +466,12 @@ def compare_optional_integer_enum_left(left: Foo | None, right: Bar):
         reveal_type(right)  # revealed: Bar
     else:
         reveal_type(left)  # revealed: Foo | None
-        reveal_type(right)  # revealed: Bar
 
 def compare_optional_integer_enum_right(left: Foo, right: Bar | None):
     if left == right:
         reveal_type(left)  # revealed: Foo
         reveal_type(right)  # revealed: Bar
     else:
-        reveal_type(left)  # revealed: Foo
         reveal_type(right)  # revealed: Bar | None
 ```
 
@@ -538,20 +529,31 @@ def compare_subsets(
         reveal_type(left)  # revealed: Literal[Left.SHARED]
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 
+def compare_cross_enum_residual_truthiness(
+    left: Literal[Left.A] | None,
+    disjoint: Literal[Right.B] | Literal[1],
+    overlapping: Literal[Right.B] | None,
+    matching_left: Literal[Left.SHARED] | Literal["shared"],
+    matching_right: Literal[Right.SHARED],
+):
+    reveal_type(left == disjoint)  # revealed: Literal[False]
+    reveal_type(left != disjoint)  # revealed: Literal[True]
+    reveal_type(left == overlapping)  # revealed: bool
+    reveal_type(matching_left == matching_right)  # revealed: Literal[True]
+    reveal_type(matching_left != matching_right)  # revealed: Literal[False]
+
 def compare_optional_cross_enum_left(left: Left | None, right: Right):
     if left == right:
         reveal_type(left)  # revealed: Literal[Left.SHARED]
         reveal_type(right)  # revealed: Literal[Right.SHARED]
     else:
         reveal_type(left)  # revealed: Left | None
-        reveal_type(right)  # revealed: Right
 
 def compare_optional_cross_enum_right(left: Left, right: Right | None):
     if left == right:
         reveal_type(left)  # revealed: Literal[Left.SHARED]
         reveal_type(right)  # revealed: Literal[Right.SHARED]
     else:
-        reveal_type(left)  # revealed: Left
         reveal_type(right)  # revealed: Right | None
 
 def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
@@ -848,7 +850,6 @@ def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
         reveal_type(right)  # revealed: CustomRight
     else:
         reveal_type(left)  # revealed: CustomLeft | None
-        reveal_type(right)  # revealed: CustomRight
 
 def compare_optional_open(left: OpenLeft | None, right: CustomRight):
     if left == right:
@@ -856,7 +857,6 @@ def compare_optional_open(left: OpenLeft | None, right: CustomRight):
         reveal_type(right)  # revealed: CustomRight
     else:
         reveal_type(left)  # revealed: OpenLeft | None
-        reveal_type(right)  # revealed: CustomRight
 ```
 
 The same narrowing applies when comparing enum members directly with their inherited integer or
