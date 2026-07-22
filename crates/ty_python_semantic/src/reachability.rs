@@ -200,12 +200,12 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
-        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        ActiveRecursionDetector, CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        callable_pattern_type, definite_match_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1290,7 +1290,14 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
-            equality_truthiness(db, subject_ty, value_ty)
+            equality_truthiness(
+                db,
+                subject_ty,
+                value_ty,
+                ComparisonSoundnessPolicy::from_analysis_settings(
+                    db.analysis_settings(value.file(db)),
+                ),
+            )
         }
         PatternPredicateKind::Singleton(singleton) => {
             let singleton_ty = singleton_pattern_type(db, *singleton);

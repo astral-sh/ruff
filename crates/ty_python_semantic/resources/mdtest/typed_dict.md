@@ -5281,8 +5281,8 @@ def _(x: Intersection[NonLiteralTD, Any]):
 ```
 
 This is especially important when the field type is disjoint from the comparison literal. Even
-though `str` and `int` are disjoint, we can't narrow here because a `str` subclass could override
-`__eq__` to return `True`. Without proper handling, this would wrongly narrow to `Never`:
+though a `str` subclass could override `__eq__` to return `True`, by default we assume it does not.
+Since `str` and `int` are disjoint, the positive branch narrows to `Never`:
 
 ```py
 from ty_extensions import Intersection
@@ -5293,7 +5293,7 @@ class StrTagTD(TypedDict):
 
 def _(x: Intersection[StrTagTD, Any]):
     if x["tag"] == 42:
-        reveal_type(x)  # revealed: StrTagTD & Any
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
 ```

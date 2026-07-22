@@ -121,13 +121,11 @@ def _(target: int):
 ## Value match
 
 A value pattern matches based on equality: the first `case` branch here will be taken if `subject`
-is equal to `2`, even if `subject` is not an instance of `int`. We can't know whether `C` here has a
-custom `__eq__` implementation that might cause it to compare equal to `2`, so we have to consider
-the possibility that the `case` branch might be taken even though the type `C` is disjoint from the
-type `Literal[2]`.
+is equal to `2`, even if `subject` is not an instance of `int`. By default, we assume that
+subclasses of `C` do not override equality, so the `case` branch cannot be taken when the type `C`
+is disjoint from the type `Literal[2]`.
 
-This leads us to infer `Literal[1, 3]` as the type of `y` after the `match` statement, rather than
-`Literal[1]`:
+This leads us to infer `Literal[1]` as the type of `y` after the `match` statement:
 
 ```py
 class C: ...
@@ -137,7 +135,7 @@ def _(subject: C):
     match subject:
         case 2:
             y = 3
-    reveal_type(y)  # revealed: Literal[1, 3]
+    reveal_type(y)  # revealed: Literal[1]
 ```
 
 However, in this variant, we can prove that `D` here does not have a custom `__eq__` implementation,
@@ -589,14 +587,14 @@ def _(target: int | str):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
-### Enabling strict literal narrowing
+### Enabling strict equality narrowing
 
-With strict literal narrowing enabled, broad builtin types are preserved both in the capture and
+With strict equality narrowing enabled, broad builtin types are preserved both in the capture and
 when narrowing the subject for later cases:
 
 ```toml
 [analysis]
-strict-literal-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py

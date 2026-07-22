@@ -2843,6 +2843,31 @@ def custom_comparison_pattern(value: str | AlwaysEqual):
             reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
 ```
 
+Classes that inherit identity-based equality can still compare equal when one is a subclass of the
+other, or when they can share a subclass through multiple inheritance:
+
+```py
+class Base: ...
+class Child(Base): ...
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+class Values:
+    CHILD = Child()
+    RIGHT = Right()
+
+def inherited_pattern(value: Base | None):
+    match value:
+        case Values.CHILD:
+            reveal_type(value)  # revealed: Base
+
+def overlapping_pattern(value: Left | None):
+    match value:
+        case Values.RIGHT:
+            reveal_type(value)  # revealed: Left
+```
+
 Consider the following example.
 
 ```py
@@ -2860,7 +2885,7 @@ def _(x: Literal["foo"] | int):
 
 In the first `match`, the broad `int` arm is assumed to use builtin equality and cannot compare
 equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabling
-`strict-literal-narrowing` disables this optimistic treatment of broad builtin types.
+`strict-equality-semantics` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
 disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:

@@ -1391,10 +1391,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     }
 
     fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
-        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
-            self.db
-                .analysis_settings(self.scope.file(self.db))
-                .strict_literal_narrowing,
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope.file(self.db)),
         )
     }
 
@@ -2101,8 +2099,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         if let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(self.db) {
             let key_ty = key_ty.resolve_type_alias(self.db);
             let typed_dict_key_ty = typed_dict.key_type(self.db);
+            let policy = self.comparison_soundness_policy();
             if typed_dict_key_ty.is_never()
-                || equality_truthiness(self.db, typed_dict_key_ty, key_ty)
+                || equality_truthiness(self.db, typed_dict_key_ty, key_ty, policy)
                     == Truthiness::AlwaysFalse
             {
                 return None;
@@ -2683,10 +2682,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
-        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
-            self.db
-                .analysis_settings(self.scope().file(self.db))
-                .strict_literal_narrowing,
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope().file(self.db)),
         )
     }
 

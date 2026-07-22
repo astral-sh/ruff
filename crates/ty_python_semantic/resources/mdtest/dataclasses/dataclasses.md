@@ -28,7 +28,7 @@ reveal_type(alice1.age)  # revealed: int | None
 reveal_type(repr(alice1))  # revealed: str
 
 reveal_type(alice1 == alice2)  # revealed: bool
-reveal_type(alice1 == "Alice")  # revealed: bool
+reveal_type(alice1 == "Alice")  # revealed: Literal[False]
 
 bob = Person("Bob")
 bob2 = Person("Bob", None)

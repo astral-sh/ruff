@@ -606,7 +606,15 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     match kind {
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-            if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
+            if equality_truthiness(
+                db,
+                resolved_subject_ty,
+                value_ty,
+                ComparisonSoundnessPolicy::from_analysis_settings(
+                    db.analysis_settings(value.file(db)),
+                ),
+            ) == Truthiness::AlwaysTrue
+            {
                 return subject_ty;
             }
         }
@@ -705,7 +713,14 @@ pub(crate) fn pattern_fallthrough_type<'db>(
         // whose upper bound is that enum.
         if let Some(enum_literal) = value_ty.as_enum_literal()
             && is_same_enum_pattern_domain(db, subject_ty, enum_literal)
-            && equality_truthiness(db, value_ty, value_ty) == Truthiness::AlwaysTrue
+            && equality_truthiness(
+                db,
+                value_ty,
+                value_ty,
+                ComparisonSoundnessPolicy::from_analysis_settings(
+                    db.analysis_settings(value.file(db)),
+                ),
+            ) == Truthiness::AlwaysTrue
         {
             return IntersectionBuilder::new(db)
                 .add_positive(subject_ty)
@@ -717,10 +732,7 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             subject_ty,
             value_ty,
             false,
-            ComparisonSoundnessPolicy::from_strict_literal_narrowing(
-                db.analysis_settings(value.file(db))
-                    .strict_literal_narrowing,
-            ),
+            ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(value.file(db))),
         ) {
             return IntersectionBuilder::new(db)
                 .add_positive(subject_ty)
@@ -1049,7 +1061,10 @@ pub(crate) fn definite_match_pattern_type<'db>(
             let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             // Only return the type if it's guaranteed to match itself.
             // Otherwise, we can't definitively exclude it from subsequent patterns.
-            if equality_truthiness(db, ty, ty) == Truthiness::AlwaysTrue {
+            let policy = ComparisonSoundnessPolicy::from_analysis_settings(
+                db.analysis_settings(value.file(db)),
+            );
+            if equality_truthiness(db, ty, ty, policy) == Truthiness::AlwaysTrue {
                 ty
             } else {
                 Type::Never
