@@ -423,7 +423,7 @@ jobs:
       matrix:
         platform:
           - ${{ github.repository == 'astral-sh/ruff' && 'depot-windows-2022-16' || 'windows-latest' }}
-          - ${{ github.repository == 'astral-sh/ruff' && 'depot-macos-15' || 'macos-latest' }}
+          - macos-latest
     name: "cargo test (${{ matrix.platform }})"
     runs-on: ${{ matrix.platform }}
     needs: determine_changes
@@ -452,10 +452,27 @@ jobs:
         with:
           version: "0.11.28"
           enable-cache: "true"
+      # The full test suite takes a long time on GitHub-hosted macOS runners. Depot
+      # runners are faster, but we only have limited capacity. Run only OS-sensitive
+      # tests for pull requests; pushes to main still run the complete suite.
       - name: "Run tests"
+        if: ${{ runner.os != 'macOS' || github.event_name != 'pull_request' }}
         run: |
           cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
+      - name: "Run OS-sensitive tests"
+        if: ${{ runner.os == 'macOS' && github.event_name == 'pull_request' }}
+        run: |
+          # Run CLI and real-filesystem/process integration tests.
+          cargo nextest run --all-features --profile ci \
+            --package ruff \
+            --package ruff_db \
+            --package ruff_server \
+            --package ruff_workspace \
+            --package ty \
+            --package ty_module_resolver \
+            --package ty_server \
+            --package ty_site_packages
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
