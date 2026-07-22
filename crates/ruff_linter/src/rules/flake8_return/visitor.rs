@@ -4,6 +4,7 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Default)]
 pub(super) struct Stack<'data> {
@@ -30,11 +31,16 @@ pub(super) struct Stack<'data> {
     pub(super) annotations: FxHashSet<&'data str>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
-    /// The `assignment`-to-`return` statement pairs in the current function.
+    /// The `assignment`-to-`return` statement pairs in the current function, each paired with the
+    /// ranges of any enclosing `finally` suites that run after the `return`.
     /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
     /// removal for the `return` statement.
-    pub(super) assignment_return:
-        Vec<(&'data ast::StmtAssign, &'data ast::StmtReturn, &'data Stmt)>,
+    pub(super) assignment_return: Vec<(
+        &'data ast::StmtAssign,
+        &'data ast::StmtReturn,
+        &'data Stmt,
+        Vec<TextRange>,
+    )>,
 }
 
 pub(super) struct ReturnVisitor<'semantic, 'data> {
@@ -46,6 +52,8 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
     sibling: Option<&'data Stmt>,
     /// The parent nodes of the current node.
     parents: Vec<&'data Stmt>,
+    /// Ranges of the `finally` suites that would run after a `return` reached here.
+    enclosing_finally: Vec<TextRange>,
 }
 
 impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
@@ -55,6 +63,7 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
             stack: Stack::default(),
             sibling: None,
             parents: Vec::new(),
+            enclosing_finally: Vec::new(),
         }
     }
 }
@@ -128,9 +137,12 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //     return x
                         // ```
                         Stmt::Assign(stmt_assign) => {
-                            self.stack
-                                .assignment_return
-                                .push((stmt_assign, stmt_return, stmt));
+                            self.stack.assignment_return.push((
+                                stmt_assign,
+                                stmt_return,
+                                stmt,
+                                self.enclosing_finally.clone(),
+                            ));
                         }
                         // Example:
                         // ```python
@@ -148,6 +160,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                                         stmt_assign,
                                         stmt_return,
                                         stmt,
+                                        self.enclosing_finally.clone(),
                                     ));
                                 }
                             }
@@ -166,6 +179,34 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 if let Some(first) = elif_else_clauses.first() {
                     self.stack.elifs_elses.push((body, first));
                 }
+            }
+            Stmt::Try(stmt_try) => {
+                self.sibling = Some(stmt);
+                self.parents.push(stmt);
+
+                // The `finally` runs after a `return` in the `body`, `handlers`, or `orelse`, so
+                // track its range while visiting those. Not the `finalbody` itself: its own
+                // statements can't re-read a `return`.
+                let finally_range = stmt_try
+                    .finalbody
+                    .first()
+                    .zip(stmt_try.finalbody.last())
+                    .map(|(first, last)| TextRange::new(first.start(), last.end()));
+                if let Some(finally_range) = finally_range {
+                    self.enclosing_finally.push(finally_range);
+                }
+                self.visit_body(&stmt_try.body);
+                for handler in &stmt_try.handlers {
+                    visitor::walk_except_handler(self, handler);
+                }
+                self.visit_body(&stmt_try.orelse);
+                if finally_range.is_some() {
+                    self.enclosing_finally.pop();
+                }
+                self.visit_body(&stmt_try.finalbody);
+
+                self.parents.pop();
+                return;
             }
             _ => {}
         }
