@@ -8274,6 +8274,188 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum PathFoldBreak {
+        Satisfied,
+        Unsatisfied,
+        Impossible,
+        Combine,
+    }
+
+    struct ReconstructPathFold<'b, 'db> {
+        builder: &'b ConstraintSetBuilder<'db>,
+        break_at: Option<PathFoldBreak>,
+    }
+
+    impl ReconstructPathFold<'_, '_> {
+        fn result(&self, at: PathFoldBreak, result: NodeId) -> ControlFlow<PathFoldBreak, NodeId> {
+            if self.break_at == Some(at) {
+                ControlFlow::Break(at)
+            } else {
+                ControlFlow::Continue(result)
+            }
+        }
+    }
+
+    impl PathFold for ReconstructPathFold<'_, '_> {
+        type Result = NodeId;
+        type Break = PathFoldBreak;
+
+        fn satisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
+            let result = path.assignments.iter().fold(
+                ALWAYS_TRUE,
+                |result, (assignment, (source_order, _))| {
+                    result.and(
+                        self.builder,
+                        Node::new_satisfied_constraint(self.builder, *assignment, *source_order),
+                    )
+                },
+            );
+            self.result(PathFoldBreak::Satisfied, result)
+        }
+
+        fn unsatisfied(
+            &mut self,
+            _path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            self.result(PathFoldBreak::Unsatisfied, ALWAYS_FALSE)
+        }
+
+        fn impossible(
+            &mut self,
+            _path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            self.result(PathFoldBreak::Impossible, ALWAYS_FALSE)
+        }
+
+        fn combine(
+            &mut self,
+            if_true: Self::Result,
+            if_uncertain: Self::Result,
+            if_false: Self::Result,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            let result = if_true
+                .or(self.builder, if_uncertain)
+                .or(self.builder, if_false);
+            self.result(PathFoldBreak::Combine, result)
+        }
+    }
+
+    fn path_assignments_for(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> PathAssignments {
+        match node.node() {
+            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::Interior(interior) => interior.path_assignments(builder),
+        }
+    }
+
+    #[test]
+    fn path_fold_reconstructs_constraint_sets() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let builder = ConstraintSetBuilder::new();
+
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+        let v_bytes = create_constraint(&db, &builder, v, KnownClass::Bytes);
+        let union = t_int.or(&db, &builder, || u_int);
+        let intersection = union.and(&db, &builder, || t_str.or(&db, &builder, || v_bytes));
+        let contradiction = t_int.and(&db, &builder, || t_str);
+        let tautology = union.or(&db, &builder, || union.negate(&db, &builder));
+
+        let t_u = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, Type::TypeVar(u));
+        let u_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            u,
+            KnownClass::Int.to_instance(&db),
+        );
+        let int_t = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let transitive = t_u
+            .and(&db, &builder, || u_int_upper)
+            .and(&db, &builder, || int_t)
+            .or(&db, &builder, || v_bytes);
+
+        for set in [
+            ConstraintSet::always(&builder),
+            ConstraintSet::never(&builder),
+            union,
+            intersection,
+            contradiction,
+            tautology,
+            transitive,
+        ] {
+            let mut path = path_assignments_for(&builder, set.node);
+            let mut fold = ReconstructPathFold {
+                builder: &builder,
+                break_at: None,
+            };
+            let ControlFlow::Continue(reconstructed) =
+                path.visit(&db, &builder, set.node, &mut fold)
+            else {
+                panic!("reconstruction unexpectedly aborted");
+            };
+            let reconstructed = ConstraintSet::from_node(&builder, reconstructed);
+            assert!(
+                set.iff(&db, &builder, reconstructed)
+                    .is_always_satisfied(&db)
+            );
+        }
+    }
+
+    #[test]
+    fn path_fold_break_restores_path_assignments() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+        let set = t_int
+            .and(&db, &builder, || t_str)
+            .or(&db, &builder, || u_int);
+
+        for break_at in [
+            PathFoldBreak::Satisfied,
+            PathFoldBreak::Unsatisfied,
+            PathFoldBreak::Impossible,
+            PathFoldBreak::Combine,
+        ] {
+            let mut path = path_assignments_for(&builder, set.node);
+            let mut aborting_fold = ReconstructPathFold {
+                builder: &builder,
+                break_at: Some(break_at),
+            };
+            assert_eq!(
+                path.visit(&db, &builder, set.node, &mut aborting_fold),
+                ControlFlow::Break(break_at)
+            );
+
+            let mut completing_fold = ReconstructPathFold {
+                builder: &builder,
+                break_at: None,
+            };
+            let ControlFlow::Continue(reconstructed) =
+                path.visit(&db, &builder, set.node, &mut completing_fold)
+            else {
+                panic!("reconstruction unexpectedly aborted after {break_at:?}");
+            };
+            let reconstructed = ConstraintSet::from_node(&builder, reconstructed);
+            assert!(
+                set.iff(&db, &builder, reconstructed)
+                    .is_always_satisfied(&db)
+            );
+        }
+    }
+
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the
     /// original (though the structure may differ since negation produces flat TDDs).
     #[test]
