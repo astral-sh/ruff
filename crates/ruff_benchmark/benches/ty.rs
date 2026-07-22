@@ -681,26 +681,20 @@ fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
 
     benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
 
-    let mixed_code = code.replace("LargeEnum | None", "LargeEnum | int");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[mixed_union_str_enum_comparison]",
-        &mixed_code,
-    );
-
-    let nested_dynamic_code = code.replace("LargeEnum | None", "LargeEnum | dict[str, Any]");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[nested_dynamic_str_enum_comparison]",
-        &nested_dynamic_code,
-    );
-
-    let dynamic_code = code.replace("LargeEnum | None", "LargeEnum | Any");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[dynamic_str_enum_comparison]",
-        &dynamic_code,
-    );
+    for (name, replacement) in [
+        (
+            "ty_micro[mixed_union_str_enum_comparison]",
+            "LargeEnum | int",
+        ),
+        (
+            "ty_micro[nested_dynamic_str_enum_comparison]",
+            "LargeEnum | dict[str, Any]",
+        ),
+        ("ty_micro[dynamic_str_enum_comparison]", "LargeEnum | Any"),
+    ] {
+        let code = code.replace("LargeEnum | None", replacement);
+        benchmark_enum_comparison(criterion, name, &code);
+    }
 }
 
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
@@ -767,19 +761,19 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
         &optional_code,
     );
 
-    let both_optional_code = optional_code.replace("right: Right", "right: Right | None");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[both_optional_cross_str_enum_comparison]",
-        &both_optional_code,
-    );
-
-    let mixed_code = optional_code.replace("right: Right", "right: Right | int");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[mixed_cross_str_enum_comparison]",
-        &mixed_code,
-    );
+    for (name, replacement) in [
+        (
+            "ty_micro[both_optional_cross_str_enum_comparison]",
+            "right: Right | None",
+        ),
+        (
+            "ty_micro[mixed_cross_str_enum_comparison]",
+            "right: Right | int",
+        ),
+    ] {
+        let code = optional_code.replace("right: Right", replacement);
+        benchmark_enum_comparison(criterion, name, &code);
+    }
 }
 
 /// Ensure comparisons of unions spanning several scalar enum classes avoid member-pair expansion.
