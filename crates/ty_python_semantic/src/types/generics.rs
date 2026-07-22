@@ -2718,20 +2718,53 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         path_bound: &PathBound<'db>,
     ) -> Option<SpecializationError<'db>> {
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
         match bound_typevar
             .typevar(self.db)
             .bound_or_constraints(self.db)?
         {
-            TypeVarBoundOrConstraints::UpperBound(bound) => (!argument
-                .when_assignable_to(self.db, bound, self.constraints, self.inferable)
-                .is_always_satisfied(self.db))
-            .then_some(SpecializationError::MismatchedBound {
-                bound_typevar,
-                argument,
-            }),
-            TypeVarBoundOrConstraints::Constraints(_) => {
-                (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                let argument = path_bound.lower?;
+                (!argument
+                    .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                    .is_always_satisfied(self.db))
+                .then_some(SpecializationError::MismatchedBound {
+                    bound_typevar,
+                    argument,
+                })
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                let is_possibly_assignable = |source: Type<'db>, target: Type<'db>| {
+                    let when = source.when_constraint_set_assignable_to_owned(self.db, target);
+                    !self
+                        .constraints
+                        .load(self.db, &when)
+                        .is_never_satisfied(self.db)
+                };
+                let declared_constraints = constraints.elements(self.db);
+                let argument = path_bound
+                    .lower
+                    .filter(|argument| {
+                        declared_constraints.iter().all(|constraint| {
+                            !is_possibly_assignable(
+                                *argument,
+                                constraint.top_materialization(self.db),
+                            )
+                        })
+                    })
+                    .or_else(|| {
+                        path_bound
+                            .has_upper()
+                            .then(|| path_bound.upper.materialize_exact(self.db))
+                            .filter(|upper| {
+                                declared_constraints.iter().all(|constraint| {
+                                    !is_possibly_assignable(
+                                        constraint.bottom_materialization(self.db),
+                                        *upper,
+                                    )
+                                })
+                            })
+                    })?;
+                Some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
                     argument,
                 })
@@ -2753,6 +2786,101 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(()) | Err(ConstraintSetInferenceError::Unsatisfiable) => Ok(()),
             Err(ConstraintSetInferenceError::InvalidTypeVar(error)) => Err(error),
         }
+    }
+
+    /// Records an actual-intersection constraint set and preserves one diagnostic for all failed
+    /// positive elements. Lower-bound evidence meets across those elements; upper-bound evidence
+    /// joins.
+    fn infer_from_intersection_constraint_set(
+        &mut self,
+        when: ConstraintSet<'db, 'c>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let mut typevar_errors = Vec::new();
+        let solutions = when.solutions_with(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |_variance, path_bound| {
+                let solution = PathBounds::default_solve(self.db, self.constraints, path_bound);
+                if solution.is_err()
+                    && let Some(error) = self.specialization_error_from_failed_bounds(path_bound)
+                {
+                    typevar_errors.push((
+                        error,
+                        path_bound.lower.is_some(),
+                        path_bound.has_upper(),
+                    ));
+                }
+                solution
+            },
+        );
+        self.pending.intersect(self.db, self.constraints, when);
+
+        if !matches!(solutions, Solutions::Unsatisfiable) {
+            return Ok(());
+        }
+
+        let Some((first, _, _)) = typevar_errors.first() else {
+            return Ok(());
+        };
+        if typevar_errors.len() < 2
+            || typevar_errors
+                .iter()
+                .any(|(error, _, _)| error.bound_typevar() != first.bound_typevar())
+            || typevar_errors.iter().any(|(error, _, _)| {
+                !matches!(
+                    (first, error),
+                    (
+                        SpecializationError::MismatchedBound { .. },
+                        SpecializationError::MismatchedBound { .. }
+                    ) | (
+                        SpecializationError::MismatchedConstraint { .. },
+                        SpecializationError::MismatchedConstraint { .. }
+                    )
+                )
+            })
+        {
+            return Err(first.clone());
+        }
+
+        let has_only_lower_bounds = typevar_errors
+            .iter()
+            .all(|(_, has_lower, has_upper)| *has_lower && !has_upper);
+        let has_only_upper_bounds = typevar_errors
+            .iter()
+            .all(|(_, has_lower, has_upper)| !has_lower && *has_upper);
+        let argument = if has_only_lower_bounds {
+            IntersectionType::from_elements(
+                self.db,
+                typevar_errors
+                    .iter()
+                    .map(|(error, _, _)| error.argument_type()),
+            )
+        } else if has_only_upper_bounds {
+            UnionType::from_elements(
+                self.db,
+                typevar_errors
+                    .iter()
+                    .map(|(error, _, _)| error.argument_type()),
+            )
+        } else {
+            return Err(first.clone());
+        };
+
+        Err(match first {
+            SpecializationError::MismatchedBound { bound_typevar, .. } => {
+                SpecializationError::MismatchedBound {
+                    bound_typevar: *bound_typevar,
+                    argument,
+                }
+            }
+            SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
+                SpecializationError::MismatchedConstraint {
+                    bound_typevar: *bound_typevar,
+                    argument,
+                }
+            }
+        })
     }
 
     /// Returns common protocol constraints for a union containing only `TypedDict`s when every
@@ -3287,7 +3415,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
                 self.has_actual_intersection_constraint = true;
-                self.infer_from_constraint_set(when)?;
+                self.infer_from_intersection_constraint_set(when)?;
                 return Ok(());
             }
 

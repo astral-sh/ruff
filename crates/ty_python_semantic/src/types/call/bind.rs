@@ -5595,6 +5595,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
+        let mut constraint_set_error_indices = Vec::new();
         for relation in self.argument_relations() {
             let declared_type = relation.declared_type;
             // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
@@ -5616,12 +5617,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             if let Err(error) = builder.infer(declared_type, relation.argument_type) {
-                self.constraint_set_errors[relation.argument_index] = true;
+                constraint_set_error_indices.push(relation.argument_index);
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
                     argument_index: relation.adjusted_argument_index,
                 });
             }
+        }
+        for argument_index in constraint_set_error_indices {
+            self.constraint_set_errors[argument_index] = true;
         }
 
         preferred_type_mappings
