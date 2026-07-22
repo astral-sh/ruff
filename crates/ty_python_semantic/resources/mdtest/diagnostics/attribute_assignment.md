@@ -278,13 +278,13 @@ instance.attr = "wrong"  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`. Call to `__set__` method failed.
   --> src/mdtest_snippet.py:11:1
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^
    |
-info: parameter `value` has an incompatible argument type: `Literal["wrong"]` is not assignable to `int`
+info: incompatible type for parameter `value`: `Literal["wrong"]` is not assignable to `int`
 ```
 
 ### Invalid `__set__` method signature
@@ -304,7 +304,7 @@ instance.attr = 1  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`. Call to `__set__` method failed.
   --> src/mdtest_snippet.py:11:1
    |
 11 | instance.attr = 1  # snapshot: invalid-assignment

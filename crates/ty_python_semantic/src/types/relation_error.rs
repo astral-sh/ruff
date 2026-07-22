@@ -308,7 +308,7 @@ impl<'db> ErrorContext<'db> {
                 expected,
                 parameter,
             } => format!(
-                "{parameter} has an incompatible argument type: `{}` is not assignable to `{}`",
+                "incompatible type for {parameter}: `{}` is not assignable to `{}`",
                 provided.display(db),
                 expected.display(db),
             ),

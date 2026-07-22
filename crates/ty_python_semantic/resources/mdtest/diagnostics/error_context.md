@@ -1596,13 +1596,13 @@ c.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C` with custom `__set__` method
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`. Call to `__set__` method failed.
  --> src/mdtest_snippet.py:8:1
   |
 8 | c.x = (1, b"")  # snapshot
   | ^^^
   |
-info: parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
+info: incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
 
@@ -1617,13 +1617,13 @@ c.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C` with custom `__setattr__` method.
+error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`. Call to `__setattr__` method failed.
  --> src/mdtest_snippet.py:5:1
   |
 5 | c.x = (1, b"")  # snapshot
   | ^^^
   |
-info: parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
+info: incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
 
@@ -1644,7 +1644,7 @@ d.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D` with custom `__setattr__` method.
+error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`. Call to `__setattr__` method failed.
   --> src/mdtest_snippet.py:16:1
    |
 16 | d.x = (1, b"")  # snapshot
@@ -1652,10 +1652,10 @@ error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Lit
    |
 info: no overload matches the call
 info: ├── overload `(self, name: str, value: tuple[int, str]) -> Unknown`
-info: │   └── parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
+info: │   └── incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
 info: │       └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 info: └── overload `(self, name: str, value: int) -> Unknown`
-info:     └── parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `int`
+info:     └── incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `int`
 ```
 
 ### In `invalid-yield` diagnostics
