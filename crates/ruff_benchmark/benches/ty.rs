@@ -759,6 +759,27 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
+
+    let optional_code = code.replace("left: Left,", "left: Left | None,");
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[optional_cross_str_enum_comparison]",
+        &optional_code,
+    );
+
+    let both_optional_code = optional_code.replace("right: Right", "right: Right | None");
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[both_optional_cross_str_enum_comparison]",
+        &both_optional_code,
+    );
+
+    let mixed_code = optional_code.replace("right: Right", "right: Right | int");
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[mixed_cross_str_enum_comparison]",
+        &mixed_code,
+    );
 }
 
 /// Ensure comparisons of unions spanning several scalar enum classes avoid member-pair expansion.
@@ -785,15 +806,30 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
             .collect::<Vec<_>>()
             .join(" | ")
     };
+    let left_union = class_union("Left");
+    let right_union = class_union("Right");
     writeln!(
         &mut code,
-        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
-        class_union("Left"),
-        class_union("Right"),
+        "\ndef compare(left: {left_union}, right: {right_union}):\n    if left != right:\n        return\n    return left == right",
     )
     .ok();
 
     benchmark_enum_comparison(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
+
+    let optional_code = code
+        .replace(
+            &format!("left: {left_union},"),
+            &format!("left: {left_union} | None,"),
+        )
+        .replace(
+            &format!("right: {right_union}):"),
+            &format!("right: {right_union} | None):"),
+        );
+    benchmark_enum_comparison(
+        criterion,
+        "ty_micro[optional_mixed_str_enum_comparison]",
+        &optional_code,
+    );
 }
 
 /// Micro-benchmark that tests our performance when slicing and unpacking

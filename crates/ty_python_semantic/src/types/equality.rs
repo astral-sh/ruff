@@ -17,7 +17,7 @@ use super::{
 
 mod enums;
 
-use self::enums::evaluate_enum_domains;
+use self::enums::{evaluate_enum_domains, evaluate_partitioned_enum_domains};
 
 /// The result of evaluating a runtime comparison between two types.
 ///
@@ -168,6 +168,16 @@ pub(super) fn evaluate_type_equality<'db>(
     .or_else(|| {
         evaluate_enum_domains(db, left, right, branch, ComparisonOperator::Equality)
             .and_then(|result| result.constraint(branch))
+    })
+    .or_else(|| {
+        evaluate_partitioned_enum_domains(
+            &mut ComparisonEvaluator::new(db, soundness_policy),
+            left,
+            right,
+            branch,
+            ComparisonOperator::Equality,
+        )
+        .and_then(|result| result.constraint(branch))
     })
     .or_else(|| {
         if comparison_domain(
@@ -490,6 +500,12 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
+    if let Some(result) =
+        evaluate_partitioned_enum_domains(evaluator, left, right, branch, operator)
+    {
+        return result;
+    }
+
     match (left, right) {
         (Type::Dynamic(_), other) => {
             return if !operator.condition_expects_equality(branch)
@@ -514,25 +530,6 @@ fn evaluate_comparison_once<'db>(
             };
         }
         (_, Type::Dynamic(_)) => return ComparisonResult::Ambiguous,
-        _ => {}
-    }
-
-    // Expand a union containing its enum peer before expanding that enum into individual members.
-    match (left, right) {
-        (Type::Union(union), other)
-            if other.is_enum(db)
-                && union.elements(db).contains(&other)
-                && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
-        {
-            return evaluate_union_left(evaluator, union.elements(db), other, branch, operator);
-        }
-        (other, Type::Union(union))
-            if other.is_enum(db)
-                && union.elements(db).contains(&other)
-                && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
-        {
-            return evaluate_union_right(evaluator, other, union.elements(db), branch, operator);
-        }
         _ => {}
     }
 
