@@ -57,7 +57,7 @@ exclude = [
 
 [dependency-groups]
 dev = [
-    "prek==0.4.8",
+    "prek==0.4.9",
 ]
 release = [
     "rooster==0.1.1",
