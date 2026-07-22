@@ -108,13 +108,13 @@ use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -11615,7 +11615,9 @@ impl StringPartsCollector {
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
         } else {
-            Type::literal_string()
+            Type::LiteralValue(LiteralValueType::promotable(
+                LiteralValueTypeKind::LiteralString,
+            ))
         }
     }
 }
