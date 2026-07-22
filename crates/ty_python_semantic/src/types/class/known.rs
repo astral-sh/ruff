@@ -95,6 +95,7 @@ pub enum KnownClass {
     EllipsisType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
+    SupportsKeysAndGetItem,
     // Typing
     Awaitable,
     Generator,
@@ -268,6 +269,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::SupportsKeysAndGetItem
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -382,6 +384,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -494,6 +497,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -607,6 +611,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -653,6 +658,7 @@ impl KnownClass {
         match self {
             Self::Hashable
             | Self::SupportsIndex
+            | Self::SupportsKeysAndGetItem
             | Self::Iterable
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
@@ -850,6 +856,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -921,6 +928,7 @@ impl KnownClass {
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
             Self::NoneType => "NoneType",
+            Self::SupportsKeysAndGetItem => "SupportsKeysAndGetItem",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
             Self::ExtensionsTypeVar => "TypeVar",
@@ -1323,7 +1331,7 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::NotImplementedType
             | Self::WrapperDescriptorType => KnownModule::Types,
-            Self::NoneType => KnownModule::Typeshed,
+            Self::NoneType | Self::SupportsKeysAndGetItem => KnownModule::Typeshed,
             Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -1493,6 +1501,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1611,6 +1620,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1672,6 +1682,7 @@ impl KnownClass {
             "deprecated" => &[Self::Deprecated],
             "GenericAlias" => &[Self::GenericAlias],
             "NoneType" => &[Self::NoneType],
+            "SupportsKeysAndGetItem" => &[Self::SupportsKeysAndGetItem],
             "ModuleType" => &[Self::ModuleType],
             "GeneratorType" => &[Self::GeneratorType],
             "AsyncGeneratorType" => &[Self::AsyncGeneratorType],
@@ -1821,6 +1832,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback
+            | Self::SupportsKeysAndGetItem
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::TypeVar

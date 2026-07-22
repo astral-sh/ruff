@@ -2888,17 +2888,6 @@ impl<'db> Type<'db> {
                     .class_namespace_member(db, instance.class(db), name, policy)
             }
 
-            // The generic TypedDict's meta-type does not retain its specialization, so synthesize
-            // members from the specialized defining class before performing descriptor binding.
-            Type::TypedDict(typed_dict)
-                if let Some((class, specialization)) = typed_dict
-                    .defining_class()
-                    .and_then(|class| class.static_class_literal(db))
-                    && specialization.is_some() =>
-            {
-                class.typed_dict_member(db, specialization, name, policy)
-            }
-
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                 ty.to_meta_type(db).class_object_member(db, name, policy)
             }

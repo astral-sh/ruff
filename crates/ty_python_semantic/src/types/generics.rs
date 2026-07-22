@@ -2663,7 +2663,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             ty: Type<'db>,
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
-            typed_dicts: &mut FxOrderSet<Type<'db>>,
+            typed_dicts: &mut FxHashSet<Type<'db>>,
             other_types: &mut FxOrderSet<Type<'db>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
@@ -2694,20 +2694,41 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     result
                 }
                 Type::Intersection(intersection)
-                    if intersection
-                        .iter_positive(db)
-                        .any(|element| element.resolve_type_alias(db).is_typed_dict()) =>
+                    if intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|element| element.resolve_type_alias(db).is_typed_dict())
+                        && intersection.iter_positive(db).all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            element.is_typed_dict()
+                                || element
+                                    == KnownClass::Dict
+                                        .to_instance_unknown(db)
+                                        .top_materialization(db)
+                        }) =>
                 {
                     // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
-                    // constraint-equivalence check below remains authoritative.
+                    // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
+                    // constraints that the shared mapping would erase.
                     typed_dicts.insert(ty);
                     true
                 }
-                _ => {
+                Type::NominalInstance(instance)
+                    if matches!(
+                        instance.class(db).known(db),
+                        Some(KnownClass::Dict | KnownClass::Mapping | KnownClass::OrderedDict)
+                    ) && instance
+                        .class(db)
+                        .into_generic_alias()
+                        .is_some_and(|alias| {
+                            matches!(alias.specialization(db).types(db), [key, _]
+                                if key.resolve_type_alias(db) == KnownClass::Str.to_instance(db))
+                        }) =>
+                {
                     other_types.insert(ty);
                     true
                 }
+                _ => false,
             };
             completed.insert(ty, result);
             result
@@ -2715,7 +2736,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
-        let mut typed_dicts = FxOrderSet::default();
+        let mut typed_dicts = FxHashSet::default();
         let mut other_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
@@ -2732,150 +2753,55 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if typed_dicts.is_empty() {
             return None;
         }
-
-        if !other_types.is_empty() {
-            // `SupportsKeysAndGetItem` observes a `TypedDict` through arbitrary string keys.
-            // Implicitly open `TypedDict`s therefore share `Mapping[str, object]`, while explicit
-            // extra items preserve their exposed value type. Other protocols can observe
-            // individual gradual or specialized fields and must retain their original constraints.
-            let Type::ProtocolInstance(protocol) = formal else {
-                return None;
-            };
-            if !protocol.to_nominal_instance().is_some_and(|instance| {
-                instance.class_name(self.db) == "SupportsKeysAndGetItem"
-                    && instance
-                        .class_module_name(self.db)
-                        .is_some_and(|module| module.as_str() == "_typeshed")
-            }) {
-                return None;
-            }
-
-            if !typed_dicts.iter().all(|element| match element {
-                Type::TypedDict(_) => true,
-                Type::Intersection(intersection) => {
-                    intersection.negative(self.db).is_empty()
-                        && intersection.iter_positive(self.db).all(|positive| {
-                            let positive = positive.resolve_type_alias(self.db);
-                            positive.is_typed_dict()
-                                || matches!(positive, Type::NominalInstance(instance)
-                                    if instance.class(self.db).is_known(self.db, KnownClass::Dict)
-                                        && instance.class(self.db).into_generic_alias().is_some_and(
-                                            |alias| alias.specialization(self.db).materialization_kind(self.db)
-                                                == Some(MaterializationKind::Top),
-                                        ))
-                        })
-                }
-                _ => false,
-            }) {
-                return None;
-            }
-
-            let string = KnownClass::Str.to_instance(self.db);
-            let key_type = protocol
-                .to_nominal_instance()
-                .and_then(|instance| instance.class(self.db).into_generic_alias())
-                .and_then(|alias| {
-                    alias
-                        .specialization(self.db)
-                        .types(self.db)
-                        .first()
-                        .copied()
-                });
-            if !other_types.iter().all(|element| {
-                let Some(Type::TypeVar(key_typevar)) = key_type else {
-                    // A fixed protocol key cannot prove that a structural mapping has static keys.
-                    return element.nominal_class(self.db).is_some_and(|class| {
-                        class.iter_mro(self.db).filter_map(ClassBase::into_class).any(
-                            |base| {
-                                (base.is_known(self.db, KnownClass::Dict)
-                                    || base.is_known(self.db, KnownClass::Mapping))
-                                    && base.into_generic_alias().is_some_and(|alias| {
-                                        matches!(alias.specialization(self.db).types(self.db), [key, _]
-                                            if key.resolve_type_alias(self.db) == string)
-                                    })
-                            },
-                        )
-                    });
-                };
-                let when = self.constraints.load(
-                    self.db,
-                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                );
-                let Solutions::Constrained(solutions) =
-                    when.solutions(self.db, self.constraints, self.inferable)
-                else {
-                    return false;
-                };
-                solutions.iter().all(|solution| {
-                    solution
-                        .iter()
-                        .find(|binding| binding.bound_typevar == key_typevar)
-                        .is_some_and(|binding| {
-                            binding.solution.resolve_type_alias(self.db) == string
-                        })
-                })
-            }) {
-                return None;
-            }
+        // Other protocols can observe key-specific or gradual evidence that the shared mapping
+        // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
+        if !other_types.is_empty()
+            && !matches!(formal, Type::ProtocolInstance(protocol)
+            if protocol.to_nominal_instance().is_some_and(|instance| {
+                instance.class(self.db).is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            }))
+        {
+            return None;
         }
 
-        let mut shared_mappings = FxOrderSet::default();
+        // Use the read-only `Mapping[str, object]` as the fallback rather than `dict[str, object]`.
+        // The current constraint solver can consider mutable protocol constraints equivalent even
+        // when a `TypedDict` preserves more precise correlations between its keys and values.
+        let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
+        let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
+        let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
+        let mapping_when = self.constraints.load(self.db, &mapping_when);
+        // Logically equivalent constraints can still infer different solutions, such as `Any`
+        // instead of `object`; preserve the original constraints when gradual evidence differs.
+        let mapping_solutions = (!other_types.is_empty())
+            .then(|| mapping_when.solutions(self.db, self.constraints, self.inferable));
         if !typed_dicts.into_iter().all(|element| {
-            let value_ty = if other_types.is_empty() {
-                Type::object()
-            } else {
-                match element {
-                    Type::TypedDict(typed_dict) => typed_dict.value_type(self.db),
-                    Type::Intersection(intersection) => {
-                        let Some(typed_dict) =
-                            intersection
-                                .iter_positive(self.db)
-                                .find_map(|positive| match positive.resolve_type_alias(self.db) {
-                                    Type::TypedDict(typed_dict) => Some(typed_dict),
-                                    _ => None,
-                                })
-                        else {
-                            return false;
-                        };
-                        typed_dict.value_type(self.db)
-                    }
-                    _ => return false,
-                }
-            };
-            // Use read-only `Mapping` representatives so collapsing does not introduce mutable
-            // correlations. Explicit extra items determine the observable arbitrary-key values.
-            let mapping = KnownClass::Mapping.to_specialized_instance(
-                self.db,
-                &[KnownClass::Str.to_instance(self.db), value_ty],
-            );
-            let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
-            let mapping_when = self.constraints.load(self.db, &mapping_when);
             let element_when = self.constraints.load(
                 self.db,
                 &element.when_constraint_set_assignable_to_owned(self.db, formal),
             );
-            if !element_when
+            element_when
                 .iff(self.db, self.constraints, mapping_when)
                 .is_always_satisfied(self.db)
-            {
-                return false;
-            }
-            shared_mappings.insert(mapping);
-            true
+                && mapping_solutions.as_ref().is_none_or(|solutions| {
+                    &element_when.solutions(self.db, self.constraints, self.inferable) == solutions
+                })
         }) {
             return None;
         }
 
-        Some(shared_mappings.into_iter().chain(other_types).when_all(
-            self.db,
-            self.constraints,
-            |element| {
-                self.constraints.load(
-                    self.db,
-                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                )
-            },
-        ))
+        // Reuse one constraint for all equivalent TypedDicts, but retain each mapping arm's
+        // original constraints.
+        Some(mapping_when.and(self.db, self.constraints, || {
+            other_types
+                .into_iter()
+                .when_all(self.db, self.constraints, |element| {
+                    self.constraints.load(
+                        self.db,
+                        &element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    )
+                })
+        }))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.

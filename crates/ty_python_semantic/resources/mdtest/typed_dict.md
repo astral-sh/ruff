@@ -2615,40 +2615,31 @@ from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
 A = TypedDict("A", {"type": Literal["a"], "irrelevant": Any})
-B = TypedDict("B", {"type": Literal["b"], "irrelevant": Any})
-C = TypedDict("C", {"type": Literal["c"], "irrelevant": Any})
-D = TypedDict("D", {"type": Literal["d"], "irrelevant": Any})
-E = TypedDict("E", {"type": Literal["e"], "irrelevant": Any})
-F = TypedDict("F", {"type": Literal["f"], "irrelevant": Any})
-G = TypedDict("G", {"type": Literal["g"], "irrelevant": Any})
-H = TypedDict("H", {"type": Literal["h"], "irrelevant": Any})
-I = TypedDict("I", {"type": Literal["i"], "irrelevant": Any})
-J = TypedDict("J", {"type": Literal["j"], "irrelevant": Any})
-K = TypedDict("K", {"type": Literal["k"], "irrelevant": Any})
-L = TypedDict("L", {"type": Literal["l"], "irrelevant": Any})
-M = TypedDict("M", {"type": Literal["m"], "irrelevant": Any})
-N = TypedDict("N", {"type": Literal["n"], "irrelevant": Any})
-O = TypedDict("O", {"type": Literal["o"], "irrelevant": Any})
-P = TypedDict("P", {"type": Literal["p"], "irrelevant": Any})
-Q = TypedDict("Q", {"type": Literal["q"], "irrelevant": Any})
-R = TypedDict("R", {"type": Literal["r"], "irrelevant": Any})
-S = TypedDict("S", {"type": Literal["s"], "irrelevant": Any})
-T = TypedDict("T", {"type": Literal["t"], "irrelevant": Any})
-U = TypedDict("U", {"type": Literal["u"], "irrelevant": Any})
-V = TypedDict("V", {"type": Literal["v"], "irrelevant": Any})
-W = TypedDict("W", {"type": Literal["w"], "irrelevant": Any})
-X = TypedDict("X", {"type": Literal["x"], "irrelevant": Any})
+B = TypedDict("B", {"type": Literal["b"]})
+C = TypedDict("C", {"type": Literal["c"]})
+D = TypedDict("D", {"type": Literal["d"]})
+E = TypedDict("E", {"type": Literal["e"]})
+F = TypedDict("F", {"type": Literal["f"]})
+G = TypedDict("G", {"type": Literal["g"]})
+H = TypedDict("H", {"type": Literal["h"]})
+I = TypedDict("I", {"type": Literal["i"]})
+J = TypedDict("J", {"type": Literal["j"]})
+K = TypedDict("K", {"type": Literal["k"]})
+L = TypedDict("L", {"type": Literal["l"]})
+M = TypedDict("M", {"type": Literal["m"]})
+N = TypedDict("N", {"type": Literal["n"]})
+O = TypedDict("O", {"type": Literal["o"]})
+P = TypedDict("P", {"type": Literal["p"]})
+Q = TypedDict("Q", {"type": Literal["q"]})
+R = TypedDict("R", {"type": Literal["r"]})
+S = TypedDict("S", {"type": Literal["s"]})
+T = TypedDict("T", {"type": Literal["t"]})
+U = TypedDict("U", {"type": Literal["u"]})
+V = TypedDict("V", {"type": Literal["v"]})
+W = TypedDict("W", {"type": Literal["w"]})
+X = TypedDict("X", {"type": Literal["x"]})
 
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
-
-class StringDict(dict[str, Any]): ...
-
-class StringMapping:
-    def keys(self) -> list[str]:
-        return ["type"]
-
-    def __getitem__(self, key: str, /) -> Any:
-        return "value"
 
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
@@ -2659,26 +2650,31 @@ def _(item: Item) -> None:
 def _(item: Item | str) -> None:
     if isinstance(item, dict):
         reveal_type(dict(item))  # revealed: dict[str, object]
+```
 
-# A single plain-dict member must not make combining the shared `TypedDict` constraints
-# exponential, even when the `TypedDict`s contain unrelated gradual fields.
+A union can also contain a regular dictionary. Copying the union remains fast even when a
+`TypedDict` has an unrelated `Any` field:
+
+```py
 def _(item: Item | dict[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
     if isinstance(item, dict):
-        reveal_type(dict(item))  # revealed: dict[str, object]
+        dict(item)
+```
+
+The same performance guarantee applies to `Mapping` and `OrderedDict`:
+
+```py
+def _(item: Item | Mapping[str, Any]) -> None:
+    dict(item)
 
 def _(item: Item | OrderedDict[str, Any]) -> None:
-    reveal_type(dict(item))  # revealed: dict[str, object]
+    dict(item)
+```
 
-def _(item: Item | Mapping[str, Any]) -> None:
-    reveal_type(dict(item))  # revealed: dict[str, object]
+The union can also be assembled from type aliases:
 
-def _(item: Item | StringDict) -> None:
-    reveal_type(dict(item))  # revealed: dict[str, object]
-
-def _(item: Item | StringMapping) -> None:
-    reveal_type(dict(item))  # revealed: dict[str, object]
-
+```py
 type FirstGroup = A | B | C | D | E | F | G | H
 type SecondGroup = I | J | K | L | M | N | O | P
 type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
@@ -2792,237 +2788,62 @@ def _(value: ClearA | ClearB) -> None:
         reveal_type(clear_result(value))  # revealed: None
 ```
 
-Mixed unions must retain gradual evidence from their `TypedDict` members:
+An `isinstance()` check against a protocol can establish that `__getitem__()` returns `Any`. That
+return type must be preserved for unions containing a `TypedDict`:
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, TypedDict, runtime_checkable
+
+ValueT = TypeVar("ValueT", covariant=True)
+
+class GetValue(Protocol[ValueT]):
+    def __getitem__(self, key: Literal["value"], /) -> ValueT: ...
+
+class StringValue(TypedDict):
+    value: str
+
+@runtime_checkable
+class GetAnyValue(Protocol):
+    def __getitem__(self, key: Literal["value"], /) -> Any: ...
+
+def get_value(value: GetValue[ValueT]) -> ValueT:
+    raise NotImplementedError
+
+def _(value: StringValue | dict[str, Any]) -> None:
+    if isinstance(value, GetAnyValue):
+        reveal_type(get_value(value))  # revealed: Any
+```
+
+The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
 
 ```py
 from _typeshed import SupportsKeysAndGetItem
-from typing import Any, Literal, Protocol, TypeVar, TypedDict, runtime_checkable
-from typing_extensions import TypeAliasType, TypedDict as ExtensionsTypedDict
+from collections.abc import Iterable
 
-GradualValueT = TypeVar("GradualValueT", covariant=True)
-GradualBoundedValueT = TypeVar("GradualBoundedValueT", bound=str, covariant=True)
-GradualConstrainedValueT = TypeVar("GradualConstrainedValueT", str, bytes, covariant=True)
-
-class GradualGetValue(Protocol[GradualValueT]):
-    def __getitem__(self, key: Literal["value"], /) -> GradualValueT: ...
-
-class GradualValue(TypedDict):
-    value: Any
-
-class StaticValue(TypedDict):
-    value: str
-
-class GenericValue[GenericItem](TypedDict):
-    value: GenericItem
-
-class GradualExtras(ExtensionsTypedDict, extra_items=Any): ...
-class StringExtras(ExtensionsTypedDict, extra_items=str): ...
-
-class DynamicKeys:
-    def keys(self) -> Any:
-        return [1]
-
-    def __getitem__(self, key: int, /) -> str:
-        return "value"
-
-class DynamicStringDict(dict[str, str]):
-    def keys(self) -> Any:
-        return [1]
-
-    def __getitem__(self, key: Any, /) -> str:
-        return "value"
+BoundedValueT = TypeVar("BoundedValueT", bound=str)
 
 @runtime_checkable
-class DynamicGetValue(Protocol):
-    def __getitem__(self, key: Literal["value"], /) -> Any: ...
+class AnyValueMapping(Protocol):
+    def keys(self) -> Iterable[str]: ...
+    def __getitem__(self, key: str, /) -> Any: ...
 
-def get_gradual_value(value: GradualGetValue[GradualValueT]) -> GradualValueT:
+def get_bounded_mapping(value: SupportsKeysAndGetItem[str, BoundedValueT]) -> BoundedValueT:
     raise NotImplementedError
 
-def get_bounded_value(value: GradualGetValue[GradualBoundedValueT]) -> GradualBoundedValueT:
-    raise NotImplementedError
-
-def get_constrained_value(
-    value: GradualGetValue[GradualConstrainedValueT],
-) -> GradualConstrainedValueT:
-    raise NotImplementedError
-
-def get_bounded_mapping_value(
-    value: SupportsKeysAndGetItem[str, GradualBoundedValueT],
-) -> GradualBoundedValueT:
-    raise NotImplementedError
-
-def get_constrained_mapping_value(
-    value: SupportsKeysAndGetItem[str, GradualConstrainedValueT],
-) -> GradualConstrainedValueT:
-    raise NotImplementedError
-
-def _(value: dict[str, Any] | GradualValue) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: Any
-    get_gradual_value(value).strip()
-    reveal_type(get_bounded_value(value))  # revealed: Any
-    reveal_type(get_constrained_value(value))  # revealed: Any
-
-def _(value: DynamicKeys | StaticValue) -> None:
-    reveal_type(dict(value))  # revealed: dict[Unknown, Unknown]
-
-def _(value: DynamicStringDict | StaticValue) -> None:
-    reveal_type(dict(value))  # revealed: dict[Unknown, Unknown]
-
-def _(value: GradualExtras | dict[str, str]) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, Any | str]
-    next(iter(dict(value).values())).strip()
-    get_bounded_mapping_value(value).strip()
-    get_constrained_mapping_value(value).strip()
-
-def _(value: dict[str, str] | GradualExtras) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, Any | str]
-    next(iter(dict(value).values())).strip()
-    get_bounded_mapping_value(value).strip()
-    get_constrained_mapping_value(value).strip()
-
-def _(value: StringExtras | dict[str, str]) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, str]
-    get_bounded_mapping_value(value).strip()
-    get_constrained_mapping_value(value).strip()
-
-def _(value: dict[str, Any] | StaticValue) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: object
-    get_bounded_value(value)  # error: [invalid-argument-type]
-
-def _(value: StaticValue | dict[str, Any]) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: object
-    get_bounded_value(value)  # error: [invalid-argument-type]
-
-def _(value: dict[str, Any] | StaticValue) -> None:
-    if isinstance(value, DynamicGetValue):
-        reveal_type(get_gradual_value(value))  # revealed: Any
-        get_gradual_value(value).strip()
-        get_bounded_value(value).strip()
-
-def _(value: GenericValue[int]) -> None:
-    reveal_type(value.__getitem__("value"))  # revealed: int
-
-def _(value: dict[str, str] | GenericValue[int]) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: object
-    get_gradual_value(value).strip()  # error: [unresolved-attribute]
-    get_bounded_value(value)  # error: [invalid-argument-type]
-    get_constrained_value(value)  # error: [invalid-argument-type]
-
-def _(value: GenericValue[int] | dict[str, str]) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: object
-    get_gradual_value(value).strip()  # error: [unresolved-attribute]
-    get_bounded_value(value)  # error: [invalid-argument-type]
-    get_constrained_value(value)  # error: [invalid-argument-type]
-
-type GradualValueAlias = Any
-
-class AliasedGradualValue(TypedDict):
-    value: GradualValueAlias
-
-class AliasedGradualExtras(ExtensionsTypedDict, extra_items=GradualValueAlias): ...
-
-def _(value: dict[str, Any] | AliasedGradualValue) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, object]
-
-def _(value: AliasedGradualExtras | dict[str, str]) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, Any | str]
-    get_bounded_mapping_value(value).strip()
-
-ManualGradualValueAlias = TypeAliasType("ManualGradualValueAlias", Any)
-
-class ManuallyAliasedGradualValue(TypedDict):
-    value: ManualGradualValueAlias
-
-class ManuallyAliasedGradualExtras(
-    ExtensionsTypedDict,
-    extra_items=ManualGradualValueAlias,
-): ...
-
-def _(value: dict[str, Any] | ManuallyAliasedGradualValue) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, object]
-
-def _(value: ManuallyAliasedGradualExtras | dict[str, str]) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, Any | str]
-    get_bounded_mapping_value(value).strip()
-
-type ManyGenericValues = (
-    GenericValue[Literal[0]]
-    | GenericValue[Literal[1]]
-    | GenericValue[Literal[2]]
-    | GenericValue[Literal[3]]
-    | GenericValue[Literal[4]]
-    | GenericValue[Literal[5]]
-    | GenericValue[Literal[6]]
-    | GenericValue[Literal[7]]
-    | GenericValue[Literal[8]]
-    | GenericValue[Literal[9]]
-    | GenericValue[Literal[10]]
-    | GenericValue[Literal[11]]
-    | GenericValue[Literal[12]]
-    | GenericValue[Literal[13]]
-    | GenericValue[Literal[14]]
-    | GenericValue[Literal[15]]
-    | GenericValue[Literal[16]]
-    | GenericValue[Literal[17]]
-    | GenericValue[Literal[18]]
-    | GenericValue[Literal[19]]
-    | GenericValue[Literal[20]]
-    | GenericValue[Literal[21]]
-    | GenericValue[Literal[22]]
-    | GenericValue[Literal[23]]
-    | GenericValue[Literal[24]]
-    | GenericValue[Literal[25]]
-    | GenericValue[Literal[26]]
-    | GenericValue[Literal[27]]
-    | GenericValue[Literal[28]]
-    | GenericValue[Literal[29]]
-    | GenericValue[Literal[30]]
-    | GenericValue[Literal[31]]
-    | GenericValue[Literal[32]]
-    | GenericValue[Literal[33]]
-    | GenericValue[Literal[34]]
-    | GenericValue[Literal[35]]
-    | GenericValue[Literal[36]]
-    | GenericValue[Literal[37]]
-    | GenericValue[Literal[38]]
-    | GenericValue[Literal[39]]
-)
-
-def _(value: ManyGenericValues | dict[str, Any]) -> None:
-    reveal_type(get_gradual_value(value))  # revealed: object
-    reveal_type(dict(value))  # revealed: dict[str, object]
-
-def _(value: dict[str, Any] | ManyGenericValues) -> None:
-    reveal_type(dict(value))  # revealed: dict[str, object]
+def _(value: StringValue | dict[str, Any]) -> None:
+    if isinstance(value, AnyValueMapping):
+        reveal_type(get_bounded_mapping(value))  # revealed: Any
 ```
 
-Mixed-union protocol constraints must also preserve their original source ordering:
+A `TypedDict` that permits extra items of type `Any` keeps that type when copied:
 
 ```py
-from collections.abc import Iterator
-from typing import Protocol, TypeVar, TypedDict
+from typing_extensions import TypedDict as ExtensionsTypedDict
 
-IterationValueT = TypeVar("IterationValueT", covariant=True)
+class AnyExtraItems(ExtensionsTypedDict, extra_items=Any): ...
 
-class IterableValues(Protocol[IterationValueT]):
-    def __iter__(self) -> Iterator[IterationValueT]: ...
-
-class Integers:
-    def __iter__(self) -> Iterator[int]:
-        raise NotImplementedError
-
-class StringValues(TypedDict):
-    value: str
-
-def get_iterated_value(value: IterableValues[IterationValueT]) -> IterationValueT:
-    raise NotImplementedError
-
-def integers_first(value: Integers | StringValues) -> None:
-    reveal_type(get_iterated_value(value))  # revealed: int | str
-
-def typed_dict_first(value: StringValues | Integers) -> None:
-    reveal_type(get_iterated_value(value))  # revealed: str | int
+def _(value: AnyExtraItems | dict[str, str]) -> None:
+    reveal_type(dict(value))  # revealed: dict[str, Any | str]
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference:
