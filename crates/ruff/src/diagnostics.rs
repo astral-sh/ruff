@@ -1,7 +1,6 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use std::borrow::Cow;
-use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::ops::{Add, AddAssign};
@@ -302,7 +301,11 @@ pub(crate) fn lint_path(
             ) {
                 if !fixed.is_empty() {
                     match fix_mode {
-                        flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
+                        flags::FixMode::Apply => {
+                            let mut buffer = Vec::new();
+                            transformed.write(&mut buffer)?;
+                            fs::atomic_write(path, &buffer)?;
+                        }
                         flags::FixMode::Diff => {
                             write!(
                                 &mut io::stdout().lock(),

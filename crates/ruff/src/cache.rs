@@ -301,10 +301,10 @@ impl Cache {
 
 /// Return a [`NamedTempFile`] in the specified directory.
 ///
-/// Sets the permissions of the temporary file to `0o666`, to match the non-temporary file
-/// default. ([`NamedTempFile`] defaults to `0o600`.)
+/// Sets the permissions of the temporary file to `0o666`, to match the
+/// non-temporary file default. ([`NamedTempFile`] defaults to `0o600`.)
 #[cfg(unix)]
-fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+pub(crate) fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
     use std::os::unix::fs::PermissionsExt;
 
     tempfile::Builder::new()
@@ -314,7 +314,7 @@ fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
 
 /// Return a [`NamedTempFile`] in the specified directory.
 #[cfg(not(unix))]
-fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+pub(crate) fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
     tempfile::Builder::new().tempfile_in(path)
 }
 

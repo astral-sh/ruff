@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use std::fs::File;
 use std::io;
 use std::io::{Write, stderr, stdout};
 use std::path::{Path, PathBuf};
@@ -289,16 +288,16 @@ pub(crate) fn format_path(
     // Don't write back to the cache if formatting a range.
     let cache = cache.filter(|_| range.is_none());
 
-    // Format the source.
     let format_result = match format_source(&unformatted, Some(path), settings, range)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
-                let mut writer = File::create(path).map_err(|err| {
+                let mut buffer = Vec::new();
+                formatted
+                    .write(&mut buffer)
+                    .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+                fs::atomic_write(path, &buffer).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
                 })?;
-                formatted
-                    .write(&mut writer)
-                    .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
                 if let Some(cache) = cache {
                     if let Ok(cache_key) = FileCacheKey::from_path(path) {

@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Display;
-use std::fs;
 use std::ops::Add;
 use std::path::Path;
 
@@ -18,7 +17,7 @@ use rustc_hash::FxHashSet;
 
 use crate::Edit;
 use crate::Locator;
-use crate::fs::relativize_path;
+use crate::fs::{atomic_write, relativize_path};
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::suppression::{self, Suppressions};
@@ -794,7 +793,7 @@ pub(crate) fn add_suppression(
         suppression_kind,
     );
 
-    fs::write(path, output)?;
+    atomic_write(path, output.as_bytes()).map_err(anyhow::Error::from)?;
     Ok(count)
 }
 
