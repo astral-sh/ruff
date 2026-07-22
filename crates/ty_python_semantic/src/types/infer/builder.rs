@@ -80,8 +80,7 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
-    enclosing_binding_contexts,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -103,7 +102,9 @@ use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarSet,
+};
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
@@ -5117,7 +5118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .signature
                     .generic_context
                     .map(|generic_context| generic_context.inferable_typevars(db))
-                    .unwrap_or(InferableTypeVars::None);
+                    .unwrap_or(TypeVarSet::None);
 
                 !overload
                     .return_ty
@@ -6409,7 +6410,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_to_class_literal(self.db())
                 .and_then(|class| class.generic_context(self.db()))
                 .map(|generic_context| generic_context.inferable_typevars(self.db()))
-                .unwrap_or(InferableTypeVars::None);
+                .unwrap_or(TypeVarSet::None);
             annotation.filter_disjoint_elements(
                 self.db(),
                 Type::homogeneous_tuple(self.db(), Type::unknown()),

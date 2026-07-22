@@ -16,7 +16,7 @@ use crate::types::diagnostic::{
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
-use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -24,6 +24,7 @@ use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
+use crate::types::typevar::TypeVarSet;
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
@@ -985,12 +986,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
-                                .when_assignable_to(
-                                    db,
-                                    bound,
-                                    &constraints,
-                                    InferableTypeVars::None,
-                                )
+                                .when_assignable_to(db, bound, &constraints, TypeVarSet::None)
                                 .is_never_satisfied(db)
                             {
                                 if let Some(builder) = self
@@ -1025,7 +1021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     db,
                                     typevar_constraints.as_type(db),
                                     &constraints,
-                                    InferableTypeVars::None,
+                                    TypeVarSet::None,
                                 )
                                 .is_never_satisfied(db)
                             {

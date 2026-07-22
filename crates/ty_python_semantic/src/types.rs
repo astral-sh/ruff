@@ -75,9 +75,7 @@ use crate::types::function::{
     FunctionType, KnownFunction,
 };
 pub(crate) use crate::types::generics::GenericContext;
-use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
-};
+use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
     InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
@@ -93,11 +91,11 @@ use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
-use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
     BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarNonce,
 };
+use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
@@ -2121,7 +2119,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
