@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
@@ -129,6 +129,9 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::Snippet),
                 };
 
+                let trigger_parameter_hints =
+                    is_callable_with_snippet_parentheses(comp.kind, comp.insert_text_format);
+
                 CompletionItem {
                     label,
                     kind,
@@ -139,6 +142,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
+                    command: trigger_parameter_hints.then(|| Command {
+                        title: String::new(),
+                        tooltip: None,
+                        command: "editor.action.triggerParameterHints".into(),
+                        arguments: None,
+                    }),
                     ..Default::default()
                 }
             })
@@ -160,6 +169,20 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
 impl RetriableRequestHandler for CompletionRequestHandler {
     const RETRY_ON_CANCELLATION: bool = true;
+}
+
+/// Returns `true` if the completion is for a callable whose insertion includes
+/// snippet-style parentheses (`foo($0)`), meaning the cursor will land inside the
+/// parentheses after insertion and the server should request VS Code to trigger
+/// signature help automatically.
+fn is_callable_with_snippet_parentheses(
+    kind: Option<CompletionKind>,
+    insert_text_format: CompletionInsertTextFormat,
+) -> bool {
+    matches!(
+        kind,
+        Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Constructor)
+    ) && insert_text_format == CompletionInsertTextFormat::Snippet
 }
 
 fn ty_kind_to_lsp_kind(kind: CompletionKind) -> CompletionItemKind {
