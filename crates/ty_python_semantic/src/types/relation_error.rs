@@ -100,6 +100,18 @@ pub(crate) enum ErrorContext<'db> {
         target: Type<'db>,
         parameter: ParameterDescription,
     },
+    InvalidCallArgumentType {
+        provided: Type<'db>,
+        expected: Type<'db>,
+        parameter: ParameterDescription,
+    },
+    MissingCallArguments {
+        parameters: Box<[ParameterDescription]>,
+    },
+    TooManyCallPositionalArguments {
+        expected: usize,
+        provided: usize,
+    },
     InferredCallableType {
         source: Type<'db>,
         callable: Type<'db>,
@@ -280,6 +292,30 @@ impl<'db> ErrorContext<'db> {
                     source = source.display(db),
                     target = target.display(db),
                 )
+            }
+            Self::InvalidCallArgumentType {
+                provided,
+                expected,
+                parameter,
+            } => format!(
+                "{parameter} has an incompatible argument type: `{}` is not assignable to `{}`",
+                provided.display(db),
+                expected.display(db),
+            ),
+            Self::MissingCallArguments { parameters } => {
+                let parameter_count = parameters.len();
+                let parameters = parameters
+                    .iter()
+                    .map(ParameterDescription::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "no argument{} provided for {parameters}",
+                    if parameter_count == 1 { "" } else { "s" },
+                )
+            }
+            Self::TooManyCallPositionalArguments { expected, provided } => {
+                format!("too many positional arguments: expected {expected}, got {provided}")
             }
             Self::InferredCallableType { source, callable } => format!(
                 "type `{}` has inferred callable type `{}`",

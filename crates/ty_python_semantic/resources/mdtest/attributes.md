@@ -2998,8 +2998,27 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
-date.tz = "UTC"
+date.month = "May"  # snapshot: unresolved-attribute
+date.tz = "UTC"  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Cannot assign object of type `Literal["May"]` to attribute `month` on type `Date` with custom `__setattr__` method.
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | date.month = "May"  # snapshot: unresolved-attribute
+   | ^^^^^^^^^^
+   |
+info: parameter `value` has an incompatible argument type: `Literal["May"]` is not assignable to `int`
+
+
+error[unresolved-attribute]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method.
+  --> src/mdtest_snippet.py:14:1
+   |
+14 | date.tz = "UTC"  # snapshot: unresolved-attribute
+   | ^^^^^^^
+   |
+info: parameter `name` has an incompatible argument type: `Literal["tz"]` is not assignable to `Literal["day", "month", "year"]`
 ```
 
 ### Return type of `__setattr__`

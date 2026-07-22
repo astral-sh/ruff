@@ -67,9 +67,10 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    LiteralValueTypeKind, NominalInstanceType, ParameterDescription, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -7242,6 +7243,13 @@ impl ParameterContext {
             positional,
         }
     }
+
+    pub(crate) fn description(&self) -> ParameterDescription {
+        self.name.as_ref().map_or_else(
+            || ParameterDescription::Index(self.index),
+            |name| ParameterDescription::Named(name.name().clone()),
+        )
+    }
 }
 
 impl std::fmt::Display for ParameterContext {
@@ -7260,6 +7268,12 @@ impl std::fmt::Display for ParameterContext {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ParameterContexts(Vec<ParameterContext>);
+
+impl ParameterContexts {
+    pub(crate) fn descriptions(&self) -> Box<[ParameterDescription]> {
+        self.0.iter().map(ParameterContext::description).collect()
+    }
+}
 
 impl std::fmt::Display for ParameterContexts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -1738,13 +1738,14 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
-        // TODO: Here, it would be nice to emit an additional diagnostic
-        // that explains why the call failed
-        builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Invalid assignment to data descriptor attribute \
             `{attribute}` on type `{}` with custom `__set__` method",
             object_type.display(db)
         ));
+        dunder_set_failure
+            .to_error_context(db)
+            .attach_to(db, &mut diagnostic);
     }
 }
 

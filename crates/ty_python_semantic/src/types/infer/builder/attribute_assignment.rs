@@ -59,6 +59,7 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
     PossiblyMissing,
     BadSetAttr {
         value_ty: Type<'db>,
+        failure: CallError<'db>,
     },
     Unresolved {
         with_period: bool,
@@ -410,9 +411,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             }
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                Err(CallDunderError::CallError(..)) => {
+                Err(CallDunderError::CallError(kind, bindings, _)) => {
                     if emit_diagnostics {
-                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
                     }
                     false
                 }
@@ -484,10 +488,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
                 match setattr_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                    Err(CallDunderError::CallError(..)) => {
+                    Err(CallDunderError::CallError(kind, bindings, _)) => {
                         if emit_diagnostics {
                             self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                                 value_ty,
+                                failure: CallError(kind, bindings),
                             });
                         }
                         false
@@ -795,18 +800,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.object_ty,
                 );
             }
-            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty } => {
+            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty, failure } => {
                 if let Some(builder) = self
                     .builder
                     .context
                     .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
                 {
-                    builder.into_diagnostic(format_args!(
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Cannot assign object of type `{}` to attribute `{}` on type `{}` with custom `__setattr__` method.",
                         value_ty.display(db),
                         self.attribute,
                         self.object_ty.display(db)
                     ));
+                    failure.to_error_context(db).attach_to(db, &mut diagnostic);
                 }
             }
             AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {

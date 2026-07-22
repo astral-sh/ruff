@@ -4539,6 +4539,12 @@ impl ParameterDisplayName<&Name> {
     }
 }
 
+impl<N> ParameterDisplayName<N> {
+    pub(crate) fn name(&self) -> &N {
+        &self.name
+    }
+}
+
 impl<N: AsRef<str>> fmt::Display for ParameterDisplayName<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.prefix.as_str())?;

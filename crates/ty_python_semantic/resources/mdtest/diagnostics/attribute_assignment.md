@@ -274,17 +274,17 @@ class C:
 instance = C()
 instance.attr = 1  # fine
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
 instance.attr = "wrong"  # snapshot: invalid-assignment
 ```
 
 ```snapshot
 error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
-  --> src/mdtest_snippet.py:12:1
+  --> src/mdtest_snippet.py:11:1
    |
-12 | instance.attr = "wrong"  # snapshot: invalid-assignment
+11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^
    |
+info: parameter `value` has an incompatible argument type: `Literal["wrong"]` is not assignable to `int`
 ```
 
 ### Invalid `__set__` method signature
@@ -299,7 +299,7 @@ class C:
 
 instance = C()
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong number of arguments for `__set__`)
+# TODO: Ideally, we would emit the error on the wrong `__set__` function, and not emit an error here
 instance.attr = 1  # snapshot: invalid-assignment
 ```
 
@@ -310,6 +310,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
 11 | instance.attr = 1  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^
    |
+info: no argument provided for parameter `extra`
 ```
 
 ## Setting attributes on union types

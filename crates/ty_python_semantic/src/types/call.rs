@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{ClassType, ErrorContext, ErrorContextTree, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -270,6 +270,58 @@ impl<'db> CallError<'db> {
                 BindingError::PropertyHasNoDeleter(property) => Some(*property),
                 _ => None,
             })
+    }
+
+    /// Collect the most useful part of a failed call for diagnostics that cannot point at the
+    /// individual call arguments, such as an implicit descriptor `__set__` call.
+    ///
+    /// This deliberately does not try to reproduce the full call diagnostic. Call errors can
+    /// represent unions, intersections, and overloaded callables, but these diagnostics only need
+    /// a concise explanation for a failed synthetic call.
+    pub(crate) fn to_error_context(&self, db: &'db dyn Db) -> ErrorContextTree<'db> {
+        if self.0 != CallErrorKind::BindingError {
+            return ErrorContextTree::new();
+        }
+
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .find_map(|error| match error {
+                BindingError::InvalidArgumentType {
+                    parameter,
+                    expected_ty,
+                    provided_ty,
+                    ..
+                } => {
+                    let context = provided_ty.assignability_error_context(db, *expected_ty);
+                    context.push(ErrorContext::InvalidCallArgumentType {
+                        provided: *provided_ty,
+                        expected: *expected_ty,
+                        parameter: parameter.description(),
+                    });
+                    Some(context)
+                }
+                BindingError::MissingArguments { parameters, .. } => Some(
+                    ErrorContext::MissingCallArguments {
+                        parameters: parameters.descriptions(),
+                    }
+                    .into(),
+                ),
+                BindingError::TooManyPositionalArguments {
+                    expected_positional_count,
+                    provided_positional_count,
+                    ..
+                } => Some(
+                    ErrorContext::TooManyCallPositionalArguments {
+                        expected: *expected_positional_count,
+                        provided: *provided_positional_count,
+                    }
+                    .into(),
+                ),
+                _ => None,
+            })
+            .unwrap_or_else(ErrorContextTree::new)
     }
 }
 
