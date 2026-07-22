@@ -233,7 +233,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
-        3 + # ty:ignore[ignore-comment-unknown-rule] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
+        3 + # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero, ignore-comment-unknown-rule]
         4 | value = 1 / 0
           |
         ");
@@ -318,8 +318,9 @@ mod tests {
           |
           |
         2 | seen_code = True
-        3 + # ty:ignore[ignore-comment-unknown-rule]
-        4 | # ty: ignore[not-a-rule] tracked by [123]
+          - # ty: ignore[not-a-rule] tracked by [123]
+        3 + # ty: ignore[not-a-rule] tracked by [123]  # ty:ignore[ignore-comment-unknown-rule]
+        4 | value = 1
           |
         ");
     }
@@ -439,7 +440,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
-        3 + # ty: ignore[not-a-rule, ignore-comment-unknown-rule]  # ty: ignore[unresolved-reference]
+        3 + # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference, ignore-comment-unknown-rule]
         4 | value = missing
           |
         ");
@@ -464,8 +465,9 @@ mod tests {
           |
           |
         2 | seen_code = True
-        3 + # ty:ignore[invalid-ignore-comment]
-        4 | # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+          - # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+        3 + # ty: ignore[*-*]  # ty: ignore[unresolved-reference, invalid-ignore-comment]
+        4 | value = missing
           |
         ");
     }
@@ -489,8 +491,9 @@ mod tests {
           |
           |
         2 | seen_code = True
-        3 + # ty:ignore[invalid-ignore-comment]
-        4 | # ty: ignore[#]
+          - # ty: ignore[#]
+        3 + # ty: ignore[#]  # ty:ignore[invalid-ignore-comment]
+        4 | value = 1
           |
         ");
     }
@@ -514,8 +517,9 @@ mod tests {
           |
           |
         2 | seen_code = True
-        3 + # ty:ignore[invalid-ignore-comment]
-        4 | # ty: ignore[unresolved-reference#]
+          - # ty: ignore[unresolved-reference#]
+        3 + # ty: ignore[unresolved-reference#]  # ty:ignore[invalid-ignore-comment]
+        4 | value = 1
           |
         ");
     }
@@ -548,16 +552,39 @@ mod tests {
     #[test]
     fn no_ignore_code_action_for_shebang_suppression() {
         let test = CodeActionTest::with_source(
-            r#"
-            #!/usr/bin/env -S python3 -u # ty: ignore[<START>not-a-rule<END>]
-            value = 1
-        "#,
+            "#!/usr/bin/env -S python3 -u # ty: ignore[<START>not-a-rule<END>]\nvalue = 1",
         );
 
         assert!(
             test.code_actions_for("ignore-comment-unknown-rule")
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn add_code_mid_file_hash_bang_comment() {
+        let test = CodeActionTest::with_source(
+            r#"
+            seen_code = True
+            #! notes # ty: ignore[<START>not-a-rule<END>]
+            value = 1
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions_for("ignore-comment-unknown-rule"), @"
+        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+         --> main.py:3:23
+          |
+        3 | #! notes # ty: ignore[not-a-rule]
+          |                       ^^^^^^^^^^
+          |
+          |
+        2 | seen_code = True
+          - #! notes # ty: ignore[not-a-rule]
+        3 + #! notes # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        4 | value = 1
+          |
+        ");
     }
 
     #[test]
