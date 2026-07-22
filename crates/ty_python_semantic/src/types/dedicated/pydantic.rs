@@ -518,15 +518,16 @@ pub(in crate::types) fn constructor_fields_are_optional(
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
 
-/// Return the specialized constructor parameters accepted by a settings model.
+/// Add the specialized constructor parameters accepted by a settings model.
 ///
 /// Pydantic settings models accept underscore-prefixed parameters that override values from
 /// `model_config` for a single instantiation. These parameters are defined on
 /// `BaseSettings.__init__`, so we reuse them instead of duplicating their names and types.
-pub(in crate::types) fn settings_constructor_parameters<'db>(
+pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
-) -> Box<[Parameter<'db>]> {
+    parameters: &mut Vec<Parameter<'db>>,
+) {
     let Some(base_settings) = class
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
@@ -534,29 +535,30 @@ pub(in crate::types) fn settings_constructor_parameters<'db>(
         .map(|(base, _)| base)
         .find(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
     else {
-        return Box::default();
+        return;
     };
 
     let Some(init) = class_member(db, base_settings.body_scope(db), "__init__")
         .ignore_possibly_undefined()
         .and_then(Type::as_function_literal)
     else {
-        return Box::default();
+        return;
     };
     let Some(signature) = init.signature(db).iter().next() else {
-        return Box::default();
+        return;
     };
 
-    signature
-        .parameters()
-        .iter()
-        .filter(|parameter| {
-            parameter.name().is_some_and(|name| {
-                name.as_str().starts_with('_') && !name.as_str().starts_with("__")
+    parameters.extend(
+        signature
+            .parameters()
+            .iter()
+            .filter(|parameter| {
+                parameter.name().is_some_and(|name| {
+                    name.as_str().starts_with('_') && !name.as_str().starts_with("__")
+                })
             })
-        })
-        .cloned()
-        .collect()
+            .cloned(),
+    );
 }
 
 #[salsa::tracked(

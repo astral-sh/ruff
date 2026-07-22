@@ -1401,7 +1401,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             if name == "__init__" && field_policy.is_pydantic() {
-                parameters.extend(pydantic::settings_constructor_parameters(db, self));
+                pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
             }
 
             for (field_name, field) in self.fields(db, specialization, field_policy) {
