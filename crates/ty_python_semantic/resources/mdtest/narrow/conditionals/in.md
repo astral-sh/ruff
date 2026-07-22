@@ -614,7 +614,9 @@ final class with the default identity-based equality cannot compare equal to an 
 types such as `int` and classes with custom equality when they might still match an item.
 
 A non-final element type is assumed not to have a subclass that overrides equality, so membership
-can remove `None` just as an equality check does:
+can remove `None` just as an equality check does. Different classes can still compare equal by
+identity, however, if one inherits from the other or they share a subclass through multiple
+inheritance. Membership must preserve these overlapping class types:
 
 ```py
 class Foo: ...
@@ -626,6 +628,25 @@ def equality_and_membership(x: Foo | None, y: Foo, values: list[Foo]):
         reveal_type(x)  # revealed: Foo
     if x in values:
         reveal_type(x)  # revealed: Foo
+
+class Base: ...
+class Child(Base): ...
+
+def inherited_membership(x: Base | None, y: Child, values: list[Child]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Base
+    if x in values:
+        reveal_type(x)  # revealed: Base
+
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+def overlapping_membership(x: Left | None, y: Right, values: list[Right]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Left
+    if x in values:
+        reveal_type(x)  # revealed: Left
 
 def builtin_equality_and_membership(x: str | None, y: str, values: list[str]):
     if x == y:

@@ -1339,10 +1339,8 @@ fn compare_nominal_instances<'db>(
         return ComparisonResult::Ambiguous;
     };
 
-    let classes_differ = left_instance.class_literal(db) != right_instance.class_literal(db);
-
     if left_semantics != right_semantics
-        || (left_semantics == KnownComparisonSemantics::Object && classes_differ)
+        || (left_semantics == KnownComparisonSemantics::Object && left.is_disjoint_from(db, right))
     {
         return ComparisonResult::from_bool(operator == ComparisonOperator::Inequality);
     }

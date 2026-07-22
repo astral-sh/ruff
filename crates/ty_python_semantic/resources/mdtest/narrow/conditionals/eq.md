@@ -1188,6 +1188,31 @@ def classes(value: Foo | None, other: Foo):
     if value == other:
         reveal_type(value)  # revealed: Foo
 
+class Base: ...
+class Child(Base): ...
+
+def inherited_classes(value: Base | None, other: Child):
+    reveal_type(value == other)  # revealed: bool
+    reveal_type(value != other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Base
+
+    if value != other:
+        reveal_type(value)  # revealed: Base | None
+    else:
+        reveal_type(value)  # revealed: Base
+
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+def overlapping_classes(value: Left | None, other: Right):
+    reveal_type(value == other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Left
+
 def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
     if value == other:
         reveal_type(value)  # revealed: AlwaysEqual | None
