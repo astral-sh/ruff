@@ -83,7 +83,7 @@ clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
 codspeed-criterion-compat = { version = "5.0.0", default-features = false }
 colored = { version = "3.0.0" }
-compact_str = "0.9.0"
+compact_str = "0.10.0"
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
@@ -98,7 +98,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.10.0", features = [
+get-size2 = { version = "0.10.3", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -158,7 +158,7 @@ regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the version in `fuzz/Cargo.toml`
-salsa = { version = "0.28.0", default-features = false, features = [
+salsa = { version = "0.28.1", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
