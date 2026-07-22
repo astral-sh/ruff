@@ -1582,6 +1582,105 @@ error[invalid-assignment]: Object of type `tuple[Literal[1], Literal[b""]]` is n
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
 
+### In `invalid-assignment` for failed `__set__` calls
+
+```py
+class Descriptor:
+    def __set__(self, instance, value: tuple[int, str]) -> None: ...
+
+class C:
+    x = Descriptor()
+
+c = C()
+c.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | c.x = (1, b"")  # snapshot
+  | ^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...
+  |         ^^^^^^^                 ---------------------- Parameter declared here
+  |
+```
+
+### In `invalid-assignment` for failed `__setattr__` calls
+
+```py
+class C:
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+
+c = C()
+c.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`
+ --> src/mdtest_snippet.py:5:7
+  |
+5 | c.x = (1, b"")  # snapshot
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Method defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+  |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
+  |
+```
+
+This also works for overloaded `__setattr__` methods:
+
+```py
+from typing import overload
+
+class D:
+    @overload
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+    @overload
+    def __setattr__(self, name: str, value: int): ...
+    def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+
+d = D()
+d.x = (1, b"")  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`
+  --> src/mdtest_snippet.py:16:1
+   |
+16 | d.x = (1, b"")  # snapshot
+   | ^^^ No overload of bound method `D.__setattr__` matches arguments
+   |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: First overload defined here
+  --> src/mdtest_snippet.py:9:5
+   |
+ 9 | /     @overload
+10 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+   | |_________________________________________________________________^ First overload defined here
+   |
+info: Possible overloads for bound method `__setattr__`:
+info:   (self, name: str, value: tuple[int, str]) -> Unknown
+info:   (self, name: str, value: int) -> Unknown
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
 ### In `invalid-yield` diagnostics
 
 ```py

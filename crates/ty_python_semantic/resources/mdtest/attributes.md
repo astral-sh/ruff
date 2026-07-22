@@ -2998,8 +2998,56 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+date.month = "May"  # snapshot: invalid-assignment
+# snapshot: invalid-assignment
+# snapshot: invalid-assignment
 date.tz = "UTC"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attribute `month` on type `Date`
+  --> src/mdtest_snippet.py:13:14
+   |
+13 | date.month = "May"  # snapshot: invalid-assignment
+   |              ^^^^^ Expected `int`, found `Literal["May"]`
+   |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^                                              ---------- Parameter declared here
+  |
+
+
+error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
+  --> src/mdtest_snippet.py:16:1
+   |
+16 | date.tz = "UTC"
+   | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
+   |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^       ------------------------------------- Parameter declared here
+  |
+
+
+error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
+  --> src/mdtest_snippet.py:16:11
+   |
+16 | date.tz = "UTC"
+   |           ^^^^^ Expected `int`, found `Literal["UTC"]`
+   |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^                                              ---------- Parameter declared here
+  |
 ```
 
 ### Return type of `__setattr__`
@@ -3117,7 +3165,7 @@ def use_module(m: MyModule, param: int) -> None:
 
     # But assigning to an attribute that's not explicitly defined will still
     # use `__setattr__` for validation.
-    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule` with custom `__setattr__` method."
+    # error: [invalid-assignment] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule`"
     m.undefined_param = param
 ```
 
@@ -3158,7 +3206,7 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 Foo.whatever = 42
-Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+Foo.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
 If both the metaclass and class define `__setattr__`, class-object assignments use the metaclass
@@ -3169,11 +3217,11 @@ class WithSetAttr(metaclass=Meta):
     def __setattr__(self, name: str, value: str) -> None: ...
 
 WithSetAttr.class_attribute = 42
-WithSetAttr.class_attribute = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+WithSetAttr.class_attribute = "invalid"  # error: [invalid-assignment]
 
 instance = WithSetAttr()
 instance.instance_attribute = "valid"
-instance.instance_attribute = 42  # error: [unresolved-attribute] "with custom `__setattr__` method"
+instance.instance_attribute = 42  # error: [invalid-assignment]
 ```
 
 The same applies when the class object is annotated as `type[Foo]`:
@@ -3181,7 +3229,7 @@ The same applies when the class object is annotated as `type[Foo]`:
 ```py
 def set_on_subclass(cls: type[Foo]) -> None:
     cls.whatever = 42
-    cls.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+    cls.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
 The setter also provides the expected type when inferring the assigned value:
@@ -3225,7 +3273,7 @@ OverloadedClass.callback = lambda number: (
     number.missing
 )
 OverloadedClass.payload = {"value": 1}
-OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "with custom `__setattr__` method"
+OverloadedClass.callback = {"value": 1}  # error: [invalid-assignment]
 ```
 
 A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:

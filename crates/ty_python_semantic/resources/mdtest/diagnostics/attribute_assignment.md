@@ -274,17 +274,27 @@ class C:
 instance = C()
 instance.attr = 1  # fine
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
 instance.attr = "wrong"  # snapshot: invalid-assignment
+
+# Check that the concise diagnostic retains the useful expected and provided types.
+# error: [invalid-assignment] "Expected `int`, found `Literal["also wrong"]`"
+instance.attr = "also wrong"
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
-  --> src/mdtest_snippet.py:12:1
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:11:1
    |
-12 | instance.attr = "wrong"  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^
+11 | instance.attr = "wrong"  # snapshot: invalid-assignment
+   | ^^^^^^^^^^^^^ Expected `int`, found `Literal["wrong"]`
    |
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance: object, value: int) -> None:
+  |         ^^^^^^^                         ---------- Parameter declared here
+  |
 ```
 
 ### Invalid `__set__` method signature
@@ -299,17 +309,23 @@ class C:
 
 instance = C()
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong number of arguments for `__set__`)
 instance.attr = 1  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
-  --> src/mdtest_snippet.py:11:1
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:10:1
    |
-11 | instance.attr = 1  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^
+10 | instance.attr = 1  # snapshot: invalid-assignment
+   | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
    |
+info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:53
+  |
+2 |     def __set__(self, instance: object, value: int, extra: int) -> None:
+  |                                                     ^^^^^^^^^^
+  |
 ```
 
 ## Setting attributes on union types
