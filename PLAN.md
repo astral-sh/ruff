@@ -200,6 +200,8 @@ free interface = {Y}
 
 **Status:** complete.
 
+**PR:** [astral-sh/ruff#27113](https://github.com/astral-sh/ruff/pull/27113) (`dcreager/inferable-instances`).
+
 **Dependency:** Phase 1 in the implementation stack; this representation change is logically independent of the pure `Atom::Range` refactoring and should likewise be independently reviewable as a behavior-preserving prerequisite PR.
 
 1. Change `TypeVarSetInner` from an ordered set of `BoundTypeVarIdentity`s to an ordered map from identity to `BoundTypeVarInstance`, following `GenericContext::variables_inner`.
