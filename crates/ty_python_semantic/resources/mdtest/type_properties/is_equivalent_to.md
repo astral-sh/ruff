@@ -661,7 +661,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_equivalent_to
 
 # error: [possibly-missing-submodule]
-reveal_type(imported.abc)  # revealed: Unknown
+reveal_type(imported.abc)  # revealed: <module 'imported.abc'> & Any
 
 reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 
