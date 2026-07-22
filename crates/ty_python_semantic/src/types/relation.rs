@@ -2688,6 +2688,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, other, complement.remaining_literal_union(db))
             }
 
+            // `type[T]` and `TypeForm[S]` overlap whenever their represented instance types do.
+            (Type::SubclassOf(subclass_of), Type::TypeForm(typeform))
+            | (Type::TypeForm(typeform), Type::SubclassOf(subclass_of)) => {
+                self.check_type_pair(db, subclass_of.to_instance(db), typeform.type_argument(db))
+            }
+
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
             (
                 Type::SubclassOf(subclass_of),
