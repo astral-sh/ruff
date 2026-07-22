@@ -35,7 +35,7 @@ reveal_type(C.ten)  # revealed: Literal[10]
 # This is fine:
 c.ten = 10
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C`. Call to `__set__` method failed."
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C`"
 c.ten = 11
 ```
 
@@ -78,7 +78,7 @@ c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C`. Call to `__set__` method failed."
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C`"
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -215,7 +215,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
-            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f`. Call to `__set__` method failed."
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f`"
             self.attr = b"foo"
 
     reveal_type(C1().attr)  # revealed: Literal["data"] | bytes
@@ -480,7 +480,7 @@ on the metaclass:
 ```py
 C1.meta_data_descriptor = 1
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>`. Call to `__set__` method failed."
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>`"
 C1.meta_data_descriptor = "invalid"
 ```
 
@@ -586,7 +586,7 @@ def _(flag: bool):
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
-    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>`. Call to `__set__` method failed."
+    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>`"
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
@@ -735,7 +735,7 @@ reveal_type(C.name)  # revealed: property
 c.name = "new"
 c.name = None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C`. Call to `__set__` method failed."
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C`"
 c.name = 42
 ```
 

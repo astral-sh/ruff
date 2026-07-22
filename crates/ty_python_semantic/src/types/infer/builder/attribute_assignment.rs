@@ -807,11 +807,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Cannot assign object of type `{}` to attribute `{}` on type `{}`. Call to `__setattr__` method failed.",
+                        "Cannot assign object of type `{}` to attribute `{}` on type `{}`",
                         value_ty.display(db),
                         self.attribute,
                         self.object_ty.display(db)
                     ));
+                    diagnostic.info("implicit call to `__setattr__` failed");
                     failure.to_error_context(db).attach_to(db, &mut diagnostic);
                 }
             }

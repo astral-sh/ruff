@@ -1739,10 +1739,10 @@ pub(super) fn report_bad_dunder_set_call<'db>(
         }
     } else {
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`. \
-            Call to `__set__` method failed.",
+            "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
             object_type.display(db)
         ));
+        diagnostic.info("implicit call to `__set__` failed");
         dunder_set_failure
             .to_error_context(db)
             .attach_to(db, &mut diagnostic);

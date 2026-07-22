@@ -1596,12 +1596,13 @@ c.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`. Call to `__set__` method failed.
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
  --> src/mdtest_snippet.py:8:1
   |
 8 | c.x = (1, b"")  # snapshot
   | ^^^
   |
+info: implicit call to `__set__` failed
 info: incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
@@ -1617,12 +1618,13 @@ c.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`. Call to `__setattr__` method failed.
+error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`
  --> src/mdtest_snippet.py:5:1
   |
 5 | c.x = (1, b"")  # snapshot
   | ^^^
   |
+info: implicit call to `__setattr__` failed
 info: incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
 info: └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```
@@ -1644,12 +1646,13 @@ d.x = (1, b"")  # snapshot
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`. Call to `__setattr__` method failed.
+error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`
   --> src/mdtest_snippet.py:16:1
    |
 16 | d.x = (1, b"")  # snapshot
    | ^^^
    |
+info: implicit call to `__setattr__` failed
 info: no overload matches the call
 info: ├── overload `(self, name: str, value: tuple[int, str]) -> Unknown`
 info: │   └── incompatible type for parameter `value`: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`

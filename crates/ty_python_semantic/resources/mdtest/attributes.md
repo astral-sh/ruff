@@ -3003,21 +3003,23 @@ date.tz = "UTC"  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign object of type `Literal["May"]` to attribute `month` on type `Date`. Call to `__setattr__` method failed.
+error[unresolved-attribute]: Cannot assign object of type `Literal["May"]` to attribute `month` on type `Date`
   --> src/mdtest_snippet.py:13:1
    |
 13 | date.month = "May"  # snapshot: unresolved-attribute
    | ^^^^^^^^^^
    |
+info: implicit call to `__setattr__` failed
 info: incompatible type for parameter `value`: `Literal["May"]` is not assignable to `int`
 
 
-error[unresolved-attribute]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`. Call to `__setattr__` method failed.
+error[unresolved-attribute]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
   --> src/mdtest_snippet.py:14:1
    |
 14 | date.tz = "UTC"  # snapshot: unresolved-attribute
    | ^^^^^^^
    |
+info: implicit call to `__setattr__` failed
 info: incompatible type for parameter `name`: `Literal["tz"]` is not assignable to `Literal["day", "month", "year"]`
 ```
 
@@ -3136,7 +3138,7 @@ def use_module(m: MyModule, param: int) -> None:
 
     # But assigning to an attribute that's not explicitly defined will still
     # use `__setattr__` for validation.
-    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule`. Call to `__setattr__` method failed."
+    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule`"
     m.undefined_param = param
 ```
 
@@ -3177,7 +3179,7 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 Foo.whatever = 42
-Foo.whatever = "invalid"  # error: [unresolved-attribute] "Call to `__setattr__` method failed"
+Foo.whatever = "invalid"  # error: [unresolved-attribute]
 ```
 
 If both the metaclass and class define `__setattr__`, class-object assignments use the metaclass
@@ -3188,11 +3190,11 @@ class WithSetAttr(metaclass=Meta):
     def __setattr__(self, name: str, value: str) -> None: ...
 
 WithSetAttr.class_attribute = 42
-WithSetAttr.class_attribute = "invalid"  # error: [unresolved-attribute] "Call to `__setattr__` method failed"
+WithSetAttr.class_attribute = "invalid"  # error: [unresolved-attribute]
 
 instance = WithSetAttr()
 instance.instance_attribute = "valid"
-instance.instance_attribute = 42  # error: [unresolved-attribute] "Call to `__setattr__` method failed"
+instance.instance_attribute = 42  # error: [unresolved-attribute]
 ```
 
 The same applies when the class object is annotated as `type[Foo]`:
@@ -3200,7 +3202,7 @@ The same applies when the class object is annotated as `type[Foo]`:
 ```py
 def set_on_subclass(cls: type[Foo]) -> None:
     cls.whatever = 42
-    cls.whatever = "invalid"  # error: [unresolved-attribute] "Call to `__setattr__` method failed"
+    cls.whatever = "invalid"  # error: [unresolved-attribute]
 ```
 
 The setter also provides the expected type when inferring the assigned value:
@@ -3244,7 +3246,7 @@ OverloadedClass.callback = lambda number: (
     number.missing
 )
 OverloadedClass.payload = {"value": 1}
-OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "Call to `__setattr__` method failed"
+OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute]
 ```
 
 A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:

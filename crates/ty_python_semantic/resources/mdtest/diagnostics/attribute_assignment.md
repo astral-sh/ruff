@@ -278,12 +278,13 @@ instance.attr = "wrong"  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`. Call to `__set__` method failed.
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
   --> src/mdtest_snippet.py:11:1
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^
    |
+info: implicit call to `__set__` failed
 info: incompatible type for parameter `value`: `Literal["wrong"]` is not assignable to `int`
 ```
 
@@ -291,6 +292,7 @@ info: incompatible type for parameter `value`: `Literal["wrong"]` is not assigna
 
 ```py
 class WrongDescriptor:
+    # TODO: Ideally, we would also emit an error on the invalid `__set__` definition
     def __set__(self, instance: object, value: int, extra: int) -> None:
         pass
 
@@ -299,17 +301,17 @@ class C:
 
 instance = C()
 
-# TODO: Ideally, we would emit the error on the wrong `__set__` function, and not emit an error here
 instance.attr = 1  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`. Call to `__set__` method failed.
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
   --> src/mdtest_snippet.py:11:1
    |
 11 | instance.attr = 1  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^
    |
+info: implicit call to `__set__` failed
 info: no argument provided for parameter `extra`
 ```
 
