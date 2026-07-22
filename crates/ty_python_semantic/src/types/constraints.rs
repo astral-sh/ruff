@@ -3534,7 +3534,10 @@ impl<'db> Type<'db> {
     cycle_initial = |_, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+pub(super) fn is_possibly_constraint_set_assignable<'db>(
+    db: &'db dyn Db,
+    types: TypePair<'db>,
+) -> bool {
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(db, types.second(db))
@@ -7716,9 +7719,7 @@ mod tests {
             )
         };
 
-        let solutions = set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
-            PathBounds::default_solve(&db, &builder, path_bound)
-        });
+        let solutions = set.solutions(&db, &builder, inferable);
         assert_eq!(
             solutions,
             Solutions::Constrained(vec![vec![TypeVarSolution {
@@ -7755,11 +7756,7 @@ mod tests {
             )
         };
 
-        let Solutions::Constrained(solutions) =
-            set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
-                PathBounds::default_solve(&db, &builder, path_bound)
-            })
-        else {
+        let Solutions::Constrained(solutions) = set.solutions(&db, &builder, inferable) else {
             panic!("expected constrained solutions");
         };
         assert_eq!(solutions.len(), 1);
@@ -7800,9 +7797,7 @@ mod tests {
         };
 
         assert_eq!(
-            set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
-                PathBounds::default_solve(&db, &builder, path_bound)
-            }),
+            set.solutions(&db, &builder, inferable),
             Solutions::Unsatisfiable
         );
 

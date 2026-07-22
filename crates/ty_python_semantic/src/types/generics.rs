@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solutions,
+    PathBounds, Solutions, is_possibly_constraint_set_assignable,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -33,7 +33,7 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping, TypePair,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
     binding_type, infer_definition_types, inferred_declaration,
 };
@@ -2246,11 +2246,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Option<Box<[TypeVarInference<'db>]>> {
-        if !self.has_actual_intersection_constraint
-            || generic_context
-                .variables_inner(self.db)
-                .values()
-                .any(|typevar| typevar.is_paramspec(self.db))
+        if generic_context
+            .variables_inner(self.db)
+            .values()
+            .any(|typevar| typevar.is_paramspec(self.db))
         {
             return None;
         }
@@ -2279,12 +2278,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return None;
             }
 
-            let inferred: Box<[_]> = generic_context
-                .variables_inner(self.db)
-                .keys()
-                .map(|identity| types.get(identity).copied())
-                .collect();
-            let inference = TypeVarInference::new(self.db, generic_context, inferred);
+            let inference = self.typevar_inference(generic_context, &types);
             if !inferences.contains(&inference) {
                 inferences.push(inference);
             }
@@ -2733,21 +2727,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 })
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                let is_possibly_assignable = |source: Type<'db>, target: Type<'db>| {
-                    let when = source.when_constraint_set_assignable_to_owned(self.db, target);
-                    !self
-                        .constraints
-                        .load(self.db, &when)
-                        .is_never_satisfied(self.db)
-                };
                 let declared_constraints = constraints.elements(self.db);
                 let argument = path_bound
                     .lower
                     .filter(|argument| {
                         declared_constraints.iter().all(|constraint| {
-                            !is_possibly_assignable(
-                                *argument,
-                                constraint.top_materialization(self.db),
+                            !is_possibly_constraint_set_assignable(
+                                self.db,
+                                TypePair::new(
+                                    self.db,
+                                    *argument,
+                                    constraint.top_materialization(self.db),
+                                ),
                             )
                         })
                     })
@@ -2757,9 +2748,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             .then(|| path_bound.upper.materialize_exact(self.db))
                             .filter(|upper| {
                                 declared_constraints.iter().all(|constraint| {
-                                    !is_possibly_assignable(
-                                        constraint.bottom_materialization(self.db),
-                                        *upper,
+                                    !is_possibly_constraint_set_assignable(
+                                        self.db,
+                                        TypePair::new(
+                                            self.db,
+                                            constraint.bottom_materialization(self.db),
+                                            *upper,
+                                        ),
                                     )
                                 })
                             })
@@ -2805,11 +2800,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if solution.is_err()
                     && let Some(error) = self.specialization_error_from_failed_bounds(path_bound)
                 {
-                    typevar_errors.push((
-                        error,
-                        path_bound.lower.is_some(),
-                        path_bound.has_upper(),
-                    ));
+                    typevar_errors.push((error, path_bound.variance()));
                 }
                 solution
             },
@@ -2820,14 +2811,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        let Some((first, _, _)) = typevar_errors.first() else {
+        let Some((first, first_variance)) = typevar_errors.first() else {
             return Ok(());
         };
         if typevar_errors.len() < 2
-            || typevar_errors
-                .iter()
-                .any(|(error, _, _)| error.bound_typevar() != first.bound_typevar())
-            || typevar_errors.iter().any(|(error, _, _)| {
+            || typevar_errors.iter().any(|(error, variance)| {
+                error.bound_typevar() != first.bound_typevar() || variance != first_variance
+            })
+            || typevar_errors.iter().any(|(error, _)| {
                 !matches!(
                     (first, error),
                     (
@@ -2843,28 +2834,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Err(first.clone());
         }
 
-        let has_only_lower_bounds = typevar_errors
+        let arguments = typevar_errors
             .iter()
-            .all(|(_, has_lower, has_upper)| *has_lower && !has_upper);
-        let has_only_upper_bounds = typevar_errors
-            .iter()
-            .all(|(_, has_lower, has_upper)| !has_lower && *has_upper);
-        let argument = if has_only_lower_bounds {
-            IntersectionType::from_elements(
-                self.db,
-                typevar_errors
-                    .iter()
-                    .map(|(error, _, _)| error.argument_type()),
-            )
-        } else if has_only_upper_bounds {
-            UnionType::from_elements(
-                self.db,
-                typevar_errors
-                    .iter()
-                    .map(|(error, _, _)| error.argument_type()),
-            )
-        } else {
-            return Err(first.clone());
+            .map(|(error, _)| error.argument_type());
+        let argument = match first_variance {
+            TypeVarVariance::Contravariant => IntersectionType::from_elements(self.db, arguments),
+            TypeVarVariance::Covariant => UnionType::from_elements(self.db, arguments),
+            TypeVarVariance::Invariant | TypeVarVariance::Bivariant => {
+                return Err(first.clone());
+            }
         };
 
         Err(match first {
