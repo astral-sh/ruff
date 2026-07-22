@@ -91,7 +91,7 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
-    /// Whether equality-based checks account for subclasses with different equality behavior.
+    /// Whether ty should use conservative equality and inequality semantics.
     pub strict_equality_semantics: bool,
 
     /// Whether errors can be suppressed with `type: ignore` comments.

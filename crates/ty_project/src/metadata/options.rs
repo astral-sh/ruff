@@ -1472,56 +1472,68 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether equality-based checks should account for subclasses with different equality
-    /// behavior.
+    /// Whether ty should use conservative equality and inequality semantics.
     ///
-    /// By default, ty assumes that subclasses of a non-final class do not override `__eq__` or
-    /// `__ne__`. This allows equality, inequality, and equality-driven membership or match checks
-    /// to remove otherwise incompatible union members. This behavior is shared by type narrowing,
-    /// equality-result inference, and reachability:
-    ///
-    /// ```python
-    /// from typing import reveal_type
-    ///
-    /// class Foo: ...
-    ///
-    /// class AlwaysEqual(Foo):
-    ///     def __eq__(self, other: object) -> bool:
-    ///         return True
-    ///
-    /// def narrow(value: Foo | None, other: Foo) -> None:
-    ///     reveal_type(None == other)  # Literal[False] (but can still be True!)
-    ///     if value == other:
-    ///         reveal_type(value)  # Foo (but can still be None!)
-    ///
-    /// narrow(None, AlwaysEqual())
-    /// ```
-    ///
-    /// ty also narrows broad builtin types to literal types. Broad builtin types include
-    /// subclasses, while literal types distinguish values by both their runtime type and value.
-    /// This makes the narrowing unsound even for subclasses that inherit builtin equality:
+    /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+    /// `value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+    /// membership tests and literal match patterns, which use equality comparisons.
     ///
     /// ```python
     /// from typing import Literal
     ///
     /// def parse(value: str) -> Literal["a"] | None:
     ///     if value == "a":
-    ///         return value
+    ///         return value  # Accepted by default; `value` remains `str` in strict mode.
     ///     return None
+    /// ```
     ///
+    /// Broad builtin types include subclasses, but literal types distinguish values by both their
+    /// runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+    /// builtin equality. For example:
+    ///
+    /// ```python
     /// class StringSubclass(str): ...
+    ///
     /// result = parse(StringSubclass("a"))
     /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
     /// ```
     ///
-    /// Enable this option to preserve all possible union members and broad builtin types instead.
+    /// The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
+    /// respectively. This means enum members can encounter the same unsoundness:
+    ///
+    /// ```python
+    /// from enum import StrEnum
+    ///
+    /// class Choice(StrEnum):
+    ///     A = "a"
+    ///
+    /// result = parse(Choice.A)
+    /// # Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
+    /// ```
+    ///
+    /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
+    ///
+    /// ```python
+    /// class MisleadingStr(str):
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    /// result = parse(MisleadingStr("b"))
+    /// # Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+    /// ```
+    ///
+    /// ty also assumes subclasses of non-final classes do not override `__eq__` or `__ne__`. This
+    /// can discard possible union members, affecting equality-result inference and reachability as
+    /// well as type narrowing.
+    ///
+    /// Enable this option to avoid unsound assumptions about equality and inequality comparisons.
     ///
     /// Defaults to `false`.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Preserve values that could compare equal through a subclass
+        # Preserve broad builtin types instead of narrowing them to literals
         strict-equality-semantics = true
         "#
     )]
