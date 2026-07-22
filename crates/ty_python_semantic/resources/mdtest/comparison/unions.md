@@ -63,6 +63,33 @@ def _(small: Literal[1, 2], large: Literal[2, 3]):
     reveal_type(small > large)  # revealed: Literal[False]
 ```
 
+Equality inference still preserves custom return types for every union arm:
+
+```py
+class AEq: ...
+class ANe: ...
+class BEq: ...
+class BNe: ...
+
+class A:
+    def __eq__(self, other: object) -> AEq:  # error: [invalid-method-override]
+        return AEq()
+
+    def __ne__(self, other: object) -> ANe:  # error: [invalid-method-override]
+        return ANe()
+
+class B:
+    def __eq__(self, other: object) -> BEq:  # error: [invalid-method-override]
+        return BEq()
+
+    def __ne__(self, other: object) -> BNe:  # error: [invalid-method-override]
+        return BNe()
+
+def _(value: A | B):
+    reveal_type(value == object())  # revealed: AEq | BEq
+    reveal_type(value != object())  # revealed: ANe | BNe
+```
+
 ## Unsupported operations
 
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall

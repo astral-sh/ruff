@@ -4,15 +4,14 @@ use smallvec::SmallVec;
 
 use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
-use crate::types::equality::{equality_truthiness, inequality_truthiness};
+use crate::types::equality::{ComparisonOperator as EqualityOperator, equality_result_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -96,6 +95,35 @@ impl From<MembershipTestCompareOperator> for ast::CmpOp {
     }
 }
 
+/// A comparison operator not handled by the equality evaluator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NonEqualityOperator {
+    Lt,
+    LtE,
+    Gt,
+    GtE,
+    In,
+    NotIn,
+    Is,
+    IsNot,
+}
+
+impl NonEqualityOperator {
+    const fn from_ast(operator: ast::CmpOp) -> Option<Self> {
+        match operator {
+            ast::CmpOp::Eq | ast::CmpOp::NotEq => None,
+            ast::CmpOp::Lt => Some(Self::Lt),
+            ast::CmpOp::LtE => Some(Self::LtE),
+            ast::CmpOp::Gt => Some(Self::Gt),
+            ast::CmpOp::GtE => Some(Self::GtE),
+            ast::CmpOp::In => Some(Self::In),
+            ast::CmpOp::NotIn => Some(Self::NotIn),
+            ast::CmpOp::Is => Some(Self::Is),
+            ast::CmpOp::IsNot => Some(Self::IsNot),
+        }
+    }
+}
+
 /// Context for a failed comparison operation.
 ///
 /// `left_ty` and `right_ty` are the "low-level" types
@@ -172,13 +200,15 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    let comparison_truthiness = match op {
-        ast::CmpOp::Eq => equality_truthiness(db, left, right),
-        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
-        _ => Truthiness::Ambiguous,
+    let equality_operator = match op {
+        ast::CmpOp::Eq => Some(EqualityOperator::Equality),
+        ast::CmpOp::NotEq => Some(EqualityOperator::Inequality),
+        _ => None,
     };
-    if comparison_truthiness != Truthiness::Ambiguous {
-        return Ok(Type::from_truthiness(db, comparison_truthiness));
+    if let Some(operator) = equality_operator
+        && let Some(truthiness) = equality_result_truthiness(db, left, right, operator)
+    {
+        return Ok(Type::from_truthiness(db, truthiness));
     }
 
     let comparison_result = match (left, right) {
@@ -406,25 +436,26 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
 
         (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
-            match (left_literal.kind(), right_literal.kind()) {
+            NonEqualityOperator::from_ast(op).and_then(|operator| match (
+                left_literal.kind(),
+                right_literal.kind(),
+            ) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
-                    Some(match op {
-                        ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
-                        ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
-                        ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
-                        ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
-                        ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
-                        ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
+                    Some(match operator {
+                        NonEqualityOperator::Lt => Ok(Type::bool_literal(n < m)),
+                        NonEqualityOperator::LtE => Ok(Type::bool_literal(n <= m)),
+                        NonEqualityOperator::Gt => Ok(Type::bool_literal(n > m)),
+                        NonEqualityOperator::GtE => Ok(Type::bool_literal(n >= m)),
                         // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
                         // Even if they are the same value, they may not be the same object.
-                        ast::CmpOp::Is => {
+                        NonEqualityOperator::Is => {
                             if n == m {
                                 Ok(KnownClass::Bool.to_instance(db))
                             } else {
                                 Ok(Type::bool_literal(false))
                             }
                         }
-                        ast::CmpOp::IsNot => {
+                        NonEqualityOperator::IsNot => {
                             if n == m {
                                 Ok(KnownClass::Bool.to_instance(db))
                             } else {
@@ -432,11 +463,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
                             }
                         }
                         // Undefined for (int, int)
-                        ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
-                            op,
-                            left_ty: left,
-                            right_ty: right,
-                        }),
+                        NonEqualityOperator::In | NonEqualityOperator::NotIn => {
+                            Err(UnsupportedComparisonError {
+                                op,
+                                left_ty: left,
+                                right_ty: right,
+                            })
+                        }
                     })
                 }
                 // Booleans are coded as integers (False = 0, True = 1)
@@ -492,23 +525,25 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 ) => {
                     let s1 = salsa_s1.value(db);
                     let s2 = salsa_s2.value(db);
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
-                        ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
-                        ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
-                        ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
-                        ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
-                        ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
-                        ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
-                        ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
-                        ast::CmpOp::Is => {
+                    let result = match operator {
+                        NonEqualityOperator::Lt => Type::bool_literal(s1 < s2),
+                        NonEqualityOperator::LtE => Type::bool_literal(s1 <= s2),
+                        NonEqualityOperator::Gt => Type::bool_literal(s1 > s2),
+                        NonEqualityOperator::GtE => Type::bool_literal(s1 >= s2),
+                        NonEqualityOperator::In => {
+                            Type::bool_literal(s2.contains(s1))
+                        }
+                        NonEqualityOperator::NotIn => {
+                            Type::bool_literal(!s2.contains(s1))
+                        }
+                        NonEqualityOperator::Is => {
                             if s1 == s2 {
                                 KnownClass::Bool.to_instance(db)
                             } else {
                                 Type::bool_literal(false)
                             }
                         }
-                        ast::CmpOp::IsNot => {
+                        NonEqualityOperator::IsNot => {
                             if s1 == s2 {
                                 KnownClass::Bool.to_instance(db)
                             } else {
@@ -525,27 +560,25 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 ) => {
                     let b1 = salsa_b1.value(db);
                     let b2 = salsa_b2.value(db);
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
-                        ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
-                        ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
-                        ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
-                        ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
-                        ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
-                        ast::CmpOp::In => {
+                    let result = match operator {
+                        NonEqualityOperator::Lt => Type::bool_literal(b1 < b2),
+                        NonEqualityOperator::LtE => Type::bool_literal(b1 <= b2),
+                        NonEqualityOperator::Gt => Type::bool_literal(b1 > b2),
+                        NonEqualityOperator::GtE => Type::bool_literal(b1 >= b2),
+                        NonEqualityOperator::In => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
                         }
-                        ast::CmpOp::NotIn => {
+                        NonEqualityOperator::NotIn => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
                         }
-                        ast::CmpOp::Is => {
+                        NonEqualityOperator::Is => {
                             if b1 == b2 {
                                 KnownClass::Bool.to_instance(db)
                             } else {
                                 Type::bool_literal(false)
                             }
                         }
-                        ast::CmpOp::IsNot => {
+                        NonEqualityOperator::IsNot => {
                             if b1 == b2 {
                                 KnownClass::Bool.to_instance(db)
                             } else {
@@ -556,52 +589,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
-                // Same-kind exact literals and the special relationship between `int` and `bool`
-                // are handled above. Any remaining pair of exact builtin literals compares
-                // unequal. `LiteralString` also compares unequal to non-string literals, but its
-                // comparison with an exact string literal remains ambiguous.
-                (
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::String(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::String(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                )
-                | (
-                    LiteralValueTypeKind::LiteralString,
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                )
-                | (
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                    LiteralValueTypeKind::LiteralString,
-                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
-                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
-                }
                 _ => None,
-            }
-        }
-
-        (
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-        ) => {
-            let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(db, left.constraints(db));
-            let right = constraints.load(db, right.constraints(db));
-            let result = left.iff(db, &constraints, right);
-            let equivalent = result.is_always_satisfied(db);
-            match op {
-                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),
-                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(!equivalent))),
-                _ => None,
-            }
+            })
         }
 
         (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1

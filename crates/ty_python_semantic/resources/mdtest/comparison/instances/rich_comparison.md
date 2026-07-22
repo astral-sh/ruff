@@ -494,10 +494,12 @@ def compare_str_bound(a: V, b: V) -> bool:
 
 ### Constrained TypeVar comparisons
 
-Constrained TypeVars support comparisons if all constraints support the operation:
+Constrained TypeVars support comparisons if all constraints support the operation. Comparisons
+between two occurrences of the same constrained TypeVar preserve the correlation that both
+occurrences have the same specialization:
 
 ```py
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 W = TypeVar("W", int, str)
 
@@ -510,6 +512,12 @@ X = TypeVar("X", int, str)
 def compare_constrained_lt(a: X, b: X) -> bool:
     # Both int and str support <
     return a < b
+
+Y = TypeVar("Y", Literal[1], Literal[2])
+
+def compare_same_constrained_literal(value: Y):
+    reveal_type(value == value)  # revealed: Literal[True]
+    reveal_type(value != value)  # revealed: Literal[False]
 ```
 
 ### TypeVar with `complex` bound
