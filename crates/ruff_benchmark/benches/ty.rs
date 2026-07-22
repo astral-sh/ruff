@@ -665,6 +665,21 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
 }
 
+/// Ensure optional enum comparisons do not expand the enum into all of its members.
+fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str(
+        "\n\ndef compare(\n    slug: LargeEnum,\n    first: LargeEnum | None,\n    second: LargeEnum | None,\n    third: LargeEnum | None,\n    fourth: LargeEnum | None,\n    fifth: LargeEnum | None,\n) -> bool:\n    return first == slug or second == slug or third == slug or fourth == slug or fifth == slug\n",
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
+}
+
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
 fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
@@ -1958,6 +1973,7 @@ criterion_group!(
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
     benchmark_narrowed_str_enum_comparison,
+    benchmark_optional_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,

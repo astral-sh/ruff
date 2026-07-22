@@ -168,6 +168,38 @@ def compare_non_overlapping_literal_unions(
     right: Literal[Choice.THIRD, Choice.FOURTH],
 ):
     reveal_type(left == right)  # revealed: Literal[False]
+
+def compare_optional_left(left: Choice | None, right: Choice):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice | None
+        reveal_type(right)  # revealed: Choice
+
+def compare_optional_right(left: Choice, right: Choice | None):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice | None
+
+def compare_optional_singleton(left: Choice | None, right: Literal[Choice.FIRST]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Choice.FIRST]
+    else:
+        reveal_type(left)  # revealed: Literal[Choice.SECOND, Choice.THIRD, Choice.FOURTH] | None
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def compare_optional_integer_enum(left: Number | None, right: Literal[1]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Number.ONE]
+    else:
+        reveal_type(left)  # revealed: Literal[Number.TWO] | None
 ```
 
 Members with the same known value are aliases, even when one value comes from a function call.

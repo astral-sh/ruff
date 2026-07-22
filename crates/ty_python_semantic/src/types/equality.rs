@@ -490,6 +490,16 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
+    match (left, right) {
+        (Type::Union(union), other) => {
+            return evaluate_union_left(evaluator, union.elements(db), other, branch, operator);
+        }
+        (other, Type::Union(union)) => {
+            return evaluate_union_right(evaluator, other, union.elements(db), branch, operator);
+        }
+        _ => {}
+    }
+
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
@@ -566,12 +576,6 @@ fn evaluate_comparison_once<'db>(
             .evaluate(other, newtype.concrete_base_type(db), branch, operator)
             .discard_narrowing(),
 
-        (Type::Union(union), other) => {
-            evaluate_union_left(evaluator, union.elements(db), other, branch, operator)
-        }
-        (other, Type::Union(union)) => {
-            evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
-        }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
             evaluator,
             Type::Intersection(intersection),
