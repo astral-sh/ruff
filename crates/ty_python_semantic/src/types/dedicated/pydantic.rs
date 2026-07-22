@@ -525,6 +525,49 @@ pub(in crate::types) fn constructor_fields_are_optional(
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
 
+/// Add the specialized constructor parameters accepted by a settings model.
+///
+/// Pydantic settings models accept underscore-prefixed parameters that override values from
+/// `model_config` for a single instantiation. These parameters are defined on
+/// `BaseSettings.__init__`, so we reuse them instead of duplicating their names and types.
+pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    parameters: &mut Vec<Parameter<'db>>,
+) {
+    let Some(base_settings) = class
+        .iter_mro(db, None)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.static_class_literal(db))
+        .map(|(base, _)| base)
+        .find(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
+    else {
+        return;
+    };
+
+    let Some(init) = class_member(db, base_settings.body_scope(db), "__init__")
+        .ignore_possibly_undefined()
+        .and_then(Type::as_function_literal)
+    else {
+        return;
+    };
+    let Some(signature) = init.signature(db).iter().next() else {
+        return;
+    };
+
+    parameters.extend(
+        signature
+            .parameters()
+            .iter()
+            .filter(|parameter| {
+                parameter.name().is_some_and(|name| {
+                    name.as_str().starts_with('_') && !name.as_str().starts_with("__")
+                })
+            })
+            .cloned(),
+    );
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, _, _| ModelConfig::unknown(),
@@ -960,8 +1003,13 @@ fn lax_alias<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ModelInitBehavior {
+    /// The model inherits Pydantic's ordinary `BaseModel` initializer.
     BaseModel,
+    /// The first custom initializer in the MRO accepts arbitrary keyword arguments.
     CustomVariadic,
+    /// The first custom initializer in the MRO has a fixed parameter list.
+    CustomFixed,
+    /// The model has a specialized Pydantic initializer or no recognized initializer.
     Other,
 }
 
@@ -995,12 +1043,24 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
                 }) {
                 ModelInitBehavior::CustomVariadic
             } else {
-                ModelInitBehavior::Other
+                ModelInitBehavior::CustomFixed
             };
         }
     }
 
     ModelInitBehavior::Other
+}
+
+/// Return `true` if `class` should synthesize a field-derived constructor signature.
+///
+/// A fixed custom initializer on an intermediate base class controls the constructor accepted by
+/// its subclasses. A variadic custom initializer still allows Pydantic to validate field values
+/// passed via keyword arguments.
+pub(in crate::types) fn synthesizes_constructor_signature_from_fields(
+    db: &dyn Db,
+    class: StaticClassLiteral<'_>,
+) -> bool {
+    model_init_behavior(db, class) != ModelInitBehavior::CustomFixed
 }
 
 /// Return `true` if `class` should accept extra keywords in its synthesized constructor.

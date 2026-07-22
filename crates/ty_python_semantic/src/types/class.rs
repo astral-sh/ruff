@@ -298,8 +298,16 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
-        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    pub(super) fn synthesizes_constructor_signature_from_fields(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::DataclassLike(_) => true,
+            Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
+            Self::NamedTuple | Self::TypedDict => false,
+        }
     }
 
     pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
