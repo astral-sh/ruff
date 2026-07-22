@@ -179,6 +179,8 @@ free interface = {Y}
 
 **Status:** complete.
 
+**PR:** [astral-sh/ruff#27111](https://github.com/astral-sh/ruff/pull/27111) (`dcreager/refactor-atoms`).
+
 **Dependency:** existing PR 0 and merged PR 1B only. This phase is intended to land as its own independently reviewable prerequisite PR, before the semantic PR 2A work.
 
 1. Introduce `Atom<'db>` with exactly one variant, `Range(Constraint<'db>)`. Do not add `Existential`, an existential ID, a separate arena, a domain helper, or any other quantification feature in this revision.
