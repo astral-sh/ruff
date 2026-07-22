@@ -490,11 +490,25 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
+    // Expand an optional enum before its peer's members to avoid repeatedly expanding the enum.
+    // Other unions must retain their normal evaluation order, especially around dynamic operands.
     match (left, right) {
-        (Type::Union(union), other) => {
+        (Type::Union(union), other)
+            if other.is_enum(db)
+                && union.elements(db).len() == 2
+                && union.elements(db).contains(&other)
+                && union.elements(db).iter().any(|element| element.is_none(db))
+                && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
+        {
             return evaluate_union_left(evaluator, union.elements(db), other, branch, operator);
         }
-        (other, Type::Union(union)) => {
+        (other, Type::Union(union))
+            if other.is_enum(db)
+                && union.elements(db).len() == 2
+                && union.elements(db).contains(&other)
+                && union.elements(db).iter().any(|element| element.is_none(db))
+                && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
+        {
             return evaluate_union_right(evaluator, other, union.elements(db), branch, operator);
         }
         _ => {}
@@ -576,6 +590,12 @@ fn evaluate_comparison_once<'db>(
             .evaluate(other, newtype.concrete_base_type(db), branch, operator)
             .discard_narrowing(),
 
+        (Type::Union(union), other) => {
+            evaluate_union_left(evaluator, union.elements(db), other, branch, operator)
+        }
+        (other, Type::Union(union)) => {
+            evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
+        }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
             evaluator,
             Type::Intersection(intersection),
