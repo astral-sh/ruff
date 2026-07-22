@@ -699,8 +699,21 @@ dependencies = [
  "itoa",
  "rustversion",
  "ryu",
+ "static_assertions",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79fcda08c33bb58b97008b2cdada6622500e949e060f5913361763121abd2416"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
  "serde",
  "static_assertions",
+ "zmij",
 ]
 
 [[package]]
@@ -1312,7 +1325,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "823645bc6404ae2915707777061a47d3a031a9ee0bff51b34ec973df3d8d2990"
 dependencies = [
- "compact_str",
+ "compact_str 0.9.1",
  "get-size-derive2",
  "hashbrown 0.17.1",
  "indexmap",
@@ -3205,7 +3218,7 @@ dependencies = [
  "anstyle",
  "arc-swap",
  "camino",
- "compact_str",
+ "compact_str 0.10.0",
  "dashmap",
  "dunce",
  "etcetera",
@@ -3355,7 +3368,7 @@ dependencies = [
  "bitflags 2.13.0",
  "clap",
  "colored",
- "compact_str",
+ "compact_str 0.10.0",
  "fern",
  "glob",
  "globset",
@@ -3491,7 +3504,7 @@ dependencies = [
  "arrayvec",
  "bitflags 2.13.0",
  "char_str",
- "compact_str",
+ "compact_str 0.10.0",
  "get-size2",
  "is-macro",
  "memchr",
@@ -3880,7 +3893,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63ad5919b18c2deaf18921fffd5c84d6e41416d1ef80b6b541d629aa30ce8556"
 dependencies = [
  "boxcar",
- "compact_str",
+ "compact_str 0.9.1",
  "crossbeam-queue",
  "crossbeam-utils",
  "hashbrown 0.17.1",
@@ -4717,7 +4730,7 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.13.0",
  "camino",
- "compact_str",
+ "compact_str 0.10.0",
  "get-size2",
  "indexmap",
  "insta",
@@ -4757,7 +4770,7 @@ version = "0.0.5"
 dependencies = [
  "anyhow",
  "camino",
- "compact_str",
+ "compact_str 0.10.0",
  "get-size2",
  "insta",
  "regex",
@@ -4784,7 +4797,7 @@ dependencies = [
  "bitvec",
  "camino",
  "colored",
- "compact_str",
+ "compact_str 0.10.0",
  "crossbeam",
  "get-size2",
  "globset",
@@ -4867,7 +4880,7 @@ dependencies = [
  "bitflags 2.13.0",
  "camino",
  "char_str",
- "compact_str",
+ "compact_str 0.10.0",
  "datatest-stable",
  "drop_bomb",
  "get-size2",
