@@ -2716,7 +2716,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 Type::NominalInstance(instance)
                     if matches!(
                         instance.class(db).known(db),
-                        Some(KnownClass::Dict | KnownClass::Mapping | KnownClass::OrderedDict)
+                        Some(
+                            KnownClass::Dict
+                                | KnownClass::Mapping
+                                | KnownClass::MutableMapping
+                                | KnownClass::OrderedDict
+                        )
                     ) && let Some(alias) = instance.class(db).into_generic_alias()
                         && let [key, _] = alias.specialization(db).types(db)
                         && key.resolve_type_alias(db) == KnownClass::Str.to_instance(db) =>
