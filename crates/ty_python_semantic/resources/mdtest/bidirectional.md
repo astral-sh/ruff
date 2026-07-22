@@ -1444,7 +1444,7 @@ def from_or(values: list[str] | None) -> None:
         reveal_type(value)  # revealed: str
 
 def constructor_fallback(values: list[int] | None) -> None:
-    reveal_type(values or list())  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(values or list())  # revealed: list[int] | list[Unknown]
 
 def from_and(values: list[str]) -> None:
     reveal_type(values and [])  # revealed: list[str]
@@ -1466,10 +1466,10 @@ def collection_literal_first(values: list[str], flag: bool) -> None:
     reveal_type([] if flag else values)  # revealed: list[str]
 
 def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
-    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+    reveal_type(values or {"foo": 0})  # revealed: dict[Key, int]
 
 def non_empty_set_fallback(values: set[Key] | None) -> None:
-    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+    reveal_type(values or {"foo"})  # revealed: set[Key]
 
 class TextContent: ...
 class TagContent: ...
@@ -1493,10 +1493,10 @@ def generic_type_context(values: list[int | str] | None) -> None:
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+    reveal_type(result)  # revealed: list[int] | list[int | str]
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
-    reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
+    reveal_type(values or [1])  # revealed: set[str] | list[int]
 
 def typed_dict_peer_is_only_a_hint(value: Payload | None, flag: bool) -> None:
     value or {}
@@ -1507,7 +1507,7 @@ def stored_literal_is_not_fresh(values: dict[Key, int] | None) -> None:
     fallback = {"foo": 0}
     reveal_type(fallback)  # revealed: dict[str, int]
     result = values or fallback
-    reveal_type(result)  # revealed: (dict[Key, int] & ~AlwaysFalsy) | dict[str, int]
+    reveal_type(result)  # revealed: dict[Key, int] | dict[str, int]
 
 @dataclass
 class SortParams[F]:

@@ -737,11 +737,11 @@ practice.
 ```py
 def _(x: int, y: bool):
     if x:
-        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(x)  # revealed: int
     if y:
         reveal_type(y)  # revealed: Literal[True]
     if x and y:
-        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(x)  # revealed: int
         reveal_type(y)  # revealed: Literal[True]
 
     x_alias = x
@@ -757,10 +757,10 @@ def _(x: int, y: bool):
     x_alias2 = bool(x)
     y_alias2 = bool(y)
     if x_alias2:
-        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(x)  # revealed: int
     if y_alias2:
         reveal_type(y)  # revealed: Literal[True]
     if x_alias2 and y_alias2:
-        reveal_type(x)  # revealed: int & ~AlwaysFalsy
+        reveal_type(x)  # revealed: int
         reveal_type(y)  # revealed: Literal[True]
 ```

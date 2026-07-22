@@ -136,7 +136,7 @@ class Choice(StrEnum):
 
 def compare_after_truthiness_check(left: Choice, right: Choice):
     if right and left != right:
-        reveal_type(right)  # revealed: Choice & ~AlwaysFalsy
+        reveal_type(right)  # revealed: Choice
         return
 
     reveal_type(right)  # revealed: Choice

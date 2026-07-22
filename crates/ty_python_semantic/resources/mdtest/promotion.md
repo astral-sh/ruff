@@ -18,8 +18,7 @@ In addition to promoting literal types to their nominal supertype (e.g. `Literal
 `Literal["foo"]` to `str`, we also promote `float` to `int | float` and `complex` to
 `int | float | complex`.
 
-We also remove negative intersection elements, so that e.g. `A & ~AlwaysFalsy` promotes to simply
-`A`.
+We also remove negative intersection elements, so that e.g. `A & ~B` promotes to simply `A`.
 
 We avoid promoting literal types that originate from an explicit annotation.
 
@@ -364,19 +363,20 @@ However, this promotion should not take place in contravariant position:
 
 ```py
 from typing import Generic, TypeVar
-from ty_extensions import Intersection, Not, AlwaysFalsy
+from ty_extensions import Intersection, Not
 
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
 
 class A: ...
+class B: ...
 class Consumer(Generic[T_contra]): ...
 class Producer(Generic[T_co]): ...
 
-def _(c: Consumer[Intersection[A, Not[AlwaysFalsy]]], p: Producer[Intersection[A, Not[AlwaysFalsy]]]):
-    reveal_type(c)  # revealed: Consumer[A & ~AlwaysFalsy]
-    reveal_type(p)  # revealed: Producer[A & ~AlwaysFalsy]
-    reveal_type([c])  # revealed: list[Consumer[A & ~AlwaysFalsy]]
+def _(c: Consumer[Intersection[A, Not[B]]], p: Producer[Intersection[A, Not[B]]]):
+    reveal_type(c)  # revealed: Consumer[A & ~B]
+    reveal_type(p)  # revealed: Producer[A & ~B]
+    reveal_type([c])  # revealed: list[Consumer[A & ~B]]
     reveal_type([p])  # revealed: list[Producer[A]]
 ```
 
@@ -385,7 +385,7 @@ callable is promoted as a list element, these positions must be transformed inde
 parameter keeps the narrowed type, while the return type is promoted.
 
 ```py
-type NarrowA = Intersection[A, Not[AlwaysFalsy]]
+type NarrowA = Intersection[A, Not[B]]
 
 def transform(value: NarrowA) -> NarrowA:
     return value

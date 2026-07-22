@@ -714,7 +714,7 @@ Regression tests for complex nested simplifications:
 from typing_extensions import Any, assert_type
 
 def _(x: bool & ~(Any & ~AlwaysTruthy & ~AlwaysFalsy)):
-    assert_type(x, bool)
+    reveal_type(x)  # revealed: bool & Any
 
 def _(x: bool & Any | Literal[True] | Literal[False]):
     assert_type(x, bool)
@@ -751,7 +751,7 @@ def f(
     reveal_type(g)  # revealed: LiteralString & ~Literal[""]
     reveal_type(h)  # revealed: LiteralString & ~Literal[""]
     reveal_type(i)  # revealed: Unknown & Literal[""]
-    reveal_type(j)  # revealed: Unknown & Literal[""]
+    reveal_type(j)  # revealed: Unknown & LiteralString
 ```
 
 ## Simplifications involving enums and enum literals

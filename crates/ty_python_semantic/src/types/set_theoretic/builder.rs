@@ -1922,6 +1922,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return Type::EnumComplement(complement);
         }
 
+        // Preserve standalone negations such as `~AlwaysFalsy`, but discard truthiness guards
+        // that did not simplify any of the positive intersection elements.
+        if !self.positive.is_empty() {
+            self.negative.swap_remove(&Type::AlwaysTruthy);
+            self.negative.swap_remove(&Type::AlwaysFalsy);
+        }
+
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(),
             (1, 0) => self.positive[0],
