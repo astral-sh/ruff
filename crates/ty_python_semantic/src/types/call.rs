@@ -279,49 +279,56 @@ impl<'db> CallError<'db> {
     /// represent unions, intersections, and overloaded callables, but these diagnostics only need
     /// a concise explanation for a failed synthetic call.
     pub(crate) fn to_error_context(&self, db: &'db dyn Db) -> ErrorContextTree<'db> {
-        if self.0 != CallErrorKind::BindingError {
-            return ErrorContextTree::new();
+        match self.0 {
+            CallErrorKind::NotCallable => ErrorContext::CallNotCallable {
+                callable: self.1.callable_type(),
+            }
+            .into(),
+            CallErrorKind::PossiblyNotCallable => ErrorContext::CallPossiblyNotCallable {
+                callable: self.1.callable_type(),
+            }
+            .into(),
+            CallErrorKind::BindingError => self
+                .1
+                .iter_flat()
+                .flatten()
+                .flat_map(bind::Binding::errors)
+                .find_map(|error| match error {
+                    BindingError::InvalidArgumentType {
+                        parameter,
+                        expected_ty,
+                        provided_ty,
+                        ..
+                    } => {
+                        let context = provided_ty.assignability_error_context(db, *expected_ty);
+                        context.push(ErrorContext::InvalidCallArgumentType {
+                            provided: *provided_ty,
+                            expected: *expected_ty,
+                            parameter: parameter.description(),
+                        });
+                        Some(context)
+                    }
+                    BindingError::MissingArguments { parameters, .. } => Some(
+                        ErrorContext::MissingCallArguments {
+                            parameters: parameters.descriptions(),
+                        }
+                        .into(),
+                    ),
+                    BindingError::TooManyPositionalArguments {
+                        expected_positional_count,
+                        provided_positional_count,
+                        ..
+                    } => Some(
+                        ErrorContext::TooManyCallPositionalArguments {
+                            expected: *expected_positional_count,
+                            provided: *provided_positional_count,
+                        }
+                        .into(),
+                    ),
+                    _ => None,
+                })
+                .unwrap_or_else(ErrorContextTree::new),
         }
-
-        self.1
-            .iter_flat()
-            .flatten()
-            .flat_map(bind::Binding::errors)
-            .find_map(|error| match error {
-                BindingError::InvalidArgumentType {
-                    parameter,
-                    expected_ty,
-                    provided_ty,
-                    ..
-                } => {
-                    let context = provided_ty.assignability_error_context(db, *expected_ty);
-                    context.push(ErrorContext::InvalidCallArgumentType {
-                        provided: *provided_ty,
-                        expected: *expected_ty,
-                        parameter: parameter.description(),
-                    });
-                    Some(context)
-                }
-                BindingError::MissingArguments { parameters, .. } => Some(
-                    ErrorContext::MissingCallArguments {
-                        parameters: parameters.descriptions(),
-                    }
-                    .into(),
-                ),
-                BindingError::TooManyPositionalArguments {
-                    expected_positional_count,
-                    provided_positional_count,
-                    ..
-                } => Some(
-                    ErrorContext::TooManyCallPositionalArguments {
-                        expected: *expected_positional_count,
-                        provided: *provided_positional_count,
-                    }
-                    .into(),
-                ),
-                _ => None,
-            })
-            .unwrap_or_else(ErrorContextTree::new)
     }
 }
 

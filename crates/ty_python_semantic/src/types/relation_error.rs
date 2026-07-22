@@ -112,6 +112,12 @@ pub(crate) enum ErrorContext<'db> {
         expected: usize,
         provided: usize,
     },
+    CallNotCallable {
+        callable: Type<'db>,
+    },
+    CallPossiblyNotCallable {
+        callable: Type<'db>,
+    },
     InferredCallableType {
         source: Type<'db>,
         callable: Type<'db>,
@@ -316,6 +322,12 @@ impl<'db> ErrorContext<'db> {
             }
             Self::TooManyCallPositionalArguments { expected, provided } => {
                 format!("too many positional arguments: expected {expected}, got {provided}")
+            }
+            Self::CallNotCallable { callable } => {
+                format!("type `{}` is not callable", callable.display(db))
+            }
+            Self::CallPossiblyNotCallable { callable } => {
+                format!("type `{}` may not be callable", callable.display(db))
             }
             Self::InferredCallableType { source, callable } => format!(
                 "type `{}` has inferred callable type `{}`",
