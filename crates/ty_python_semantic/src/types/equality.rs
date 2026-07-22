@@ -1438,7 +1438,6 @@ impl KnownComparisonSemantics {
             }
             Type::NominalInstance(instance)
                 if instance.class(db).is_final(db)
-                    || instance.tuple_spec(db).is_some()
                     || soundness_policy.allow_unsafe_equality
                         // `object` can contain values whose classes define their own comparison
                         // method, so treating it as exact would incorrectly eliminate those values.

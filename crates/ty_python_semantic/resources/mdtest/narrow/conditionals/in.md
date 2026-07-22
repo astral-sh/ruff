@@ -220,7 +220,8 @@ def _(x: Foo):
 ## Enabling strict equality narrowing for membership
 
 With strict equality narrowing enabled, a broad union arm and a broad element type are preserved
-when a membership test succeeds, while literal arms are still narrowed safely:
+when a membership test succeeds, while literal arms are still narrowed safely. Tuple elements are
+also preserved because their subclasses can override equality:
 
 ```toml
 [environment]
@@ -254,6 +255,16 @@ def inline_set(x: str):
 class Bar: ...
 
 def broad_element(x: Bar | None, values: list[Bar]):
+    if x in values:
+        reveal_type(x)  # revealed: Bar | None
+
+class EqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def broad_tuple_element(x: Bar | None, value: tuple[int, ...], values: list[tuple[int, ...]]):
+    if x in [value]:
+        reveal_type(x)  # revealed: Bar | None
     if x in values:
         reveal_type(x)  # revealed: Bar | None
 ```

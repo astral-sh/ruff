@@ -1752,7 +1752,7 @@ def _(x: A | B):
 
 The `strict-equality-narrowing` option can be enabled to preserve broad builtin types and union
 members that a subclass could compare equal to. Narrowing types that are already literal unions
-remains safe and is unaffected.
+remains safe and is unaffected. This also applies to tuples, whose subclasses can override equality.
 
 ```toml
 [analysis]
@@ -1785,6 +1785,22 @@ def union(value: Foo | None, other: Foo):
     reveal_type(None != other)  # revealed: bool
 
     if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+class EqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def tuple_union(value: Foo | None, other: tuple[int, ...]):
+    reveal_type(None == other)  # revealed: bool
+    reveal_type(None != other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+    if value != other:
+        reveal_type(value)  # revealed: Foo | None
+    else:
         reveal_type(value)  # revealed: Foo | None
 ```
 
