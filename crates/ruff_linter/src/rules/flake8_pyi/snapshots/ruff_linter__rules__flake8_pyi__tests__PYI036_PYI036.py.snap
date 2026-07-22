@@ -212,3 +212,23 @@ PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) s
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 169 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
     |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:187:25
+    |
+185 |     # T has no bound — could be anything, so type[T] is not a valid first-arg annotation.
+186 |     def __exit__[T](
+187 |         self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    |                         ^^^^^^^^^^^^^^
+188 |     ) -> bool: ...  # PYI036: T has no bound constraining it to BaseException
+    |
+
+PYI036 The second argument in `__exit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:187:46
+    |
+185 |     # T has no bound — could be anything, so type[T] is not a valid first-arg annotation.
+186 |     def __exit__[T](
+187 |         self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    |                                              ^^^^^^^^
+188 |     ) -> bool: ...  # PYI036: T has no bound constraining it to BaseException
+    |
