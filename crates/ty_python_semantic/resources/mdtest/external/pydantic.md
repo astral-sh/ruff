@@ -469,6 +469,77 @@ Nested(value=[{"a": 1}, {"b": "2", "c": 3.0}])
 Nested(value=[{"a": 1}, {"b": None}])  # error: [invalid-argument-type]
 ```
 
+In lax mode, fields that refer to an ordinary Pydantic model accept either an instance of that model
+or a mapping:
+
+```py
+class Child(BaseModel):
+    value: int
+
+class Stranger(BaseModel):
+    value: int
+
+class Parent(BaseModel):
+    child: Child
+    children: list[Child]
+
+# revealed: (self: Parent, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
+reveal_type(Parent.__init__)
+
+child_input = {"value": "1"}
+
+Parent(child=Child(value=1), children=[Child(value=2), Child(value=3)])
+Parent(child={"value": "1"}, children=[{"value": "2"}, {"value": "3"}])
+
+Parent(child=Stranger(value=1), children=[])  # error: [invalid-argument-type]
+Parent(child=1, children=[])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[Stranger(value=2)])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
+```
+
+For fields that refer to generic models, we widen to a gradual specialization, since Pydantic
+revalidates same-origin generic model instances against the target specialization:
+
+```py
+class Box[T](BaseModel):
+    value: T
+
+class HasBox(BaseModel):
+    box: Box[int]
+
+# revealed: (self: HasBox, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
+reveal_type(HasBox.__init__)
+
+HasBox(box=Box(value=1))
+HasBox(box=Box(value="1"))
+HasBox(box=1)  # error: [invalid-argument-type]
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasBox(box=Box(value=None))
+```
+
+Models configured to validate from attributes can accept arbitrary objects, so their field
+parameters remain `Any`:
+
+```py
+class AttributeChild(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    value: int
+
+class AttributeParent(BaseModel):
+    child: AttributeChild
+
+class AttributeSource:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+# revealed: (self: AttributeParent, *, child: Any, **extra: Any) -> None
+reveal_type(AttributeParent.__init__)
+
+AttributeParent(child=AttributeSource(1))
+```
+
 For enums, we currently fall back to a very permissive `Any`, because Pydantic allows certain
 conversions that are not further specified in the documentation.
 
@@ -1111,6 +1182,21 @@ Model(int_list=[1, 2, 3])
 Model(int_list=["1", "2", "3"])
 
 Model(int_list=1)  # error: [invalid-argument-type]
+```
+
+Generic root models can accept root models with a different specialization:
+
+```py
+class GenericRoot[T](RootModel[T]): ...
+
+class HasGenericRoot(BaseModel):
+    root: GenericRoot[int]
+
+HasGenericRoot(root=GenericRoot(1))
+HasGenericRoot(root=GenericRoot("1"))
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasGenericRoot(root=GenericRoot(None))
 ```
 
 ## Model configuration

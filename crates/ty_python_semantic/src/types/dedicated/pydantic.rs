@@ -332,6 +332,8 @@ pub(crate) struct ModelConfig {
     /// The `strict` configuration controls whether constructor parameters accept values that
     /// Pydantic can coerce to the declared field type.
     strict: ConfigBoolean,
+    /// Whether model fields can be populated from attributes on arbitrary objects.
+    from_attributes: ConfigBoolean,
     /// Whether assignments to fields on model instances are forbidden.
     frozen: ConfigBoolean,
     /// Whether fields with aliases can be initialized by their alias.
@@ -347,6 +349,7 @@ impl ModelConfig {
         Self {
             extra: Some(ExtraBehavior::Unknown),
             strict: ConfigBoolean::Unknown,
+            from_attributes: ConfigBoolean::Unknown,
             frozen: ConfigBoolean::Unknown,
             validate_by_alias: ConfigBoolean::Unknown,
             validate_by_name: ConfigBoolean::Unknown,
@@ -358,6 +361,7 @@ impl ModelConfig {
     fn merge(&mut self, other: Self) {
         self.extra = other.extra.or(self.extra);
         self.strict = other.strict.or(self.strict);
+        self.from_attributes = other.from_attributes.or(self.from_attributes);
         self.frozen = other.frozen.or(self.frozen);
         self.validate_by_alias = other.validate_by_alias.or(self.validate_by_alias);
         self.validate_by_name = other.validate_by_name.or(self.validate_by_name);
@@ -636,6 +640,11 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         ExtraBehavior::from_value(extra)
     });
     let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
+    let from_attributes = config_boolean(
+        db,
+        definition,
+        call.arguments.find_keyword("from_attributes"),
+    );
     let frozen = config_boolean(db, definition, call.arguments.find_keyword("frozen"));
     let validate_by_alias = config_boolean(
         db,
@@ -656,6 +665,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     Some(ModelConfig {
         extra,
         strict,
+        from_attributes,
         frozen,
         validate_by_alias,
         validate_by_name,
@@ -687,6 +697,7 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
                 ));
             }
             "strict" => config.strict = ConfigBoolean::from_type(value),
+            "from_attributes" => config.from_attributes = ConfigBoolean::from_type(value),
             "frozen" => config.frozen = ConfigBoolean::from_type(value),
             "validate_by_alias" => config.validate_by_alias = ConfigBoolean::from_type(value),
             "validate_by_name" => config.validate_by_name = ConfigBoolean::from_type(value),
@@ -725,6 +736,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
         ExtraBehavior::from_value(extra)
     });
     let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
+    let from_attributes = config_boolean(db, definition, arguments.find_keyword("from_attributes"));
     let frozen = config_boolean(db, definition, arguments.find_keyword("frozen"));
     let validate_by_alias =
         config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
@@ -736,6 +748,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     ModelConfig {
         extra,
         strict,
+        from_attributes,
         frozen,
         validate_by_alias,
         validate_by_name,
@@ -795,6 +808,10 @@ fn lax_input_type_impl<'db>(
     }
 
     if let Some(input_type) = root_model_input_type(db, field_type, expanding_types) {
+        return input_type;
+    }
+
+    if let Some(input_type) = model_input_type(db, field_type) {
         return input_type;
     }
 
@@ -928,11 +945,39 @@ fn root_model_input_type<'db>(
     let root_input_type = lax_input_type_impl(db, root_field.declared_ty, expanding_types);
 
     expanding_types.remove(&field_type);
+    // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
+    // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
+    // covariant generics.
+    let model_instance = Type::instance(db, class.unknown_specialization(db));
     Some(UnionType::from_two_elements(
         db,
-        field_type,
+        model_instance,
         root_input_type,
     ))
+}
+
+/// Return the input type accepted for an ordinary Pydantic model field.
+///
+/// By default, Pydantic accepts either an instance of the model or a mapping of string keys to
+/// input values. Custom validators can accept additional input types, which are not modeled here.
+fn model_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Option<Type<'db>> {
+    let (class, _) = field_type.nominal_class(db)?.static_class_literal(db)?;
+    if !is_model(db, class) || is_root_model(db, class) {
+        return None;
+    }
+
+    // Attribute-based validation can accept arbitrary objects that do not implement `Mapping`.
+    if model_config(db, class).from_attributes.enabled_or(false) {
+        return Some(Type::any());
+    }
+
+    // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
+    // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
+    // covariant generics.
+    let model_instance = Type::instance(db, class.unknown_specialization(db));
+    let mapping = KnownClass::Mapping
+        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+    Some(UnionType::from_two_elements(db, model_instance, mapping))
 }
 
 /// Return the known module, name, and class literal for an instance's nominal class.
