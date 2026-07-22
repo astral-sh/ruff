@@ -104,7 +104,8 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 ///
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
 /// which in turn take precedence over definitely non-data metaclass members. If the metaclass
-/// member is absent or possibly undefined, the class object's own attributes form the fallback.
+/// member is absent, possibly undefined, or could be a non-data descriptor, the class object's own
+/// attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
     /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
@@ -148,7 +149,7 @@ impl ExplicitAttributeWriteRequirement<'_> {
     }
 }
 
-/// A write target found through a possibly absent fallback lookup.
+/// A receiver-level write target that can govern the write instead of the type member.
 pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
@@ -182,8 +183,8 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
 /// ```
 pub(super) enum AssignmentAttributeMembers<'db> {
     /// The type member governs the write, as `Meta.data` does above because it is a data descriptor.
-    /// If the type member may be missing, the corresponding receiver member (`C.data`) is retained
-    /// as `receiver_fallback`.
+    /// If the type member may be missing or may be a non-data descriptor, the corresponding
+    /// receiver member (`C.data`) is retained as `receiver_fallback`.
     TypeMember {
         member: PlaceAndQualifiers<'db>,
         receiver_fallback: Option<PlaceAndQualifiers<'db>>,
@@ -599,36 +600,63 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-/// Return the class member that takes precedence over a definitely non-data metaclass member.
-fn class_member_preceding_non_data_metaclass_member<'db>(
+enum ClassObjectMemberPrecedence<'db> {
+    /// The class-object member always shadows the metaclass member.
+    Receiver(PlaceAndQualifiers<'db>),
+    /// The metaclass member's descriptor status is uncertain, so either member can govern the
+    /// write.
+    TypeOrReceiver(PlaceAndQualifiers<'db>),
+}
+
+/// Classify the precedence between a metaclass member and a class-object member.
+///
+/// For example, `C.attribute` governs the assignment below because `Meta.attribute` does not
+/// implement `__set__` or `__delete__`:
+///
+/// ```python
+/// class Meta(type):
+///     attribute = object()
+///
+/// class C(metaclass=Meta):
+///     attribute: int
+///
+/// C.attribute = 1
+/// ```
+fn class_object_member_precedence<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
     attribute: &str,
     type_member: PlaceAndQualifiers<'db>,
-) -> Option<PlaceAndQualifiers<'db>> {
+) -> Option<ClassObjectMemberPrecedence<'db>> {
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) || !type_member
-        .place
-        .ignore_possibly_undefined()?
-        .is_definitely_non_data_descriptor(db)
-    {
+    ) {
         return None;
     }
 
-    object_ty
+    let receiver_member = object_ty
         .find_name_in_mro_with_policy(db, attribute, MemberLookupPolicy::default())
-        .filter(|class_attr| !class_attr.place.is_undefined())
+        .filter(|class_attr| !class_attr.place.is_undefined())?;
+    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
+
+    if type_member_ty.is_definitely_non_data_descriptor(db) {
+        Some(ClassObjectMemberPrecedence::Receiver(receiver_member))
+    } else if !type_member_ty.is_divergent() && !type_member_ty.is_data_descriptor(db) {
+        Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member))
+    } else {
+        None
+    }
 }
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
 ///
 /// The type member comes from class-member lookup. A member found directly on the receiver is
 /// queried when the type member is absent or possibly undefined. For class objects, a class-MRO
-/// member instead takes precedence over a definitely non-data metaclass member. Composite and
-/// dynamic receiver types return `None`; their callers either decompose them before this point or
-/// handle them without member lookup.
+/// member instead takes precedence over a definitely non-data metaclass member and remains an
+/// alternative when the metaclass member's descriptor status is uncertain. Composite and dynamic
+/// receiver types return `None`; their callers either decompose them before this point or handle
+/// them without member lookup.
 ///
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
 /// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
@@ -648,11 +676,16 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, attribute)
     };
-    if let Some(receiver_member) =
-        class_member_preceding_non_data_metaclass_member(db, object_ty, attribute, type_member)
-    {
-        return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
-    }
+    let receiver_alternative =
+        match class_object_member_precedence(db, object_ty, attribute, type_member) {
+            Some(ClassObjectMemberPrecedence::Receiver(receiver_member)) => {
+                return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
+            }
+            Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member)) => {
+                Some(receiver_member)
+            }
+            None => None,
+        };
     let needs_receiver_fallback = matches!(
         type_member.place,
         Place::Defined(DefinedPlace {
@@ -660,7 +693,9 @@ pub(super) fn assignment_attribute_members<'db>(
             ..
         }) | Place::Undefined
     );
-    let receiver_fallback = if needs_receiver_fallback {
+    let receiver_fallback = if let Some(receiver_alternative) = receiver_alternative {
+        Some(receiver_alternative)
+    } else if needs_receiver_fallback {
         Some(match object_ty {
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
