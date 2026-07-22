@@ -2610,7 +2610,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 A = TypedDict("A", {"type": Literal["a"]})
 B = TypedDict("B", {"type": Literal["b"]})
@@ -2646,6 +2646,12 @@ def _(item: Item) -> None:
 # Those intersections should still reuse the common protocol constraints of the union.
 # Regression test for https://github.com/astral-sh/ty/issues/3974.
 def _(item: Item | str) -> None:
+    if isinstance(item, dict):
+        reveal_type(dict(item))  # revealed: dict[str, object]
+
+# A single plain-dict member must not make combining the shared `TypedDict` constraints exponential.
+def _(item: Item | dict[str, Any]) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
     if isinstance(item, dict):
         reveal_type(dict(item))  # revealed: dict[str, object]
 
