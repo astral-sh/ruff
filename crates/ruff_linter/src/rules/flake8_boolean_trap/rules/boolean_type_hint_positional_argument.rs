@@ -7,9 +7,11 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_boolean_type_hint_pos_arg_literal_enabled;
 use crate::rules::flake8_boolean_trap::helpers::{
     add_liskov_substitution_principle_help, is_allowed_func_def,
 };
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -92,11 +94,16 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// round_number(1.5, up=False)
 /// ```
 ///
+/// ## Preview
+/// When [preview] is enabled, this rule also flags `typing.Literal` annotations that
+/// include a boolean literal as a variant - e.g. `Literal[True, False]`.
+///
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanTypeHintPositionalArgument;
@@ -128,7 +135,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
+        if !match_annotation_to_complex_bool(annotation, checker.semantic(), checker.settings()) {
             continue;
         }
 
@@ -160,7 +167,11 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
 /// Returns `true` if the annotation is a boolean type hint (e.g., `bool`), or a type hint that
 /// includes boolean as a variant (e.g., `bool | int`).
-fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
+fn match_annotation_to_complex_bool(
+    annotation: &Expr,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
     match annotation {
         // Ex) `bool`
         Expr::Name(name) => &name.id == "bool",
@@ -173,8 +184,8 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
             right,
             ..
         }) => {
-            match_annotation_to_complex_bool(left, semantic)
-                || match_annotation_to_complex_bool(right, semantic)
+            match_annotation_to_complex_bool(left, semantic, settings)
+                || match_annotation_to_complex_bool(right, semantic, settings)
         }
         // Ex) `typing.Union[bool, int]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -189,7 +200,7 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
             }) {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
-                        .any(|elt| match_annotation_to_complex_bool(elt, semantic))
+                        .any(|elt| match_annotation_to_complex_bool(elt, semantic, settings))
                 } else {
                     // Union with a single type is an invalid type annotation
                     false
@@ -197,7 +208,28 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
             } else if qualified_name.as_ref().is_some_and(|qualified_name| {
                 semantic.match_typing_qualified_name(qualified_name, "Optional")
             }) {
-                match_annotation_to_complex_bool(slice, semantic)
+                match_annotation_to_complex_bool(slice, semantic, settings)
+            } else if is_boolean_type_hint_pos_arg_literal_enabled(settings)
+                && qualified_name.as_ref().is_some_and(|qualified_name| {
+                    semantic.match_typing_qualified_name(qualified_name, "Literal")
+                })
+            {
+                // Ex) `typing.Literal[True, False]`, `typing.Literal[True, None]`
+                match slice.as_ref() {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        let mut seen_bool = false;
+                        for elt in elts {
+                            match elt {
+                                Expr::BooleanLiteral(_) => seen_bool = true,
+                                Expr::NoneLiteral(_) => {}
+                                _ => return false,
+                            }
+                        }
+                        seen_bool
+                    }
+                    Expr::BooleanLiteral(_) => true,
+                    _ => false,
+                }
             } else {
                 false
             }
