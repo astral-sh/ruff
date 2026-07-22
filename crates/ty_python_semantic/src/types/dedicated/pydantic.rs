@@ -771,7 +771,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
-    if has_before_field_validator(db, class, field_name.clone()) {
+    if has_before_or_plain_field_validator(db, class, field_name.clone()) {
         return Type::any();
     }
 
@@ -782,13 +782,13 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     lax_input_type(db, field_type)
 }
 
-/// Return whether `field_name` has a Pydantic field validator that runs before normal validation.
+/// Return whether `field_name` has a Pydantic field validator that receives the raw input.
 ///
-/// A before validator receives the raw input and can transform arbitrary values before Pydantic
-/// validates them against the declared field type. We therefore cannot derive a useful input type
-/// from the field annotation alone.
+/// A before validator can transform arbitrary values before Pydantic validates them against the
+/// declared field type, while a plain validator bypasses that validation entirely. We therefore
+/// cannot derive a useful input type from the field annotation alone.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-pub(in crate::types) fn has_before_field_validator<'db>(
+pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     field_name: Name,
@@ -816,7 +816,11 @@ pub(in crate::types) fn has_before_field_validator<'db>(
             }
             if declarations.any_reachable(db, |declaration| {
                 declaration.is_defined_and(|definition| {
-                    function_has_before_field_validator(db, definition, field_name.as_str())
+                    function_has_before_or_plain_field_validator(
+                        db,
+                        definition,
+                        field_name.as_str(),
+                    )
                 })
             }) {
                 return true;
@@ -827,7 +831,7 @@ pub(in crate::types) fn has_before_field_validator<'db>(
     false
 }
 
-fn function_has_before_field_validator<'db>(
+fn function_has_before_or_plain_field_validator<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     field_name: &str,
@@ -860,7 +864,7 @@ fn function_has_before_field_validator<'db>(
         if decorators
             .expression_type(&mode.value)
             .and_then(Type::as_string_literal)
-            .is_none_or(|mode| mode.value(db) != "before")
+            .is_none_or(|mode| !matches!(mode.value(db), "before" | "plain"))
         {
             return false;
         }

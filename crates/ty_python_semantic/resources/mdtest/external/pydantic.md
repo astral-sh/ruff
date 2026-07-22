@@ -497,8 +497,8 @@ Parent(child={"value": 1}, children=[Stranger(value=2)])  # error: [invalid-argu
 Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
 ```
 
-A "before" field validator can accept input of a different type, so for now, we widen the input
-types of affected fields to `Any`:
+"before" and "plain" field validators can accept input of a different type, so for now, we widen the
+input types of affected fields to `Any`:
 
 ```py
 from pydantic import field_validator
@@ -556,6 +556,25 @@ class WildcardBeforeValidatedParent(BaseModel):
 reveal_type(WildcardBeforeValidatedParent.__init__)
 
 WildcardBeforeValidatedParent(child=1)
+```
+
+A "plain" field validator also bypasses Pydantic's validation against the field's declared type:
+
+```py
+class PlainValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="plain")
+    @classmethod
+    def accept_child(cls, value: object) -> object:
+        return value
+
+# revealed: (self: PlainValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(PlainValidatedParent.__init__)
+
+PlainValidatedParent(child=1, untouched_child={"value": "2"})
+PlainValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
 ```
 
 An "after" field validator does not change the raw input accepted by the field:
