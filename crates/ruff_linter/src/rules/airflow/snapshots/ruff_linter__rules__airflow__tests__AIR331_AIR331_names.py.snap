@@ -1,0 +1,66 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR331 `airflow.traces.otel_tracer` is removed in Airflow 3.2
+  --> AIR331_names.py:11:1
+   |
+ 9 | from airflow.traces.utils import gen_span_id_from_ti_key
+10 |
+11 | otel_tracer
+   | ^^^^^^^^^^^
+12 | get_otel_tracer
+13 | NO_TRACE_ID
+   |
+
+AIR331 `airflow.traces.otel_tracer.get_otel_tracer` is removed in Airflow 3.2
+  --> AIR331_names.py:12:1
+   |
+11 | otel_tracer
+12 | get_otel_tracer
+   | ^^^^^^^^^^^^^^^
+13 | NO_TRACE_ID
+14 | Trace
+   |
+
+AIR331 `airflow.traces.NO_TRACE_ID` is removed in Airflow 3.2
+  --> AIR331_names.py:13:1
+   |
+11 | otel_tracer
+12 | get_otel_tracer
+13 | NO_TRACE_ID
+   | ^^^^^^^^^^^
+14 | Trace
+15 | add_debug_span
+   |
+
+AIR331 `airflow.traces.tracer.Trace` is removed in Airflow 3.2
+  --> AIR331_names.py:14:1
+   |
+12 | get_otel_tracer
+13 | NO_TRACE_ID
+14 | Trace
+   | ^^^^^
+15 | add_debug_span
+16 | gen_span_id_from_ti_key
+   |
+
+AIR331 `airflow.traces.tracer.add_debug_span` is removed in Airflow 3.2
+  --> AIR331_names.py:15:1
+   |
+13 | NO_TRACE_ID
+14 | Trace
+15 | add_debug_span
+   | ^^^^^^^^^^^^^^
+16 | gen_span_id_from_ti_key
+   |
+
+AIR331 `airflow.traces.utils.gen_span_id_from_ti_key` is removed in Airflow 3.2
+  --> AIR331_names.py:16:1
+   |
+14 | Trace
+15 | add_debug_span
+16 | gen_span_id_from_ti_key
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+17 |
+18 | # These should not trigger
+   |
