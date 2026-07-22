@@ -301,6 +301,9 @@ pub struct Completion<'db> {
     pub insert: Option<CompactString>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
+    /// An editor action the client should perform after applying this
+    /// completion, if any. See [`CompletionCommand`].
+    pub command: Option<CompletionCommand>,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
@@ -487,33 +490,41 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
-        {
-            let label = self.insert.unwrap_or_else(|| self.name.clone());
-            if ctx.capabilities.snippets {
-                let insert = compact_str::format_compact!("{label}($0)");
-                (
-                    Some(label),
-                    Some(insert),
-                    CompletionInsertTextFormat::Snippet,
-                )
+        let (label, insert, insert_text_format, command) =
+            if ctx.should_complete_callable_parentheses(kind) {
+                let label = self.insert.unwrap_or_else(|| self.name.clone());
+                if ctx.capabilities.snippets {
+                    let insert = compact_str::format_compact!("{label}($0)");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::Snippet,
+                        Some(CompletionCommand::TriggerSignatureHelp),
+                    )
+                } else {
+                    let insert = compact_str::format_compact!("{label}()");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::PlainText,
+                        None,
+                    )
+                }
             } else {
-                let insert = compact_str::format_compact!("{label}()");
                 (
-                    Some(label),
-                    Some(insert),
+                    None,
+                    self.insert,
                     CompletionInsertTextFormat::PlainText,
+                    None,
                 )
-            }
-        } else {
-            (None, self.insert, CompletionInsertTextFormat::PlainText)
-        };
+            };
         Completion {
             name: self.name,
             label,
             qualified: self.qualified,
             insert,
             insert_text_format,
+            command,
             ty: self.ty,
             kind,
             module_name: self.module_name,
@@ -630,6 +641,21 @@ pub enum CompletionKind {
     Event,
     Operator,
     TypeParameter,
+}
+
+/// An editor action the client should perform after applying this completion.
+///
+/// This is an editor-neutral *intent* produced by the analysis layer. The
+/// language server maps it to a concrete, client-specific command (for example
+/// VS Code's `editor.action.triggerParameterHints`) when building the LSP
+/// response, so this enum never names a particular editor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionCommand {
+    /// The completion inserts an opening parenthesis with the cursor placed
+    /// inside it (e.g. `foo($0)`). Because that parenthesis is inserted
+    /// programmatically rather than typed, the client will not auto-trigger
+    /// signature help, so it should be asked to open it explicitly.
+    TriggerSignatureHelp,
 }
 
 /// The format of a completion's insertion text.

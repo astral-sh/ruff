@@ -8,7 +8,10 @@ use lsp_types::{
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
+use ty_ide::{
+    CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
+    completion,
+};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -129,9 +132,6 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::Snippet),
                 };
 
-                let trigger_parameter_hints =
-                    is_callable_with_snippet_parentheses(comp.kind, comp.insert_text_format);
-
                 CompletionItem {
                     label,
                     kind,
@@ -142,12 +142,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
-                    command: trigger_parameter_hints.then(|| Command {
-                        title: String::new(),
-                        tooltip: None,
-                        command: "editor.action.triggerParameterHints".into(),
-                        arguments: None,
-                    }),
+                    command: comp.command.map(to_lsp),
                     ..Default::default()
                 }
             })
@@ -171,18 +166,20 @@ impl RetriableRequestHandler for CompletionRequestHandler {
     const RETRY_ON_CANCELLATION: bool = true;
 }
 
-/// Returns `true` if the completion is for a callable whose insertion includes
-/// snippet-style parentheses (`foo($0)`), meaning the cursor will land inside the
-/// parentheses after insertion and the server should request VS Code to trigger
-/// signature help automatically.
-fn is_callable_with_snippet_parentheses(
-    kind: Option<CompletionKind>,
-    insert_text_format: CompletionInsertTextFormat,
-) -> bool {
-    matches!(
-        kind,
-        Some(CompletionKind::Function | CompletionKind::Method | CompletionKind::Constructor)
-    ) && insert_text_format == CompletionInsertTextFormat::Snippet
+/// Maps an editor-neutral completion intent to the concrete LSP command the
+/// client should run after applying the completion.
+///
+/// The intent itself is decided in `ty_ide`; this is the single place that knows
+/// any editor-specific command identifiers.
+fn to_lsp(command: CompletionCommand) -> Command {
+    match command {
+        CompletionCommand::TriggerSignatureHelp => Command {
+            title: String::new(),
+            tooltip: None,
+            command: "editor.action.triggerParameterHints".into(),
+            arguments: None,
+        },
+    }
 }
 
 fn ty_kind_to_lsp_kind(kind: CompletionKind) -> CompletionItemKind {
