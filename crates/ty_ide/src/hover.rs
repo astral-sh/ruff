@@ -89,7 +89,7 @@ pub fn hover<'db>(
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                typevar.bind_pep695(db).map_or(
+                typevar.bind_pep695(&ctx).map_or(
                     HoverContent::Type {
                         ty,
                         variance: None,

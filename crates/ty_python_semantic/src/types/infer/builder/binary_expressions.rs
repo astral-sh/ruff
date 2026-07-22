@@ -138,7 +138,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
-                    typed_dict.to_partial(self.db()),
+                    typed_dict.to_partial(self.semantic_context()),
                     typed_dict,
                     "__ror__",
                 )
@@ -160,7 +160,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
-                typed_dict.to_partial(self.db()),
+                typed_dict.to_partial(self.semantic_context()),
                 typed_dict,
                 "__or__",
             )
@@ -233,7 +233,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Subset updates use the mutation-safe patch as context.
-        let update_patch = typed_dict.to_update_patch(self.db());
+        let update_patch = typed_dict.to_update_patch(self.semantic_context());
         if self
             .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
             .is_some()

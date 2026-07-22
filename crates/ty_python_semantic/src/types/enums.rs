@@ -187,7 +187,6 @@ impl<'db> EnumValueConstruction<'db> {
         value_ty: Type<'db>,
         is_auto: bool,
     ) -> Option<Type<'db>> {
-        let db = ctx.db();
         if self.new.is_user_defined()
             || matches!(self.data_type, InheritedEnumDataType::Opaque)
             || self.metaclass_may_transform_values
@@ -200,7 +199,7 @@ impl<'db> EnumValueConstruction<'db> {
         } else if self.generate_next_value.is_opaque() {
             return None;
         } else if let Some(function) = self.generate_next_value.function() {
-            function.signature(db).overload_return_type_or_unknown(ctx)
+            function.signature(ctx).overload_return_type_or_unknown(ctx)
         } else {
             value_ty
         };
@@ -311,18 +310,26 @@ pub struct EnumClassLiteral<'db> {
 impl get_size2::GetSize for EnumClassLiteral<'_> {}
 
 impl<'db> ClassLiteral<'db> {
-    pub(crate) fn into_enum_class(self, db: &'db dyn Db) -> Option<EnumClassLiteral<'db>> {
-        enum_class_literal(db, self)
+    pub(crate) fn into_enum_class(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> Option<EnumClassLiteral<'db>> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.python_file(db).python_version(db)
+        );
+        enum_class_literal_inner(db, self)
     }
 }
 
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-fn enum_class_literal<'db>(
+fn enum_class_literal_inner<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let metadata = enum_metadata(db, class)?;
     let ctx = SemanticContext::from_file(db, class.python_file(db));
+    let metadata = enum_metadata(&ctx, class)?;
     let members = metadata
         .members
         .keys()
@@ -360,7 +367,7 @@ fn enum_has_custom_missing<'db>(ctx: &SemanticContext<'db>, class: ClassLiteral<
         .filter_map(ClassBase::into_class)
         .take_while(|base| base.known(db) != Some(KnownClass::Enum))
         .filter_map(|base| base.class_literal(db).as_static())
-        .any(|base| custom_enum_method(db, base.body_scope(db), "_missing_").is_some())
+        .any(|base| custom_enum_method(ctx, base.body_scope(db), "_missing_").is_some())
 }
 
 impl<'db> EnumClassLiteral<'db> {
@@ -564,7 +571,6 @@ impl<'db> EnumMetadata<'db> {
         ctx: &SemanticContext<'db>,
         member_name: &Name,
     ) -> Option<Type<'db>> {
-        let db = ctx.db();
         let declared_value = self.members.get(member_name).copied()?;
         if self.member_value_may_be_transformed(member_name) {
             return None;
@@ -576,7 +582,7 @@ impl<'db> EnumMetadata<'db> {
                 .is_user_defined()
             && let Some(func_ty) = self.value_construction.generate_next_value.function()
         {
-            func_ty.signature(db).overload_return_type_or_unknown(ctx)
+            func_ty.signature(ctx).overload_return_type_or_unknown(ctx)
         } else {
             declared_value
         };
@@ -695,7 +701,7 @@ impl<'db> EnumComplementType<'db> {
                 continue;
             };
 
-            let Some(enum_class_literal) = instance.class_literal(ctx).into_enum_class(db) else {
+            let Some(enum_class_literal) = instance.class_literal(ctx).into_enum_class(ctx) else {
                 rest.push(*positive);
                 continue;
             };
@@ -895,8 +901,20 @@ impl<'db> EnumComplementType<'db> {
 }
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
+pub(crate) fn enum_ignored_names<'db>(
+    ctx: &SemanticContext<'db>,
+    scope_id: ScopeId<'db>,
+) -> &'db FxHashSet<Name> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        scope_id.python_file(db).python_version(db)
+    );
+    enum_ignored_names_inner(db, scope_id)
+}
+
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+fn enum_ignored_names_inner<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -954,8 +972,20 @@ fn try_register_alias<'db>(
 }
 
 /// List all members of an enum.
-#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
+    ctx: &SemanticContext<'db>,
+    class: ClassLiteral<'db>,
+) -> Option<&'db EnumMetadata<'db>> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        class.python_file(db).python_version(db)
+    );
+    enum_metadata_inner(db, class)
+}
+
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
+fn enum_metadata_inner<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
@@ -1039,19 +1069,19 @@ pub(crate) fn enum_metadata<'db>(
     let mut aliases_are_known = true;
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
-    let ignored_names = enum_ignored_names(db, scope_id);
+    let ignored_names = enum_ignored_names(&ctx, scope_id);
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
     let data_type = inherited_enum_data_type(&ctx, ClassLiteral::Static(class));
-    let user_defined_init = custom_enum_method(db, scope_id, "__init__")
+    let user_defined_init = custom_enum_method(&ctx, scope_id, "__init__")
         .or_else(|| inherited_user_defined_enum_method(&ctx, class, "__init__"));
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(&ctx, class, "__init__")
     });
     // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
     // through the MRO or falling back to the data-type constructor.
-    let user_defined_new = custom_enum_method(db, scope_id, "__new__")
+    let user_defined_new = custom_enum_method(&ctx, scope_id, "__new__")
         .or_else(|| inherited_user_defined_enum_new(&ctx, class))
         .or_else(|| inherited_user_defined_mixin_new(&ctx, class));
     let new = resolve_enum_method(user_defined_new, || {
@@ -1059,7 +1089,7 @@ pub(crate) fn enum_metadata<'db>(
     });
     let metaclass_may_transform_values = enum_metaclass_may_transform_values(&ctx, class);
     let user_defined_generate_next_value =
-        custom_enum_method(db, scope_id, "_generate_next_value_")
+        custom_enum_method(&ctx, scope_id, "_generate_next_value_")
             .or_else(|| inherited_user_defined_enum_method(&ctx, class, "_generate_next_value_"));
     let generate_next_value = resolve_enum_method(user_defined_generate_next_value, || {
         inherited_known_enum_method(&ctx, class, "_generate_next_value_")
@@ -1310,7 +1340,7 @@ fn enum_metaclass_may_transform_values<'db>(
         .any(|base| {
             ["__prepare__", "__new__"]
                 .into_iter()
-                .any(|name| custom_enum_method(db, base.body_scope(db), name).is_some())
+                .any(|name| custom_enum_method(ctx, base.body_scope(db), name).is_some())
         })
 }
 
@@ -1447,10 +1477,11 @@ enum EnumMethodBinding<'db> {
 
 /// Returns the enum method defined in `scope`, including opaque bindings.
 fn custom_enum_method<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     scope: ScopeId<'db>,
     name: &str,
 ) -> Option<EnumMethodBinding<'db>> {
+    let db = ctx.db();
     let symbol_id = place_table(db, scope).symbol_id(name)?;
     let mut bindings = use_def_map(db, scope).end_of_scope_symbol_bindings(symbol_id);
     let binding = bindings.next()?;
@@ -1463,7 +1494,7 @@ fn custom_enum_method<'db>(
         return Some(EnumMethodBinding::Opaque);
     }
 
-    match binding_type(db, definition) {
+    match binding_type(ctx, definition) {
         Type::FunctionLiteral(function) => Some(EnumMethodBinding::Function(function)),
         _ => Some(EnumMethodBinding::Opaque),
     }
@@ -1478,7 +1509,7 @@ fn inherited_user_defined_enum_method<'db>(
     let db = ctx.db();
     iter_parent_enum_classes(ctx, class)
         .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
+        .find_map(|base| custom_enum_method(ctx, base.body_scope(db), name))
 }
 
 /// Looks up the first user-defined enum member constructor in the MRO.
@@ -1491,8 +1522,8 @@ fn inherited_user_defined_enum_new<'db>(
         .filter(|base| base.known(db).is_none())
         .find_map(|base| {
             let scope = base.body_scope(db);
-            custom_enum_method(db, scope, "__new_member__")
-                .or_else(|| custom_enum_method(db, scope, "__new__"))
+            custom_enum_method(ctx, scope, "__new_member__")
+                .or_else(|| custom_enum_method(ctx, scope, "__new__"))
         })
 }
 
@@ -1512,7 +1543,7 @@ fn inherited_user_defined_mixin_new<'db>(
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.class_literal(db).as_static())
         .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
+        .find_map(|base| custom_enum_method(ctx, base.body_scope(db), "__new__"))
 }
 
 /// Looks up a resolvable method inherited from a known enum class.
@@ -1525,7 +1556,7 @@ fn inherited_known_enum_method<'db>(
     iter_parent_enum_classes(ctx, class)
         .filter(|base| base.known(db).is_some())
         .find_map(
-            |base| match custom_enum_method(db, base.body_scope(db), name) {
+            |base| match custom_enum_method(ctx, base.body_scope(db), name) {
                 Some(EnumMethodBinding::Function(function)) => Some(function),
                 Some(EnumMethodBinding::Opaque) | None => None,
             },
@@ -1549,11 +1580,12 @@ fn resolve_enum_method<'db>(
 
 /// Return the enum's canonical member literals when they exhaust its runtime domain.
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     class: ClassLiteral<'db>,
     exclude_member: Option<&'a Name>,
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
-    let enum_class_literal = class.into_enum_class(db)?;
+    let db = ctx.db();
+    let enum_class_literal = class.into_enum_class(ctx)?;
     if !enum_class_literal.members_are_exhaustive(db) {
         return None;
     }
@@ -1568,15 +1600,19 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
 }
 
 /// Return whether the enum has exactly one possible runtime value.
-pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    class.into_enum_class(db).is_some_and(|enum_class| {
+pub(crate) fn is_single_member_enum<'db>(
+    ctx: &SemanticContext<'db>,
+    class: ClassLiteral<'db>,
+) -> bool {
+    let db = ctx.db();
+    class.into_enum_class(ctx).is_some_and(|enum_class| {
         enum_class.members_are_exhaustive(db) && enum_class.member_count(db) == 1
     })
 }
 
-pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+pub(crate) fn is_enum_class<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> bool {
     match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
+        Type::ClassLiteral(class_literal) => enum_metadata(ctx, class_literal).is_some(),
         _ => false,
     }
 }

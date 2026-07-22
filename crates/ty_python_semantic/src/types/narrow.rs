@@ -73,7 +73,7 @@ use self::containment::{elements_of, narrow_string_membership};
 /// But if we called this with the same `test` expression, but the `symbol` of `y`, no
 /// constraint is applied to that symbol, so we'd just return `(None, None)`.
 pub(crate) fn infer_narrowing_constraints<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
 ) -> (
@@ -82,22 +82,22 @@ pub(crate) fn infer_narrowing_constraints<'db>(
 ) {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
-            let constraints = all_narrowing_constraints_for_expression(db, expression);
+            let constraints = all_narrowing_constraints_for_expression(ctx, expression);
             (
                 constraints.get(place, true).cloned(),
                 constraints.get(place, false).cloned(),
             )
         }
         PredicateNode::Pattern(pattern) => {
-            let positive = all_narrowing_constraints_for_pattern(db, pattern)
+            let positive = all_narrowing_constraints_for_pattern(ctx, pattern)
                 .and_then(|constraints| constraints.get(&place).cloned());
-            let negative = all_negative_narrowing_constraints_for_pattern(db, pattern)
+            let negative = all_negative_narrowing_constraints_for_pattern(ctx, pattern)
                 .and_then(|constraints| constraints.get(&place).cloned());
             (positive, negative)
         }
         PredicateNode::SubjectElementPattern(subject_element) => {
             let positive = all_narrowing_constraints_for_subject_element_pattern(
-                db,
+                ctx,
                 subject_element.pattern,
                 subject_element.target,
             )
@@ -116,8 +116,20 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
+    ctx: &SemanticContext<'db>,
+    pattern: PatternPredicate<'db>,
+) -> Option<&'db FrozenNarrowingConstraints<'db>> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        pattern.python_file(db).python_version(db)
+    );
+    all_narrowing_constraints_for_pattern_inner(db, pattern)
+}
+
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn all_narrowing_constraints_for_pattern_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
@@ -133,12 +145,24 @@ fn all_narrowing_constraints_for_pattern<'db>(
     .finish()
 }
 
+fn all_narrowing_constraints_for_expression<'db>(
+    ctx: &SemanticContext<'db>,
+    expression: Expression<'db>,
+) -> &'db ExpressionNarrowingConstraints<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        expression.python_file(db).python_version(db)
+    );
+    all_narrowing_constraints_for_expression_inner(db, expression)
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, _, _| ExpressionNarrowingConstraints::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn all_narrowing_constraints_for_expression<'db>(
+fn all_narrowing_constraints_for_expression_inner<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> ExpressionNarrowingConstraints<'db> {
@@ -153,8 +177,20 @@ fn all_narrowing_constraints_for_expression<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
+    ctx: &SemanticContext<'db>,
+    pattern: PatternPredicate<'db>,
+) -> Option<&'db FrozenNarrowingConstraints<'db>> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        pattern.python_file(db).python_version(db)
+    );
+    all_negative_narrowing_constraints_for_pattern_inner(db, pattern)
+}
+
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn all_negative_narrowing_constraints_for_pattern_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
@@ -170,8 +206,21 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_subject_element_pattern<'db>(
+    ctx: &SemanticContext<'db>,
+    pattern: PatternPredicate<'db>,
+    target: ExpressionNodeKey,
+) -> Option<&'db FrozenNarrowingConstraints<'db>> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        pattern.python_file(db).python_version(db)
+    );
+    all_narrowing_constraints_for_subject_element_pattern_inner(db, pattern, target)
+}
+
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn all_narrowing_constraints_for_subject_element_pattern_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
     target: ExpressionNodeKey,
@@ -408,6 +457,18 @@ struct PatternSuccessAnalyzer<'db> {
 ///         case item:
 ///             reveal_type(item)  # str
 /// ```
+pub(crate) fn pattern_success_types<'db>(
+    ctx: &SemanticContext<'db>,
+    pattern: PatternPredicate<'db>,
+) -> &'db PatternSuccessTypes<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        pattern.python_file(db).python_version(db)
+    );
+    pattern_success_types_inner(db, pattern)
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
@@ -417,13 +478,16 @@ struct PatternSuccessAnalyzer<'db> {
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn pattern_success_types<'db>(
+fn pattern_success_types_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
-    let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
-    let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
+    let ctx = SemanticContext::from_file(db, subject.python_file(db));
+    let incoming_subject_ty =
+        infer_same_file_expression_type(&ctx, subject, TypeContext::default());
+    let incoming_subject_ty =
+        type_narrowed_by_previous_patterns(&ctx, pattern, incoming_subject_ty);
     let analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let ctx = analyzer.ctx.clone();
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
@@ -1032,12 +1096,11 @@ fn necessary_match_pattern_type<'db>(
     ctx: &SemanticContext<'db>,
     pattern: &PatternPredicateKind<'db>,
 ) -> Type<'db> {
-    let db = ctx.db();
     match pattern {
         PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(ctx, *singleton),
         PatternPredicateKind::Class(kind) => positive_class_pattern_type(
             ctx,
-            infer_same_file_expression_type(db, kind.class, TypeContext::default()),
+            infer_same_file_expression_type(ctx, kind.class, TypeContext::default()),
         )
         .unwrap_or_else(Type::object),
         PatternPredicateKind::Mapping(_) => mapping_pattern_type(ctx),
@@ -1155,7 +1218,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Expr::Attribute(attribute) => {
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 let inference =
-                    infer_expression_types(self.ctx.db(), expression, TypeContext::default());
+                    infer_expression_types(&self.ctx, expression, TypeContext::default());
                 let nominal_constraints = self
                     .narrow_nominal_attribute_by_truthiness(
                         inference.expression_type(&*attribute.value),
@@ -1172,7 +1235,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Expr::Subscript(subscript) => {
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 let inference =
-                    infer_expression_types(self.ctx.db(), expression, TypeContext::default());
+                    infer_expression_types(&self.ctx, expression, TypeContext::default());
                 let typeddict_constraints = self
                     .narrow_typeddict_subscript_by_truthiness(
                         inference.expression_type(&*subscript.value),
@@ -1238,10 +1301,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let test_truthiness =
-            infer_expression_types(self.ctx.db(), expression, TypeContext::default())
-                .expression_type(&expr_if.test)
-                .bool(&self.ctx);
+        let test_truthiness = infer_expression_types(&self.ctx, expression, TypeContext::default())
+            .expression_type(&expr_if.test)
+            .bool(&self.ctx);
 
         match test_truthiness {
             Truthiness::AlwaysTrue => {
@@ -1328,7 +1390,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
         let place = self.expect_place(&subject_place);
         let subject_ty =
-            infer_same_file_expression_type(self.ctx.db(), subject, TypeContext::default());
+            infer_same_file_expression_type(&self.ctx, subject, TypeContext::default());
         let mut constraints = expression_constraints.unwrap_or_default();
         constraints.remove(&place);
         if let Some(subject_constraint) = self.positive_subject_constraint(kind, subject_ty) {
@@ -1393,7 +1455,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match pattern {
             PatternPredicateKind::Value(value) => {
                 let value_ty =
-                    infer_same_file_expression_type(self.ctx.db(), *value, TypeContext::default());
+                    infer_same_file_expression_type(&self.ctx, *value, TypeContext::default());
                 self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
                     .map(NarrowingConstraint::intersection)
             }
@@ -1634,8 +1696,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         value: Expression<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
-        let value_ty =
-            infer_same_file_expression_type(self.ctx.db(), value, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(&self.ctx, value, TypeContext::default());
         let ctx = self.ctx.clone();
         evaluate_type_equality(
             &ctx,
@@ -1772,7 +1833,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
         let subject_is_final = subject_ty
             .nominal_class(&self.ctx)
-            .is_some_and(|class| class.is_final(self.ctx.db()));
+            .is_some_and(|class| class.is_final(&self.ctx));
         let specialized_pattern_class =
             if context.positional_sources.is_empty() && kind.keywords.is_empty() {
                 None
@@ -1799,7 +1860,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .ignore_possibly_undefined();
             } else if let Some(pattern_class) = context.class
                 && pattern_class
-                    .generic_context(self.ctx.db())
+                    .generic_context(&self.ctx)
                     .and_then(|generic_context| {
                         pattern_class
                             .instance_member(
@@ -1812,7 +1873,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     })
                     .is_some_and(|ty| ty.has_typevar(&self.ctx))
             {
-                let unknown_pattern_class = pattern_class.unknown_specialization(self.ctx.db());
+                let unknown_pattern_class = pattern_class.unknown_specialization(&self.ctx);
                 let unknown_pattern_member_ty = Type::instance(&self.ctx, unknown_pattern_class)
                     .member(&self.ctx, name.as_str())
                     .place
@@ -1904,9 +1965,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         pattern_class: ClassLiteral<'db>,
         subject_class: ClassType<'db>,
     ) -> Option<ClassType<'db>> {
-        let generic_context = pattern_class.generic_context(self.ctx.db())?;
+        let generic_context = pattern_class.generic_context(&self.ctx)?;
         let pattern_base = pattern_class
-            .identity_specialization(self.ctx.db())
+            .identity_specialization(&self.ctx)
             .iter_mro(&self.ctx)
             .filter_map(ClassBase::into_class)
             .find(|base| {
@@ -1958,7 +2019,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }) {
             return None;
         }
-        Some(pattern_class.apply_specialization(self.ctx.db(), |_| {
+        Some(pattern_class.apply_specialization(&self.ctx, |_| {
             generic_context.specialize(self.ctx.db(), types)
         }))
     }
@@ -1968,7 +2029,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
     ) -> SmallVec<[ClassPatternContext<'db>; 2]> {
         let class_expr_ty =
-            infer_same_file_expression_type(self.ctx.db(), kind.class, TypeContext::default())
+            infer_same_file_expression_type(&self.ctx, kind.class, TypeContext::default())
                 .resolve_type_alias(&self.ctx);
         let context = |class_expr_ty: Type<'db>| {
             let class = class_expr_ty.as_class_literal();
@@ -2144,11 +2205,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             }
             if let Some(key) = key_ty.as_string_literal() {
                 return typed_dict
-                    .item(self.ctx.db(), key.value(self.ctx.db()))
+                    .item(&self.ctx, key.value(self.ctx.db()))
                     .map(|field| field.declared_ty)
                     .or_else(|| {
                         typed_dict
-                            .openness(self.ctx.db())
+                            .openness(&self.ctx)
                             .is_implicitly_open()
                             .then_some(Type::object())
                     });
@@ -2213,7 +2274,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind.entries
             .iter()
             .map(|entry| {
-                infer_same_file_expression_type(self.ctx.db(), entry.key, TypeContext::default())
+                infer_same_file_expression_type(&self.ctx, entry.key, TypeContext::default())
             })
             .collect()
     }
@@ -3262,7 +3323,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return None;
         }
 
-        let inference = infer_expression_types(self.ctx.db(), expression, TypeContext::default());
+        let inference = infer_expression_types(&self.ctx, expression, TypeContext::default());
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -3469,7 +3530,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.items(self.ctx.db())
+                    td.items(&self.ctx)
                         .get(key)
                         .is_some_and(TypedDictField::is_required)
                 };
@@ -3572,7 +3633,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         )
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.ctx.db()))
+                    && (is_positive || other_class.is_final(&self.ctx))
                 {
                     let place = self.expect_place(&target);
                     constraints.insert(
@@ -3643,7 +3704,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.ctx.db(), expression, TypeContext::default());
+        let inference = infer_expression_types(&self.ctx, expression, TypeContext::default());
 
         if let Some(type_guard_call_constraints) =
             self.evaluate_type_guard_call(inference, expr_call, is_positive)
@@ -3803,7 +3864,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PlaceExpr::try_from_expr(subject.node_ref(self.ctx.db()).node(self.module))?;
         let place = self.expect_place(&subject_place);
         let subject_ty =
-            infer_same_file_expression_type(self.ctx.db(), subject, TypeContext::default());
+            infer_same_file_expression_type(&self.ctx, subject, TypeContext::default());
         let definitely_matched =
             definite_match_pattern_type_for_subject(&self.ctx, pattern, subject_ty);
         if definitely_matched.is_never() {
@@ -3841,7 +3902,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
 
         let subject_ty =
-            infer_same_file_expression_type(self.ctx.db(), subject, TypeContext::default());
+            infer_same_file_expression_type(&self.ctx, subject, TypeContext::default());
         let ctx = self.ctx.clone();
         let narrowed_ty = pattern_binding_fallthrough_type(&ctx, pattern, subject_ty);
         if narrowed_ty == subject_ty {
@@ -3962,7 +4023,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return PatternNarrowingResult::Possible(None);
         };
         let subject_ty =
-            infer_expression_types(self.ctx.db(), subject_expression, TypeContext::default())
+            infer_expression_types(&self.ctx, subject_expression, TypeContext::default())
                 .expression_type(subject_expr);
         let Some(constraint) = self.positive_subject_constraint(pattern, subject_ty) else {
             return PatternNarrowingResult::Possible(None);
@@ -3997,9 +4058,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             self.expect_place(&subject)
         };
         let subject_ty =
-            infer_same_file_expression_type(self.ctx.db(), subject, TypeContext::default());
-        let value_ty =
-            infer_same_file_expression_type(self.ctx.db(), value, TypeContext::default());
+            infer_same_file_expression_type(&self.ctx, subject, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(&self.ctx, value, TypeContext::default());
 
         let mut constraints = self
             .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
@@ -4021,7 +4081,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //
         // Like in the `if` statement case, we're constraining `union` itself, not `union["tag"]`.
         if let ast::Expr::Subscript(subscript) = subject_node {
-            let inference = infer_expression_types(self.ctx.db(), subject, TypeContext::default());
+            let inference = infer_expression_types(&self.ctx, subject, TypeContext::default());
             if let Some((place, constraint)) = self.narrow_typeddict_subscript(
                 inference.expression_type(&*subscript.value),
                 &subscript.value,
@@ -4042,7 +4102,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 constraints.insert(place, constraint);
             }
         } else if let ast::Expr::Attribute(attribute) = subject_node {
-            let inference = infer_expression_types(self.ctx.db(), subject, TypeContext::default());
+            let inference = infer_expression_types(&self.ctx, subject, TypeContext::default());
             if let Some((place, constraint)) = self.narrow_nominal_attribute(
                 inference.expression_type(&*attribute.value),
                 &attribute.value,
@@ -4063,8 +4123,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let db = self.ctx.db();
-        let inference = infer_expression_types(db, expression, TypeContext::default());
+        let inference = infer_expression_types(&self.ctx, expression, TypeContext::default());
         let ctx = self.ctx.clone();
         let sub_constraints = expr_bool_op
             .values
@@ -4421,7 +4480,7 @@ fn is_or_contains_typeddict<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> b
 fn typeddict_declares_key<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>, key: &str) -> bool {
     let db = ctx.db();
     match ty {
-        Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
+        Type::TypedDict(typed_dict) => typed_dict.items(ctx).contains_key(key),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
@@ -4538,7 +4597,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
         // There's no matching field to check if `.get()` returns `None`.
         typeddict
-            .items(db)
+            .items(ctx)
             .get(field_name)
             .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };

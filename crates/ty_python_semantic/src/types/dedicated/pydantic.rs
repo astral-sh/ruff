@@ -41,14 +41,15 @@ impl get_size2::GetSize for ModelMetadata<'_> {}
 
 impl<'db> ModelMetadata<'db> {
     pub(in crate::types) fn from_class(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         class: StaticClassLiteral<'db>,
         transformer_params: DataclassTransformerParams<'db>,
     ) -> Self {
+        let db = ctx.db();
         Self::new(
             db,
             transformer_params.field_specifiers(db),
-            model_config(db, class),
+            model_config(ctx, class),
         )
     }
 
@@ -207,7 +208,7 @@ impl<'db> FieldMetadata<'db> {
         let Some(subscript) = annotation.as_subscript_expr() else {
             return false;
         };
-        if definition_expression_type(db, definition, &subscript.value)
+        if definition_expression_type(ctx, definition, &subscript.value)
             != Type::SpecialForm(SpecialFormType::Annotated)
         {
             return false;
@@ -224,7 +225,7 @@ impl<'db> FieldMetadata<'db> {
             let Some(call) = metadata.as_call_expr() else {
                 continue;
             };
-            let callee = definition_expression_type(db, definition, &call.func);
+            let callee = definition_expression_type(ctx, definition, &call.func);
 
             if callee
                 .as_class_literal()
@@ -233,7 +234,9 @@ impl<'db> FieldMetadata<'db> {
                 let strict = call.arguments.find_argument_value("strict", 0).map_or(
                     ConfigBoolean::Enabled,
                     |strict| {
-                        ConfigBoolean::from_type(definition_expression_type(db, definition, strict))
+                        ConfigBoolean::from_type(definition_expression_type(
+                            ctx, definition, strict,
+                        ))
                     },
                 );
                 self.merge_strict(strict);
@@ -242,7 +245,7 @@ impl<'db> FieldMetadata<'db> {
                 Type::FunctionLiteral(function)
                     if function.is_known(db, KnownFunction::PydanticField)
             ) {
-                let field_type = definition_expression_type(db, definition, metadata);
+                let field_type = definition_expression_type(ctx, definition, metadata);
                 if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
                     self.merge_field(ctx, field, specialization);
                 } else {
@@ -287,7 +290,7 @@ impl<'db> FieldMetadata<'db> {
     ) {
         let db = ctx.db();
         if let Some(default) = call.arguments.find_argument_value("default", 0) {
-            let default_type = definition_expression_type(db, definition, default);
+            let default_type = definition_expression_type(ctx, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(ctx, specialization));
@@ -297,7 +300,7 @@ impl<'db> FieldMetadata<'db> {
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
-            let init = definition_expression_type(db, definition, &init.value);
+            let init = definition_expression_type(ctx, definition, &init.value);
             self.init &= !init.bool(ctx).is_always_false();
         }
 
@@ -306,13 +309,13 @@ impl<'db> FieldMetadata<'db> {
             .find_keyword("validation_alias")
             .or_else(|| call.arguments.find_keyword("alias"))
         {
-            self.alias = definition_expression_type(db, definition, &alias.value)
+            self.alias = definition_expression_type(ctx, definition, &alias.value)
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
         if let Some(strict) = call.arguments.find_keyword("strict") {
-            let strict = definition_expression_type(db, definition, &strict.value);
+            let strict = definition_expression_type(ctx, definition, &strict.value);
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
@@ -478,12 +481,12 @@ impl ConfigBoolean {
 }
 
 fn config_boolean(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     definition: Definition<'_>,
     keyword: Option<&Keyword>,
 ) -> ConfigBoolean {
     keyword.map_or(ConfigBoolean::Unspecified, |keyword| {
-        ConfigBoolean::from_type(definition_expression_type(db, definition, &keyword.value))
+        ConfigBoolean::from_type(definition_expression_type(ctx, definition, &keyword.value))
     })
 }
 
@@ -513,14 +516,23 @@ pub(in crate::types) fn field_provides_default(
 /// Pydantic model fields are generally keyword-only, but a root model's `root` field can also be
 /// passed positionally.
 pub(in crate::types) fn constructor_fields_are_keyword_only(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    !is_root_model(db, class)
+    !is_root_model(ctx, class)
+}
+
+fn is_root_model<'db>(ctx: &SemanticContext<'db>, class: StaticClassLiteral<'db>) -> bool {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        class.python_file(db).python_version(db)
+    );
+    is_root_model_inner(db, class)
 }
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+fn is_root_model_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     let ctx = SemanticContext::from_file(db, class.python_file(db));
     class
         .iter_mro(&ctx, None)
@@ -570,7 +582,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     else {
         return;
     };
-    let Some(signature) = init.signature(db).iter().next() else {
+    let Some(signature) = init.signature(ctx).iter().next() else {
         return;
     };
 
@@ -587,18 +599,27 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     );
 }
 
+fn model_config<'db>(ctx: &SemanticContext<'db>, class: StaticClassLiteral<'db>) -> ModelConfig {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        class.python_file(db).python_version(db)
+    );
+    model_config_inner(db, class)
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
+fn model_config_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
     let ctx = SemanticContext::from_file(db, class.python_file(db));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
-    for base in class.explicit_bases(db) {
+    for base in class.explicit_bases(&ctx) {
         let Some(base) = base.to_class_type(&ctx) else {
             config = ModelConfig::unknown();
             continue;
@@ -610,7 +631,7 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
         };
 
         if is_model(&ctx, base) {
-            config.merge(model_config(db, base));
+            config.merge(model_config(&ctx, base));
         } else if let Some(base_config) = inherited_model_config(&ctx, base) {
             config.merge(base_config);
         }
@@ -619,7 +640,7 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     if let Some(own_config) = own_model_config(&ctx, class) {
         config.merge(own_config);
     }
-    config.merge(class_keyword_config(db, class));
+    config.merge(class_keyword_config(&ctx, class));
     config
 }
 
@@ -676,13 +697,13 @@ fn own_model_config(
     };
 
     if let Some(dict) = value.as_dict_expr() {
-        return Some(model_config_from_dict(db, definition, dict));
+        return Some(model_config_from_dict(ctx, definition, dict));
     }
 
     let Some(call) = value.as_call_expr() else {
         return Some(ModelConfig::unknown());
     };
-    let callee = definition_expression_type(db, definition, &call.func);
+    let callee = definition_expression_type(ctx, definition, &call.func);
     if !callee.as_class_literal().is_some_and(|class| {
         class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
     }) {
@@ -701,30 +722,30 @@ fn own_model_config(
     // Keep this list of recognized options in sync with `model_config_from_dict` and
     // `class_keyword_config`.
     let extra = call.arguments.find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(db, definition, &extra.value)
+        let extra = definition_expression_type(ctx, definition, &extra.value)
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
+    let strict = config_boolean(ctx, definition, call.arguments.find_keyword("strict"));
     let from_attributes = config_boolean(
-        db,
+        ctx,
         definition,
         call.arguments.find_keyword("from_attributes"),
     );
-    let frozen = config_boolean(db, definition, call.arguments.find_keyword("frozen"));
+    let frozen = config_boolean(ctx, definition, call.arguments.find_keyword("frozen"));
     let validate_by_alias = config_boolean(
-        db,
+        ctx,
         definition,
         call.arguments.find_keyword("validate_by_alias"),
     );
     let validate_by_name = config_boolean(
-        db,
+        ctx,
         definition,
         call.arguments.find_keyword("validate_by_name"),
     );
     let populate_by_name = config_boolean(
-        db,
+        ctx,
         definition,
         call.arguments.find_keyword("populate_by_name"),
     );
@@ -740,7 +761,12 @@ fn own_model_config(
     })
 }
 
-fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDict) -> ModelConfig {
+fn model_config_from_dict(
+    ctx: &SemanticContext<'_>,
+    definition: Definition<'_>,
+    dict: &ExprDict,
+) -> ModelConfig {
+    let db = ctx.db();
     let mut config = ModelConfig::default();
 
     for item in dict {
@@ -753,7 +779,7 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
             // it could incorrectly preserve a lower-precedence configuration value.
             return ModelConfig::unknown();
         };
-        let value = definition_expression_type(db, definition, &item.value);
+        let value = definition_expression_type(ctx, definition, &item.value);
 
         // Keep this match in sync with the options recognized for `ConfigDict` calls in
         // `own_model_config` and for class keywords in `class_keyword_config`.
@@ -776,7 +802,8 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
     config
 }
 
-fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
+fn class_keyword_config(ctx: &SemanticContext<'_>, class: StaticClassLiteral<'_>) -> ModelConfig {
+    let db = ctx.db();
     let definition = class.definition(db);
     let module = parsed_module(db, class.python_file(db)).load(db);
     let kind = definition.kind(db);
@@ -797,20 +824,21 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     // Keep this list of recognized options in sync with `own_model_config` and
     // `model_config_from_dict`.
     let extra = arguments.find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(db, definition, &extra.value)
+        let extra = definition_expression_type(ctx, definition, &extra.value)
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
-    let from_attributes = config_boolean(db, definition, arguments.find_keyword("from_attributes"));
-    let frozen = config_boolean(db, definition, arguments.find_keyword("frozen"));
+    let strict = config_boolean(ctx, definition, arguments.find_keyword("strict"));
+    let from_attributes =
+        config_boolean(ctx, definition, arguments.find_keyword("from_attributes"));
+    let frozen = config_boolean(ctx, definition, arguments.find_keyword("frozen"));
     let validate_by_alias =
-        config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
+        config_boolean(ctx, definition, arguments.find_keyword("validate_by_alias"));
     let validate_by_name =
-        config_boolean(db, definition, arguments.find_keyword("validate_by_name"));
+        config_boolean(ctx, definition, arguments.find_keyword("validate_by_name"));
     let populate_by_name =
-        config_boolean(db, definition, arguments.find_keyword("populate_by_name"));
+        config_boolean(ctx, definition, arguments.find_keyword("populate_by_name"));
 
     ModelConfig {
         extra,
@@ -892,7 +920,7 @@ fn has_before_or_plain_field_validator_inner<'db>(
             if declarations.any_reachable(&ctx, |declaration| {
                 declaration.is_defined_and(|definition| {
                     function_has_before_or_plain_field_validator(
-                        db,
+                        &ctx,
                         definition,
                         field_name.as_str(),
                     )
@@ -907,10 +935,11 @@ fn has_before_or_plain_field_validator_inner<'db>(
 }
 
 fn function_has_before_or_plain_field_validator<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
     field_name: &str,
 ) -> bool {
+    let db = ctx.db();
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return false;
     };
@@ -919,7 +948,7 @@ fn function_has_before_or_plain_field_validator<'db>(
     if function_node.decorator_list.is_empty() {
         return false;
     }
-    let decorators = function_known_decorators(db, definition);
+    let decorators = function_known_decorators(ctx, definition);
 
     function_node.decorator_list.iter().any(|decorator| {
         let Some(call) = decorator.expression.as_call_expr() else {
@@ -1114,16 +1143,16 @@ fn root_model_input_type<'db>(
 ) -> Option<Type<'db>> {
     let db = ctx.db();
     let (class, specialization) = field_type.nominal_class(ctx)?.static_class_literal(db)?;
-    if !is_root_model(db, class) {
+    if !is_root_model(ctx, class) {
         return None;
     }
 
     let Some(field_policy @ CodeGeneratorKind::Pydantic(_)) =
-        CodeGeneratorKind::from_class(db, class.into())
+        CodeGeneratorKind::from_class(ctx, class.into())
     else {
         return Some(Type::any());
     };
-    let Some(root_field) = class.fields(db, specialization, field_policy).get("root") else {
+    let Some(root_field) = class.fields(ctx, specialization, field_policy).get("root") else {
         return Some(Type::any());
     };
 
@@ -1136,7 +1165,7 @@ fn root_model_input_type<'db>(
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(ctx, class.unknown_specialization(db));
+    let model_instance = Type::instance(ctx, class.unknown_specialization(ctx));
     Some(UnionType::from_two_elements(
         ctx,
         model_instance,
@@ -1152,19 +1181,19 @@ fn root_model_input_type<'db>(
 fn model_input_type<'db>(ctx: &SemanticContext<'db>, field_type: Type<'db>) -> Option<Type<'db>> {
     let db = ctx.db();
     let (class, _) = field_type.nominal_class(ctx)?.static_class_literal(db)?;
-    if !is_model(ctx, class) || is_root_model(db, class) {
+    if !is_model(ctx, class) || is_root_model(ctx, class) {
         return None;
     }
 
     // Attribute-based validation can accept arbitrary objects that do not implement `Mapping`.
-    if model_config(db, class).from_attributes.enabled_or(false) {
+    if model_config(ctx, class).from_attributes.enabled_or(false) {
         return Some(Type::any());
     }
 
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(ctx, class.unknown_specialization(db));
+    let model_instance = Type::instance(ctx, class.unknown_specialization(ctx));
     let mapping = KnownClass::Mapping
         .to_specialized_instance(ctx, &[KnownClass::Str.to_instance(ctx), Type::any()]);
     Some(UnionType::from_two_elements(ctx, model_instance, mapping))
@@ -1234,7 +1263,7 @@ fn model_init_behavior(
                 .ignore_possibly_undefined()
                 .and_then(Type::as_function_literal)
                 .is_some_and(|init| {
-                    init.signature(db)
+                    init.signature(ctx)
                         .iter()
                         .any(|signature| signature.parameters().keyword_variadic().is_some())
                 }) {
@@ -1296,15 +1325,16 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     }
 
     let db = context.db();
+    let ctx = context.semantic_context();
     let Some((class, _)) = class.static_class_literal(db) else {
         return;
     };
-    let Some(metadata) = CodeGeneratorKind::from_class(db, class.into())
+    let Some(metadata) = CodeGeneratorKind::from_class(ctx, class.into())
         .and_then(CodeGeneratorKind::pydantic_metadata)
     else {
         return;
     };
-    if !model_init_discards_extra(context.semantic_context(), class, metadata) {
+    if !model_init_discards_extra(ctx, class, metadata) {
         return;
     }
 

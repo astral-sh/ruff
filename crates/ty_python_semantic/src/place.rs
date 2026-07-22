@@ -460,13 +460,13 @@ pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'
 /// `scope`.
 #[allow(unused)]
 pub(crate) fn symbol<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     scope: ScopeId<'db>,
     name: &str,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     symbol_impl(
-        db,
+        ctx,
         scope,
         name,
         RequiresExplicitReExport::No,
@@ -483,12 +483,13 @@ pub(crate) fn symbol<'db>(
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_symbol<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     file: PythonFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
+    let db = ctx.db();
     symbol_impl(
-        db,
+        ctx,
         global_scope(db, file),
         name,
         RequiresExplicitReExport::No,
@@ -505,14 +506,12 @@ pub(crate) fn explicit_global_symbol<'db>(
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 #[allow(unused)]
 pub(crate) fn global_symbol<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     file: PythonFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let ctx = SemanticContext::from_file(db, file);
-    explicit_global_symbol(db, file, name).or_fall_back_to(&ctx, || {
-        module_type_implicit_global_symbol(&ctx, file, name)
-    })
+    explicit_global_symbol(ctx, file, name)
+        .or_fall_back_to(ctx, || module_type_implicit_global_symbol(ctx, file, name))
 }
 
 /// Infers the public type of an imported symbol.
@@ -557,7 +556,7 @@ pub(crate) fn imported_symbol<'db>(
         });
 
         symbol_impl(
-            db,
+            ctx,
             global_scope(db, file),
             name,
             requires_explicit_reexport,
@@ -610,7 +609,7 @@ pub(crate) fn builtins_symbol<'db>(
     let resolver = |module: Module<'db>| {
         let python_file = module.python_file(db)?;
         let found_symbol = symbol_impl(
-            db,
+            ctx,
             global_scope(db, python_file),
             symbol,
             RequiresExplicitReExport::Yes,
@@ -1017,6 +1016,27 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
+pub(crate) fn place_by_id<'db>(
+    ctx: &SemanticContext<'db>,
+    scope: ScopeId<'db>,
+    place_id: ScopedPlaceId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
+) -> PlaceAndQualifiers<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        scope.python_file(db).python_version(db)
+    );
+    place_by_id_inner(
+        db,
+        scope,
+        place_id,
+        requires_explicit_reexport,
+        considered_definitions,
+    )
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
@@ -1026,7 +1046,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn place_by_id<'db>(
+fn place_by_id_inner<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,
@@ -1319,12 +1339,13 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
 
 /// Implementation of [`symbol`].
 fn symbol_impl<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     scope: ScopeId<'db>,
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
+    let db = ctx.db();
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     let is_known_module = |known_module| {
@@ -1367,7 +1388,7 @@ fn symbol_impl<'db>(
         .symbol_id(name)
         .map(|symbol| {
             place_by_id(
-                db,
+                ctx,
                 scope,
                 symbol.into(),
                 requires_explicit_reexport,
@@ -1378,6 +1399,18 @@ fn symbol_impl<'db>(
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
+pub(crate) fn loop_header_reachability<'db>(
+    ctx: &SemanticContext<'db>,
+    definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        definition.python_file(db).python_version(db)
+    );
+    loop_header_reachability_inner(db, definition)
+}
+
 #[salsa::tracked(
     returns(clone),
     cycle_initial=|db, _, definition: Definition<'db>| {
@@ -1387,7 +1420,7 @@ fn symbol_impl<'db>(
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
 )]
-pub(crate) fn loop_header_reachability<'db>(
+fn loop_header_reachability_inner<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
@@ -1572,7 +1605,7 @@ fn place_from_bindings_impl<'db>(
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding)
-                    if is_discarded_dict_key_assignment(db, binding) =>
+                    if is_discarded_dict_key_assignment(ctx, binding) =>
                 {
                     // This synthesized `d[key] = value` binding was derived from an assignment such
                     // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
@@ -1668,7 +1701,7 @@ fn place_from_bindings_impl<'db>(
             // like all other bindings, so that it can participate in fixpoint iteration.
             let binding_kind = binding.kind(db);
             if binding_kind.is_loop_header() {
-                let loop_header = loop_header_reachability(db, binding);
+                let loop_header = loop_header_reachability(ctx, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
                 // that none of them loop-back. In that case short-circuit, so that we don't
@@ -1686,7 +1719,7 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = binding_type(db, binding);
+            let binding_ty = binding_type(ctx, binding);
             Some((
                 narrowing_constraint.narrow(ctx, binding_ty, binding.place(db)),
                 static_reachability,
@@ -1817,7 +1850,7 @@ impl<'db> PublicTypeBuilder<'db> {
                                 return false;
                             };
                             let queued_definition = queued_function.last_definition(db);
-                            function.contains_definition(db, queued_definition)
+                            function.contains_definition(&self.ctx, queued_definition)
                         })
                     {
                         self.queue = None;
@@ -1970,7 +2003,7 @@ fn place_from_declarations_impl<'db>(
         if static_reachability.is_always_false() {
             None
         } else {
-            let declared_type = inferred_declaration(db, declaration).declared()?;
+            let declared_type = inferred_declaration(ctx, declaration).declared()?;
             first_declaration.get_or_insert(declaration);
             provenance = provenance.or(Provenance::SingleDefinition(declaration));
             all_declarations_definitely_reachable =

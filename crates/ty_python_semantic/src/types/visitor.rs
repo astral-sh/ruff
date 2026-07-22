@@ -495,11 +495,11 @@ pub(super) fn non_any_dynamic_content<'db>(
             let db = ctx.db();
             let protocol_ty = Type::ProtocolInstance(protocol);
             let Some(class) = protocol.as_class_based() else {
-                walk_protocol_instance_interface(ctx, protocol.interface(db), protocol_ty, self);
+                walk_protocol_instance_interface(ctx, protocol.interface(ctx), protocol_ty, self);
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
-                walk_protocol_instance_interface(ctx, protocol.interface(db), protocol_ty, self);
+                walk_protocol_instance_interface(ctx, protocol.interface(ctx), protocol_ty, self);
                 return;
             };
 
@@ -520,7 +520,7 @@ pub(super) fn non_any_dynamic_content<'db>(
                 || {
                     walk_protocol_instance_interface(
                         ctx,
-                        protocol.interface(db),
+                        protocol.interface(ctx),
                         protocol_ty,
                         self,
                     );

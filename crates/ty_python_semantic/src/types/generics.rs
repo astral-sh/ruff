@@ -47,13 +47,15 @@ use ty_python_core::{SemanticIndex, semantic_index};
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
 pub(crate) fn enclosing_generic_contexts<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
+        .filter_map(|(_, ancestor_scope)| {
+            GenericContext::of_node(ctx, ancestor_scope.node(), index)
+        })
 }
 
 /// Returns the binding contexts introduced by the given scope or any enclosing scope.
@@ -86,12 +88,13 @@ pub(crate) fn enclosing_binding_contexts<'a, 'db>(
 /// is about to bind it (indicated by a non-`None` `typevar_binding_context`), in which case we
 /// bind the typevar with that new binding context.
 pub(crate) fn bind_typevar<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     index: &SemanticIndex<'db>,
     containing_scope: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    let db = ctx.db();
     // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It
     // is always bound to the outermost method in the nearest enclosing class. The walk looks for a
     // (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
@@ -139,7 +142,7 @@ pub(crate) fn bind_typevar<'db>(
             }
             continue;
         }
-        let generic_context = GenericContext::of_node(db, ancestor_scope.node(), index);
+        let generic_context = GenericContext::of_node(ctx, ancestor_scope.node(), index);
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
@@ -181,7 +184,7 @@ pub(crate) fn typing_self<'db>(
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
         ctx,
-        class.identity_specialization(db),
+        class.identity_specialization(ctx),
     ));
     let typevar = TypeVarInstance::new(
         db,
@@ -235,7 +238,7 @@ pub(crate) fn typing_self<'db>(
         .unwrap_or_else(|| scope_id.file_scope_id(db));
 
     bind_typevar(
-        db,
+        ctx,
         index,
         containing_scope,
         typevar_binding_context,
@@ -357,41 +360,43 @@ impl get_size2::GetSize for GenericContext<'_> {}
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
+        let db = ctx.db();
         let variables = type_params_node.iter().filter_map(|type_param| {
-            Self::variable_from_type_param(db, index, binding_context, type_param)
+            Self::variable_from_type_param(ctx, index, binding_context, type_param)
         });
 
         Self::from_typevar_instances(db, variables)
     }
 
     pub(crate) fn of_node(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         node: &NodeWithScopeKind,
         index: &SemanticIndex<'db>,
     ) -> Option<Self> {
         match node {
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
-                original_class_type(db, definition)?.generic_context(db)
+                let db = ctx.db();
+                original_class_type(db, definition)?.generic_context(ctx)
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
-                infer_definition_types(db, definition)
+                infer_definition_types(ctx, definition)
                     .function_type(definition)?
-                    .last_definition_signature(db)
+                    .last_definition_signature(ctx)
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
                 let definition = index.expect_single_definition(type_alias);
-                binding_type(db, definition)
+                binding_type(ctx, definition)
                     .as_type_alias()?
                     .as_pep_695_type_alias()?
-                    .generic_context(db)
+                    .generic_context(ctx)
             }
             _ => None,
         }
@@ -562,15 +567,16 @@ impl<'db> GenericContext<'db> {
     }
 
     fn variable_from_type_param(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
     ) -> Option<BoundTypeVarInstance<'db>> {
+        let db = ctx.db();
         match type_param_node {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
+                let declared = inferred_declaration(ctx, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                     declared.inner_type()
                 else {
@@ -580,7 +586,7 @@ impl<'db> GenericContext<'db> {
             }
             ast::TypeParam::ParamSpec(node) => {
                 let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
+                let declared = inferred_declaration(ctx, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                     declared.inner_type()
                 else {
@@ -590,7 +596,7 @@ impl<'db> GenericContext<'db> {
             }
             ast::TypeParam::TypeVarTuple(node) => {
                 let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
+                let declared = inferred_declaration(ctx, definition).declared()?;
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                     declared.inner_type()
                 else {
@@ -3515,9 +3521,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
             (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol
-                    .interface(self.ctx.db())
-                    .call_method(self.ctx)
+                let Some(call_method) = formal_protocol.interface(self.ctx).call_method(self.ctx)
                 else {
                     return Ok(());
                 };

@@ -170,11 +170,10 @@ fn generic_contexts_mentioned_in_type<'db>(
         }
 
         fn visit_function_type(&self, ctx: &SemanticContext<'db>, function: FunctionType<'db>) {
-            let db = ctx.db();
-            for signature in &function.signature(db).overloads {
+            for signature in &function.signature(ctx).overloads {
                 self.visit_signature(ctx, signature);
             }
-            self.visit_signature(ctx, function.last_definition_signature(db));
+            self.visit_signature(ctx, function.last_definition_signature(ctx));
         }
 
         fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
@@ -1495,7 +1494,7 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
                     )) => {
-                        if function.is_classmethod(db) {
+                        if function.is_classmethod(ctx) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -1513,7 +1512,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
-                        } else if function.is_staticmethod(db) {
+                        } else if function.is_staticmethod(ctx) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
@@ -1530,7 +1529,7 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.is_classmethod(db) {
+                            if function.is_classmethod(ctx) {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
@@ -1550,7 +1549,7 @@ impl<'db> Bindings<'db> {
 
                                     _ => {}
                                 }
-                            } else if function.is_staticmethod(db) {
+                            } else if function.is_staticmethod(ctx) {
                                 overload.set_return_type(*function_ty);
                             } else {
                                 match overload.parameter_types() {
@@ -2173,15 +2172,15 @@ impl<'db> Bindings<'db> {
 
                                 let generic_context_for_simple_type = |ty: Type<'db>| match ty {
                                     Type::ClassLiteral(class) => {
-                                        class.generic_context(db).map(wrap_generic_context)
+                                        class.generic_context(ctx).map(wrap_generic_context)
                                     }
 
                                     Type::FunctionLiteral(function) => {
-                                        signature_generic_context(function.signature(db))
+                                        signature_generic_context(function.signature(ctx))
                                     }
 
                                     Type::BoundMethod(bound_method) => signature_generic_context(
-                                        bound_method.function(db).signature(db),
+                                        bound_method.function(db).signature(ctx),
                                     ),
 
                                     Type::Callable(callable) => {
@@ -2190,7 +2189,7 @@ impl<'db> Bindings<'db> {
 
                                     Type::KnownInstance(KnownInstanceType::TypeAliasType(
                                         alias,
-                                    )) => alias.generic_context(db).map(wrap_generic_context),
+                                    )) => alias.generic_context(ctx).map(wrap_generic_context),
 
                                     _ => None,
                                 };
@@ -2263,7 +2262,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class)
+                                        if let Some(metadata) = enums::enum_metadata(ctx, *class)
                                             && metadata.aliases_are_known
                                         {
                                             Type::heterogeneous_tuple(
@@ -2324,7 +2323,7 @@ impl<'db> Bindings<'db> {
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
                                 overload.set_return_type(Type::bool_literal(
                                     ty.as_class_literal()
-                                        .is_some_and(|class| class.is_protocol(db)),
+                                        .is_some_and(|class| class.is_protocol(ctx)),
                                 ));
                             }
                         }
@@ -2334,10 +2333,10 @@ impl<'db> Bindings<'db> {
                             // class-literal is passed in, not if a generic alias is passed in, to emulate the behaviour
                             // of `typing.get_protocol_members` at runtime.
                             if let [Some(Type::ClassLiteral(class))] = overload.parameter_types()
-                                && let Some(protocol_class) = class.into_protocol_class(db)
+                                && let Some(protocol_class) = class.into_protocol_class(ctx)
                             {
                                 let member_names = protocol_class
-                                    .interface(db)
+                                    .interface(ctx)
                                     .members(db)
                                     .map(|member| Type::string_literal(db, member.name()));
                                 let specialization = UnionType::from_elements(ctx, member_names);
@@ -2604,7 +2603,7 @@ impl<'db> Bindings<'db> {
                             // However, we do not yet enforce this, and in the case of multiple
                             // applications of the decorator, we will only consider the last one.
                             let transformer_params = function_type
-                                .iter_overloads_and_implementation(db)
+                                .iter_overloads_and_implementation(ctx)
                                 .rev()
                                 .find_map(|function_overload| {
                                     function_overload.dataclass_transformer_params(db)
@@ -3450,12 +3449,12 @@ impl<'db> CallableBinding<'db> {
     /// the overload declarations of the underlying function.
     fn diagnostic_overload_indexes(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         kind: FunctionKind,
         function: FunctionType<'db>,
     ) -> SmallVec<[usize; 1]> {
         if matches!(kind, FunctionKind::MethodWrapper) {
-            let (overloads, _) = function.overloads_and_implementation(db);
+            let (overloads, _) = function.overloads_and_implementation(ctx);
             return (0..overloads.len()).collect();
         }
 
@@ -4298,7 +4297,7 @@ impl<'db> CallableBinding<'db> {
                             kind,
                             function,
                             candidate_indexes: self.diagnostic_overload_indexes(
-                                context.db(),
+                                context.semantic_context(),
                                 kind,
                                 function,
                             ),
@@ -4326,7 +4325,7 @@ impl<'db> CallableBinding<'db> {
                             kind,
                             function,
                             candidate_indexes: self.diagnostic_overload_indexes(
-                                context.db(),
+                                context.semantic_context(),
                                 kind,
                                 function,
                             ),
@@ -4373,9 +4372,12 @@ impl<'db> CallableBinding<'db> {
 
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
-                        function.overloads_and_implementation(context.db());
-                    let diagnostic_overload_indexes =
-                        self.diagnostic_overload_indexes(context.db(), kind, function);
+                        function.overloads_and_implementation(context.semantic_context());
+                    let diagnostic_overload_indexes = self.diagnostic_overload_indexes(
+                        context.semantic_context(),
+                        kind,
+                        function,
+                    );
                     let possible_overloads = diagnostic_overload_indexes
                         .iter()
                         .filter_map(|&index| overloads.get(index).copied())
@@ -7640,18 +7642,17 @@ fn invalid_dataclass_target<'db>(
     ctx: &SemanticContext<'db>,
     class_literal: &ClassLiteral<'db>,
 ) -> Option<InvalidDataclassTarget> {
-    let db = ctx.db();
     if matches!(class_literal, ClassLiteral::DynamicNamedTuple(_))
         || class_literal
             .as_static()
             .is_some_and(|class| class.has_named_tuple_class_in_mro(ctx))
     {
         Some(InvalidDataclassTarget::NamedTuple)
-    } else if class_literal.is_typed_dict(db) {
+    } else if class_literal.is_typed_dict(ctx) {
         Some(InvalidDataclassTarget::TypedDict)
-    } else if is_enum_class(db, Type::from(*class_literal)) {
+    } else if is_enum_class(ctx, Type::from(*class_literal)) {
         Some(InvalidDataclassTarget::Enum)
-    } else if class_literal.is_protocol(db) {
+    } else if class_literal.is_protocol(ctx) {
         Some(InvalidDataclassTarget::Protocol)
     } else {
         None
@@ -7755,7 +7756,7 @@ impl<'db> BindingError<'db> {
                 error_context.attach_to(ctx, &mut diag);
 
                 if let Some(matching_overload) = matching_overload {
-                    if let Some(overload_literal) = matching_overload.get(context.db()) {
+                    if let Some(overload_literal) = matching_overload.get(ctx) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Matching overload defined here",
@@ -7776,7 +7777,7 @@ impl<'db> BindingError<'db> {
                             matching_overload.function.name(context.db())
                         ));
                         for (overload_index, overload) in matching_overload
-                            .candidate_overloads(context.db())
+                            .candidate_overloads(ctx)
                             .take(MAXIMUM_OVERLOADS)
                         {
                             if overload_index == matching_overload.index {
@@ -8374,8 +8375,8 @@ struct MatchingOverloadLiteral<'db> {
 
 impl<'db> MatchingOverloadLiteral<'db> {
     /// Returns the [`OverloadLiteral`] representing this matching overload.
-    fn get(&self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
-        let (overloads, _) = self.function.overloads_and_implementation(db);
+    fn get(&self, ctx: &SemanticContext<'db>) -> Option<OverloadLiteral<'db>> {
+        let (overloads, _) = self.function.overloads_and_implementation(ctx);
 
         // TODO: This should actually be safe to index directly but isn't so as of this writing.
         // The main reason is that we've custom overload signatures that are constructed manually
@@ -8390,9 +8391,9 @@ impl<'db> MatchingOverloadLiteral<'db> {
     /// source overload-definition index.
     fn candidate_overloads(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
     ) -> impl Iterator<Item = (usize, OverloadLiteral<'db>)> + '_ {
-        let (overloads, _) = self.function.overloads_and_implementation(db);
+        let (overloads, _) = self.function.overloads_and_implementation(ctx);
         self.candidate_indexes.iter().filter_map(|&index| {
             overloads
                 .get(index)

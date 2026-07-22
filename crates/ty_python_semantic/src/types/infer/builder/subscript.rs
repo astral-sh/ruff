@@ -74,11 +74,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let db = ctx.db();
             match ty {
                 Type::TypedDict(typed_dict) => {
-                    if typed_dict.explicit_extra_items(db).is_some() {
+                    if typed_dict.explicit_extra_items(ctx).is_some() {
                         return Some(KnownClass::Str.to_instance(ctx));
                     }
                     let keys = typed_dict
-                        .items(db)
+                        .items(ctx)
                         .keys()
                         .map(|key| Type::string_literal(db, key))
                         .collect_vec();
@@ -245,7 +245,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
 
-                if let Some(generic_context) = class.generic_context(db)
+                if let Some(generic_context) = class.generic_context(ctx)
                     && let Some(class) = class.as_static()
                 {
                     return self.infer_explicit_class_specialization(
@@ -257,7 +257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                if let Some(generic_context) = type_alias.generic_context(db) {
+                if let Some(generic_context) = type_alias.generic_context(ctx) {
                     return self.infer_explicit_type_alias_type_specialization(
                         subscript,
                         value_ty,
@@ -478,23 +478,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ctx = self.semantic_context();
         let db = self.db();
         let specialize = &|types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(db, |_| {
+            Type::from(generic_class.apply_specialization(ctx, |_| {
                 generic_context.specialize_partial(ctx, types.iter().copied())
             }))
         };
 
         // Avoid constructing an identity specialization and a full protocol interface for the
         // many generic protocols that do not directly declare `__class__`.
-        let disable_int_float_special_case = generic_class.is_protocol(db)
+        let disable_int_float_special_case = generic_class.is_protocol(ctx)
             && place_table(db, generic_class.body_scope(db))
                 .symbol_id("__class__")
                 .is_some()
             && generic_class
-                .identity_specialization(db)
-                .into_protocol_class(db)
+                .identity_specialization(ctx)
+                .into_protocol_class(ctx)
                 .is_some_and(|protocol| {
                     protocol
-                        .interface(db)
+                        .interface(ctx)
                         .includes_generic_writable_instance_member(
                             ctx,
                             "__class__",
@@ -549,7 +549,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(db, |_| {
+            let type_alias = generic_type_alias.apply_specialization(ctx, |_| {
                 generic_context.specialize_partial(ctx, types.iter().copied())
             });
 
@@ -1585,8 +1585,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(ctx)
         {
-            let identity_instance = Type::instance(ctx, class_literal.identity_specialization(db));
-            let collection_generic_context = class_literal.generic_context(db);
+            let identity_instance = Type::instance(ctx, class_literal.identity_specialization(ctx));
+            let collection_generic_context = class_literal.generic_context(ctx);
 
             let ast_arguments = [
                 ArgOrKeyword::Arg(&target.slice),
@@ -1845,7 +1845,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 for key in keys {
                     // Infer the value with type context.
-                    let item = typed_dict.item(db, key);
+                    let item = typed_dict.item(ctx, key);
                     let value_ty = infer_rhs_value.infer_silent(
                         self,
                         TypeContext::new(item.as_ref().map(|item| item.declared_ty)),
@@ -2146,14 +2146,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // instead refer to any declared field, so deletion is only safe when all
                     // possible fields are optional and mutable.
                     let can_delete_extra_literals = typed_dict
-                        .explicit_extra_items(db)
+                        .explicit_extra_items(ctx)
                         .is_some_and(|extra_items| !extra_items.is_read_only())
                         && string_literal_values(db, slice_ty).is_some_and(|mut literals| {
-                            literals.all(|literal| !typed_dict.items(db).contains_key(literal))
+                            literals.all(|literal| !typed_dict.items(ctx).contains_key(literal))
                         });
                     let can_delete_arbitrary_key = slice_ty
                         .is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
-                        && typed_dict.supports_arbitrary_key_deletion(db);
+                        && typed_dict.supports_arbitrary_key_deletion(ctx);
                     if can_delete_extra_literals || can_delete_arbitrary_key {
                         return;
                     }
@@ -2203,7 +2203,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 slice_ty.as_string_literal()
                                             {
                                                 let key = string_literal.value(db);
-                                                let items = typed_dict.items(db);
+                                                let items = typed_dict.items(ctx);
 
                                                 if let Some(field) = items.get(key) {
                                                     // Key exists but is required (i.e., can't be deleted).
@@ -2216,7 +2216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                         TypedDictDeleteErrorKind::RequiredKey,
                                                     );
                                                 } else if typed_dict
-                                                    .explicit_extra_items(db)
+                                                    .explicit_extra_items(ctx)
                                                     .is_some_and(|extra_items| {
                                                         extra_items.is_read_only()
                                                     })
@@ -2459,7 +2459,7 @@ fn legacy_generic_class_context<'db>(
     for ty in typevars {
         let argument_ty = *ty;
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {
-            let bound = bind_typevar(db, index, file_scope_id, typevar_binding_context, typevar)
+            let bound = bind_typevar(ctx, index, file_scope_id, typevar_binding_context, typevar)
                 .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
             if bound.is_typevartuple(db) {
                 return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);

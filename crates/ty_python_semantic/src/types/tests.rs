@@ -409,7 +409,9 @@ fn type_alias_variance() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let module = PythonFile::new(db, module, db.python_version());
-        let ty = global_symbol(db, module, name).place.expect_type();
+        let ty = global_symbol(&db.semantic_context(), module, name)
+            .place
+            .expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
             type_alias,
         ))) = ty
@@ -422,7 +424,7 @@ fn type_alias_variance() {
         db: &'db TestDb,
         type_alias: PEP695TypeAliasType<'db>,
     ) -> BoundTypeVarIdentity<'db> {
-        let generic_context = type_alias.generic_context(db).unwrap();
+        let generic_context = type_alias.generic_context(&db.semantic_context()).unwrap();
         generic_context.variables(db).next().unwrap().identity(db)
     }
 
@@ -567,7 +569,9 @@ fn eager_expansion() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let module = PythonFile::new(db, module, db.python_version());
-        let ty = global_symbol(db, module, name).place.expect_type();
+        let ty = global_symbol(&db.semantic_context(), module, name)
+            .place
+            .expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
             type_alias,
         ))) = ty

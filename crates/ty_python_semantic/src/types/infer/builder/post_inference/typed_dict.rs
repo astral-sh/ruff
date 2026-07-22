@@ -104,12 +104,12 @@ fn validate_typed_dict_field_overrides<'db>(
 ) {
     let db = context.db();
     let ctx = context.semantic_context();
-    let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
-    let own_fields = class.own_fields(db, None, CodeGeneratorKind::TypedDict);
+    let child_fields = TypedDictType::new(class.identity_specialization(ctx)).items(ctx);
+    let own_fields = class.own_fields(ctx, None, CodeGeneratorKind::TypedDict);
     let mut reported_fields = FxHashSet::default();
 
     for base in direct_bases {
-        for (field_name, base_field) in TypedDictType::new(*base).items(db) {
+        for (field_name, base_field) in TypedDictType::new(*base).items(ctx) {
             let Some(child_field) = child_fields.get(field_name.as_str()) else {
                 continue;
             };
@@ -154,9 +154,9 @@ fn validate_typed_dict_openness<'db>(
 ) {
     let db = context.db();
     let ctx = context.semantic_context();
-    let child = TypedDictType::new(class.identity_specialization(db));
-    let child_openness = child.openness(db);
-    let child_items = child.items(db);
+    let child = TypedDictType::new(class.identity_specialization(ctx));
+    let child_openness = child.openness(ctx);
+    let child_items = child.items(ctx);
 
     if let Some(arguments) = class_node.arguments.as_deref()
         && arguments.find_keyword("closed").is_some()
@@ -171,8 +171,8 @@ fn validate_typed_dict_openness<'db>(
 
     for base in direct_bases {
         let base_typed_dict = TypedDictType::new(*base);
-        let base_openness = base_typed_dict.openness(db);
-        let base_items = base_typed_dict.items(db);
+        let base_openness = base_typed_dict.openness(ctx);
+        let base_items = base_typed_dict.items(ctx);
 
         match base_openness {
             TypedDictOpenness::ImplicitlyOpen => {}

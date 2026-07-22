@@ -218,15 +218,14 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
     }
 
     fn visit_type_alias_type(&self, ctx: &SemanticContext<'db>, alias: TypeAliasType<'db>) {
-        self.visit_type(ctx, alias.raw_value_type(ctx.db()));
+        self.visit_type(ctx, alias.raw_value_type(ctx));
     }
 
     fn visit_typed_dict_type(&self, ctx: &SemanticContext<'db>, typed_dict: TypedDictType<'db>) {
-        let db = ctx.db();
-        for field in typed_dict.items(db).values() {
+        for field in typed_dict.items(ctx).values() {
             self.visit_type(ctx, field.declared_ty);
         }
-        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+        if let Some(extra_items) = typed_dict.explicit_extra_items(ctx) {
             self.visit_type(ctx, extra_items.declared_ty);
         }
     }
@@ -774,7 +773,7 @@ mod tests {
         let db = ctx.db();
         let file = system_path_to_file(db, "/src/a.py").unwrap();
         let file = PythonFile::new(db, file, ctx.python_version());
-        global_symbol(db, file, name)
+        global_symbol(ctx, file, name)
             .place
             .expect_type()
             .to_instance_approximation(ctx)

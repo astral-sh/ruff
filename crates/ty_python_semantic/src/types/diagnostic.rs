@@ -762,7 +762,7 @@ pub(super) fn report_missing_type_arguments<'db>(
         Type::ClassLiteral(class) => {
             let db = context.db();
 
-            let Some(generic_context) = class.generic_context(db) else {
+            let Some(generic_context) = class.generic_context(context.semantic_context()) else {
                 return;
             };
             let ctx = &context.semantic_context();
@@ -2799,7 +2799,7 @@ pub(crate) fn report_call_to_abstract_method(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
     let span = abstract_method_span(
-        db,
+        context.semantic_context(),
         function,
         AbstractMethodAnnotationPolicy::AlwaysIncludeBody,
     );
@@ -2809,11 +2809,12 @@ pub(crate) fn report_call_to_abstract_method(
 }
 
 pub(super) fn abstract_method_span<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     function: FunctionType<'db>,
     policy: AbstractMethodAnnotationPolicy,
 ) -> Span {
-    let (_, implementation) = function.overloads_and_implementation(db);
+    let db = ctx.db();
+    let (_, implementation) = function.overloads_and_implementation(ctx);
 
     let Some(implementation) = implementation else {
         return function.spans(db).name;
@@ -2902,8 +2903,8 @@ pub(crate) fn report_undeclared_protocol_member(
         .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
 
     if definition.kind(db).is_unannotated_assignment() {
-        let binding_type = binding_type(db, definition);
         let ctx = &context.semantic_context();
+        let binding_type = binding_type(ctx, definition);
         let suggestion = binding_type.promote(ctx);
 
         if should_give_hint(ctx, suggestion) {
@@ -3481,7 +3482,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     let db = context.db();
 
     let base_index = class
-        .explicit_bases(db)
+        .explicit_bases(context.semantic_context())
         .iter()
         .position(|base| {
             matches!(
@@ -3631,7 +3632,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
-            Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
+            Type::ClassLiteral(class) if class.generic_context(ctx).is_none() => {
                 ClassType::NonGeneric(*class)
             }
             _ => continue,
@@ -3758,7 +3759,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
     };
-    let span = match binding_type(db, other_definition) {
+    let span = match binding_type(context.semantic_context(), other_definition) {
         Type::ClassLiteral(class) => class.header_span(db),
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
@@ -3847,9 +3848,9 @@ pub(super) fn report_invalid_method_override<'db>(
             ..
         }) = class_member(superclass)
         && let Some(superclass_function_kind) =
-            MethodDecorator::try_from_fn_type(db, superclass_function)
+            MethodDecorator::try_from_fn_type(ctx, superclass_function)
         && let Some(subclass_function_kind) =
-            MethodDecorator::try_from_fn_type(db, subclass_function)
+            MethodDecorator::try_from_fn_type(ctx, subclass_function)
         && superclass_function_kind != subclass_function_kind
     {
         diagnostic.info(format_args!(
@@ -4040,6 +4041,7 @@ pub(super) fn report_overridden_final_method<'db>(
     superclass_method_defs: &[FunctionType<'db>],
 ) {
     let db = context.db();
+    let ctx = context.semantic_context();
 
     // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
     let property_getter_definition = if subclass_definition.kind(db).is_function_def()
@@ -4089,13 +4091,13 @@ pub(super) fn report_overridden_final_method<'db>(
 
     let first_final_superclass_definition = superclass_method_defs
         .iter()
-        .find(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+        .find(|function| function.has_known_decorator(ctx, FunctionDecorators::FINAL))
         .expect(
             "At least one function definition in the superclass should be decorated with `@final`",
         );
 
     let superclass_function_literal = if first_final_superclass_definition.file(db).is_stub(db) {
-        first_final_superclass_definition.first_overload_or_implementation(db)
+        first_final_superclass_definition.first_overload_or_implementation(ctx)
     } else {
         first_final_superclass_definition
             .literal(db)
@@ -4110,8 +4112,8 @@ pub(super) fn report_overridden_final_method<'db>(
         .message(format_args!("`{superclass_name}.{member}` defined here")),
     );
 
-    if let Some(decorator_span) =
-        superclass_function_literal.find_known_decorator_span(db, KnownFunction::Final)
+    if let Some(decorator_span) = superclass_function_literal
+        .find_known_decorator_span(context.semantic_context(), KnownFunction::Final)
     {
         sub.annotate(Annotation::secondary(decorator_span));
     }
@@ -4137,7 +4139,7 @@ pub(super) fn report_overridden_final_method<'db>(
             .expect_class()
             .node(context.module());
 
-        let (overloads, implementation) = function.overloads_and_implementation(db);
+        let (overloads, implementation) = function.overloads_and_implementation(ctx);
         let overload_count = overloads.len() + usize::from(implementation.is_some());
         let is_only = overload_count >= class_node.body.len();
 
@@ -4170,7 +4172,7 @@ pub(super) fn report_overridden_final_method<'db>(
                 .expect("`parsed_module` should have assigned a node index"),
         );
 
-        match function.overloads_and_implementation(db) {
+        match function.overloads_and_implementation(ctx) {
             ([first_overload, rest @ ..], None) => {
                 diagnostic.help(format_args!("Remove all overloads for `{member}`"));
                 diagnostic.set_optional_fix(should_fix.then(|| {
@@ -4486,6 +4488,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     base_is_frozen: bool,
 ) {
     let db = context.db();
+    let ctx = context.semantic_context();
 
     let Some(builder) =
         context.report_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS, class.header_range(db))
@@ -4525,7 +4528,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 
     diagnostic.annotate(context.secondary(base_class_node));
 
-    if let Some(position) = class.find_dataclass_decorator_position(db) {
+    if let Some(position) = class.find_dataclass_decorator_position(ctx) {
         diagnostic.annotate(
             context
                 .secondary(&class_node.decorator_list[position])
@@ -4534,7 +4537,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     }
     diagnostic.info("This causes the class creation to fail");
 
-    if let Some(decorator_position) = base_class.find_dataclass_decorator_position(db) {
+    if let Some(decorator_position) = base_class.find_dataclass_decorator_position(ctx) {
         let mut sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!("Base class definition"),

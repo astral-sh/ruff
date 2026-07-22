@@ -29,17 +29,16 @@ pub(super) fn evaluate_enum_domains<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let db = ctx.db();
     let target = EnumDomainSet::from_type(ctx, target)?;
     let other = EnumDomainSet::from_type(ctx, other)?;
     if let (Some(target), Some(other)) = (target.single(), other.single())
         && target.enum_class == other.enum_class
     {
-        return SameEnumComparison::new(db, target.clone(), other.clone(), operator)
+        return SameEnumComparison::new(ctx, target.clone(), other.clone(), operator)
             .evaluate(ctx, branch, operator);
     }
 
-    ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(ctx, branch, operator)
+    ProjectedEnumComparison::new(ctx, target, &other, operator)?.evaluate(ctx, branch, operator)
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -54,7 +53,7 @@ struct SameEnumComparison<'db> {
 
 impl<'db> SameEnumComparison<'db> {
     fn new(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         left: EnumValueSet<'db>,
         right: EnumValueSet<'db>,
         operator: ComparisonOperator,
@@ -65,7 +64,7 @@ impl<'db> SameEnumComparison<'db> {
         Self {
             left,
             right,
-            profile: same_enum_comparison_profile(db, enum_class, operator),
+            profile: same_enum_comparison_profile(ctx, enum_class, operator),
         }
     }
 
@@ -192,7 +191,7 @@ impl<'db> EnumValueSet<'db> {
                     }
                 }
                 Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(ctx).into_enum_class(db)?,
+                    enum_class: instance.class_literal(ctx).into_enum_class(ctx)?,
                     members: EnumValueSetMembers::All,
                 },
                 Type::EnumComplement(complement) => EnumValueSet {
@@ -511,12 +510,12 @@ impl<'db> EnumDomainSet<'db> {
 
     fn key_projection(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         operator: ComparisonOperator,
     ) -> Option<EnumKeyProjection<'db>> {
         let mut projection = EnumKeyProjection::default();
         for domain in &self.domains {
-            domain.add_keys_to_projection(db, operator, &mut projection)?;
+            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
         }
         Some(projection)
     }
@@ -536,14 +535,13 @@ impl<'db> EnumDomainSet<'db> {
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let db = ctx.db();
         let mut builder = UnionBuilder::new(ctx);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
-            domain.add_keys_to_projection(db, operator, &mut projection)?;
+            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
             if projection.unknowns_may_overlap(other) {
                 builder = builder.add(domain.restriction_type(ctx));
-            } else if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
+            } else if let Some(retained) = domain.retain_keys(ctx, operator, &other.keys).ok()? {
                 builder = builder.add(retained.restriction_type(ctx));
             }
         }
@@ -557,15 +555,14 @@ impl<'db> EnumDomainSet<'db> {
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let db = ctx.db();
         let mut builder = UnionBuilder::new(ctx);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
-            domain.add_keys_to_projection(db, operator, &mut projection)?;
+            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
             if projection.unknowns_may_overlap(other) {
                 continue;
             }
-            if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
+            if let Some(retained) = domain.retain_keys(ctx, operator, &other.keys).ok()? {
                 builder = builder.add(retained.restriction_type(ctx));
             }
         }
@@ -582,13 +579,13 @@ struct ProjectedEnumComparison<'db> {
 
 impl<'db> ProjectedEnumComparison<'db> {
     fn new(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         left: EnumDomainSet<'db>,
         right: &EnumDomainSet<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        let left_projection = left.key_projection(db, operator)?;
-        let right_projection = right.key_projection(db, operator)?;
+        let left_projection = left.key_projection(ctx, operator)?;
+        let right_projection = right.key_projection(ctx, operator)?;
         Some(Self {
             left,
             left_projection,
@@ -723,11 +720,12 @@ impl<'db> EnumKeyProjection<'db> {
 impl<'db> EnumValueSet<'db> {
     fn add_keys_to_projection(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         operator: ComparisonOperator,
         projection: &mut EnumKeyProjection<'db>,
     ) -> Option<()> {
-        let profile = enum_class_key_profile(db, self.enum_class, operator);
+        let db = ctx.db();
+        let profile = enum_class_key_profile(ctx, self.enum_class, operator);
         let semantics = profile.semantics?;
         let key_domain = EnumComparisonKeyDomain::new(self.enum_class, semantics);
 
@@ -758,11 +756,12 @@ impl<'db> EnumValueSet<'db> {
 
     fn retain_keys(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         operator: ComparisonOperator,
         keys: &FxHashSet<EnumComparisonKey<'db>>,
     ) -> Result<Option<Self>, ()> {
-        let profile = enum_class_key_profile(db, self.enum_class, operator);
+        let db = ctx.db();
+        let profile = enum_class_key_profile(ctx, self.enum_class, operator);
         let semantics = profile.semantics.ok_or(())?;
         let mut included = FxOrderMap::default();
         for (name, scalar_key) in &profile.members {
@@ -795,8 +794,24 @@ struct EnumClassKeyProfile<'db> {
 }
 
 /// Cache each class's modeled comparison keys independently of any particular operand pair.
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn enum_class_key_profile<'db>(
+    ctx: &SemanticContext<'db>,
+    enum_class: EnumClassLiteral<'db>,
+    operator: ComparisonOperator,
+) -> &'db EnumClassKeyProfile<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        enum_class
+            .class_literal(db)
+            .python_file(db)
+            .python_version(db)
+    );
+    enum_class_key_profile_inner(db, enum_class, operator)
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn enum_class_key_profile_inner<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
@@ -844,13 +859,30 @@ struct SameEnumComparisonProfile {
     comparison_keys: Option<SameEnumComparisonKeys>,
 }
 
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn same_enum_comparison_profile<'db>(
+    ctx: &SemanticContext<'db>,
+    enum_class: EnumClassLiteral<'db>,
+    operator: ComparisonOperator,
+) -> SameEnumComparisonProfile {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        enum_class
+            .class_literal(db)
+            .python_file(db)
+            .python_version(db)
+    );
+    same_enum_comparison_profile_inner(db, enum_class, operator)
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn same_enum_comparison_profile_inner<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
-    let profile = enum_class_key_profile(db, enum_class, operator);
+    let ctx = SemanticContext::from_file(db, enum_class.class_literal(db).python_file(db));
+    let profile = enum_class_key_profile(&ctx, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
         Some(KnownComparisonSemantics::Object) if !enum_class.aliases_are_known(db) => {

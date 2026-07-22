@@ -356,7 +356,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let value_ty = if let Some(key_ty) = key_ty
                 && let Some(key) = key_ty.as_string_literal()
-                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
+                && let Some(field) = typed_dict.item(self.semantic_context(), key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
             } else if let Some(key_ty) = key_ty {
@@ -429,8 +429,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &unpacked_keyword_types,
                     &mut |expr, tcx| self.get_or_infer_expression(expr, tcx),
                 );
-                let positional_target =
-                    typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
+                let positional_target = typed_dict_with_relaxed_keys(
+                    self.semantic_context(),
+                    typed_dict,
+                    &keyword_keys,
+                );
                 let target_ty = Type::TypedDict(positional_target);
                 self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
             }
@@ -470,7 +473,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let value_tcx = keyword
                 .arg
                 .as_ref()
-                .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
+                .and_then(|arg_name| typed_dict.item(self.semantic_context(), arg_name.id.as_str()))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
@@ -498,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_ref()
                 .map(|key| self.get_or_infer_expression(key, key_tcx));
             let value_tcx = if let Some(key) = key_ty.and_then(Type::as_string_literal)
-                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
+                && let Some(field) = typed_dict.item(self.semantic_context(), key.value(self.db()))
             {
                 TypeContext::new(Some(field.declared_ty))
             } else if let Some(key_ty) = key_ty {

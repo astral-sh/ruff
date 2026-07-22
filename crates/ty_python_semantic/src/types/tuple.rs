@@ -259,7 +259,7 @@ impl<'db> TupleType<'db> {
             .try_to_class_literal(ctx)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-        tuple_class.apply_specialization(db, |generic_context| {
+        tuple_class.apply_specialization(ctx, |generic_context| {
             if generic_context.variables(db).len() == 1 {
                 let element_type = self.tuple(db).tuple_class_type(ctx);
                 generic_context.specialize_tuple(db, element_type, self)
@@ -755,7 +755,7 @@ fn to_class_type_cycle_initial<'db>(
         .try_to_class_literal(ctx)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-    tuple_class.apply_specialization(db, |generic_context| {
+    tuple_class.apply_specialization(ctx, |generic_context| {
         if generic_context.variables(db).len() == 1 {
             generic_context.specialize_tuple(db, Type::divergent(id), self_)
         } else {

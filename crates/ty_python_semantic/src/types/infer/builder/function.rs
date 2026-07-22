@@ -166,7 +166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 if let Some(class) = self.class_context_of_current_method() {
                     enclosing_class_context = Some(class);
-                    if class.is_protocol(db) {
+                    if class.is_protocol(ctx) {
                         return;
                     }
                 }
@@ -315,8 +315,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference =
-            (!decorator_list.is_empty()).then(|| function_known_decorators(db, definition));
+        let decorator_inference = (!decorator_list.is_empty())
+            .then(|| function_known_decorators(self.semantic_context(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
             self.context.extend(decorator_inference.diagnostics());
             self.expressions
@@ -451,7 +451,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope = self.scope().file_scope_id(db);
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
-                for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
+                for enclosing in
+                    enclosing_generic_contexts(self.semantic_context(), self.index, current_scope)
+                {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
                         let kind = match type_param {
                             ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
@@ -572,8 +574,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .index
                     .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
                     .to_scope_id(db, self.python_file());
-                let type_params_inference =
-                    infer_scope_types(db, type_params_scope, TypeContext::default());
+                let type_params_inference = infer_scope_types(
+                    self.semantic_context(),
+                    type_params_scope,
+                    TypeContext::default(),
+                );
 
                 for param_with_default in function.parameters.iter_non_variadic_params() {
                     let Some(default) = param_with_default.default.as_deref() else {
@@ -860,7 +865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         || self.is_in_type_checking_block(self.scope(), default_expr)
                         || self
                             .class_context_of_current_method()
-                            .is_some_and(|class| class.is_protocol(db)))
+                            .is_some_and(|class| class.is_protocol(ctx)))
                         && default
                             .as_ref()
                             .is_some_and(|d| d.is_ellipsis_literal_expr()))
@@ -1019,7 +1024,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_name = &function_node.name;
 
         let mut is_classmethod = is_implicit_classmethod(function_name);
-        let inference = infer_definition_types(db, method_definition);
+        let inference = infer_definition_types(self.semantic_context(), method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
             if let Some(known_class) = decorator_ty
@@ -1198,7 +1203,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
-            self.db(),
+            self.semantic_context(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;

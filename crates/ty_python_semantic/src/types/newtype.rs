@@ -46,11 +46,21 @@ impl get_size2::GetSize for NewType<'_> {}
 
 #[salsa::tracked]
 impl<'db> NewType<'db> {
-    pub fn base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
+    pub fn base(self, ctx: &SemanticContext<'db>) -> NewTypeBase<'db> {
+        let db = ctx.db();
         match self.eager_base(db) {
             Some(base) => base,
-            None => self.lazy_base(db),
+            None => self.lazy_base(ctx),
         }
+    }
+
+    fn lazy_base(self, ctx: &SemanticContext<'db>) -> NewTypeBase<'db> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.definition(db).python_file(db).python_version(db)
+        );
+        self.lazy_base_inner(db)
     }
 
     #[salsa::tracked(
@@ -60,7 +70,7 @@ impl<'db> NewType<'db> {
         )),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
+    fn lazy_base_inner(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
@@ -77,7 +87,7 @@ impl<'db> NewType<'db> {
         let Some(second_arg) = call_expr.arguments.args.get(1) else {
             return object_fallback;
         };
-        match definition_expression_type(db, definition, second_arg) {
+        match definition_expression_type(&ctx, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
                 NewTypeBase::ClassType(nominal_instance_type.class(&ctx))
             }
@@ -95,19 +105,18 @@ impl<'db> NewType<'db> {
         }
     }
 
-    fn iter_bases(self, db: &'db dyn Db) -> NewTypeBaseIter<'db> {
+    fn iter_bases<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> NewTypeBaseIter<'db, 'ctx> {
         NewTypeBaseIter {
             current: Some(self),
             seen_before: FxHashSet::default(),
-            db,
+            ctx,
         }
     }
 
     // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
     // one if this `NewType` is cyclical, and we fall back to `object` in that case.
     pub fn concrete_base_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        for base in self.iter_bases(db) {
+        for base in self.iter_bases(ctx) {
             match base {
                 NewTypeBase::NewType(_) => continue,
                 concrete => return concrete.instance_type(ctx),
@@ -128,9 +137,10 @@ impl<'db> NewType<'db> {
     /// `NewType`s with no underlying `ClassType`, this has no effect and does not call `f`.
     pub(crate) fn try_map_base_class_type(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,
     ) -> Option<Self> {
+        let db = ctx.db();
         // Modifying the base class type requires unwrapping and re-wrapping however many base
         // newtypes there are between here and there. Normally recursion would be natural for this,
         // but the bases iterator does cycle detection, and I think using that with a stack is a
@@ -139,7 +149,7 @@ impl<'db> NewType<'db> {
         // unmodified seems more correct than injecting some default type like `object` into the
         // cycle, which is what `CycleDetector` would do if we used it here.
         let mut inner_newtype_stack = Vec::new();
-        for base in self.iter_bases(db) {
+        for base in self.iter_bases(ctx) {
             match base {
                 // Build up the stack of intermediate newtypes that we'll need to re-wrap after
                 // we've mapped the `ClassType`.
@@ -177,10 +187,10 @@ impl<'db> NewType<'db> {
 
     pub(crate) fn map_base_class_type(
         self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         f: impl FnOnce(ClassType<'db>) -> ClassType<'db>,
     ) -> Self {
-        self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
+        self.try_map_base_class_type(ctx, |class_type| Some(f(class_type)))
             .unwrap()
     }
 
@@ -208,17 +218,18 @@ impl<'db> NewType<'db> {
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_newtype_pair(
         &self,
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         source: NewType<'db>,
         target: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let db = ctx.db();
         // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
         // subtype of another is to have the other in its chain of newtype bases. Once we reach the
         // base class, we don't have to keep looking.
         if source.is_equivalent_to(db, target) {
             return self.always();
         }
-        for base in source.iter_bases(db) {
+        for base in source.iter_bases(ctx) {
             if let NewTypeBase::NewType(base_newtype) = base
                 && base_newtype.is_equivalent_to(db, target)
             {
@@ -242,9 +253,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         let db = ctx.db();
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
-            .check_newtype_pair(db, left, right)
+            .check_newtype_pair(ctx, left, right)
             .or(ctx, self.constraints, || {
-                relation_checker.check_newtype_pair(db, right, left)
+                relation_checker.check_newtype_pair(ctx, right, left)
             })
             .negate(db, self.constraints)
     }
@@ -257,7 +268,7 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
 ) {
     let db = ctx.db();
     let base = if visitor.should_visit_lazy_type_attributes() {
-        Some(newtype.base(db))
+        Some(newtype.base(ctx))
     } else {
         newtype.eager_base(db)
     };
@@ -321,18 +332,18 @@ impl<'db> NewTypeBase<'db> {
 /// As far as this iterator is concerned, that's the "common case", and it yields the one
 /// `NewTypeBase::ClassType` for `list[Foo]`. Functions like `normalize` that continue recursing
 /// over the base class need to pass down a cycle-detecting visitor as usual.
-struct NewTypeBaseIter<'db> {
+struct NewTypeBaseIter<'db, 'ctx> {
     current: Option<NewType<'db>>,
     seen_before: FxHashSet<NewType<'db>>,
-    db: &'db dyn Db,
+    ctx: &'ctx SemanticContext<'db>,
 }
 
-impl<'db> Iterator for NewTypeBaseIter<'db> {
+impl<'db> Iterator for NewTypeBaseIter<'db, '_> {
     type Item = NewTypeBase<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current?;
-        match current.base(self.db) {
+        match current.base(self.ctx) {
             NewTypeBase::NewType(base_newtype) => {
                 // Doing the insertion only in this branch avoids allocating in the common case.
                 self.seen_before.insert(current);

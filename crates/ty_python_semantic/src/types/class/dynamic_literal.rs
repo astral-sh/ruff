@@ -192,15 +192,28 @@ impl<'db> DynamicClassLiteral<'db> {
     /// or if the bases argument cannot be extracted precisely.
     ///
     /// Returns `[Unknown]` if the bases iterable is variable-length.
-    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+    pub(crate) fn explicit_bases(self, ctx: &SemanticContext<'db>) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
+            ctx: &SemanticContext<'db>,
+            definition: Definition<'db>,
+        ) -> &'db [Type<'db>] {
+            let db = ctx.db();
+            debug_assert_eq!(
+                ctx.python_version(),
+                definition.python_file(db).python_version(db)
+            );
+            deferred_explicit_bases_inner(db, definition)
+        }
+
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_explicit_bases_inner<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
             let python_file = definition.python_file(db);
+            let ctx = SemanticContext::from_file(db, python_file);
             let module = parsed_module(db, python_file).load(db);
 
             let value = definition
@@ -216,19 +229,17 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            extract_fixed_length_iterable_element_types(
-                &SemanticContext::from_file(db, python_file),
-                bases_arg,
-                |expr| definition_expression_type(db, definition, expr),
-            )
+            extract_fixed_length_iterable_element_types(&ctx, bases_arg, |expr| {
+                definition_expression_type(&ctx, definition, expr)
+            })
             .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
-        match self.anchor(db) {
+        match self.anchor(ctx.db()) {
             // For dangling calls, bases are stored directly on the anchor.
             DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
             // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
+            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(ctx, *definition),
         }
     }
 
@@ -293,8 +304,7 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         ctx: &SemanticContext<'db>,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let db = ctx.db();
-        let original_bases = self.explicit_bases(db);
+        let original_bases = self.explicit_bases(ctx);
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
@@ -304,7 +314,7 @@ impl<'db> DynamicClassLiteral<'db> {
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
-        if self.try_mro(db).is_err() {
+        if self.try_mro(ctx).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
@@ -404,9 +414,8 @@ impl<'db> DynamicClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let db = ctx.db();
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
-        if CodeGeneratorKind::from_class(db, self.into())
+        if CodeGeneratorKind::from_class(ctx, self.into())
             .is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             if name == "__dataclass_fields__" {
@@ -470,6 +479,18 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
+    pub(crate) fn try_mro(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.scope(db).python_file(db).python_version(db)
+        );
+        self.try_mro_inner(db)
+    }
+
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
@@ -480,7 +501,7 @@ impl<'db> DynamicClassLiteral<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+    fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         let ctx = SemanticContext::from_file(db, self.scope(db).python_file(db));
         Mro::of_dynamic_class(&ctx, self)
     }

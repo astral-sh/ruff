@@ -1181,7 +1181,7 @@ fn finite_alternatives<'db>(
         Type::NominalInstance(instance)
             if KnownComparisonSemantics::of_type(ctx, ty, operator).is_some() =>
         {
-            enum_member_literals(db, instance.class_literal(ctx), None).map(Iterator::collect)
+            enum_member_literals(ctx, instance.class_literal(ctx), None).map(Iterator::collect)
         }
         _ => None,
     }
@@ -1464,7 +1464,7 @@ impl KnownComparisonSemantics {
                     .then_some(first)
             }
             Type::NominalInstance(instance)
-                if instance.class(ctx).is_final(db)
+                if instance.class(ctx).is_final(ctx)
                     || soundness_policy.allow_unsafe_equality
                         // `object` can contain values whose classes define their own comparison
                         // method, so treating it as exact would incorrectly eliminate those values.
@@ -1721,7 +1721,7 @@ fn enum_literal_value<'db>(
 ) -> Option<Type<'db>> {
     let db = ctx.db();
     let enum_class_literal = literal.enum_class_literal(db);
-    let metadata = enum_metadata(db, enum_class_literal.class_literal(db))?;
+    let metadata = enum_metadata(ctx, enum_class_literal.class_literal(db))?;
     let name = enum_class_literal.resolve_member(db, literal.name(db))?;
     metadata.concrete_value_type(ctx, name)
 }

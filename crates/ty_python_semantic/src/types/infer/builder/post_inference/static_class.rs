@@ -87,7 +87,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     };
 
     // Check that the class does not have a cyclic definition
-    if let Some(inheritance_cycle) = class.inheritance_cycle(db) {
+    if let Some(inheritance_cycle) = class.inheritance_cycle(context.semantic_context()) {
         if inheritance_cycle.is_participant()
             && let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
         {
@@ -105,7 +105,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     let ctx = context.semantic_context();
 
     // Check that the class is not an enum and generic
-    if is_enum_class_by_inheritance(ctx, class) && class.generic_context(db).is_some() {
+    if is_enum_class_by_inheritance(ctx, class) && class.generic_context(ctx).is_some() {
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_ENUM, class_node) {
             builder.into_diagnostic(format_args!(
                 "Enum class `{}` cannot be generic",
@@ -114,14 +114,14 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let class_kind = CodeGeneratorKind::from_class(db, class.into());
+    let class_kind = CodeGeneratorKind::from_class(ctx, class.into());
 
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
     if class_kind == Some(CodeGeneratorKind::NamedTuple) {
         let mut field_with_default_encountered = None;
 
-        for (field_name, field) in class.own_fields(db, None, CodeGeneratorKind::NamedTuple) {
+        for (field_name, field) in class.own_fields(ctx, None, CodeGeneratorKind::NamedTuple) {
             if field_name.starts_with('_') {
                 report_named_tuple_field_with_leading_underscore(
                     context,
@@ -149,7 +149,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let is_protocol = class.is_protocol(db);
+    let is_protocol = class.is_protocol(ctx);
 
     if let Some(disjoint_base_decorator) = class_node.decorator_list.iter().find(|decorator| {
         file_expression_type(&decorator.expression)
@@ -186,7 +186,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 diagnostic
                     .info("An exception will be raised when instantiating the class at runtime");
             }
-        } else if class.is_typed_dict(db) {
+        } else if class.is_typed_dict(ctx) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`TypedDict` class `{}` cannot be decorated with `@dataclass`",
@@ -315,7 +315,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
-                    && let Some(generic_context) = class.generic_context(db)
+                    && let Some(generic_context) = class.generic_context(ctx)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
                             let declared_variance = typevar.typevar(db).explicit_variance(db)?;
@@ -351,12 +351,12 @@ pub(crate) fn check_static_class_definitions<'db>(
             _ => continue,
         };
 
-        if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
+        if let Some(disjoint_base) = base_class.nearest_disjoint_base(ctx) {
             disjoint_bases.insert(disjoint_base, i, base_class.class_literal(db));
         }
 
         if is_protocol {
-            if !base_class.is_protocol(db)
+            if !base_class.is_protocol(ctx)
                 && !base_class.is_object(db)
                 && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
@@ -367,7 +367,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 ));
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
-            if !base_class.class_literal(db).is_typed_dict(db)
+            if !base_class.class_literal(db).is_typed_dict(ctx)
                 && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -383,12 +383,12 @@ pub(crate) fn check_static_class_definitions<'db>(
                         .message(format_args!("`{}` defined here", base_class.name(db))),
                 );
             }
-            if base_class.class_literal(db).is_typed_dict(db) {
+            if base_class.class_literal(db).is_typed_dict(ctx) {
                 direct_typed_dict_bases.push(base_class);
             }
         }
 
-        if base_class.is_final(db)
+        if base_class.is_final(ctx)
             && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
             builder.into_diagnostic(format_args!(
@@ -418,7 +418,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         if let Some(ordered_base_class) = ordered_dataclass_base_class(ctx, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
-            if !class.has_own_comparison_methods(db)
+            if !class.has_own_comparison_methods(ctx)
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
@@ -438,7 +438,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check for starred variable-length tuples that cannot be unpacked
     for base in class_node.bases() {
         if let ast::Expr::Starred(starred) = base
-            && let starred_ty = definition_expression_type(db, class_definition, &starred.value)
+            && let starred_ty = definition_expression_type(ctx, class_definition, &starred.value)
             && let Some(tuple_spec) = starred_ty.tuple_instance_spec(ctx)
             && !matches!(tuple_spec.as_ref(), Tuple::Fixed(_))
         {
@@ -448,7 +448,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's MRO is resolvable
     let mut inconsistent_generic_bases = false;
-    match class.try_mro(db, None) {
+    match class.try_mro(ctx, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
                 for duplicate in duplicates {
@@ -530,7 +530,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
 
-            let explicit_bases = class.explicit_bases(db);
+            let explicit_bases = class.explicit_bases(context.semantic_context());
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
@@ -644,7 +644,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
-                || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                || class.typed_dict_module(ctx) == Some(TypedDictModule::TypingExtensions)
                 || ctx.python_version() >= PythonVersion::PY315;
 
             for keyword in &args.keywords {
@@ -747,8 +747,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
-    if class.has_pep_695_type_params(db)
-        && let Some(generic_context) = class.inherited_legacy_generic_context(db)
+    if class.has_pep_695_type_params(ctx)
+        && let Some(generic_context) = class.inherited_legacy_generic_context(ctx)
         && let Some(typevar) = generic_context
             .variables(db)
             .find(|typevar| !typevar.typevar(db).is_self(db))
@@ -761,8 +761,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if let (Some(legacy), Some(inherited)) = (
-        class.legacy_generic_context(db),
-        class.inherited_legacy_generic_context(db),
+        class.legacy_generic_context(ctx),
+        class.inherited_legacy_generic_context(ctx),
     ) {
         if !inherited.is_subset_of(db, legacy)
             && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
@@ -790,8 +790,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-        if !class.has_pep_695_type_params(db)
-            && let Some(generic_context) = class.legacy_generic_context(db)
+        if !class.has_pep_695_type_params(ctx)
+            && let Some(generic_context) = class.legacy_generic_context(ctx)
         {
             struct State<'db> {
                 typevar_with_default: TypeVarInstance<'db>,
@@ -832,8 +832,8 @@ pub(crate) fn check_static_class_definitions<'db>(
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
-            .pep695_generic_context(db)
-            .or_else(|| class.legacy_generic_context(db))
+            .pep695_generic_context(ctx)
+            .or_else(|| class.legacy_generic_context(ctx))
         {
             let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
 
@@ -873,10 +873,10 @@ pub(crate) fn check_static_class_definitions<'db>(
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
             // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(db) {
+            if let Some(generic_context) = class.generic_context(ctx) {
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(db, index, parent) {
+                    for enclosing in enclosing_generic_contexts(ctx, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                             report_shadowed_type_variable(
                                 context,
@@ -896,7 +896,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // variables from enclosing scopes (by identity).
             for base_typevar in class.typevars_referenced_in_bases(ctx) {
                 let typevar = base_typevar.typevar(db);
-                for enclosing in enclosing_generic_contexts(db, index, parent) {
+                for enclosing in enclosing_generic_contexts(ctx, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
                         report_shadowed_type_variable(
                             context,
@@ -916,7 +916,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(db, class.into())
+        CodeGeneratorKind::from_class(ctx, class.into())
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
@@ -925,7 +925,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut required_after_default_field_names = vec![];
         let mut has_seen_default_field = false;
 
-        for (name, field) in class.own_fields(db, specialization, field_policy) {
+        for (name, field) in class.own_fields(ctx, specialization, field_policy) {
             if field.is_kw_only_sentinel(db) {
                 kw_only_sentinel_fields.push(name);
                 continue;
@@ -1019,11 +1019,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
-    if let Some(protocol) = class.into_protocol_class(db) {
+    if let Some(protocol) = class.into_protocol_class(ctx) {
         protocol.validate_members(context);
     }
 
-    if class.is_typed_dict(db) {
+    if class.is_typed_dict(ctx) {
         validate_typed_dict_class(context, class, class_node, &direct_typed_dict_bases);
     }
 
@@ -1131,7 +1131,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
                     continue;
                 }
 
-                let assigned_ty = binding_type(db, definition);
+                let assigned_ty = binding_type(ctx, definition);
                 if !assigned_ty.is_assignable_to(ctx, metaclass_member_ty) {
                     reported_incompatible_binding = true;
                     report_invalid_attribute_assignment(
@@ -1195,11 +1195,11 @@ fn ordered_dataclass_base_class<'db>(
             continue;
         };
 
-        if ancestor_literal.is_ordered_dataclass(db) {
+        if ancestor_literal.is_ordered_dataclass(ctx) {
             return Some(ancestor);
         }
 
-        if ancestor_literal.has_own_comparison_methods(db) {
+        if ancestor_literal.has_own_comparison_methods(ctx) {
             return None;
         }
     }
@@ -1218,9 +1218,10 @@ fn check_final_class_abstract_methods<'db>(
     class_node: &ast::StmtClassDef,
 ) {
     let db = context.db();
+    let ctx = context.semantic_context();
 
     // Only check if the class is final.
-    if !class.is_final(db) {
+    if !class.is_final(ctx) {
         return;
     }
 
@@ -1228,14 +1229,14 @@ fn check_final_class_abstract_methods<'db>(
     // without subclassing it, so an `@final` `Protocol` class with unimplemented abstract
     // methods is not inherently broken in the same way as a non-`Protocol` final class
     // with unimplemented abstract methods.
-    if class.is_protocol(db) {
+    if class.is_protocol(ctx) {
         return;
     }
 
     let ctx = context.semantic_context();
 
-    let class_type = class.identity_specialization(db);
-    let abstract_methods = class_type.abstract_methods(db);
+    let class_type = class.identity_specialization(ctx);
+    let abstract_methods = class_type.abstract_methods(ctx);
 
     // If there are no abstract methods, we're done.
     let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
@@ -1253,7 +1254,7 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
-    let definition_types = infer_definition_types(db, class.definition(db));
+    let definition_types = infer_definition_types(ctx, class.definition(db));
 
     if let Some(class_node) = class.body_scope(db).node(db).as_class()
         && let Some(decorator) = class_node
@@ -1316,13 +1317,13 @@ fn check_final_class_abstract_methods<'db>(
 
     let defining_class_name = defining_class.name(db);
 
-    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+    if let Type::FunctionLiteral(function) = binding_type(ctx, *definition) {
         let policy = if kind.is_explicit() {
             AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         } else {
             AbstractMethodAnnotationPolicy::AlwaysIncludeBody
         };
-        let secondary_span = abstract_method_span(db, function, policy);
+        let secondary_span = abstract_method_span(ctx, function, policy);
         let mut secondary_annotation = Annotation::secondary(secondary_span);
         secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
             secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
@@ -1353,7 +1354,7 @@ fn check_final_class_abstract_methods<'db>(
         // and the return type is assignable to `None`, they may not have intended
         // for it to be implicitly abstract; add a clarificatory note:
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(db, *definition)
+            let function_type_as_callable = infer_definition_types(ctx, *definition)
                 .binding_type(*definition)
                 .try_upcast_to_callable(ctx);
 
@@ -1386,6 +1387,7 @@ fn check_class_final_without_value<'db>(
     }
 
     let db = context.db();
+    let ctx = context.semantic_context();
     let body_scope = class.body_scope(db);
     let body_scope_id = body_scope.file_scope_id(db);
     let use_def = index.use_def_map(body_scope_id);
@@ -1395,11 +1397,10 @@ fn check_class_final_without_value<'db>(
     // defaults are initialized by the synthesized __init__. In protocols, the
     // declaration describes a required instance attribute rather than storage
     // that must be initialized by the protocol class itself.
-    if CodeGeneratorKind::from_class(db, class.into()).is_some() || class.is_protocol(db) {
+    if CodeGeneratorKind::from_class(ctx, class.into()).is_some() || class.is_protocol(ctx) {
         return;
     }
 
-    let ctx = context.semantic_context();
     for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
         let result = place_from_declarations(ctx, declarations);
         let first_declaration = result.first_declaration;

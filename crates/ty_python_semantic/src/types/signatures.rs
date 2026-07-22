@@ -66,17 +66,18 @@ pub(super) enum ReturnCallableTypeVarScope {
 /// while in the middle of inferring its definition scope — for instance, when applying
 /// decorators.)
 fn function_signature_expression_type<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
+    let db = ctx.db();
     let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(db, definition).expression_type(expression)
+        infer_deferred_types(ctx, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
@@ -84,17 +85,18 @@ fn function_signature_expression_type<'db>(
 }
 
 fn function_signature_type_expression_flags<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeExpressionFlags {
+    let db = ctx.db();
     let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(db, definition).type_expression_flags(expression)
+        infer_deferred_types(ctx, definition).type_expression_flags(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
@@ -751,7 +753,7 @@ impl<'db> Signature<'db> {
         let return_ty = function_node
             .returns
             .as_ref()
-            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
+            .map(|returns| function_signature_expression_type(ctx, definition, returns.as_ref()))
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
             GenericContext::from_function_params(ctx, definition, &parameters, return_ty);
@@ -3772,7 +3774,7 @@ impl<'db> Parameters<'db> {
 
         for parameter in parameters {
             if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(ctx) {
-                Self::push_unpacked_typed_dict(db, &mut value, &parameter, unpacked_typed_dict);
+                Self::push_unpacked_typed_dict(ctx, &mut value, &parameter, unpacked_typed_dict);
             } else {
                 value.push(parameter);
             }
@@ -3782,7 +3784,7 @@ impl<'db> Parameters<'db> {
     }
 
     fn push_unpacked_typed_dict(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         value: &mut Vec<Parameter<'db>>,
         parameter: &Parameter<'db>,
         unpacked_typed_dict: TypedDictType<'db>,
@@ -3792,7 +3794,7 @@ impl<'db> Parameters<'db> {
             .expect("keyword variadic parameter always has a name")
             .clone();
 
-        for (name, field) in unpacked_typed_dict.items(db) {
+        for (name, field) in unpacked_typed_dict.items(ctx) {
             if value
                 .iter()
                 .any(|existing| existing.callable_by_name(name.as_str()))
@@ -3808,7 +3810,7 @@ impl<'db> Parameters<'db> {
             );
         }
 
-        if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items() {
+        if let Some(extra_items) = unpacked_typed_dict.openness(ctx).effective_extra_items() {
             value.push(
                 Parameter::keyword_variadic(kwargs_name)
                     .with_annotated_type(extra_items.declared_ty),
@@ -4204,7 +4206,6 @@ impl<'db> Parameters<'db> {
         parameters: &ast::Parameters,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let db = ctx.db();
         let ast::Parameters {
             posonlyargs,
             args,
@@ -4220,7 +4221,7 @@ impl<'db> Parameters<'db> {
                 // Use the same approach as function_signature_expression_type to avoid cycles.
                 // Defaults are always deferred (see infer_function_definition), so we can go
                 // directly to infer_deferred_types without first checking infer_definition_types.
-                infer_deferred_types(db, definition)
+                infer_deferred_types(ctx, definition)
                     .expression_type(default)
                     .replace_parameter_defaults(ctx)
             })
@@ -4879,9 +4880,9 @@ impl<'db> Parameter<'db> {
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
-                    function_signature_expression_type(db, function_definition, annotation),
+                    function_signature_expression_type(ctx, function_definition, annotation),
                     false,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
+                    function_signature_type_expression_flags(ctx, function_definition, annotation),
                     annotation.is_starred_expr(),
                 )
             } else {
@@ -5205,7 +5206,7 @@ mod tests {
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
         let module = PythonFile::new(db, module, db.python_version());
-        global_symbol(db, module, "f")
+        global_symbol(&db.semantic_context(), module, "f")
             .place
             .expect_type()
             .expect_function_literal()
@@ -5543,7 +5544,7 @@ mod tests {
 
         // With no decorators, internal and external signature are the same
         assert_eq!(
-            func.signature(&db),
+            func.signature(&db.semantic_context()),
             &CallableSignature::single(expected_sig)
         );
     }

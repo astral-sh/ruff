@@ -196,11 +196,10 @@ fn merge_truthiness_guarded_pair<'db>(
 /// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
 /// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
 fn should_preserve_hashable_union(ctx: &SemanticContext<'_>, left: Type, right: Type) -> bool {
-    let db = ctx.db();
     let is_hashable =
         |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(ctx));
     let is_non_final_nominal_instance =
-        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(ctx).is_final(db));
+        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(ctx).is_final(ctx));
 
     (is_hashable(left) && is_non_final_nominal_instance(right))
         || (is_hashable(right) && is_non_final_nominal_instance(left))
@@ -1423,7 +1422,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
 
-            let Some(enum_class_literal) = instance.class_literal(ctx).into_enum_class(db) else {
+            let Some(enum_class_literal) = instance.class_literal(ctx).into_enum_class(ctx) else {
                 continue;
             };
             if !enum_class_literal.members_are_exhaustive(db) {
@@ -2028,7 +2027,7 @@ mod tests {
             .place
             .expect_type()
             .expect_class_literal();
-        let enum_literal = enum_member_literals(&db, safe_uuid_class, None)
+        let enum_literal = enum_member_literals(&ctx, safe_uuid_class, None)
             .expect("SafeUUID is an enum")
             .next()
             .expect("SafeUUID has members");
@@ -2134,7 +2133,9 @@ mod tests {
 
         let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
         let module = PythonFile::new(&db, module, db.python_version());
-        let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
+        let alias_ty = global_symbol(&db.semantic_context(), module, "Alias")
+            .place
+            .expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
             alias_ty
         else {
@@ -2239,7 +2240,7 @@ mod tests {
             .ignore_possibly_undefined()
             .unwrap();
 
-        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
+        let literals = enum_member_literals(&ctx, safe_uuid_class.expect_class_literal(), None)
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(literals.len(), 3);

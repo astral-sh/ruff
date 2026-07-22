@@ -236,7 +236,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         "Cannot subscript non-generic type alias `{}`",
                         alias.name(db)
                     ));
-                    let value_type = alias.raw_value_type(db);
+                    let value_type = alias.raw_value_type(ctx);
                     if value_type.is_specialized_generic(db) {
                         diagnostic.annotate(context.secondary(&*subscript.value).message(
                             format_args!(
@@ -283,7 +283,7 @@ impl<'db> SubscriptErrorKind<'db> {
                             *value_ty,
                             None,
                             *slice_ty,
-                            typed_dict.items(db),
+                            typed_dict.items(ctx),
                         );
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -321,7 +321,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     typed_dict_ty,
                     *full_object_ty,
                     *slice_ty,
-                    typed_dict.items(db),
+                    typed_dict.items(ctx),
                 );
             }
             Self::NotSubscriptable { value_ty, method } => {
@@ -502,12 +502,12 @@ fn typed_dict_subscript<'db>(
         .as_string_literal()
         .map(|literal| literal.value(db))
     else {
-        if typed_dict.explicit_extra_items(db).is_some()
+        if typed_dict.explicit_extra_items(ctx).is_some()
             && slice_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
         {
             return Ok(typed_dict.value_type(ctx));
         }
-        let result_ty = if typed_dict.openness(db).is_closed()
+        let result_ty = if typed_dict.openness(ctx).is_closed()
             && slice_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
         {
             typed_dict.value_type(ctx)
@@ -524,7 +524,7 @@ fn typed_dict_subscript<'db>(
         ));
     };
 
-    typed_dict.item(db, key).map_or_else(
+    typed_dict.item(ctx, key).map_or_else(
         || {
             Err(SubscriptError::new(
                 Type::unknown(),
@@ -785,7 +785,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)), _)
-                if alias.generic_context(db).is_none() =>
+                if alias.generic_context(ctx).is_none() =>
             {
                 debug_assert!(alias.specialization(db).is_none());
                 Some(Err(SubscriptError::new(
@@ -946,7 +946,7 @@ impl<'db> Type<'db> {
                     return Ok(KnownClass::GenericAlias.to_instance(ctx));
                 }
 
-                if class.generic_context(db).is_some() {
+                if class.generic_context(ctx).is_some() {
                     // TODO: specialize the generic class using these explicit type
                     // variable assignments. This branch is only encountered when an
                     // explicit class specialization appears inside of some other subscript

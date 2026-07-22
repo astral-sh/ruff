@@ -19,7 +19,7 @@ fn python_file(db: &TestDb, file: File) -> PythonFile<'_> {
 }
 
 fn global_symbol<'db>(db: &'db TestDb, file: File, name: &str) -> PlaceAndQualifiers<'db> {
-    crate::place::global_symbol(db, python_file(db, file), name)
+    crate::place::global_symbol(&db.semantic_context(), python_file(db, file), name)
 }
 
 #[track_caller]
@@ -45,7 +45,8 @@ fn get_symbol<'db>(
         assert_eq!(scope.name(db, &module), *expected_scope_name);
     }
 
-    symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
+    let ctx = SemanticContext::from_file(db, scope.python_file(db));
+    symbol(&ctx, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
 }
 
 #[track_caller]

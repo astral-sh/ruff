@@ -1604,7 +1604,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self.check_newtype_pair(db, source_newtype, target_newtype)
+                self.check_newtype_pair(ctx, source_newtype, target_newtype)
             }
 
             (Type::Union(union), _) => {
@@ -1900,7 +1900,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_callable_signature_pair(
                         ctx,
                         source_partial.partial(db).signatures(db),
-                        target_function.into_callable_type(db).signatures(db),
+                        target_function.into_callable_type(ctx).signatures(db),
                     )
                 })
             }
@@ -2150,7 +2150,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 } else {
                     ConstraintSet::from_bool(
                         self.constraints,
-                        is_single_member_enum(db, target_enum_literal.enum_class(db)),
+                        is_single_member_enum(ctx, target_enum_literal.enum_class(db)),
                     )
                 }
             }
@@ -2617,7 +2617,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let db = ctx.db();
         protocol
-            .interface(db)
+            .interface(ctx)
             .members(db)
             .when_any(ctx, self.constraints, |member| {
                 other
@@ -3015,7 +3015,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
             | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
-                if nominal.class(ctx).is_final(db) =>
+                if nominal.class(ctx).is_final(ctx) =>
             {
                 self.with_recursion_guard(ctx, left, right, || {
                     self.any_protocol_members_absent_or_disjoint(
@@ -3030,7 +3030,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (other, Type::ProtocolInstance(protocol)) => {
                 self.with_recursion_guard(ctx, left, right, || {
                     protocol
-                        .interface(db)
+                        .interface(ctx)
                         .members(db)
                         .when_any(ctx, self.constraints, |member| {
                             match other.member(ctx, member.name()).place {
@@ -3239,8 +3239,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     // method names, then they're clearly disjoint.
                     self.always()
                 } else if a_function != b_function
-                    && a_function.has_known_decorator(db, FunctionDecorators::FINAL)
-                    && b_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                    && a_function.has_known_decorator(ctx, FunctionDecorators::FINAL)
+                    && b_function.has_known_decorator(ctx, FunctionDecorators::FINAL)
                 {
                     // If *both* methods are `@final` (and they're not literally the same
                     // definition), they must be disjoint.
@@ -3317,7 +3317,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 Type::NominalInstance(nominal),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-            ) if nominal.class(ctx).is_final(db) => Type::NominalInstance(nominal)
+            ) if nominal.class(ctx).is_final(ctx) => Type::NominalInstance(nominal)
                 .member_lookup_with_policy(
                     ctx,
                     "__call__",
