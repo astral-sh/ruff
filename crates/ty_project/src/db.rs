@@ -625,7 +625,7 @@ impl Db for ProjectDatabase {
 
 #[cfg(feature = "format")]
 mod format {
-    use crate::ProjectDatabase;
+    use crate::{Db as _, ProjectDatabase};
     use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
@@ -633,7 +633,7 @@ mod format {
     impl FormatDb for ProjectDatabase {
         fn format_options(&self, file: File) -> PyFormatOptions {
             let source_ty = file.source_type(self);
-            PyFormatOptions::from_source_type(source_ty)
+            PyFormatOptions::from_source_type(source_ty).with_target_version(self.python_version())
         }
     }
 }
