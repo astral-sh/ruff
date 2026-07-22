@@ -95,6 +95,7 @@ struct LineFailures {
 pub fn match_file(
     db: &dyn Db,
     file: File,
+    python_version: PythonVersion,
     diagnostics: &[Diagnostic],
     options: RunOptions,
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
@@ -110,8 +111,7 @@ pub fn match_file(
         });
         (assertions, diagnostics)
     } else {
-        let parsed =
-            parsed_module(db, PythonFile::new(db, file, PythonVersion::latest_ty())).load(db);
+        let parsed = parsed_module(db, PythonFile::new(db, file, python_version)).load(db);
         let assertions = InlineFileAssertions::from_file(
             source.as_str(),
             AssertionSource::Python(&parsed),
@@ -531,6 +531,7 @@ mod tests {
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -591,7 +592,7 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, file, &diagnostics, options)
+        super::match_file(&db, file, PythonVersion::latest_ty(), &diagnostics, options)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {
