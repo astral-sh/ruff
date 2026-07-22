@@ -1278,9 +1278,10 @@ def builtin_positional_pattern_refines_subject_alias(value: bool) -> Literal[Tru
 ## Overlapping class patterns
 
 Two unrelated non-final classes can have a common subclass through multiple inheritance. The
-successful pattern therefore preserves both class types. Attributes from both bases remain possible,
-even when one annotation is broader than the other. For a generic pattern class whose type arguments
-are not known from the subject, its attributes use `Unknown`.
+successful pattern therefore preserves both class types. Attributes defined on both classes use the
+intersection of their declared types, consistent with ordinary attribute access on an intersection.
+For a generic pattern class whose type arguments are not known from the subject, its attributes use
+`Unknown`.
 
 ```py
 from typing import Generic, TypeVar
@@ -1310,14 +1311,14 @@ class CompatibleOverlapMemberA:
     member: object = "x"
 
 class CompatibleOverlapMemberB:
-    member: int = 1
+    member: int | str = 1
 
-def test_match_class_capture_combines_overlapping_member_types(
+def match_class_capture_intersects_overlapping_member_types(
     value: OverlapMemberA,
 ) -> None:
     match value:
         case OverlapMemberB(member=item):
-            reveal_type(item)  # revealed: int | str
+            reveal_type(item)  # revealed: Never
 
 def test_match_class_capture_preserves_compatible_overlapping_member_types(
     value: CompatibleOverlapMemberA,
@@ -1325,6 +1326,27 @@ def test_match_class_capture_preserves_compatible_overlapping_member_types(
     match value:
         case CompatibleOverlapMemberB(member=str() as item):
             reveal_type(item)  # revealed: str
+
+class OverlapAParams:
+    a: str
+
+class OverlapBParams:
+    b: str
+
+class OverlapEventA:
+    params: OverlapAParams
+
+class OverlapEventB:
+    params: OverlapBParams
+
+def match_class_capture_filters_overlapping_union_members(
+    event: OverlapEventA | OverlapEventB,
+) -> None:
+    match event:
+        case OverlapEventA(params=params):
+            reveal_type(event)  # revealed: OverlapEventA
+            reveal_type(params)  # revealed: OverlapAParams
+            params.a
 
 class GenericOverlapA:
     member: int
@@ -1347,7 +1369,7 @@ def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
 ) -> None:
     match value:
         case GenericOverlapB(member=str() as item):
-            reveal_type(item)  # revealed: str
+            reveal_type(item)  # revealed: Unknown & str
 
 def test_match_generic_container_member_keeps_loop_reachable(
     value: GenericListOverlapA,

@@ -1743,25 +1743,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .ignore_possibly_undefined();
             let place = subject_ty.member(self.db, name.as_str()).place;
             let mut member_ty = place.ignore_possibly_undefined();
-            if original_subject_ty.nominal_class(self.db).is_some()
-                && let Type::Intersection(intersection) = subject_ty
-            {
-                let overlapping_member_ty = UnionType::from_elements(
-                    self.db,
-                    intersection
-                        .positive(self.db)
-                        .iter()
-                        .filter_map(|positive| {
-                            positive
-                                .member(self.db, name.as_str())
-                                .place
-                                .ignore_possibly_undefined()
-                        }),
-                );
-                if !overlapping_member_ty.is_never() {
-                    member_ty = Some(overlapping_member_ty);
-                }
-            }
 
             if let Some(specialized_pattern_class) = specialized_pattern_class {
                 member_ty = Type::instance(self.db, specialized_pattern_class)
