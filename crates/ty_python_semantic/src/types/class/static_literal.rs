@@ -67,27 +67,6 @@ use ty_python_core::{
     use_def_map,
 };
 
-/// The result of determining whether a class has a generic context.
-///
-/// `Unknown` represents incomplete inference, including Salsa cycle recovery. It must remain
-/// distinct from `DefinitelyAbsent` so that diagnostics do not interpret missing information as
-/// proof that a class is non-generic.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum GenericContextState<'db> {
-    Known(GenericContext<'db>),
-    DefinitelyAbsent,
-    Unknown,
-}
-
-impl<'db> GenericContextState<'db> {
-    pub(crate) const fn context(self) -> Option<GenericContext<'db>> {
-        match self {
-            Self::Known(context) => Some(context),
-            Self::DefinitelyAbsent | Self::Unknown => None,
-        }
-    }
-}
-
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -288,21 +267,16 @@ impl<'db> StaticClassLiteral<'db> {
         None
     }
 
-    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.generic_context_state(db).context()
-    }
-
-    /// Return the class's generic context, preserving whether an absent context is definitive.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| GenericContextState::Unknown,
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn generic_context_state(self, db: &'db dyn Db) -> GenericContextState<'db> {
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
         if self.is_known(db, KnownClass::VersionInfo) {
-            return GenericContextState::DefinitelyAbsent;
+            return None;
         }
 
         // We've already verified that the class literal does not contain both a PEP-695 generic
@@ -311,47 +285,9 @@ impl<'db> StaticClassLiteral<'db> {
         // Note that if a class has an explicit legacy generic context (by inheriting from
         // `typing.Generic`), and also an implicit one (by inheriting from other generic classes,
         // specialized by typevars), the explicit one takes precedence.
-        if let Some(context) = self
-            .pep695_generic_context(db)
+        self.pep695_generic_context(db)
             .or_else(|| self.legacy_generic_context(db))
             .or_else(|| self.inherited_legacy_generic_context(db))
-        {
-            return GenericContextState::Known(context);
-        }
-
-        if self.has_type_params(db) || !self.typevars_referenced_in_bases(db).is_empty() {
-            return GenericContextState::Unknown;
-        }
-
-        if !self.has_explicit_bases(db) {
-            return GenericContextState::DefinitelyAbsent;
-        }
-
-        let explicit_bases = self.explicit_bases(db);
-        if explicit_bases.is_empty()
-            || explicit_bases
-                .iter()
-                .any(|base| !self.has_known_genericity_for_base(db, *base))
-        {
-            GenericContextState::Unknown
-        } else {
-            GenericContextState::DefinitelyAbsent
-        }
-    }
-
-    fn has_known_genericity_for_base(self, db: &'db dyn Db, base: Type<'db>) -> bool {
-        match base {
-            Type::ClassLiteral(class) => !matches!(
-                class.generic_context_state(db),
-                GenericContextState::Unknown
-            ),
-            Type::GenericAlias(_) => true,
-            Type::TypeAlias(alias) => self.has_known_genericity_for_base(db, alias.value_type(db)),
-            _ => matches!(
-                ClassBase::try_from_explicit_base(db, base, Some(self.into())),
-                Some(ClassBase::Class(_) | ClassBase::Protocol | ClassBase::TypedDict(_))
-            ),
-        }
     }
 
     pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {

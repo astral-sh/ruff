@@ -942,7 +942,7 @@ recovers to `Unknown`.
 ```py
 class NonGeneric: ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
 def direct(value: NonGeneric[int]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
@@ -950,9 +950,7 @@ def direct(value: NonGeneric[int]) -> None:
 The same diagnostic applies when the specialization is nested inside `type[...]`.
 
 ```py
-class NonGeneric: ...
-
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
 def nested(value: type[NonGeneric[int]]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
@@ -961,35 +959,17 @@ Inheriting from a non-generic class, or from a specialization of a generic class
 subclass generic.
 
 ```py
-class NonGeneric: ...
-class PlainChild(NonGeneric): ...
+class Child(NonGeneric): ...
 class Generic[T]: ...
 class SpecializedChild(Generic[int]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
-def plain_child(value: PlainChild[str]) -> None:
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+def child(value: Child[str]) -> None:
     reveal_type(value)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type"
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'SpecializedChild'>`"
 def specialized_child(value: SpecializedChild[bytes]) -> None:
     reveal_type(value)  # revealed: Unknown
-```
-
-Classes parameterized by any kind of type variable remain subscriptable.
-
-```py
-class TypeVarGeneric[T]: ...
-class ParamSpecGeneric[**P]: ...
-class TypeVarTupleGeneric[*Ts]: ...
-
-def valid(
-    type_var: TypeVarGeneric[int],
-    param_spec: ParamSpecGeneric[[int, str]],
-    type_var_tuple: TypeVarTupleGeneric[int, str],
-) -> None:
-    reveal_type(type_var)  # revealed: TypeVarGeneric[int]
-    reveal_type(param_spec)  # revealed: ParamSpecGeneric[(int, str, /)]
-    reveal_type(type_var_tuple)  # revealed: TypeVarTupleGeneric[int, str]
 ```
 
 ## Tuple as a PEP-695 generic class

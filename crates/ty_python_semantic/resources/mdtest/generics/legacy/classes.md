@@ -161,15 +161,14 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 
 ## Specializing classes with unavailable generic context
 
-Failure to determine a class's generic context is not proof that the class is non-generic. Avoid
-emitting a cascading `not-subscriptable` diagnostic when the class definition still contains
-evidence that it may be generic.
+When an earlier error prevents ty from determining a class's generic context, specializing the class
+can emit a cascading `not-subscriptable` diagnostic.
 
 ### Conditional typing compatibility imports
 
-Libraries commonly support multiple Python versions by importing generic machinery from either
-`typing_extensions` or `typing`. The resulting union currently prevents ty from constructing a
-generic context, but either runtime branch creates a generic class.
+Libraries support multiple Python versions by importing generic machinery from either
+`typing_extensions` or `typing`. ty does not yet recognize the resulting union as the corresponding
+typing special form.
 
 ```py
 try:
@@ -179,10 +178,12 @@ except ImportError:
 
 T = typing.TypeVar("T")
 
-# error: [invalid-argument-type]
-class Parser(typing.Protocol, typing.Generic[T]): ...
+# TODO: Fix the conditional typing import in https://github.com/astral-sh/ty/issues/1585.
+# error: [invalid-argument-type] "`typing_extensions.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
+class Parser(typing.Generic[T]): ...
 
-parser: Parser[int]
+# TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
+parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
 ```
 
 ### Decorated generic bases
@@ -193,40 +194,43 @@ subclass that forwards type variables to that base remains possibly generic.
 ```py
 import collections.abc
 from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
 
 K = TypeVar("K")
 V = TypeVar("V")
 
-# error: [unresolved-attribute]
+# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
 @collections.abc.Mapping.register
 class Mapping(Generic[K, V]): ...
 
+# TODO: Invalid decorator causes us to lose the generic context from the class...
+reveal_type(generic_context(Mapping))  # revealed: None
+
 class FrozenDict(Mapping[K, V]): ...
 
+# TODO: ...which then causes us to emit this
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
 mapping: FrozenDict[str, int]
 ```
 
 ### Unresolved generic bases
-
-An unresolved base can still be generic at runtime. A type variable in the base specialization is
-enough evidence to avoid claiming that the subclass is definitely non-generic.
 
 ```py
 from typing import TypeVar
 
 from missing import Base  # error: [unresolved-import]
 
+reveal_type(Base)  # revealed: Unknown
+
 T = TypeVar("T")
 
 class Child(Base[T]): ...
 
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
 child: Child[int]
 ```
 
 ### Conditional generic bases
-
-When every possible base is generic, the subclass is possibly generic even if ty does not yet
-support a union of class-literal bases.
 
 `base1.py`:
 
@@ -261,6 +265,7 @@ T = TypeVar("T")
 # error: [unsupported-base]
 class Child(Base[T]): ...
 
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
 child: Child[int]
 ```
 
