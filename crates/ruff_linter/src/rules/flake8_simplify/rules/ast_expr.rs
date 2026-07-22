@@ -19,7 +19,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// Furthermore, `os.environ` behaves differently across platforms. On Windows,
 /// `os.environ` automatically converts environment variable names to uppercase.
 /// This means that if you define a lowercase environment variable (e.g., `foo=1`),
-/// looking it up or iterating over `os.environ` will yield `FOO` on Windows, but
+/// iterating over `os.environ` will yield `FOO` on Windows, but
 /// `foo` on Linux and macOS. This can lead to subtle bugs in cross-platform code
 /// if it assumes environment variables preserve their original case.
 ///
