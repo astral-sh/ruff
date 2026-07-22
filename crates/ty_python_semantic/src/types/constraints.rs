@@ -6673,51 +6673,54 @@ impl PathAssignments {
         match node.node() {
             Node::AlwaysTrue if negated => visitor.visit_unsatisfied(Some(self)),
             Node::AlwaysTrue => visitor.visit_satisfied(Some(self)),
+
             Node::AlwaysFalse if negated => visitor.visit_satisfied(Some(self)),
             Node::AlwaysFalse => visitor.visit_unsatisfied(Some(self)),
+
             Node::Interior(interior) => {
                 let interior_value = visitor.enter_interior(interior)?;
                 let interior = builder.interior_node_data(node);
+
                 let true_subtree = if negated {
                     interior.if_true.or(builder, interior.if_uncertain)
                 } else {
                     interior.if_true
                 };
-                let if_true = self
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_true(),
-                        interior.source_order,
-                        |path, new_range| {
-                            let subtree =
-                                path.visit_inner(db, builder, true_subtree, visitor, negated);
-                            match subtree {
-                                ControlFlow::Continue(subtree) => {
-                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
-                                }
-                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                let if_true = self.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_true(),
+                    interior.source_order,
+                    |path, new_range, found_conflict| {
+                        let subtree = if found_conflict {
+                            visitor.visit_impossible()
+                        } else {
+                            path.visit_inner(db, builder, true_subtree, visitor, negated)
+                        };
+                        match subtree {
+                            ControlFlow::Continue(subtree) => {
+                                visitor.visit_edge(&interior_value, subtree, path, new_range)
                             }
-                        },
-                    )
-                    .unwrap_or_else(|| visitor.visit_impossible())?;
+                            ControlFlow::Break(b) => ControlFlow::Break(b),
+                        }
+                    },
+                )?;
 
                 let if_uncertain = if negated {
-                    visitor.visit_impossible()?
+                    let subtree = visitor.visit_impossible()?;
+                    visitor.visit_edge(&interior_value, subtree, self, 0..0)?
                 } else {
                     self.walk_edge(
                         db,
                         builder,
                         interior.constraint.when_unconstrained(),
                         interior.source_order,
-                        |path, new_range| {
-                            let subtree = path.visit_inner(
-                                db,
-                                builder,
-                                interior.if_uncertain,
-                                visitor,
-                                false,
-                            );
+                        |path, new_range, found_conflict| {
+                            let subtree = if found_conflict {
+                                visitor.visit_impossible()
+                            } else {
+                                path.visit_inner(db, builder, interior.if_uncertain, visitor, false)
+                            };
                             match subtree {
                                 ControlFlow::Continue(subtree) => {
                                     visitor.visit_edge(&interior_value, subtree, path, new_range)
@@ -6725,8 +6728,7 @@ impl PathAssignments {
                                 ControlFlow::Break(b) => ControlFlow::Break(b),
                             }
                         },
-                    )
-                    .unwrap_or_else(|| visitor.visit_impossible())?
+                    )?
                 };
 
                 let false_subtree = if negated {
@@ -6734,24 +6736,25 @@ impl PathAssignments {
                 } else {
                     interior.if_false
                 };
-                let if_false = self
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_false(),
-                        interior.source_order,
-                        |path, new_range| {
-                            let subtree =
-                                path.visit_inner(db, builder, false_subtree, visitor, negated);
-                            match subtree {
-                                ControlFlow::Continue(subtree) => {
-                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
-                                }
-                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                let if_false = self.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_false(),
+                    interior.source_order,
+                    |path, new_range, found_conflict| {
+                        let subtree = if found_conflict {
+                            visitor.visit_impossible()
+                        } else {
+                            path.visit_inner(db, builder, false_subtree, visitor, negated)
+                        };
+                        match subtree {
+                            ControlFlow::Continue(subtree) => {
+                                visitor.visit_edge(&interior_value, subtree, path, new_range)
                             }
-                        },
-                    )
-                    .unwrap_or_else(|| visitor.visit_impossible())?;
+                            ControlFlow::Break(b) => ControlFlow::Break(b),
+                        }
+                    },
+                )?;
 
                 visitor.leave_interior(&interior_value, if_true, if_uncertain, if_false)
             }
@@ -6786,8 +6789,8 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
-        f: impl FnOnce(&mut Self, Range<usize>) -> R,
-    ) -> Option<R> {
+        f: impl FnOnce(&mut Self, Range<usize>, bool) -> R,
+    ) -> R {
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
@@ -6810,19 +6813,10 @@ impl PathAssignments {
         debug_assert!(self.assignment_queue.is_empty());
         self.assignment_queue
             .push_back((assignment, AssignmentFuel::origin()));
-        let found_conflict = self.drain_assignment_queue(db, builder, source_order);
-        let result = if found_conflict.is_err() {
-            // If that results in the path now being impossible due to a contradiction, return
-            // without invoking the callback, and clear any other assignments that were enqueued to
-            // be added to the path.
-            self.assignment_queue.clear();
-            None
-        } else {
-            // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
-            // traverse additional edges, which might add more to our `assignments` set. But even
-            // if that happens, `start..end` will mark the assignments that were added by the
-            // `add_assignment` call above — that is, the new assignment for this edge along with
-            // the derived information we inferred from it.
+        let found_conflict = self
+            .drain_assignment_queue(db, builder, source_order)
+            .is_err();
+        if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
@@ -6833,12 +6827,18 @@ impl PathAssignments {
                 ),
                 "new assignments",
             );
-            let end = self.assignments.len();
-            Some(f(self, start..end))
-        };
+        }
+        // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
+        // traverse additional edges, which might add more to our `assignments` set. But even
+        // if that happens, `start..end` will mark the assignments that were added by the
+        // `add_assignment` call above — that is, the new assignment for this edge along with
+        // the derived information we inferred from it.
+        let end = self.assignments.len();
+        let result = f(self, start..end, found_conflict);
 
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
+        self.assignment_queue.clear();
         self.assignments.truncate(start);
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
