@@ -490,23 +490,21 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
-    // Expand an optional enum before its peer's members to avoid repeatedly expanding the enum.
-    // Other unions must retain their normal evaluation order, especially around dynamic operands.
+    // Expand a union containing its enum peer before expanding that enum into individual members.
+    // Gradual unions must retain their normal evaluation order to preserve dynamic narrowing.
     match (left, right) {
         (Type::Union(union), other)
             if other.is_enum(db)
-                && union.elements(db).len() == 2
                 && union.elements(db).contains(&other)
-                && union.elements(db).iter().any(|element| element.is_none(db))
+                && !left.has_dynamic(db)
                 && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
         {
             return evaluate_union_left(evaluator, union.elements(db), other, branch, operator);
         }
         (other, Type::Union(union))
             if other.is_enum(db)
-                && union.elements(db).len() == 2
                 && union.elements(db).contains(&other)
-                && union.elements(db).iter().any(|element| element.is_none(db))
+                && !right.has_dynamic(db)
                 && KnownComparisonSemantics::of_type(db, other, operator).is_some() =>
         {
             return evaluate_union_right(evaluator, other, union.elements(db), branch, operator);

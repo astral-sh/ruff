@@ -185,6 +185,30 @@ def compare_optional_right(left: Choice, right: Choice | None):
         reveal_type(left)  # revealed: Choice
         reveal_type(right)  # revealed: Choice | None
 
+def compare_mixed_union_left(left: Choice | int, right: Choice):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice | int
+        reveal_type(right)  # revealed: Choice
+
+def compare_mixed_union_right(left: Choice, right: Choice | int):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice | int
+
+def compare_multi_arm_union(left: Choice | int | None, right: Choice):
+    if left != right:
+        reveal_type(left)  # revealed: Choice | int | None
+        reveal_type(right)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice
+        reveal_type(right)  # revealed: Choice
+
 def compare_optional_singleton(left: Choice | None, right: Literal[Choice.FIRST]):
     if left == right:
         reveal_type(left)  # revealed: Literal[Choice.FIRST]
@@ -1514,6 +1538,16 @@ def gradual_enum_union(value: Color | Any, other: Color | None):
     if value != other:
         reveal_type(value)  # revealed: Color | Any
         assert_type(value, Color | Any)
+
+def gradual_enum_union_against_enum(value: Color | Any, other: Color):
+    if value == other:
+        reveal_type(value)  # revealed: Color | Any
+        assert_type(value, Color | Any)
+
+def custom_equality_enum_union(value: NonReflexive | int, other: NonReflexive):
+    if value == other:
+        reveal_type(value)  # revealed: NonReflexive | int
+        reveal_type(other)  # revealed: NonReflexive
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
