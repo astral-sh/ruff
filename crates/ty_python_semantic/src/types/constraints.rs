@@ -7707,8 +7707,7 @@ mod tests {
             &builder,
             || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
         );
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = InferableTypeVars::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7742,10 +7741,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, u, int, int)
             });
-        let inferable = InferableTypeVars::from_typevars(
-            &db,
-            [t.identity(&db), u.identity(&db)].into_iter().collect(),
-        );
+        let inferable = InferableTypeVars::from_typevars(&db, [t, u]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7784,8 +7780,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, t, str, str)
             });
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = InferableTypeVars::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7959,13 +7954,7 @@ mod tests {
         build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
         expected: impl IntoIterator<Item = &'static str>,
     ) {
-        let inferable = InferableTypeVars::from_typevars(
-            db,
-            typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect(),
-        );
+        let inferable = InferableTypeVars::from_typevars(db, typevars.iter().copied());
         let mut signatures = FxIndexSet::default();
 
         for constraint_order in (0..atoms.len()).permutations(atoms.len()) {

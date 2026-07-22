@@ -5,7 +5,7 @@
 - [x] PR 0's C0/E1–E6 behavior basis already exists on the parent stack.
 - [x] PR 1B's visitor-driven `PathAssignments` implementation is already merged into `main`.
 - [x] Phase 1 — Introduce single-variant `Atom` as a standalone, pure-refactoring PR.
-- [ ] Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances.
+- [x] Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances.
 - [ ] Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end.
 
 This document is the ground truth for phase ordering and dependencies. Phases should normally be completed in the order listed. An agent resuming this plan must read the relevant repository files and verify that the status markers accurately reflect the implementation before continuing.
@@ -198,7 +198,7 @@ free interface = {Y}
 
 ## Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances
 
-**Status:** pending.
+**Status:** complete.
 
 **Dependency:** Phase 1 in the implementation stack; this representation change is logically independent of the pure `Atom::Range` refactoring and should likewise be independently reviewable as a behavior-preserving prerequisite PR.
 
@@ -212,6 +212,8 @@ free interface = {Y}
 1. Run the existing quantification and ordering mdtests without changing their expected behavior. Keep `ConstraintSetStorage`, `OwnedConstraintSetInner`, `Atom`, and existing existential-abstraction algorithms unchanged.
 
 **Exit criteria:** `InferableTypeVars` retains actual bound instances while preserving its existing identity-based membership, ordering, first-wins deduplication, laziness, Salsa/cache behavior, and observable inference results; no new existential-specific methods or domain computations have been introduced; the revision is independently mergeable as a pure refactor.
+
+**Validation note:** the focused inferable-typevar unit tests, quantification and constraint-ordering mdtests, and full `ty_python_semantic` suite pass (769 passed, 35 skipped). No snapshot expectations changed.
 
 ## Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end
 
