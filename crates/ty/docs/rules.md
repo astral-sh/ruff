@@ -150,13 +150,18 @@ python-version = "3.11"
 from typing import assert_type
 
 
-def _(x: int):
-    assert_type(x, int)  # fine
-    if x:
-        # the actual type is `int & ~AlwaysFalsy`,
-        # which excludes types like `Literal[0]`
+class A: ...
+
+
+class B: ...
+
+
+def _(x: A):
+    assert_type(x, A)  # fine
+    if isinstance(x, B):
+        # the actual type is `A & B`
         # error: [assert-type-unspellable-subtype]
-        assert_type(x, int)
+        assert_type(x, A)
 ```
 
 ## `blanket-ignore-comment`
