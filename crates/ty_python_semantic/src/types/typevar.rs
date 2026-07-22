@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::fmt::Display;
 use std::rc::Rc;
 
 use itertools::{Either, Itertools};
@@ -1597,7 +1596,7 @@ impl<'db> TypeVarSet<'db> {
 
     // Keep this around for debugging purposes
     #[cfg_attr(not(test), expect(dead_code))]
-    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(self, db: &'db dyn Db) -> String {
         format!(
             "[{}]",
             self.iter(db)
@@ -2001,7 +2000,7 @@ mod tests {
         assert_eq!(merged, TypeVarSet::from_typevars(&db, [lazy, u, v]));
         assert!(lazy.is_inferable(&db, merged));
         assert!(eager.is_inferable(&db, merged));
-        assert_eq!(merged.display(&db).to_string(), "[T, U, V]");
+        assert_eq!(merged.display(&db), "[T, U, V]");
 
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(&db, "lazy_bound_unchecked", None, &events);
