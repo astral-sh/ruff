@@ -1069,3 +1069,21 @@ select = ["D100"]
 #!/usr/bin/env python
 # ruff:ignore[D100]
 ```
+
+## Empty diagnostic range before a shebang with a trailing ignore
+
+A trailing ignore on the first line after a shebang should suppress diagnostics with an empty range
+at offset zero, as with `noqa`.
+
+```toml
+[lint]
+preview = true
+select = ["CPY001", "D100", "RUF100"]
+```
+
+```py
+#!/usr/bin/env python3
+from __future__ import annotations  # ruff:ignore[missing-copyright-notice, undocumented-public-module]
+
+from importlib.metadata import version as get_version
+```

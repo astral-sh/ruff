@@ -872,25 +872,23 @@ impl<'a> SuppressionsBuilder<'a> {
             SuppressionAction::Ignore => {
                 if is_ruff_ignore_enabled(self.settings) {
                     let (before, after) = tokens.split_at(suppression.token_range.start());
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                    let mut range = if indentation_at_offset(suppression.range.start(), self.source)
                         .is_some()
                     {
                         // own-line ignore
-                        let mut range =
-                            Self::standalone_comment_range(suppression.range, before, after);
-
-                        // Allow an ignore to suppress diagnostics on a leading shebang.
-                        if let Some(shebang) = leading_shebang_range(self.source, tokens)
-                            && shebang.end() == self.source.line_start(suppression.range.start())
-                        {
-                            range = shebang.cover(range);
-                        }
-
-                        range
+                        Self::standalone_comment_range(suppression.range, before, after)
                     } else {
                         // trailing ignore
                         self.trailing_comment_range(suppression.token_range, before)
                     };
+
+                    // Allow an ignore to suppress diagnostics on a leading shebang.
+                    if let Some(shebang) = leading_shebang_range(self.source, tokens)
+                        && shebang.end() == self.source.line_start(suppression.range.start())
+                    {
+                        range = shebang.cover(range);
+                    }
+
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {
                             code: code.into(),
