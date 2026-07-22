@@ -2651,7 +2651,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Returns common protocol constraints for a union containing only `TypedDict`s when every
+    /// Returns common protocol constraints for the `TypedDict` members of a union when every such
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
         &self,
@@ -2664,6 +2664,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
+            other_types: &mut FxOrderSet<Type<'db>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
@@ -2680,7 +2681,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return false;
                     }
                     let result = union.elements(db).iter().all(|element| {
-                        collect_typed_dicts(db, *element, resolving, completed, typed_dicts)
+                        collect_typed_dicts(
+                            db,
+                            *element,
+                            resolving,
+                            completed,
+                            typed_dicts,
+                            other_types,
+                        )
                     });
                     resolving.remove(&ty);
                     result
@@ -2696,7 +2704,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     typed_dicts.insert(ty);
                     true
                 }
-                _ => false,
+                _ => {
+                    other_types.insert(ty);
+                    true
+                }
             };
             completed.insert(ty, result);
             result
@@ -2705,6 +2716,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
+        let mut other_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
                 self.db,
@@ -2712,8 +2724,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &mut resolving,
                 &mut completed,
                 &mut typed_dicts,
+                &mut other_types,
             )
         }) {
+            return None;
+        }
+        if typed_dicts.is_empty() {
             return None;
         }
 
@@ -2724,18 +2740,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
         let mapping_when = self.constraints.load(self.db, &mapping_when);
-        typed_dicts
-            .into_iter()
-            .all(|element| {
-                let element_when = self.constraints.load(
-                    self.db,
-                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                );
-                element_when
-                    .iff(self.db, self.constraints, mapping_when)
-                    .is_always_satisfied(self.db)
-            })
-            .then_some(mapping_when)
+        if !typed_dicts.into_iter().all(|element| {
+            let element_when = self.constraints.load(
+                self.db,
+                &element.when_constraint_set_assignable_to_owned(self.db, formal),
+            );
+            element_when
+                .iff(self.db, self.constraints, mapping_when)
+                .is_always_satisfied(self.db)
+        }) {
+            return None;
+        }
+
+        Some(mapping_when.and(self.db, self.constraints, || {
+            other_types
+                .into_iter()
+                .when_all(self.db, self.constraints, |element| {
+                    self.constraints.load(
+                        self.db,
+                        &element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    )
+                })
+        }))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
