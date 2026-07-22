@@ -647,10 +647,7 @@ impl<'db> Conjunctions<'db> {
         self.conjuncts
             .into_iter()
             .fold(Type::object(), |accumulated, conjunct| {
-                IntersectionBuilder::new(db)
-                    .add_positive(accumulated)
-                    .add_positive(conjunct)
-                    .build()
+                IntersectionType::from_two_elements(db, accumulated, conjunct)
             })
     }
 }
