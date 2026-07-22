@@ -5202,6 +5202,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .map(|inference| inference.specialization(self.db))
     }
 
+    /// Yields the formal and actual type for every matched argument-parameter pair.
+    ///
+    /// Gradual variadic parameters are omitted, and unpacked homogeneous tuple annotations are
+    /// normalized to the element type expected for each matched argument.
     fn argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + '_ {
         self.enumerate_argument_types().flat_map(
             move |(argument_index, adjusted_argument_index, _, argument_types)| {
@@ -5242,10 +5246,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         )
     }
 
+    /// Yields only argument relations containing an inferable type variable on either side.
     fn inference_argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + '_ {
         self.argument_relations().filter(|relation| {
             inferable_typevar_occurrences(self.db, relation.declared_type, self.inferable_typevars)
                 > 0
+                || inferable_typevar_occurrences(
+                    self.db,
+                    relation.argument_type,
+                    self.inferable_typevars,
+                ) > 0
         })
     }
 
