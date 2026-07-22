@@ -3569,8 +3569,10 @@ impl<'db> PathBounds<'db> {
             type Result = ();
             type Break = Infallible;
 
-            fn satisfied(
+            fn satisfied<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 let mut path: Vec<_> = path.positive_constraints().collect();
@@ -3579,22 +3581,28 @@ impl<'db> PathBounds<'db> {
                 ControlFlow::Continue(())
             }
 
-            fn unsatisfied(
+            fn unsatisfied<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn impossible(
+            fn impossible<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(())
             }
 
-            fn combine(
+            fn combine<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _if_true: Self::Result,
                 _if_uncertain: Self::Result,
                 _if_false: Self::Result,
@@ -4259,12 +4267,11 @@ impl InteriorNode {
             Remove,
         }
 
-        struct AbstractVisitor<'b, 'db, F> {
-            builder: &'b ConstraintSetBuilder<'db>,
+        struct AbstractVisitor<F> {
             should_remove: F,
         }
 
-        impl<F> PathVisitor for AbstractVisitor<'_, '_, F>
+        impl<F> PathVisitor for AbstractVisitor<F>
         where
             F: FnMut(ConstraintId) -> bool,
         {
@@ -4272,32 +4279,40 @@ impl InteriorNode {
             type Interior = (Disposition, ConstraintId, usize);
             type Break = Infallible;
 
-            fn visit_satisfied(
+            fn visit_satisfied<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_TRUE)
             }
 
-            fn visit_unsatisfied(
+            fn visit_unsatisfied<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_FALSE)
             }
 
-            fn visit_impossible(
+            fn visit_impossible<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
                 _path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
                 ControlFlow::Continue(ALWAYS_FALSE)
             }
 
-            fn enter_interior(
+            fn enter_interior<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
                 interior: InteriorNode,
             ) -> ControlFlow<Self::Break, Self::Interior> {
-                let interior = self.builder.interior_node_data(interior.node());
+                let interior = builder.interior_node_data(interior.node());
                 let disposition = if (self.should_remove)(interior.constraint) {
                     Disposition::Remove
                 } else {
@@ -4306,8 +4321,10 @@ impl InteriorNode {
                 ControlFlow::Continue((disposition, interior.constraint, interior.source_order))
             }
 
-            fn visit_edge(
+            fn visit_edge<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
                 interior: &Self::Interior,
                 subtree: Self::Result,
                 path: &PathAssignments,
@@ -4335,9 +4352,9 @@ impl InteriorNode {
                                 })
                                 .fold(subtree, |subtree, (assignment, (source_order, _))| {
                                     subtree.and(
-                                        self.builder,
+                                        builder,
                                         Node::new_satisfied_constraint(
-                                            self.builder,
+                                            builder,
                                             *assignment,
                                             *source_order,
                                         ),
@@ -4348,8 +4365,10 @@ impl InteriorNode {
                 }
             }
 
-            fn leave_interior(
+            fn leave_interior<'db>(
                 &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
                 interior: &Self::Interior,
                 if_true: Self::Result,
                 if_uncertain: Self::Result,
@@ -4366,11 +4385,11 @@ impl InteriorNode {
                     // derived constraints into the result, and those constraints might appear before this
                     // one in the BDD ordering.
                     Disposition::Keep => {
-                        let guard = Node::new_constraint(self.builder, *constraint, *source_order);
+                        let guard = Node::new_constraint(builder, *constraint, *source_order);
                         ControlFlow::Continue(guard.ite(
-                            self.builder,
-                            if_true.or(self.builder, if_uncertain),
-                            if_false.or(self.builder, if_uncertain),
+                            builder,
+                            if_true.or(builder, if_uncertain),
+                            if_false.or(builder, if_uncertain),
                         ))
                     }
 
@@ -4379,19 +4398,14 @@ impl InteriorNode {
                     // this node's constraint that is true. (We will have already added any
                     // necessary derived facts in the `visit_edge` method.)
                     Disposition::Remove => ControlFlow::Continue(
-                        if_true
-                            .or(self.builder, if_uncertain)
-                            .or(self.builder, if_false),
+                        if_true.or(builder, if_uncertain).or(builder, if_false),
                     ),
                 }
             }
         }
 
         let mut path = self.path_assignments(builder);
-        let mut visitor = AbstractVisitor {
-            builder,
-            should_remove,
-        };
+        let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, builder, self.node(), &mut visitor);
         result
     }
@@ -6334,14 +6348,20 @@ trait PathVisitor {
     /// Called when we reach the end of a satisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
-    fn visit_satisfied(&mut self, path: &PathAssignments)
-    -> ControlFlow<Self::Break, Self::Result>;
+    fn visit_satisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Called when we reach the end of an unsatisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
-    fn visit_unsatisfied(
+    fn visit_unsatisfied<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
@@ -6349,8 +6369,10 @@ trait PathVisitor {
     /// contradict each other, or because an edge is structurally absent (such as the uncertain
     /// edge when visiting a negated BDD). The `Result` value that you return will be propagated
     /// back up as we "unwind" this path.
-    fn visit_impossible(
+    fn visit_impossible<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result>;
 
@@ -6358,16 +6380,20 @@ trait PathVisitor {
     /// [`Interior`][Self::Interior] value that will be passed to the
     /// [`visit_edge`][Self::visit_edge] and [`leave_interior`][Self::leave_interior] methods
     /// when we call them for this node.
-    fn enter_interior(
+    fn enter_interior<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         interior_node: InteriorNode,
     ) -> ControlFlow<Self::Break, Self::Interior>;
 
     /// Called once for each edge in the BDD. You are given the [`Result`][Self::Result] value
     /// of the subtree that the edge points to, as well as the origin and derived assignments that
     /// are added by the edge.
-    fn visit_edge(
+    fn visit_edge<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         interior_value: &Self::Interior,
         subtree: Self::Result,
         path: &PathAssignments,
@@ -6376,8 +6402,10 @@ trait PathVisitor {
 
     /// Called on the way back up as we leave each interior node in the BDD. Combines the
     /// [`Result`][Self::Result] values for each of the interior node's subtrees.
-    fn leave_interior(
+    fn leave_interior<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         interior_value: &Self::Interior,
         if_true: Self::Result,
         if_uncertain: Self::Result,
@@ -6395,18 +6423,35 @@ trait PathFold {
     type Break;
 
     /// Returns the base case value that represents a satisfied path.
-    fn satisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
+    fn satisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Returns the base case value that represents an unsatisfied path.
-    fn unsatisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
+    fn unsatisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Returns the base case value that represents an impossible path.
-    fn impossible(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result>;
+    fn impossible<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
 
     /// Combines the values for each subtree of an interior node, returning a value that represents
     /// the subtree rooted at that node.
-    fn combine(
+    fn combine<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         if_true: Self::Result,
         if_uncertain: Self::Result,
         if_false: Self::Result,
@@ -6421,36 +6466,46 @@ where
     type Interior = ();
     type Break = <T as PathFold>::Break;
 
-    fn visit_satisfied(
+    fn visit_satisfied<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::satisfied(self, path)
+        PathFold::satisfied(self, db, builder, path)
     }
 
-    fn visit_unsatisfied(
+    fn visit_unsatisfied<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::unsatisfied(self, path)
+        PathFold::unsatisfied(self, db, builder, path)
     }
 
-    fn visit_impossible(
+    fn visit_impossible<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::impossible(self, path)
+        PathFold::impossible(self, db, builder, path)
     }
 
-    fn enter_interior(
+    fn enter_interior<'db>(
         &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         _interior_node: InteriorNode,
     ) -> ControlFlow<Self::Break, Self::Interior> {
         ControlFlow::Continue(())
     }
 
-    fn visit_edge(
+    fn visit_edge<'db>(
         &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         _interior_value: &Self::Interior,
         subtree: Self::Result,
         _path: &PathAssignments,
@@ -6459,14 +6514,16 @@ where
         ControlFlow::Continue(subtree)
     }
 
-    fn leave_interior(
+    fn leave_interior<'db>(
         &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         _interior_value: &Self::Interior,
         if_true: Self::Result,
         if_uncertain: Self::Result,
         if_false: Self::Result,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::combine(self, if_true, if_uncertain, if_false)
+        PathFold::combine(self, db, builder, if_true, if_uncertain, if_false)
     }
 }
 
@@ -6479,20 +6536,37 @@ impl PathFold for IsNeverSatisfiedVisitor {
     type Result = ();
     type Break = ();
 
-    fn satisfied(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
+    fn satisfied<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
         ControlFlow::Break(())
     }
 
-    fn unsatisfied(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn impossible(&mut self, _path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn combine(
+    fn unsatisfied<'db>(
         &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn impossible<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn combine<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         _if_true: Self::Result,
         _if_uncertain: Self::Result,
         _if_false: Self::Result,
@@ -6664,14 +6738,14 @@ impl PathAssignments {
         V: PathVisitor,
     {
         match node.node() {
-            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(self),
-            Node::AlwaysTrue => visitor.visit_satisfied(self),
+            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(db, builder, self),
+            Node::AlwaysTrue => visitor.visit_satisfied(db, builder, self),
 
-            Node::AlwaysFalse if negated => visitor.visit_satisfied(self),
-            Node::AlwaysFalse => visitor.visit_unsatisfied(self),
+            Node::AlwaysFalse if negated => visitor.visit_satisfied(db, builder, self),
+            Node::AlwaysFalse => visitor.visit_unsatisfied(db, builder, self),
 
             Node::Interior(interior) => {
-                let interior_value = visitor.enter_interior(interior)?;
+                let interior_value = visitor.enter_interior(db, builder, interior)?;
                 let interior = builder.interior_node_data(node);
 
                 let true_subtree = if negated {
@@ -6686,22 +6760,27 @@ impl PathAssignments {
                     interior.source_order,
                     |path, new_range, found_conflict| {
                         let subtree = if found_conflict {
-                            visitor.visit_impossible(path)
+                            visitor.visit_impossible(db, builder, path)
                         } else {
                             path.visit_inner(db, builder, true_subtree, visitor, negated)
                         };
                         match subtree {
-                            ControlFlow::Continue(subtree) => {
-                                visitor.visit_edge(&interior_value, subtree, path, new_range)
-                            }
+                            ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                db,
+                                builder,
+                                &interior_value,
+                                subtree,
+                                path,
+                                new_range,
+                            ),
                             ControlFlow::Break(b) => ControlFlow::Break(b),
                         }
                     },
                 )?;
 
                 let if_uncertain = if negated {
-                    let subtree = visitor.visit_impossible(self)?;
-                    visitor.visit_edge(&interior_value, subtree, self, 0..0)?
+                    let subtree = visitor.visit_impossible(db, builder, self)?;
+                    visitor.visit_edge(db, builder, &interior_value, subtree, self, 0..0)?
                 } else {
                     self.walk_edge(
                         db,
@@ -6710,14 +6789,19 @@ impl PathAssignments {
                         interior.source_order,
                         |path, new_range, found_conflict| {
                             let subtree = if found_conflict {
-                                visitor.visit_impossible(path)
+                                visitor.visit_impossible(db, builder, path)
                             } else {
                                 path.visit_inner(db, builder, interior.if_uncertain, visitor, false)
                             };
                             match subtree {
-                                ControlFlow::Continue(subtree) => {
-                                    visitor.visit_edge(&interior_value, subtree, path, new_range)
-                                }
+                                ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                    db,
+                                    builder,
+                                    &interior_value,
+                                    subtree,
+                                    path,
+                                    new_range,
+                                ),
                                 ControlFlow::Break(b) => ControlFlow::Break(b),
                             }
                         },
@@ -6736,20 +6820,32 @@ impl PathAssignments {
                     interior.source_order,
                     |path, new_range, found_conflict| {
                         let subtree = if found_conflict {
-                            visitor.visit_impossible(path)
+                            visitor.visit_impossible(db, builder, path)
                         } else {
                             path.visit_inner(db, builder, false_subtree, visitor, negated)
                         };
                         match subtree {
-                            ControlFlow::Continue(subtree) => {
-                                visitor.visit_edge(&interior_value, subtree, path, new_range)
-                            }
+                            ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                db,
+                                builder,
+                                &interior_value,
+                                subtree,
+                                path,
+                                new_range,
+                            ),
                             ControlFlow::Break(b) => ControlFlow::Break(b),
                         }
                     },
                 )?;
 
-                visitor.leave_interior(&interior_value, if_true, if_uncertain, if_false)
+                visitor.leave_interior(
+                    db,
+                    builder,
+                    &interior_value,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                )
             }
         }
     }
@@ -8284,12 +8380,11 @@ mod tests {
 
     /// A path fold that reconstructs a constraint set from its satisfied paths and can abort at
     /// a specified callback.
-    struct ReconstructPathFold<'b, 'db> {
-        builder: &'b ConstraintSetBuilder<'db>,
+    struct ReconstructPathFold {
         break_at: Option<PathFoldBreak>,
     }
 
-    impl ReconstructPathFold<'_, '_> {
+    impl ReconstructPathFold {
         fn result(&self, at: PathFoldBreak, result: NodeId) -> ControlFlow<PathFoldBreak, NodeId> {
             if self.break_at == Some(at) {
                 ControlFlow::Break(at)
@@ -8299,46 +8394,55 @@ mod tests {
         }
     }
 
-    impl PathFold for ReconstructPathFold<'_, '_> {
+    impl PathFold for ReconstructPathFold {
         type Result = NodeId;
         type Break = PathFoldBreak;
 
-        fn satisfied(&mut self, path: &PathAssignments) -> ControlFlow<Self::Break, Self::Result> {
+        fn satisfied<'db>(
+            &mut self,
+            _db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
             let result = path.assignments.iter().fold(
                 ALWAYS_TRUE,
                 |result, (assignment, (source_order, _))| {
                     result.and(
-                        self.builder,
-                        Node::new_satisfied_constraint(self.builder, *assignment, *source_order),
+                        builder,
+                        Node::new_satisfied_constraint(builder, *assignment, *source_order),
                     )
                 },
             );
             self.result(PathFoldBreak::Satisfied, result)
         }
 
-        fn unsatisfied(
+        fn unsatisfied<'db>(
             &mut self,
+            _db: &'db dyn Db,
+            _builder: &ConstraintSetBuilder<'db>,
             _path: &PathAssignments,
         ) -> ControlFlow<Self::Break, Self::Result> {
             self.result(PathFoldBreak::Unsatisfied, ALWAYS_FALSE)
         }
 
-        fn impossible(
+        fn impossible<'db>(
             &mut self,
+            _db: &'db dyn Db,
+            _builder: &ConstraintSetBuilder<'db>,
             _path: &PathAssignments,
         ) -> ControlFlow<Self::Break, Self::Result> {
             self.result(PathFoldBreak::Impossible, ALWAYS_FALSE)
         }
 
-        fn combine(
+        fn combine<'db>(
             &mut self,
+            _db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
             if_true: Self::Result,
             if_uncertain: Self::Result,
             if_false: Self::Result,
         ) -> ControlFlow<Self::Break, Self::Result> {
-            let result = if_true
-                .or(self.builder, if_uncertain)
-                .or(self.builder, if_false);
+            let result = if_true.or(builder, if_uncertain).or(builder, if_false);
             self.result(PathFoldBreak::Combine, result)
         }
     }
@@ -8395,10 +8499,7 @@ mod tests {
             transitive,
         ] {
             let mut path = path_assignments_for(&builder, set.node);
-            let mut fold = ReconstructPathFold {
-                builder: &builder,
-                break_at: None,
-            };
+            let mut fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue(reconstructed) =
                 path.visit(&db, &builder, set.node, &mut fold)
             else {
@@ -8433,7 +8534,6 @@ mod tests {
         ] {
             let mut path = path_assignments_for(&builder, set.node);
             let mut aborting_fold = ReconstructPathFold {
-                builder: &builder,
                 break_at: Some(break_at),
             };
             assert_eq!(
@@ -8441,10 +8541,7 @@ mod tests {
                 ControlFlow::Break(break_at)
             );
 
-            let mut completing_fold = ReconstructPathFold {
-                builder: &builder,
-                break_at: None,
-            };
+            let mut completing_fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue(reconstructed) =
                 path.visit(&db, &builder, set.node, &mut completing_fold)
             else {
