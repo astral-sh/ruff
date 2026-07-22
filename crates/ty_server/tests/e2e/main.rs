@@ -126,9 +126,6 @@ pub(crate) enum AwaitResponseError {
     #[error("request failed because the server replied with an error: {0:?}")]
     RequestFailed(ResponseError),
 
-    #[error("malformed response message with both result and error: {0:#?}")]
-    MalformedResponse(Box<Response>),
-
     #[error("received multiple responses for the same request ID: {0:#?}")]
     MultipleResponses(Box<[Response]>),
 
@@ -477,23 +474,12 @@ impl TestServer {
 
                 let response = responses.pop().unwrap();
 
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
+                    Err(err) => {
                         return Err(AwaitResponseError::RequestFailed(err));
-                    }
-                    response => {
-                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
