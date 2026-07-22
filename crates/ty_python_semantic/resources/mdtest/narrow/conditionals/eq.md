@@ -466,6 +466,22 @@ def _(value: Foo | Bar):
         reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
     else:
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+
+def compare_optional_integer_enum_left(left: Foo | None, right: Bar):
+    if left == right:
+        reveal_type(left)  # revealed: Foo
+        reveal_type(right)  # revealed: Bar
+    else:
+        reveal_type(left)  # revealed: Foo | None
+        reveal_type(right)  # revealed: Bar
+
+def compare_optional_integer_enum_right(left: Foo, right: Bar | None):
+    if left == right:
+        reveal_type(left)  # revealed: Foo
+        reveal_type(right)  # revealed: Bar
+    else:
+        reveal_type(left)  # revealed: Foo
+        reveal_type(right)  # revealed: Bar | None
 ```
 
 `StrEnum` domains from different classes are compared by their string values. Equality retains the
@@ -474,7 +490,7 @@ member. Exact member comparisons are true or false when both values are known:
 
 ```py
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal, TypeAlias
 
 class Left(StrEnum):
     A = "a"
@@ -485,6 +501,9 @@ class Right(StrEnum):
     SHARED = "shared"
     B = "b"
     D = "d"
+
+OptionalLeft: TypeAlias = Left | None
+OptionalRight: TypeAlias = Right | None
 
 reveal_type(Left.SHARED == Right.SHARED)  # revealed: Literal[True]
 reveal_type(Left.A == Right.B)  # revealed: Literal[False]
@@ -518,6 +537,127 @@ def compare_subsets(
     if left == right:
         reveal_type(left)  # revealed: Literal[Left.SHARED]
         reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+def compare_optional_cross_enum_left(left: Left | None, right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right
+
+def compare_optional_cross_enum_right(left: Left, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right | None
+
+def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+    else:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | None
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | None
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+
+def compare_optional_cross_enum_aliases(left: OptionalLeft, right: OptionalRight):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+
+def compare_mixed_cross_enum_residuals(left: Left | None, right: Right | int):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | int
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | int
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+def compare_reversed_mixed_cross_enum_residuals(left: Left | int, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left | int
+        reveal_type(right)  # revealed: Right | None
+
+def compare_overlapping_cross_enum_residual_left(left: Left | Literal["b"], right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED, "b"]
+        reveal_type(right)  # revealed: Literal[Right.SHARED, Right.B]
+    else:
+        reveal_type(left)  # revealed: Left | Literal["b"]
+        reveal_type(right)  # revealed: Right
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | Literal["b"]
+        reveal_type(right)  # revealed: Right
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED, "b"]
+        reveal_type(right)  # revealed: Literal[Right.SHARED, Right.B]
+
+def compare_overlapping_cross_enum_residual_right(left: Left, right: Right | Literal["a"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED, Left.A]
+        reveal_type(right)  # revealed: Literal[Right.SHARED, "a"]
+    else:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right | Literal["a"]
+
+def compare_nested_dynamic_cross_enum_residual(left: Left | dict[str, Any], right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left | dict[str, Any]
+        reveal_type(right)  # revealed: Right | None
+
+def compare_gradual_cross_enum_left(left: Left | Any, right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | Any
+        reveal_type(right)  # revealed: Right
+
+def compare_gradual_cross_enum_right(left: Left, right: Right | Any):
+    if left == right:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | Any
+
+def compare_optional_against_gradual_cross_enum(left: Left | None, right: Right | Any):
+    if left == right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | Any
+
+def compare_gradual_against_optional_cross_enum(left: Left | Any, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | Any
+        reveal_type(right)  # revealed: Right | None
+
+def compare_cross_enum_singletons_with_residuals(
+    left: Literal[Left.A, Left.SHARED] | None,
+    right: Literal[Right.SHARED, Right.B] | int,
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Literal[Left.A, Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED, Right.B] | int
 ```
 
 The same comparison-key projection applies when each operand spans several enum classes. This
@@ -526,6 +666,7 @@ comparisons:
 
 ```py
 from enum import IntEnum
+from typing import Literal
 
 class MixedLeft0(IntEnum):
     A = 0
@@ -577,6 +718,32 @@ def compare_mixed_domains(
 ):
     if left == right:
         reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
+
+def compare_mixed_domains_with_residuals(
+    left: MixedLeft0 | MixedLeft1 | None,
+    right: MixedRight0 | MixedRight1 | str,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
+    else:
+        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | None
+        reveal_type(right)  # revealed: MixedRight0 | MixedRight1 | str
+
+    if left != right:
+        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | None
+        reveal_type(right)  # revealed: MixedRight0 | MixedRight1 | str
+    else:
+        reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
+
+def compare_boolean_integer_enum_residual(left: MixedLeft1 | Literal[False], right: MixedRight0):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[False]
+        reveal_type(right)  # revealed: Literal[MixedRight0.A]
+    else:
+        reveal_type(left)  # revealed: MixedLeft1 | Literal[False]
         reveal_type(right)  # revealed: MixedRight0
 ```
 
@@ -674,6 +841,22 @@ class OpenLeft(StrEnum):
 def compare_open(left: OpenLeft, right: CustomRight):
     if left == right:
         reveal_type(left)  # revealed: OpenLeft
+
+def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomLeft
+        reveal_type(right)  # revealed: CustomRight
+    else:
+        reveal_type(left)  # revealed: CustomLeft | None
+        reveal_type(right)  # revealed: CustomRight
+
+def compare_optional_open(left: OpenLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
+        reveal_type(right)  # revealed: CustomRight
+    else:
+        reveal_type(left)  # revealed: OpenLeft | None
+        reveal_type(right)  # revealed: CustomRight
 ```
 
 The same narrowing applies when comparing enum members directly with their inherited integer or
