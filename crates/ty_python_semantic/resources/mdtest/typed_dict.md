@@ -2611,7 +2611,7 @@ python-version = "3.12"
 
 ```py
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from typing import Any, Literal, TypedDict
 
 A = TypedDict("A", {"type": Literal["a"], "irrelevant": Any})
@@ -2662,10 +2662,13 @@ def _(item: Item | dict[str, Any]) -> None:
         dict(item)
 ```
 
-The same performance guarantee applies to `Mapping` and `OrderedDict`:
+The same performance guarantee applies to `Mapping`, `MutableMapping`, and `OrderedDict`:
 
 ```py
 def _(item: Item | Mapping[str, Any]) -> None:
+    dict(item)
+
+def _(item: Item | MutableMapping[str, Any]) -> None:
     dict(item)
 
 def _(item: Item | OrderedDict[str, Any]) -> None:

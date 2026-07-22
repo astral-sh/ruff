@@ -122,6 +122,7 @@ pub enum KnownClass {
     AsyncIterator,
     Sequence,
     Mapping,
+    MutableMapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     ExtensionTypedDictFallback,
@@ -269,6 +270,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
@@ -384,6 +386,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -497,6 +500,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -611,6 +615,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -758,6 +763,7 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::Mapping
+            | Self::MutableMapping
             | Self::Sequence
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
@@ -856,6 +862,7 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
             | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
@@ -976,6 +983,7 @@ impl KnownClass {
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
+            Self::MutableMapping => "MutableMapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -1343,6 +1351,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::ParamSpec
             | Self::Hashable
@@ -1501,6 +1510,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -1620,6 +1630,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
@@ -1702,6 +1713,7 @@ impl KnownClass {
             "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
+            "MutableMapping" => &[Self::MutableMapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -1875,6 +1887,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
