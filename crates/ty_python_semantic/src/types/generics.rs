@@ -2717,13 +2717,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     if matches!(
                         instance.class(db).known(db),
                         Some(KnownClass::Dict | KnownClass::Mapping | KnownClass::OrderedDict)
-                    ) && instance
-                        .class(db)
-                        .into_generic_alias()
-                        .is_some_and(|alias| {
-                            matches!(alias.specialization(db).types(db), [key, _]
-                                if key.resolve_type_alias(db) == KnownClass::Str.to_instance(db))
-                        }) =>
+                    ) && let Some(alias) = instance.class(db).into_generic_alias()
+                        && let [key, _] = alias.specialization(db).types(db)
+                        && key.resolve_type_alias(db) == KnownClass::Str.to_instance(db) =>
                 {
                     other_types.insert(ty);
                     true
@@ -2757,8 +2753,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
         if !other_types.is_empty()
             && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.to_nominal_instance().is_some_and(|instance| {
-                instance.class(self.db).is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            if protocol.class_origin().is_some_and(|class| {
+                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
             }))
         {
             return None;
