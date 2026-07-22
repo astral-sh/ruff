@@ -3,6 +3,7 @@ use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
+use smallvec::SmallVec;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
@@ -21,11 +22,10 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
-    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeFormType, TypeGuardType,
+    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -105,6 +105,170 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
     }
 
+    /// Report a runtime error for an invalid PEP 604 union operation.
+    fn report_pep_604_runtime_error(
+        &self,
+        binary: &ast::ExprBinOp,
+        left_type_value: Type<'db>,
+        right_type_value: Type<'db>,
+    ) {
+        let dunder_fails = Type::try_call_bin_op(
+            self.db(),
+            left_type_value,
+            ast::Operator::BitOr,
+            right_type_value,
+        )
+        .is_err();
+
+        // As well as trying the normal dunder lookup, check for a class-literal or generic-alias
+        // operand paired with a string literal. Typeshed annotates `type.__(r)or__` as accepting
+        // `Any`, so the normal lookup does not catch this case.
+        let should_emit_error = dunder_fails
+            || match (left_type_value, right_type_value) {
+                (Type::ClassLiteral(class), Type::LiteralValue(literal))
+                | (Type::LiteralValue(literal), Type::ClassLiteral(class))
+                    if class.metaclass(self.db())
+                        == KnownClass::Type.to_class_literal(self.db()) =>
+                {
+                    !literal.is_enum()
+                }
+                (Type::GenericAlias(_), Type::LiteralValue(literal))
+                | (Type::LiteralValue(literal), Type::GenericAlias(_)) => !literal.is_enum(),
+                _ => false,
+            };
+
+        if !should_emit_error {
+            return;
+        }
+        let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) else {
+            return;
+        };
+        let mut diagnostic = builder.into_diagnostic("Unsupported `|` operation");
+
+        if left_type_value.is_equivalent_to(self.db(), right_type_value) {
+            diagnostic.set_primary_message(format_args!(
+                "Both operands have type `{}`",
+                left_type_value.display(self.db())
+            ));
+            diagnostic.set_concise_message(format_args!(
+                "Operator `|` is unsupported between two objects of type `{}`",
+                left_type_value.display(self.db())
+            ));
+        } else {
+            for (operand, ty) in [
+                (&*binary.left, left_type_value),
+                (&*binary.right, right_type_value),
+            ] {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(operand)
+                        .message(format_args!("Has type `{}`", ty.display(self.db()))),
+                );
+            }
+            diagnostic.set_concise_message(format_args!(
+                "Operator `|` is unsupported between objects of type `{}` and `{}`",
+                left_type_value.display(self.db()),
+                right_type_value.display(self.db())
+            ));
+        }
+
+        match self.scope.scope(self.db()).kind() {
+            ScopeKind::TypeAlias => diagnostic.info(
+                "A type alias scope is lazy but will be executed at runtime if the `__value__` \
+                 property is accessed",
+            ),
+            ScopeKind::TypeParams => diagnostic.info(
+                "Type parameter scopes are lazy but may be executed at runtime if the `__bound__`, \
+                 `__value__` or `__constraints__` property of a type parameter is accessed",
+            ),
+            _ => {
+                let python_version = Program::get(self.db()).python_version(self.db());
+
+                if python_version < PythonVersion::PY314 {
+                    diagnostic.info(format_args!(
+                        "All {}s are evaluated at runtime by default on Python <3.14",
+                        self.type_expression_context()
+                    ));
+                    add_inferred_python_version_hint_to_diagnostic(
+                        self.db(),
+                        &mut diagnostic,
+                        "inferring types",
+                    );
+                    if binary.left.is_string_literal_expr() || binary.right.is_string_literal_expr()
+                    {
+                        diagnostic.help(
+                            "Put quotes around the whole union rather than just certain elements",
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn report_experimental_intersection_syntax(&self, binary: &ast::ExprBinOp) {
+        if let Some(builder) = self.context.report_lint(&EXPERIMENTAL_SYNTAX, binary) {
+            builder.into_diagnostic("Intersection type syntax is experimental");
+        }
+    }
+
+    fn report_intersection_runtime_error(
+        &self,
+        binary: &ast::ExprBinOp,
+        left_value: Type<'db>,
+        right_value: Type<'db>,
+    ) {
+        if Type::try_call_bin_op(self.db(), left_value, ast::Operator::BitAnd, right_value).is_err()
+        {
+            report_unsupported_binary_operation(
+                &self.context,
+                binary,
+                left_value,
+                right_value,
+                ast::Operator::BitAnd,
+            );
+        }
+    }
+
+    fn infer_runtime_binary_expression(
+        &self,
+        builder: &mut Self,
+        left_value: &mut Option<Type<'db>>,
+        leftmost: &ast::Expr,
+        expression: &ast::Expr,
+        binary: &ast::ExprBinOp,
+    ) {
+        let left_value = left_value
+            .get_or_insert_with(|| builder.infer_expression(leftmost, TypeContext::default()));
+        let right_value = builder.infer_expression(&binary.right, TypeContext::default());
+
+        match binary.op {
+            ast::Operator::BitOr => {
+                self.report_pep_604_runtime_error(binary, *left_value, right_value);
+            }
+            ast::Operator::BitAnd => {
+                self.report_intersection_runtime_error(binary, *left_value, right_value);
+            }
+            _ => {}
+        }
+
+        // Preserve the TypedDict-aware inference used for PEP 584 dictionary unions.
+        *left_value = if binary.op == ast::Operator::BitOr
+            && (binary.left.is_dict_expr() || binary.right.is_dict_expr())
+        {
+            builder.infer_expression(expression, TypeContext::default())
+        } else {
+            builder
+                .infer_binary_expression_type(
+                    binary.into(),
+                    false,
+                    *left_value,
+                    right_value,
+                    binary.op,
+                )
+                .unwrap_or(Type::unknown())
+        };
+    }
+
     pub(super) fn infer_name_or_attribute_type_expression(
         &self,
         ty: Type<'db>,
@@ -133,7 +297,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ignore_runtime_errors = |builder: &Self| {
+        let ignore_runtime_errors = |builder: &Self, expression: &ast::Expr| {
             builder.deferred_state.is_deferred()
                 || builder.in_stub()
                 || builder.is_in_type_checking_block(builder.scope(), expression)
@@ -242,171 +406,117 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
-
-                        // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !ignore_runtime_errors(self) {
-                            let mut speculative_builder = self.speculate_without_diagnostics();
-                            // If the left-hand side of the union is itself a PEP-604 union,
-                            // we'll already have checked whether it can be used with `|` in a previous inference step
-                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
-                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
-                            // in that case.
-                            let left_type_value = speculative_builder
-                                .infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value = speculative_builder
-                                .infer_expression(&binary.right, TypeContext::default());
-
-                            let dunder_fails = Type::try_call_bin_op(
-                                self.db(),
-                                left_type_value,
-                                ast::Operator::BitOr,
-                                right_type_value,
-                            )
-                            .is_err();
-
-                            // As well as trying the normal dunder lookup,
-                            // we also check for the case where one of the operands is a class-literal type
-                            // or generic-alias type and the other is a string literal. The normal dunder lookup
-                            // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
-                            let should_emit_error = if dunder_fails {
-                                true
-                            } else {
-                                let literal = match (left_type_value, right_type_value) {
-                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if class.metaclass(self.db())
-                                            == KnownClass::Type.to_class_literal(self.db()) =>
-                                    {
-                                        Some(literal)
-                                    }
-                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
-                                        Some(literal)
-                                    }
-                                    _ => None,
-                                };
-                                literal.is_some_and(|literal| !literal.is_enum())
-                            };
-
-                            if should_emit_error
-                                && let Some(builder) =
-                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
-                            {
-                                let mut diagnostic =
-                                    builder.into_diagnostic("Unsupported `|` operation");
-
-                                if left_type_value.is_equivalent_to(self.db(), right_type_value) {
-                                    diagnostic.set_primary_message(format_args!(
-                                        "Both operands have type `{}`",
-                                        left_type_value.display(self.db())
-                                    ));
-                                    diagnostic.set_concise_message(format_args!(
-                                        "Operator `|` is unsupported between \
-                                        two objects of type `{}`",
-                                        left_type_value.display(self.db())
-                                    ));
-                                } else {
-                                    for (operand, ty) in [
-                                        (&*binary.left, left_type_value),
-                                        (&*binary.right, right_type_value),
-                                    ] {
-                                        diagnostic.annotate(
-                                            self.context.secondary(operand).message(format_args!(
-                                                "Has type `{}`",
-                                                ty.display(self.db())
-                                            )),
-                                        );
-                                    }
-                                    diagnostic.set_concise_message(format_args!(
-                                        "Operator `|` is unsupported between \
-                                        objects of type `{}` and `{}`",
-                                        left_type_value.display(self.db()),
-                                        right_type_value.display(self.db())
-                                    ));
-                                }
-
-                                match self.scope.scope(self.db()).kind() {
-                                    ScopeKind::TypeAlias => diagnostic.info(
-                                        "A type alias scope is lazy but will be \
-                                        executed at runtime if the `__value__` property is \
-                                        accessed",
-                                    ),
-                                    ScopeKind::TypeParams => diagnostic.info(
-                                        "Type parameter scopes are lazy but may be \
-                                        executed at runtime if the `__bound__`, `__value__`
-                                        or `__constraints__` property of a type parameter is \
-                                        accessed",
-                                    ),
-                                    _ => {
-                                        let python_version =
-                                            Program::get(self.db()).python_version(self.db());
-
-                                        if python_version < PythonVersion::PY314 {
-                                            diagnostic.info(format_args!(
-                                                "All {}s are evaluated at \
-                                                runtime by default on Python <3.14",
-                                                self.type_expression_context()
-                                            ));
-                                            add_inferred_python_version_hint_to_diagnostic(
-                                                self.db(),
-                                                &mut diagnostic,
-                                                "inferring types",
-                                            );
-                                            if binary.left.is_string_literal_expr()
-                                                || binary.right.is_string_literal_expr()
-                                            {
-                                                diagnostic.help(
-                                                    "Put quotes around the whole union \
-                                                    rather than just certain elements",
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
-                    }
-                    ast::Operator::BitAnd => {
-                        if let Some(builder) =
-                            self.context.report_lint(&EXPERIMENTAL_SYNTAX, binary)
+                        let mut nested_unions: SmallVec<[(&ast::Expr, &ast::ExprBinOp); 2]> =
+                            SmallVec::new();
+                        let mut left = &*binary.left;
+                        while let ast::Expr::BinOp(left_binary) = left
+                            && left_binary.op == ast::Operator::BitOr
                         {
-                            builder.into_diagnostic("Intersection type syntax is experimental");
+                            nested_unions.push((left, left_binary));
+                            left = &left_binary.left;
                         }
 
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
+                        let mut runtime = (!ignore_runtime_errors(self, expression))
+                            .then(|| (self.speculate_without_diagnostics(), None));
 
-                        if !ignore_runtime_errors(self) {
-                            // Infer the operands as values to report the types used by the runtime
-                            // operation rather than their interpretation as type expressions.
-                            let mut speculative_builder = self.speculate_without_diagnostics();
-                            let left_value = speculative_builder
-                                .infer_expression(&binary.left, TypeContext::default());
-                            let right_value = speculative_builder
-                                .infer_expression(&binary.right, TypeContext::default());
-                            if Type::try_call_bin_op(
-                                self.db(),
-                                left_value,
-                                ast::Operator::BitAnd,
-                                right_value,
-                            )
-                            .is_err()
-                            {
-                                report_unsupported_binary_operation(
-                                    &self.context,
-                                    binary,
+                        let left_ty = self.infer_type_expression(left);
+                        let mut union = UnionBuilder::new(self.db())
+                            .unpack_aliases(false)
+                            .add(left_ty);
+
+                        for (union_expression, nested_binary) in nested_unions.into_iter().rev() {
+                            let previously_nested = self
+                                .context
+                                .inference_flags
+                                .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, true);
+                            let right_ty = self.infer_type_expression(&nested_binary.right);
+                            if let Some((runtime_builder, left_value)) = &mut runtime {
+                                self.infer_runtime_binary_expression(
+                                    runtime_builder,
                                     left_value,
-                                    right_value,
-                                    ast::Operator::BitAnd,
+                                    left,
+                                    union_expression,
+                                    nested_binary,
                                 );
                             }
+                            union.add_in_place(right_ty);
+                            let prefix_ty = union.clone().build();
+                            self.store_expression_type(union_expression, prefix_ty);
+                            self.context
+                                .inference_flags
+                                .set(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, previously_nested);
                         }
 
-                        IntersectionType::from_two_elements(self.db(), left_ty, right_ty)
+                        let right_ty = self.infer_type_expression(&binary.right);
+                        if let Some((runtime_builder, left_value)) = &mut runtime {
+                            self.infer_runtime_binary_expression(
+                                runtime_builder,
+                                left_value,
+                                left,
+                                expression,
+                                binary,
+                            );
+                        }
+                        union.add_in_place(right_ty);
+                        union.build()
+                    }
+                    ast::Operator::BitAnd => {
+                        self.report_experimental_intersection_syntax(binary);
+
+                        let mut nested_intersections: SmallVec<[(&ast::Expr, &ast::ExprBinOp); 2]> =
+                            SmallVec::new();
+                        let mut left = &*binary.left;
+                        while let ast::Expr::BinOp(left_binary) = left
+                            && left_binary.op == ast::Operator::BitAnd
+                        {
+                            self.report_experimental_intersection_syntax(left_binary);
+                            nested_intersections.push((left, left_binary));
+                            left = &left_binary.left;
+                        }
+
+                        let mut runtime = (!ignore_runtime_errors(self, expression))
+                            .then(|| (self.speculate_without_diagnostics(), None));
+
+                        let left_ty = self.infer_type_expression(left);
+                        let mut intersection =
+                            IntersectionBuilder::new(self.db()).add_positive(left_ty);
+
+                        for (intersection_expression, nested_binary) in
+                            nested_intersections.into_iter().rev()
+                        {
+                            let previously_nested = self
+                                .context
+                                .inference_flags
+                                .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, true);
+                            let right_ty = self.infer_type_expression(&nested_binary.right);
+                            if let Some((runtime_builder, left_value)) = &mut runtime {
+                                self.infer_runtime_binary_expression(
+                                    runtime_builder,
+                                    left_value,
+                                    left,
+                                    intersection_expression,
+                                    nested_binary,
+                                );
+                            }
+                            intersection = intersection.add_positive(right_ty);
+                            let prefix_ty = intersection.clone().build();
+                            self.store_expression_type(intersection_expression, prefix_ty);
+                            self.context
+                                .inference_flags
+                                .set(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, previously_nested);
+                        }
+
+                        let right_ty = self.infer_type_expression(&binary.right);
+                        if let Some((runtime_builder, left_value)) = &mut runtime {
+                            self.infer_runtime_binary_expression(
+                                runtime_builder,
+                                left_value,
+                                left,
+                                expression,
+                                binary,
+                            );
+                        }
+                        intersection.add_positive(right_ty).build()
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -628,7 +738,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let operand_ty = self.infer_type_expression(operand);
 
-                if !ignore_runtime_errors(self) {
+                if !ignore_runtime_errors(self, expression) {
                     let operand_value = self
                         .speculate_without_diagnostics()
                         .infer_expression(operand, TypeContext::default());
