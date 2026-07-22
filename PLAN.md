@@ -4,7 +4,7 @@
 
 - [x] PR 0's C0/E1–E6 behavior basis already exists on the parent stack.
 - [x] PR 1B's visitor-driven `PathAssignments` implementation is already merged into `main`.
-- [ ] Phase 1 — Introduce single-variant `NodeAtom` as a standalone, pure-refactoring PR.
+- [x] Phase 1 — Introduce single-variant `Atom` as a standalone, pure-refactoring PR.
 - [ ] Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances.
 - [ ] Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end.
 
@@ -93,7 +93,7 @@ With instances available directly in `InferableTypeVars`, a quantified variable 
 
 ### Existing range-only assumptions
 
-`ConstraintId` currently indexes the arena of ordinary range constraints:
+`AtomId` currently indexes the arena of ordinary range constraints:
 
 ```rust
 struct Constraint<'db> {
@@ -118,7 +118,7 @@ A quantified relation is an opaque Boolean atom at its containing TDD level. Ran
 
 ### Atom-versus-constraint terminology
 
-Once TDD nodes can contain different atom kinds, reserve **constraint** for the `NodeAtom::Range` payload and use **atom** for data structures and operations shared by all node atoms. In particular, the pure refactor should rename:
+Once TDD nodes can contain different atom kinds, reserve **constraint** for the `Atom::Range` payload and use **atom** for data structures and operations shared by all node atoms. In particular, the pure refactor should rename:
 
 - `ConstraintSetStorage::constraints` and `OwnedConstraintSetInner::constraints` to `atoms`;
 - the generic `constraint_cache` to `atom_cache`;
@@ -126,14 +126,14 @@ Once TDD nodes can contain different atom kinds, reserve **constraint** for the 
 - generic retained-index/overlay helpers such as `retained_constraint_index` and `adjusted_constraint_id` to their atom-named equivalents;
 - generic node fields, lookup/interning helpers, traversal callbacks, and temporary maps from `constraint`/`constraints` to `atom`/`atoms` where they describe arbitrary TDD atoms.
 
-Keep genuinely range-specific names such as `Constraint`, `ConstraintBounds`, bound-depth caches, range implication/intersection, and range-only sequent handling. Evaluate whether broader identifiers such as `ConstraintId` and `ConstraintAssignment` should also gain atom-oriented names; include those renames only if they improve consistency enough to justify their mechanical churn.
+Keep genuinely range-specific names such as `Constraint`, `ConstraintBounds`, bound-depth caches, range implication/intersection, and range-only sequent handling. Use `AtomId` for the shared TDD-atom index. Evaluate whether `ConstraintAssignment` should also gain an atom-oriented name; include that rename only if it improves consistency enough to justify its mechanical churn.
 
 ## Proposed representation
 
 Introduce the atom discriminator in two separate, reviewable steps. First land an independently mergeable, behavior-preserving prerequisite PR with only the existing range variant:
 
 ```rust
-enum NodeAtom<'db> {
+enum Atom<'db> {
     Range(Constraint<'db>),
 }
 ```
@@ -141,7 +141,7 @@ enum NodeAtom<'db> {
 That refactoring must not add existential storage, change inference behavior, or modify mdtest expectations. A second independently reviewable refactoring PR changes `InferableTypeVars` to retain identity-keyed bound instances, but adds no declared-domain helpers, existential methods, or semantic behavior. Only after both prerequisites land does PR 2A add the existential variant and its compact payload:
 
 ```rust
-enum NodeAtom<'db> {
+enum Atom<'db> {
     Range(Constraint<'db>),
     Existential(Existential<'db>),
 }
@@ -156,7 +156,7 @@ struct Existential<'db> {
 The names can change to match neighboring code. The essential properties are:
 
 1. Existing range constraints remain cheap, copyable, and fast.
-1. The existing atom ID continues to identify a TDD atom and retain its ordering/wobbling behavior; keep `ConstraintId` unless an atom-oriented rename is justified by the terminology audit.
+1. `AtomId` continues to identify a TDD atom and retain its ordering/wobbling behavior.
 1. `InferableTypeVars` is already a compact, copyable, Salsa-interned set, so the quantified relation can be stored directly inside the existing interned atom arena; no `ExistentialId`, separate relation arena, boxed local slice, or parallel interning table is needed.
 1. Locals are exactly the supplied `InferableTypeVars`, which now retain bound instances while preserving identity-based membership, first-wins deduplication, freshness distinctions, Salsa sharing, and efficient set representation.
 1. The construction boundary accepts the authoritative `InferableTypeVars` set, an `additional_domain` constraint set, and a body. It stores that set unchanged and adds no variables discovered recursively in bounds.
@@ -175,28 +175,30 @@ free interface = {Y}
 
 `Y` is an interface variable, not an additional quantified variable, and its own declared domain is not included in `DeclaredDomain({X})`. An `additional_domain` may explicitly impose restrictions involving `Y`; those restrictions remain inside this quantifier's stored domain without quantifying `Y`.
 
-## Phase 1 — Introduce single-variant `NodeAtom` as a standalone, pure-refactoring PR
+## Phase 1 — Introduce single-variant `Atom` as a standalone, pure-refactoring PR
 
-**Status:** pending.
+**Status:** complete.
 
 **Dependency:** existing PR 0 and merged PR 1B only. This phase is intended to land as its own independently reviewable prerequisite PR, before the semantic PR 2A work.
 
-1. Introduce `NodeAtom<'db>` with exactly one variant, `Range(Constraint<'db>)`. Do not add `Existential`, an existential ID, a separate arena, a domain helper, or any other quantification feature in this revision.
-1. Change builder storage, owned storage, and existing atom-interning caches from raw `Constraint` payloads to single-variant `NodeAtom` payloads. Rename the corresponding `constraints` arenas to `atoms`, `constraint_cache` to `atom_cache`, and `constraint_indices` to `atom_indices` in the same mechanical refactor.
-1. Rename generic overlay/index helpers, interior-node fields, atom lookup/interning methods, traversal callbacks, and temporary collections to use atom terminology where they apply to arbitrary TDD atoms. Audit `ConstraintId` and `ConstraintAssignment` for similarly useful renames, but avoid gratuitous churn.
+1. Introduce `Atom<'db>` with exactly one variant, `Range(Constraint<'db>)`. Do not add `Existential`, an existential ID, a separate arena, a domain helper, or any other quantification feature in this revision.
+1. Change builder storage, owned storage, and existing atom-interning caches from raw `Constraint` payloads to single-variant `Atom` payloads. Rename the corresponding `constraints` arenas to `atoms`, `constraint_cache` to `atom_cache`, and `constraint_indices` to `atom_indices` in the same mechanical refactor.
+1. Rename the shared TDD-atom index to `AtomId`, and rename generic overlay/index helpers, interior-node fields, atom lookup/interning methods, traversal callbacks, and temporary collections to use atom terminology where they apply to arbitrary TDD atoms. Move range-atom construction to `Atom::new_range`, accepting optional lower and upper bounds. Audit `ConstraintAssignment` for a similarly useful rename, but avoid gratuitous churn.
 1. Preserve arena ordering, atom identity, source order, overlay split points, hashing/equality, and terminal fast paths. Keep genuinely range-specific `Constraint`, `ConstraintBounds`, implication/intersection, bound-depth caches, and sequent terminology unchanged.
-1. Migrate range-data access, TDD construction, sequent generation, path traversal, abstraction, solution extraction, type mapping, display, owned compaction, overlay queries, and cross-builder loading through exhaustive handling of `NodeAtom::Range`.
+1. Migrate range-data access, TDD construction, sequent generation, path traversal, abstraction, solution extraction, type mapping, display, owned compaction, overlay queries, and cross-builder loading through exhaustive handling of `Atom::Range`.
 1. Preserve the existing strongly typed range APIs and avoid introducing unreachable branches, panic-based accessors, or speculative handling for nonexistent variants. The refactor should be easy to verify mechanically: every existing atom is still precisely the same range constraint.
 1. Verify existing unit tests, quantification mdtests, ordering/wobbling tests, graph-display tests, owned-storage tests, and the full crate suite without changing their expectations. Audit memory layout and hot-path behavior to avoid introducing measurable overhead for the one-variant enum.
 1. Keep this revision separate from the `InferableTypeVars` representation change and from existential construction, so it can be extracted or landed as a pure-refactoring PR.
 
-**Exit criteria:** `NodeAtom::Range` is the only possible TDD atom; generic arenas/caches/indexes use atom-oriented names while range-specific logic retains constraint-oriented names; all existing behavior, snapshots, ownership semantics, ordering, and tests are unchanged; the revision is independently mergeable as a pure refactor.
+**Exit criteria:** `Atom::Range` is the only possible TDD atom; generic arenas/caches/indexes use atom-oriented names while range-specific logic retains constraint-oriented names; all existing behavior, snapshots, ownership semantics, ordering, and tests are unchanged; the revision is independently mergeable as a pure refactor.
+
+**Validation note:** the normal full crate and mdtest suites pass. The reverse and XOR constraint-order wobble configurations retain pre-existing mdtest failures in `3954_recursive_protocol_structural_relation.md`, `constraint_set_ordering.md`, `constraints.md`, `quantification.md`, `implies_subtype_of.md`, and `typed_dict.md` (the affected subset varies by mask); both the failing-test sets and every normalized expected/actual diagnostic line were compared with the Phase 1 parent and are identical. No snapshot expectations changed.
 
 ## Phase 2 — Refactor `InferableTypeVars` to retain identity-keyed bound instances
 
 **Status:** pending.
 
-**Dependency:** Phase 1 in the implementation stack; this representation change is logically independent of the pure `NodeAtom::Range` refactoring and should likewise be independently reviewable as a behavior-preserving prerequisite PR.
+**Dependency:** Phase 1 in the implementation stack; this representation change is logically independent of the pure `Atom::Range` refactoring and should likewise be independently reviewable as a behavior-preserving prerequisite PR.
 
 1. Change `InferableTypeVarsInner` from an ordered set of `BoundTypeVarIdentity`s to an ordered map from identity to `BoundTypeVarInstance`, following `GenericContext::variables_inner`.
 1. Update the generic-context collector and mdtest tuple extraction to retain the instances they already encounter. Update the existing constraint-unit-test constructors to pass instances rather than first discarding them.
@@ -205,7 +207,7 @@ free interface = {Y}
 1. Update existing iteration and debug-display behavior as needed, without forcing evaluation of lazily represented bounds merely to construct, merge, or inspect the set. Do not add declared-domain helpers, existential constructors, new type-variable-set methods, or any other functionality required only by later phases.
 1. Audit Salsa interning, tracked `merge`, existing cache keys such as `exists_cache`, identity-based ordering, and memory usage so equivalent instance representations do not introduce avoidable cache churn or behavior changes.
 1. Add focused regression coverage for empty sets, identity-keyed first-wins construction and merging, eager/lazy equivalent instances, fresh identities, `ParamSpec` components, and preservation of lazy bounds. Do not add quantifier-domain or existential-specific tests in this refactoring revision.
-1. Run the existing quantification and ordering mdtests without changing their expected behavior. Keep `ConstraintSetStorage`, `OwnedConstraintSetInner`, `NodeAtom`, and existing existential-abstraction algorithms unchanged.
+1. Run the existing quantification and ordering mdtests without changing their expected behavior. Keep `ConstraintSetStorage`, `OwnedConstraintSetInner`, `Atom`, and existing existential-abstraction algorithms unchanged.
 
 **Exit criteria:** `InferableTypeVars` retains actual bound instances while preserving its existing identity-based membership, ordering, first-wins deduplication, laziness, Salsa/cache behavior, and observable inference results; no new existential-specific methods or domain computations have been introduced; the revision is independently mergeable as a pure refactor.
 
@@ -213,17 +215,17 @@ free interface = {Y}
 
 **Status:** pending.
 
-**Dependency:** the independently reviewable Phase 1 `NodeAtom::Range` refactor and Phase 2 `InferableTypeVars` representation refactor.
+**Dependency:** the independently reviewable Phase 1 `Atom::Range` refactor and Phase 2 `InferableTypeVars` representation refactor.
 
-Adding `NodeAtom::Existential` immediately affects exhaustive matches, `ConstraintSet`, `OwnedConstraintSet`, type mapping, and display. Treat all of the workstreams below as one self-contained implementation phase and jj revision, not as independently passing revisions. If implementation reveals a genuinely self-contained intermediate boundary, update this plan before splitting the phase.
+Adding `Atom::Existential` immediately affects exhaustive matches, `ConstraintSet`, `OwnedConstraintSet`, type mapping, and display. Treat all of the workstreams below as one self-contained implementation phase and jj revision, not as independently passing revisions. If implementation reveals a genuinely self-contained intermediate boundary, update this plan before splitting the phase.
 
 ### Declared domains, existential atoms, and free interfaces
 
 1. Add an `InferableTypeVars`-level helper that computes the conjunction of `BoundTypeVarInstance::valid_specializations` for exactly its stored instances in the supplied builder. Reuse the existing single-typevar implementation for unbounded variables, upper bounds, finite constraints, gradual materialization, and `ParamSpec` components; do not recursively add domains for variables mentioned in those bounds.
 1. Support binders whose variables do not otherwise occur in the body, `additional_domain`, or builder. Their instances are available directly from `InferableTypeVars`; do not introduce canonical-instance recovery in builder or owned storage.
 1. Preserve deterministic source ordering when constructing declared-domain roots. Never add a companion domain field to `ConstraintSet` or a separate top-level domain field to `OwnedConstraintSet`.
-1. Extend the previously single-variant `NodeAtom` with `NodeAtom::Existential(Existential<'db>)`. Add a copyable `Existential<'db>` payload containing the supplied Salsa-interned `InferableTypeVars<'db>`, a stored domain `NodeId`, and a separate body `NodeId`. Intern it through the existing `NodeAtom`/`ConstraintId` arena and cache, not through a separate quantified-relation arena.
-1. Update existing range-specific consumers to distinguish `NodeAtom::Range` from `NodeAtom::Existential`. Keep ordinary range APIs strongly typed, handle existential atoms in structural operations, and panic with a clear invariant message if one unexpectedly reaches legacy satisfiability, validity, solution extraction, or other unsupported semantic consumers.
+1. Extend the previously single-variant `Atom` with `Atom::Existential(Existential<'db>)`. Add a copyable `Existential<'db>` payload containing the supplied Salsa-interned `InferableTypeVars<'db>`, a stored domain `NodeId`, and a separate body `NodeId`. Intern it through the existing `Atom`/`AtomId` arena and cache, not through a separate quantified-relation arena.
+1. Update existing range-specific consumers to distinguish `Atom::Range` from `Atom::Existential`. Keep ordinary range APIs strongly typed, handle existential atoms in structural operations, and panic with a clear invariant message if one unexpectedly reaches legacy satisfiability, validity, solution extraction, or other unsupported semantic consumers.
 1. Add a private/internal constructor that takes an explicitly supplied `InferableTypeVars`, an `additional_domain: ConstraintSet`, and a body; verifies all constraint-set inputs use the same builder; retains the supplied type-variable set unchanged; computes `valid_specializations(locals) ∧ additional_domain`; and interns one existential atom.
 1. Preserve the correct empty-binder fast path: with no locals, the quantified relation is `additional_domain ∧ body`, not merely `body`. Avoid unsupported simplifications that would accidentally assume a nonempty binder's domain is inhabited or flatten a nested scope.
 1. Enforce binder invariants with debug assertions: stored bound instances match their identity keys, nested binder identities are fresh/disjoint where required, and scope is interpreted according to lexical nesting rather than TDD variable ordering.
