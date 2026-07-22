@@ -25,7 +25,13 @@ use crate::lexer::interpolated_string::{
 };
 use crate::string::InterpolatedStringKind;
 
+#[cfg(target_arch = "aarch64")]
+pub(crate) mod chunked;
+#[cfg(target_arch = "aarch64")]
+mod classify;
 mod cursor;
+#[cfg(target_arch = "aarch64")]
+mod fast_token;
 mod indentation;
 mod interpolated_string;
 
@@ -1625,6 +1631,13 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
+}
+
+/// Lex a Python module with the experimental ARM chunked lexer, returning the number of tokens
+/// (including EOF) on success. `None` indicates that the source requires the streaming lexer.
+#[cfg(target_arch = "aarch64")]
+pub fn lex_chunked(source: &str) -> Option<usize> {
+    chunked::lex(source).map(|tokens| tokens.tokens.len())
 }
 
 #[cfg(test)]

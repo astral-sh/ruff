@@ -6,8 +6,11 @@ use criterion::{
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
+#[cfg(not(target_arch = "aarch64"))]
 use ruff_python_ast::token::TokenKind;
-use ruff_python_parser::{Mode, lexer};
+#[cfg(not(target_arch = "aarch64"))]
+use ruff_python_parser::Mode;
+use ruff_python_parser::lexer;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -46,22 +49,29 @@ fn benchmark_lexer(criterion: &mut Criterion<WallTime>) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                b.iter(|| {
-                    let mut lexer = lexer::lex(case.code(), Mode::Module);
-                    loop {
-                        let token = lexer.next_token();
-                        match token {
-                            TokenKind::EndOfFile => break,
-                            TokenKind::Unknown => panic!("Input to be a valid Python source code"),
-                            _ => {}
-                        }
-                    }
-                });
+                b.iter(|| lex_module(case.code()));
             },
         );
     }
 
     group.finish();
+}
+
+#[cfg(target_arch = "aarch64")]
+fn lex_module(source: &str) -> usize {
+    lexer::lex_chunked(source).expect("benchmark input should be supported by the chunked lexer")
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+fn lex_module(source: &str) {
+    let mut lexer = lexer::lex(source, Mode::Module);
+    loop {
+        match lexer.next_token() {
+            TokenKind::EndOfFile => return,
+            TokenKind::Unknown => panic!("benchmark input should be valid Python source code"),
+            _ => {}
+        }
+    }
 }
 
 criterion_group!(lexer, benchmark_lexer);
