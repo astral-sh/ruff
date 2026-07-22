@@ -45,4 +45,21 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test_case(Rule::BlindExcept, Path::new("BLE_logger_callables.py"))]
+    fn logger_callables(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_blind_except").join(path).as_path(),
+            &settings::LinterSettings {
+                logger_callables: vec![
+                    "sentry_sdk.capture_exception".to_string(),
+                    "my_module.report_error".to_string(),
+                ],
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
 }

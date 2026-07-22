@@ -244,6 +244,7 @@ pub struct LinterSettings {
     pub dummy_variable_rgx: Regex,
     pub external: Vec<String>,
     pub ignore_init_module_imports: bool,
+    pub logger_callables: Vec<String>,
     pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
@@ -309,6 +310,7 @@ impl Display for LinterSettings {
                 self.dummy_variable_rgx,
                 self.external | array,
                 self.ignore_init_module_imports,
+                self.logger_callables | array,
                 self.logger_objects | array,
                 self.namespace_packages | debug,
                 self.src | paths,
@@ -822,6 +824,7 @@ impl LinterSettings {
 
             external: vec![],
             ignore_init_module_imports: true,
+            logger_callables: vec![],
             logger_objects: vec![],
             namespace_packages: vec![],
 

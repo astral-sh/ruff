@@ -529,6 +529,22 @@ pub struct LintOptions {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// A list of callables that should be treated as exception-logging
+    /// functions when used inside `except` blocks, suppressing `BLE001`.
+    ///
+    /// This is useful for projects that use custom error-reporting callables
+    /// (e.g., Sentry or custom project-wide error handlers) which properly
+    /// handle exceptions.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g.,
+    /// `sentry_sdk.capture_exception`, rather than `capture_exception`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"logger-callables = ["sentry_sdk.capture_exception", "my_module.report_error"]"#
+    )]
+    pub logger_callables: Option<Vec<String>>,
+
     /// Options for the `pydoclint` plugin.
     #[option_group]
     pub pydoclint: Option<PydoclintOptions>,
@@ -4237,6 +4253,7 @@ pub struct LintOptionsWire {
     extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
     extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
     ignore_init_module_imports: Option<bool>,
+    logger_callables: Option<Vec<String>>,
     logger_objects: Option<Vec<String>>,
     select: Option<Vec<UnresolvedRuleSelector>>,
     explicit_preview_rules: Option<bool>,
@@ -4294,6 +4311,7 @@ impl From<LintOptionsWire> for LintOptions {
             extend_safe_fixes,
             extend_unsafe_fixes,
             ignore_init_module_imports,
+            logger_callables,
             logger_objects,
             select,
             explicit_preview_rules,
@@ -4385,6 +4403,7 @@ impl From<LintOptionsWire> for LintOptions {
                 extend_per_file_ignores,
             },
             exclude,
+            logger_callables,
             pydoclint,
             ruff,
             preview,

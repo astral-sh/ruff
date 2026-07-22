@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/flake8_blind_except/mod.rs
+assertion_line: 62
+---
+BLE001 Do not catch blind exception: `Exception`
+  --> BLE_logger_callables.py:30:8
+   |
+28 | try:
+29 |     pass
+30 | except Exception as e:
+   |        ^^^^^^^^^
+31 |     print(e)  # BLE001
+   |
+
+BLE001 Do not catch blind exception: `Exception`
+  --> BLE_logger_callables.py:43:8
+   |
+41 | try:
+42 |     pass
+43 | except Exception as e:
+   |        ^^^^^^^^^
+44 |     sentry_sdk.set_tag("error", str(e))  # BLE001
+   |
