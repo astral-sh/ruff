@@ -18,6 +18,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use crate::types::typevar::TypeVarInstance;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -3067,14 +3068,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
             if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
-                builder.into_diagnostic(format_args!(
+                let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Type variable `{name}` is not bound to any outer generic context",
                     name = typevar.name(self.db())
                 ));
+                if let Some(class_name) = self.outer_class_name_for_unbound_typevar(typevar) {
+                    diagnostic.info(format_args!(
+                        "Type variables from outer generic class `{class_name}` are not valid in \
+                        nested classes"
+                    ));
+                }
             }
             Type::unknown()
         } else {
             ty
         }
+    }
+
+    fn outer_class_name_for_unbound_typevar(
+        &self,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<String> {
+        let db = self.db();
+        self.index
+            .ancestor_scopes(self.scope().file_scope_id(db))
+            .filter_map(|(_, scope)| scope.node().as_class().map(|class| (scope, class)))
+            // Skip the innermost class; only outer classes can explain a nested-class boundary.
+            .skip(1)
+            .find_map(|(scope, class)| {
+                let generic_context = GenericContext::of_node(db, scope.node(), self.index)?;
+                generic_context.binds_typevar(db, typevar)?;
+                self.index.expect_single_definition(class).name(db)
+            })
     }
 }

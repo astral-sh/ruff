@@ -426,11 +426,20 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # error: [unbound-type-variable]
-        bad: list[T] = []
+        bad: list[T] = []  # snapshot: unbound-type-variable
 
     class Inner[S]: ...
     ok2: Inner[T]
+```
+
+```snapshot
+error[unbound-type-variable]: Type variable `T` is not bound to any outer generic context
+ --> src/mdtest_snippet.py:5:19
+  |
+5 |         bad: list[T] = []  # snapshot: unbound-type-variable
+  |                   ^
+  |
+info: Type variables from outer generic class `C` are not valid in nested classes
 ```
 
 ## Type parameter defaults cannot reference outer-scope type parameters
