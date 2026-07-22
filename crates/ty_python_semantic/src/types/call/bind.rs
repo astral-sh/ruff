@@ -2232,10 +2232,10 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Len) => {
-                            if let [Some(first_arg)] = overload.parameter_types() {
-                                if let Some(len_ty) = first_arg.len(db) {
-                                    overload.set_return_type(len_ty);
-                                }
+                            if let [Some(first_arg)] = overload.parameter_types()
+                                && let Some(len_ty) = first_arg.len(db)
+                            {
+                                overload.set_return_type(len_ty);
                             }
                         }
 
@@ -2268,18 +2268,18 @@ impl<'db> Bindings<'db> {
                             // Similarly to `is_protocol`, we only evaluate to this a frozenset of literal strings if a
                             // class-literal is passed in, not if a generic alias is passed in, to emulate the behaviour
                             // of `typing.get_protocol_members` at runtime.
-                            if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
-                                if let Some(protocol_class) = class.into_protocol_class(db) {
-                                    let member_names = protocol_class
-                                        .interface(db)
-                                        .members(db)
-                                        .map(|member| Type::string_literal(db, member.name()));
-                                    let specialization = UnionType::from_elements(db, member_names);
-                                    overload.set_return_type(
-                                        KnownClass::FrozenSet
-                                            .to_specialized_instance(db, &[specialization]),
-                                    );
-                                }
+                            if let [Some(Type::ClassLiteral(class))] = overload.parameter_types()
+                                && let Some(protocol_class) = class.into_protocol_class(db)
+                            {
+                                let member_names = protocol_class
+                                    .interface(db)
+                                    .members(db)
+                                    .map(|member| Type::string_literal(db, member.name()));
+                                let specialization = UnionType::from_elements(db, member_names);
+                                overload.set_return_type(
+                                    KnownClass::FrozenSet
+                                        .to_specialized_instance(db, &[specialization]),
+                                );
                             }
                         }
 

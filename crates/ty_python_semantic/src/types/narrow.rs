@@ -527,14 +527,14 @@ impl ClassInfoConstraintFunction {
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
 
-            Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
+            Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db) => {
                 UnionType::try_from_elements(
                     db,
                     tuple
                         .iter_element_types(db)
                         .map(|element| self.generate_constraint(db, element, is_positive)),
                 )
-            }),
+            }
 
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 UnionType::try_from_elements(
@@ -607,6 +607,7 @@ impl ClassInfoConstraintFunction {
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
+            | Type::NominalInstance(_)
             | Type::NewTypeInstance(_) => None,
         }
     }
@@ -2846,10 +2847,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         Err(_) => Type::Never,
                     }
                 } else {
-                    let tuple_length = resolved
-                        .as_nominal_instance()
-                        .and_then(|instance| instance.tuple_spec(db))
-                        .map(|spec| spec.len());
+                    let tuple_length = resolved.tuple_instance_spec(db).map(|spec| spec.len());
                     let satisfies_comparison = |length_type: Type<'db>| {
                         length_type
                             .as_int_literal()
@@ -3218,8 +3216,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
-                elem.as_nominal_instance()
-                    .and_then(|inst| inst.tuple_spec(self.db))
+                elem.tuple_instance_spec(self.db)
                     .and_then(|spec| spec.py_index(self.db, index).ok())
                     .is_none_or(|el_ty| {
                         if is_positive_check {
@@ -4197,8 +4194,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
         let filtered = union.filter(self.db, |elem| {
-            elem.as_nominal_instance()
-                .and_then(|inst| inst.tuple_spec(self.db))
+            elem.tuple_instance_spec(self.db)
                 .and_then(|spec| spec.py_index(self.db, index).ok())
                 .is_none_or(|el_ty| {
                     if is_equality {
@@ -4532,8 +4528,7 @@ fn any_tuple_has_out_of_bounds_index<'db>(
     index: i32,
 ) -> bool {
     union.elements(db).iter().any(|elem| {
-        elem.as_nominal_instance()
-            .and_then(|inst| inst.tuple_spec(db))
+        elem.tuple_instance_spec(db)
             .is_some_and(|spec| spec.py_index(db, index).is_err())
     })
 }
@@ -4550,8 +4545,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     index: i32,
 ) -> bool {
     union.elements(db).iter().all(|elem| {
-        elem.as_nominal_instance()
-            .and_then(|inst| inst.tuple_spec(db))
+        elem.tuple_instance_spec(db)
             .and_then(|spec| spec.py_index(db, index).ok())
             .is_none_or(is_supported_tag_literal)
     })
