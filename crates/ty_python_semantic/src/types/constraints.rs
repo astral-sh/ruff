@@ -8282,6 +8282,8 @@ mod tests {
         Combine,
     }
 
+    /// A path fold that reconstructs a constraint set from its satisfied paths and can abort at
+    /// a specified callback.
     struct ReconstructPathFold<'b, 'db> {
         builder: &'b ConstraintSetBuilder<'db>,
         break_at: Option<PathFoldBreak>,
