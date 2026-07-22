@@ -863,9 +863,9 @@ def same_typevar[T]():
 
 ## Existential quantification
 
-Existential quantification removes the listed typevars from a constraint set while preserving any
-constraints on the remaining typevars. An uncertain disjunct becomes satisfiable when its typevar is
-removed.
+Existential quantification removes the listed typevars from a constraint set. Any constraints that
+do not involve those typevars must remain in the result. The result holds whenever _at least one_
+valid assignment to the quantified variables satisfies the expression being quantified over.
 
 ```py
 from typing import Never
@@ -892,7 +892,8 @@ def no_typevars_is_identity[T]() -> None:
 ## Universal quantification
 
 Universal quantification removes the listed typevars from a constraint set. Any constraints that do
-not involve those typevars must remain in the result, including constraints in an uncertain branch.
+not involve those typevars must remain in the result. The result holds whenever _every_ valid
+assignment to the quantified variables satisfies the expression being quantified over.
 
 ```py
 from typing import Never
