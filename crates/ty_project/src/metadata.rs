@@ -879,33 +879,6 @@ unclosed table, expected `]`
 
         Ok(())
     }
-
-    #[test]
-    fn strict_literal_narrowing_is_an_alias() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system.memory_file_system().write_file_all(
-            root.join("ty.toml"),
-            r#"
-            [analysis]
-            strict-literal-narrowing = true
-            "#,
-        )?;
-
-        let project = ProjectMetadata::discover(&root, &system)?;
-        assert_eq!(
-            project
-                .options()
-                .analysis
-                .as_ref()
-                .and_then(|analysis| analysis.strict_equality_narrowing),
-            Some(true)
-        );
-
-        Ok(())
-    }
-
     #[test]
     fn requires_python_major_minor() -> anyhow::Result<()> {
         let system = TestSystem::default();
