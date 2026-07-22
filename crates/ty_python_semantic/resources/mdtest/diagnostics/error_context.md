@@ -1586,8 +1586,7 @@ info: the second tuple element is not compatible: `Literal[b""]` is not assignab
 
 ```py
 class Descriptor:
-    def __set__(self, instance, value: tuple[int, str]) -> None:
-        ...
+    def __set__(self, instance, value: tuple[int, str]) -> None: ...
 
 class C:
     x = Descriptor()
@@ -1598,9 +1597,9 @@ c.x = (1, b"")  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C` with custom `__set__` method
- --> src/mdtest_snippet.py:9:1
+ --> src/mdtest_snippet.py:8:1
   |
-9 | c.x = (1, b"")  # snapshot
+8 | c.x = (1, b"")  # snapshot
   | ^^^
   |
 info: parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
@@ -1611,8 +1610,7 @@ info: └── the second tuple element is not compatible: `Literal[b""]` is no
 
 ```py
 class C:
-    def __setattr__(self, name: str, value: tuple[int, str]):
-        ...
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
 
 c = C()
 c.x = (1, b"")  # snapshot
@@ -1620,9 +1618,9 @@ c.x = (1, b"")  # snapshot
 
 ```snapshot
 error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C` with custom `__setattr__` method.
- --> src/mdtest_snippet.py:6:1
+ --> src/mdtest_snippet.py:5:1
   |
-6 | c.x = (1, b"")  # snapshot
+5 | c.x = (1, b"")  # snapshot
   | ^^^
   |
 info: parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
@@ -1636,15 +1634,10 @@ from typing import overload
 
 class D:
     @overload
-    def __setattr__(self, name: str, value: tuple[int, str]):
-        ...
-
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
     @overload
-    def __setattr__(self, name: str, value: int):
-        ...
-
-    def __setattr__(self, name: str, value: tuple[int, str] | int):
-        ...
+    def __setattr__(self, name: str, value: int): ...
+    def __setattr__(self, name: str, value: tuple[int, str] | int): ...
 
 d = D()
 d.x = (1, b"")  # snapshot
@@ -1652,13 +1645,17 @@ d.x = (1, b"")  # snapshot
 
 ```snapshot
 error[unresolved-attribute]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D` with custom `__setattr__` method.
-  --> src/mdtest_snippet.py:22:1
+  --> src/mdtest_snippet.py:16:1
    |
-22 | d.x = (1, b"")  # snapshot
+16 | d.x = (1, b"")  # snapshot
    | ^^^
    |
-info: parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
-info: └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: no overload matches the call
+info: ├── overload `(self, name: str, value: tuple[int, str]) -> Unknown`
+info: │   └── parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `tuple[int, str]`
+info: │       └── the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: └── overload `(self, name: str, value: int) -> Unknown`
+info:     └── parameter `value` has an incompatible argument type: `tuple[Literal[1], Literal[b""]]` is not assignable to `int`
 ```
 
 ### In `invalid-yield` diagnostics

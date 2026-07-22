@@ -118,6 +118,10 @@ pub(crate) enum ErrorContext<'db> {
     CallPossiblyNotCallable {
         callable: Type<'db>,
     },
+    NoMatchingCallOverload,
+    CallOverload {
+        signature: String,
+    },
     InferredCallableType {
         source: Type<'db>,
         callable: Type<'db>,
@@ -329,6 +333,8 @@ impl<'db> ErrorContext<'db> {
             Self::CallPossiblyNotCallable { callable } => {
                 format!("type `{}` may not be callable", callable.display(db))
             }
+            Self::NoMatchingCallOverload => "no overload matches the call".to_string(),
+            Self::CallOverload { signature } => format!("overload `{signature}`"),
             Self::InferredCallableType { source, callable } => format!(
                 "type `{}` has inferred callable type `{}`",
                 source.display(db),
