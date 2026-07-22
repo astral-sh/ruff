@@ -2687,6 +2687,18 @@ pub struct IsortOptions {
     )]
     pub import_heading: Option<FxHashMap<ImportSection, String>>,
 
+    /// The number of blank lines to place before imports.
+    /// Use `-1` for automatic determination.
+    #[option(
+        default = r#"-1"#,
+        value_type = "int",
+        example = r#"
+            # Use a single line before each import block.
+            lines-before-imports = 1
+        "#
+    )]
+    pub lines_before_imports: Option<isize>,
+
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
     ///
@@ -3090,6 +3102,7 @@ impl IsortOptions {
                 .into_iter()
                 .map(|(section, heading)| (section, format!("# {heading}")))
                 .collect(),
+            lines_before_imports: self.lines_before_imports.unwrap_or(-1),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),

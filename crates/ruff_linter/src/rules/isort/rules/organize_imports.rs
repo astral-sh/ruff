@@ -8,7 +8,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlines};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
@@ -113,7 +113,7 @@ pub(crate) fn organize_imports(
     // Also extend the start backward to include any import heading comments above
     // the first import, so they're collected and can be stripped/re-added correctly.
     let import_headings = &settings.isort.import_headings;
-    let (comment_start, fix_start) = if import_headings.is_empty() {
+    let (comment_start, mut fix_start) = if import_headings.is_empty() {
         // Preserve original behavior: comments from import start, fix range from line start.
         (range.start(), locator.line_start(range.start()))
     } else {
@@ -143,6 +143,18 @@ pub(crate) fn organize_imports(
         }
         (earliest, earliest)
     };
+
+    // Extend backward to include blank lines before the first import.
+    if settings.isort.lines_before_imports >= 0 && !block.nested {
+        while fix_start > TextSize::ZERO {
+            let previous_line_start = locator.line_start(fix_start - TextSize::new(1));
+            let previous_line = locator.line_str(previous_line_start);
+            if leading_indentation(previous_line) != previous_line {
+                break;
+            }
+            fix_start = previous_line_start;
+        }
+    }
 
     let comments = comments::collect_comments(
         TextRange::new(comment_start, locator.full_line_end(range.end())),
