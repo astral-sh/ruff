@@ -34,8 +34,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
-    binding_type, infer_definition_types, inferred_declaration,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator,
+    UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2664,7 +2664,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
-            other_types: &mut FxOrderSet<Type<'db>>,
+            ordered_types: &mut FxOrderSet<Option<Type<'db>>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
@@ -2674,6 +2674,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let result = match ty {
                 Type::TypedDict(_) => {
                     typed_dicts.insert(ty);
+                    ordered_types.insert(None);
                     true
                 }
                 Type::Union(union) => {
@@ -2687,7 +2688,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             resolving,
                             completed,
                             typed_dicts,
-                            other_types,
+                            ordered_types,
                         )
                     });
                     resolving.remove(&ty);
@@ -2702,10 +2703,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
                     // constraint-equivalence check below remains authoritative.
                     typed_dicts.insert(ty);
+                    ordered_types.insert(None);
                     true
                 }
                 _ => {
-                    other_types.insert(ty);
+                    ordered_types.insert(Some(ty));
                     true
                 }
             };
@@ -2716,7 +2718,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
-        let mut other_types = FxOrderSet::default();
+        // `None` keeps the shared TypedDict constraints at their first source position.
+        let mut ordered_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
                 self.db,
@@ -2724,12 +2727,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &mut resolving,
                 &mut completed,
                 &mut typed_dicts,
-                &mut other_types,
+                &mut ordered_types,
             )
         }) {
             return None;
         }
         if typed_dicts.is_empty() {
+            return None;
+        }
+
+        // Equivalent constraints can still differ in whether their bounds retain gradual evidence.
+        // For `class TD(TypedDict): value: Any`, a `dict[str, Any] | TD` argument passed to a
+        // generic `__getitem__(Literal["value"]) -> T` protocol must infer `T = Any`; replacing
+        // `TD` with `Mapping[str, object]` would instead infer `T = object`.
+        let has_gradual_values = |typed_dict: TypedDictType<'db>| {
+            typed_dict
+                .items(self.db)
+                .values()
+                .any(|field| field.declared_ty.has_dynamic(self.db))
+                || typed_dict
+                    .explicit_extra_items(self.db)
+                    .is_some_and(|extra_items| extra_items.declared_ty.has_dynamic(self.db))
+        };
+        if typed_dicts.iter().any(|element| match element {
+            Type::TypedDict(typed_dict) => has_gradual_values(*typed_dict),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(self.db)
+                .filter_map(|element| element.resolve_type_alias(self.db).as_typed_dict())
+                .any(has_gradual_values),
+            _ => false,
+        }) {
             return None;
         }
 
@@ -2752,16 +2779,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        Some(mapping_when.and(self.db, self.constraints, || {
-            other_types
+        Some(
+            ordered_types
                 .into_iter()
                 .when_all(self.db, self.constraints, |element| {
-                    self.constraints.load(
-                        self.db,
-                        &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                    )
-                })
-        }))
+                    element.map_or(mapping_when, |element| {
+                        self.constraints.load(
+                            self.db,
+                            &element.when_constraint_set_assignable_to_owned(self.db, formal),
+                        )
+                    })
+                }),
+        )
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
