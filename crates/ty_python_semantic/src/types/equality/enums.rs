@@ -32,7 +32,14 @@ pub(super) fn evaluate_enum_domains<'db>(
 ) -> Option<ComparisonResult<'db>> {
     let target = EnumDomainSet::from_type(db, target)?;
     let other = EnumDomainSet::from_type(db, other)?;
-    evaluate_extracted_enum_domains(db, target, &other, branch, operator)
+    if let (Some(target), Some(other)) = (target.single(), other.single())
+        && target.enum_class == other.enum_class
+    {
+        return SameEnumComparison::new(db, target.clone(), other.clone(), operator)
+            .evaluate(db, branch, operator);
+    }
+
+    ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
 }
 
 /// Compare unions that contain both enum domains and unrelated alternatives.
@@ -41,6 +48,26 @@ pub(super) fn evaluate_enum_domains<'db>(
 /// evaluated through the ordinary comparison evaluator. In particular, a gradual or scalar
 /// residual on either side can still satisfy the comparison and prevent the opposite operand from
 /// being narrowed to the enum domains' shared members.
+///
+/// ```python
+/// from enum import StrEnum
+///
+/// class Left(StrEnum):
+///     SHARED = "shared"
+///     LEFT = "left"
+///
+/// class Right(StrEnum):
+///     SHARED = "shared"
+///     RIGHT = "right"
+///
+/// def compare(left: Left | None, right: Right | None):
+///     if left == right:
+///         reveal_type(left)   # Literal[Left.SHARED] | None
+///         reveal_type(right)  # Literal[Right.SHARED] | None
+/// ```
+///
+/// Returns `None` when either operand lacks an enum domain, neither operand has a residual, or an
+/// enum has unmodeled comparison semantics.
 pub(super) fn evaluate_partitioned_enum_domains<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     target: Type<'db>,
@@ -57,13 +84,11 @@ pub(super) fn evaluate_partitioned_enum_domains<'db>(
     }
 
     let EnumDomainPartition {
-        domains: target_domains,
         enum_type: target_enum,
         alternatives: target_alternatives,
         has_residual: target_has_residual,
     } = EnumDomainPartition::from_type(db, target)?;
     let EnumDomainPartition {
-        domains: other_domains,
         enum_type: other_enum,
         alternatives: other_alternatives,
         has_residual: other_has_residual,
@@ -75,8 +100,7 @@ pub(super) fn evaluate_partitioned_enum_domains<'db>(
 
     // Partitioning is only useful when the enum domains themselves have modeled comparison
     // semantics. Custom comparison methods must retain the ordinary evaluator's fallback.
-    let enum_result =
-        evaluate_extracted_enum_domains(db, target_domains, &other_domains, branch, operator)?;
+    let enum_result = evaluate_enum_domains(db, target_enum, other_enum, branch, operator)?;
 
     let evaluate_alternative =
         |evaluator: &mut ComparisonEvaluator<'db>, target: Type<'db>, other: Type<'db>| {
@@ -128,24 +152,6 @@ pub(super) fn evaluate_partitioned_enum_domains<'db>(
         branch,
         |target| evaluate_against_other(evaluator, target),
     ))
-}
-
-/// Evaluate already extracted enum domains without inspecting non-enum alternatives.
-fn evaluate_extracted_enum_domains<'db>(
-    db: &'db dyn Db,
-    target: EnumDomainSet<'db>,
-    other: &EnumDomainSet<'db>,
-    branch: ComparisonBranch,
-    operator: ComparisonOperator,
-) -> Option<ComparisonResult<'db>> {
-    if let (Some(target), Some(other)) = (target.single(), other.single())
-        && target.enum_class == other.enum_class
-    {
-        return SameEnumComparison::new(db, target.clone(), other.clone(), operator)
-            .evaluate(db, branch, operator);
-    }
-
-    ProjectedEnumComparison::new(db, target, other, operator)?.evaluate(db, branch, operator)
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -561,37 +567,33 @@ impl<'db> EnumValueSet<'db> {
 /// Original enum alternatives are grouped at the first enum position. Residual alternatives keep
 /// their union order, while all enum classes can share one compact comparison-key projection.
 struct EnumDomainPartition<'db> {
-    domains: EnumDomainSet<'db>,
     enum_type: Type<'db>,
     alternatives: Vec<Type<'db>>,
     has_residual: bool,
 }
 
-/// An original union alternative before the enum alternatives are grouped together.
-enum EnumDomainAlternative<'db> {
-    Enum(Type<'db>),
-    Residual(Type<'db>),
-}
-
 impl<'db> EnumDomainPartition<'db> {
+    /// Group structural enum alternatives at their first position and retain residual order.
+    ///
+    /// Returns `None` when no enum domain can be extracted or a recursive alias cannot be
+    /// partitioned safely.
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            has_enum: &mut bool,
-            alternatives: &mut Vec<EnumDomainAlternative<'db>>,
-            residual_count: &mut usize,
+            enum_types: &mut Vec<Type<'db>>,
+            alternatives: &mut Vec<Type<'db>>,
+            enum_position: &mut Option<usize>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
             if EnumValueSet::from_type(db, ty, active_types).is_some() {
-                *has_enum = true;
-                alternatives.push(EnumDomainAlternative::Enum(ty));
+                enum_position.get_or_insert(alternatives.len());
+                enum_types.push(ty);
                 return Some(());
             }
 
             let Type::Union(union) = ty.resolve_type_alias(db) else {
-                alternatives.push(EnumDomainAlternative::Residual(ty));
-                *residual_count += 1;
+                alternatives.push(ty);
                 return Some(());
             };
 
@@ -599,73 +601,44 @@ impl<'db> EnumDomainPartition<'db> {
                 return None;
             }
 
-            for element in union.elements(db) {
-                if collect(
+            let result = union.elements(db).iter().try_for_each(|element| {
+                collect(
                     db,
                     *element,
-                    has_enum,
+                    enum_types,
                     alternatives,
-                    residual_count,
+                    enum_position,
                     active_types,
                 )
-                .is_none()
-                {
-                    active_types.remove(&ty);
-                    return None;
-                }
-            }
-
+            });
             active_types.remove(&ty);
-            Some(())
+            result
         }
 
-        let mut has_enum = false;
+        let mut enum_types = Vec::new();
         let mut alternatives = Vec::new();
-        let mut residual_count = 0;
+        let mut enum_position = None;
         let mut active_types = FxHashSet::default();
         collect(
             db,
             ty,
-            &mut has_enum,
+            &mut enum_types,
             &mut alternatives,
-            &mut residual_count,
+            &mut enum_position,
             &mut active_types,
         )?;
-
-        if !has_enum {
-            return None;
-        }
-
-        let enum_type = alternatives
-            .iter()
-            .fold(UnionBuilder::new(db), |builder, alternative| {
-                if let EnumDomainAlternative::Enum(ty) = alternative {
-                    builder.add(*ty)
-                } else {
-                    builder
-                }
-            })
+        let enum_position = enum_position?;
+        let enum_type = enum_types
+            .into_iter()
+            .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
-        let domains = EnumDomainSet::from_type(db, enum_type)?;
-
-        let mut grouped_alternatives = Vec::with_capacity(residual_count + 1);
-        let mut included_enum = false;
-        for alternative in alternatives {
-            match alternative {
-                EnumDomainAlternative::Enum(_) if !included_enum => {
-                    grouped_alternatives.push(enum_type);
-                    included_enum = true;
-                }
-                EnumDomainAlternative::Enum(_) => {}
-                EnumDomainAlternative::Residual(ty) => grouped_alternatives.push(ty),
-            }
-        }
+        let has_residual = !alternatives.is_empty();
+        alternatives.insert(enum_position, enum_type);
 
         Some(Self {
-            domains,
             enum_type,
-            alternatives: grouped_alternatives,
-            has_residual: residual_count != 0,
+            alternatives,
+            has_residual,
         })
     }
 }
