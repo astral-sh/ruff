@@ -153,6 +153,8 @@ def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
 
 ### Stringified generic alias
 
+#### Explicitly specialized
+
 ```py
 from typing import TypeAlias, TypeVar
 
@@ -163,7 +165,22 @@ TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
 TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
 
 def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
-    reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
+    reveal_type(x)  # revealed: dict[str, int]
+```
+
+#### Unsubscripted
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+ListAlias: TypeAlias = "list[T]"
+
+def takes_list(value: ListAlias) -> None:
+    reveal_type(value)  # revealed: list[Unknown]
+
+takes_list([1])
 ```
 
 ## Subscripted generic alias in union

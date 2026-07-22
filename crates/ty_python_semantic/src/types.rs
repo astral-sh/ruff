@@ -6527,7 +6527,6 @@ impl<'db> Type<'db> {
                         | KnownInstanceType::GenericContext(_)
                         | KnownInstanceType::Specialization(_)
                         | KnownInstanceType::Literal(_)
-                        | KnownInstanceType::LiteralStringAlias(_)
                         | KnownInstanceType::NewType(_)
                         | KnownInstanceType::Sentinel(_)
                         | KnownInstanceType::NamedTupleSpec(_),
@@ -7128,7 +7127,8 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Callable(callable_type) => {
                     callable_type.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
-                KnownInstanceType::TypeGenericAlias(ty) => {
+                KnownInstanceType::TypeGenericAlias(ty)
+                | KnownInstanceType::LiteralStringAlias(ty) => {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
@@ -7143,7 +7143,6 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::GenericContext(_)
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::Literal(_)
-                | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::Sentinel(_)

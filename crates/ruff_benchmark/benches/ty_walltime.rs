@@ -198,7 +198,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    16500,
+    16617,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
