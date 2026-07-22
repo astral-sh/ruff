@@ -8240,6 +8240,47 @@ mod tests {
         assert!(tdd.or(&db, &builder, || negated).is_always_satisfied(&db));
     }
 
+    #[test]
+    fn eager_and_lazy_negation_are_equivalent() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_bool = create_constraint(&db, &builder, t, KnownClass::Bool);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+
+        let lhs = t_int.or(&db, &builder, || u_str);
+        let rhs = t_bool.or(&db, &builder, || u_int);
+        let intersection = lhs.and(&db, &builder, || rhs);
+        let tautology = lhs.or(&db, &builder, || lhs.negate(&db, &builder));
+
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let implication = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        for set in [lhs, rhs, intersection, tautology, implication] {
+            assert_eq!(
+                set.is_always_satisfied(&db),
+                set.negate(&db, &builder).is_never_satisfied(&db)
+            );
+        }
+    }
+
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the
     /// original (though the structure may differ since negation produces flat TDDs).
     #[test]
