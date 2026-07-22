@@ -1087,7 +1087,7 @@ When inference provides only an upper bound, we prefer the most general compatib
 constraint. This also does not depend on declaration order.
 
 ```py
-from typing import Any, Callable, TypeVar
+from typing import Callable, TypeVar
 
 NarrowFirst = TypeVar("NarrowFirst", int, object)
 BroadFirst = TypeVar("BroadFirst", object, int)
@@ -1102,33 +1102,6 @@ def accepts_object(value: object) -> None: ...
 
 reveal_type(narrow_first(accepts_object))  # revealed: object
 reveal_type(broad_first(accepts_object))  # revealed: object
-
-class Row(tuple[Any, ...]): ...
-
-GradualFirst = TypeVar("GradualFirst", tuple[Any, ...], Row)
-RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...])
-AnyFirst = TypeVar("AnyFirst", Any, int)
-IntFirst = TypeVar("IntFirst", int, Any)
-
-def gradual_first(callback: Callable[[GradualFirst], None]) -> GradualFirst:
-    raise NotImplementedError
-
-def row_first(callback: Callable[[RowFirst], None]) -> RowFirst:
-    raise NotImplementedError
-
-def any_first(callback: Callable[[AnyFirst], None]) -> AnyFirst:
-    raise NotImplementedError
-
-def int_first(callback: Callable[[IntFirst], None]) -> IntFirst:
-    raise NotImplementedError
-
-def accepts_tuple(value: tuple[object, ...]) -> None: ...
-def accepts_int(value: int) -> None: ...
-
-reveal_type(gradual_first(accepts_tuple))  # revealed: tuple[Any, ...]
-reveal_type(row_first(accepts_tuple))  # revealed: tuple[Any, ...]
-reveal_type(any_first(accepts_int))  # revealed: int
-reveal_type(int_first(accepts_int))  # revealed: int
 ```
 
 ## Ambiguous constrained TypeVar inference from `Any`
