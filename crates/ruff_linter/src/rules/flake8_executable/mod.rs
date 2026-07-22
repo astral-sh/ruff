@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_1.py"))]
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_2.py"))]
     #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_3.py"))]
+    #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_4.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_1.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_2.py"))]
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_3.py"))]
