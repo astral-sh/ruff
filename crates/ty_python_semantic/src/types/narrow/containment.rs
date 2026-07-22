@@ -128,7 +128,7 @@ fn containment_behavior<'db>(
                     return ContainmentBehavior::Custom;
                 }
             }
-            if instance.class(ctx).is_final(db) {
+            if instance.class(ctx).is_final(ctx) {
                 ContainmentBehavior::ElementsOf(ty)
             } else {
                 ContainmentBehavior::Unknown

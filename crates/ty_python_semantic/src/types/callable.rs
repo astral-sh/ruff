@@ -98,20 +98,20 @@ impl<'db> Type<'db> {
             ))),
 
             Type::FunctionLiteral(function_literal)
-                if context.is_recursive_reference(db, function_literal) =>
+                if context.is_recursive_reference(ctx, function_literal) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
             Type::FunctionLiteral(function_literal) => {
-                Some(CallableTypes::one(function_literal.into_callable_type(db)))
+                Some(CallableTypes::one(function_literal.into_callable_type(ctx)))
             }
             Type::BoundMethod(bound_method)
-                if context.is_recursive_reference(db, bound_method.function(db)) =>
+                if context.is_recursive_reference(ctx, bound_method.function(db)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
             Type::BoundMethod(bound_method) => {
-                Some(CallableTypes::one(bound_method.into_callable_type(db)))
+                Some(CallableTypes::one(bound_method.into_callable_type(ctx)))
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
@@ -136,11 +136,13 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::ClassLiteral(class_literal) => {
-                Some(class_literal.identity_specialization(db).into_callable(db))
-            }
+            Type::ClassLiteral(class_literal) => Some(
+                class_literal
+                    .identity_specialization(ctx)
+                    .into_callable(ctx),
+            ),
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(ctx)),
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(ctx)
@@ -240,7 +242,7 @@ impl<'db> Type<'db> {
                 .try_upcast_to_callable_with_policy_and_context(ctx, policy, context),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
-                if context.is_recursive_reference(db, function) =>
+                if context.is_recursive_reference(ctx, function) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
@@ -266,7 +268,7 @@ impl<'db> Type<'db> {
                     db,
                     Signature::new(
                         Parameters::standard([Parameter::positional_only(None)
-                            .with_annotated_type(newtype.base(db).instance_type(ctx))]),
+                            .with_annotated_type(newtype.base(ctx).instance_type(ctx))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))
@@ -314,9 +316,13 @@ struct CallableUpcastContext<'db> {
 }
 
 impl<'db> CallableUpcastContext<'db> {
-    fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    fn is_recursive_reference(
+        self,
+        ctx: &SemanticContext<'db>,
+        function: FunctionType<'db>,
+    ) -> bool {
         self.recursive_definition
-            .is_some_and(|definition| function.contains_definition(db, definition))
+            .is_some_and(|definition| function.contains_definition(ctx, definition))
     }
 }
 

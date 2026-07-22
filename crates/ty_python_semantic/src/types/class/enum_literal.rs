@@ -189,6 +189,18 @@ impl<'db> DynamicEnumLiteral<'db> {
         KnownClass::EnumType.to_class_literal(ctx)
     }
 
+    pub(crate) fn try_mro(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.scope(db).python_file(db).python_version(db)
+        );
+        self.try_mro_inner(db)
+    }
+
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
@@ -199,7 +211,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             ]))
         }
     )]
-    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+    fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         let ctx = SemanticContext::from_file(db, self.scope(db).python_file(db));
         Mro::of_dynamic_enum(&ctx, self)
     }
@@ -239,7 +251,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         let db = ctx.db();
         let spec = self.spec(db);
         if spec.has_known_members(db)
-            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(db)
+            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(ctx)
             && let Some(canonical_name) = enum_class.resolve_member(db, &Name::new(name))
         {
             let enum_lit =

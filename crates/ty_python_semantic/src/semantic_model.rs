@@ -522,7 +522,9 @@ impl<'db> SemanticModel<'db> {
                 {
                     return TypeQualifiers::empty();
                 }
-                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                let Some(declared) =
+                    inferred_declaration(&self.semantic_context(), definition).declared()
+                else {
                     return TypeQualifiers::empty();
                 };
                 declared.qualifiers()
@@ -824,7 +826,7 @@ macro_rules! impl_binding_has_ty_def {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let binding = HasDefinition::definition(self, model);
-                Some(binding_type(model.db, binding))
+                Some(binding_type(&model.semantic_context(), binding))
             }
         }
     };
@@ -845,7 +847,10 @@ impl HasType for ast::Alias {
             return Some(Type::Never);
         }
         let index = semantic_index(model.db, model.python_file());
-        Some(binding_type(model.db, index.expect_single_definition(self)))
+        Some(binding_type(
+            &model.semantic_context(),
+            index.expect_single_definition(self),
+        ))
     }
 }
 
@@ -861,7 +866,7 @@ impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
 impl HasType for ast::ExceptHandlerExceptHandler {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let definition = self.optional_definition(model)?;
-        Some(binding_type(model.db, definition))
+        Some(binding_type(&model.semantic_context(), definition))
     }
 }
 

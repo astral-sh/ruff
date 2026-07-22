@@ -78,10 +78,10 @@ impl<'db> Type<'db> {
                     )),
                     Some(KnownClass::Object) => Type::object(),
                     _ => class_literal
-                        .is_typed_dict(db)
+                        .is_typed_dict(ctx)
                         .then(|| Type::typed_dict(class))
                         .or_else(|| {
-                            class.into_protocol_class(db).map(|protocol_class| {
+                            class.into_protocol_class(ctx).map(|protocol_class| {
                                 Self::ProtocolInstance(ProtocolInstanceType::from_class(
                                     protocol_class,
                                 ))
@@ -425,7 +425,8 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_singleton(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         match self.0 {
             // The empty tuple is a singleton on CPython and PyPy, but not on other Python
             // implementations such as GraalPy. Its *use* as a singleton is discouraged and
@@ -438,7 +439,7 @@ impl<'db> NominalInstanceType<'db> {
                 .class(db)
                 .known(db)
                 .map(KnownClass::is_singleton)
-                .unwrap_or_else(|| is_single_member_enum(db, class.class(db).class_literal(db))),
+                .unwrap_or_else(|| is_single_member_enum(ctx, class.class(db).class_literal(db))),
         }
     }
 
@@ -674,11 +675,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
         let identity_protocol = target_alias
             .origin(db)
-            .identity_specialization(db)
-            .into_protocol_class(db)?;
+            .identity_specialization(ctx)
+            .into_protocol_class(ctx)?;
 
-        let source_interface = source_protocol.interface(db);
-        let target_interface = protocol.interface(db);
+        let source_interface = source_protocol.interface(ctx);
+        let target_interface = protocol.interface(ctx);
         let source_non_recursive =
             non_recursive_protocol_interface(db, source_interface.base(), identity_protocol, ty);
         let target_non_recursive = non_recursive_protocol_interface(
@@ -762,8 +763,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 ///     def value(self) -> T | int: ...
 ///     def child(self) -> P[list[T]]: ...
 /// ```
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn non_recursive_protocol_interface<'db>(
+    ctx: &SemanticContext<'db>,
+    interface: ProtocolInterface<'db>,
+    protocol: ProtocolClass<'db>,
+    receiver_ty: Type<'db>,
+) -> ProtocolInterface<'db> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        protocol
+            .class_literal(db)
+            .python_file(db)
+            .python_version(db)
+    );
+    non_recursive_protocol_interface_inner(db, interface, protocol, receiver_ty)
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn non_recursive_protocol_interface_inner<'db>(
     db: &'db dyn Db,
     interface: ProtocolInterface<'db>,
     protocol: ProtocolClass<'db>,

@@ -76,7 +76,7 @@ fn comprehension_named_expression_is_local(
 }
 
 fn function_scope_is_overload_declaration(
-    db: &dyn Db,
+    ctx: &SemanticContext<'_>,
     index: &SemanticIndex<'_>,
     file_scope_id: FileScopeId,
 ) -> bool {
@@ -86,7 +86,7 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
+    function_known_decorator_flags(ctx, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
@@ -137,7 +137,7 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
                 crate::types::function::function_has_stub_body(function.node(&parsed))
             });
         let function_is_overload_declaration =
-            function_scope_is_overload_declaration(db, index, file_scope_id);
+            function_scope_is_overload_declaration(&ctx, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
         // Loop headers are synthesized before the loop body definitions they point to;

@@ -238,7 +238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
-                let inferred = infer_definition_types(db, *definition);
+                let inferred = infer_definition_types(self.semantic_context(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.

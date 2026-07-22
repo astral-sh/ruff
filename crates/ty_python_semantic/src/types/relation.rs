@@ -1641,7 +1641,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self.check_newtype_pair(db, source_newtype, target_newtype)
+                self.check_newtype_pair(ctx, source_newtype, target_newtype)
             }
 
             (Type::Union(union), _) => {
@@ -1937,7 +1937,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_callable_signature_pair(
                         ctx,
                         source_partial.partial(db).signatures(db),
-                        target_function.into_callable_type(db).signatures(db),
+                        target_function.into_callable_type(ctx).signatures(db),
                     )
                 })
             }
@@ -2187,7 +2187,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 } else {
                     ConstraintSet::from_bool(
                         self.constraints,
-                        is_single_member_enum(db, target_enum_literal.enum_class(db)),
+                        is_single_member_enum(ctx, target_enum_literal.enum_class(db)),
                     )
                 }
             }
@@ -2662,7 +2662,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let db = ctx.db();
         protocol
-            .interface(db)
+            .interface(ctx)
             .members(db)
             .when_any(ctx, self.constraints, |member| {
                 other
@@ -3120,7 +3120,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (other, Type::ProtocolInstance(protocol)) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
                     protocol
-                        .interface(db)
+                        .interface(ctx)
                         .members(db)
                         .when_any(ctx, self.constraints, |member| {
                             match other.member(ctx, member.name()).place {

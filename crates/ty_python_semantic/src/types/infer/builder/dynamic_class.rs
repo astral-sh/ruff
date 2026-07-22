@@ -160,7 +160,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ClassBase::Class(class_type) => {
-                    if class_type.is_final(db) {
+                    if class_type.is_final(ctx) {
                         if let Some(builder) = self
                             .context
                             .report_lint(&SUBCLASS_OF_FINAL_CLASS, diagnostic_node)
@@ -170,7 +170,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 class_type.name(db)
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(ctx) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
@@ -194,13 +194,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(ctx) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
                     }
 
-                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
+                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(ctx) {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
@@ -222,12 +222,12 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     bases: &ast::Expr,
 ) -> bool {
     let db = context.db();
-    let Err(error) = dynamic_class.try_mro(db) else {
+    let ctx = context.semantic_context();
+    let Err(error) = dynamic_class.try_mro(ctx) else {
         return true;
     };
-    let ctx = context.semantic_context();
     let bases_display = dynamic_class
-        .explicit_bases(db)
+        .explicit_bases(ctx)
         .iter()
         .map(|base| base.display(ctx))
         .join(", ");
@@ -253,7 +253,7 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
     bases: &ast::Expr,
 ) {
     let db = context.db();
-    let explicit_bases = dynamic_class.explicit_bases(db);
+    let explicit_bases = dynamic_class.explicit_bases(context.semantic_context());
     let base_nodes = bases
         .as_tuple_expr()
         .map(|tuple| tuple.elts.as_slice())

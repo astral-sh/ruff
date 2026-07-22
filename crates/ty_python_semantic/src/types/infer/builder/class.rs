@@ -55,8 +55,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 is_typed_dict |= match ty {
                     ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
-                    Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
-                    Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
+                    Type::ClassLiteral(class) => class.is_typed_dict(self.semantic_context()),
+                    Type::GenericAlias(alias) => alias.is_typed_dict(self.semantic_context()),
                     _ => false,
                 };
             }
@@ -252,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
                 let transformer_params = f
-                    .iter_overloads_and_implementation(db)
+                    .iter_overloads_and_implementation(ctx)
                     .rev()
                     .find_map(|overload| overload.dataclass_transformer_params(db));
                 if let Some(transformer_params) = transformer_params {
@@ -433,7 +433,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
             if original_class_type(self.db(), definition)
-                .is_some_and(|class_literal| class_literal.is_typed_dict(self.db()))
+                .is_some_and(|class_literal| class_literal.is_typed_dict(self.semantic_context()))
             {
                 self.infer_extra_items_kwarg(&extra_items_keyword.value);
             } else if self.in_stub() {
@@ -656,14 +656,14 @@ impl ClassDecoratorUnknownResultPolicy {
         let db = ctx.db();
         match decorator_ty {
             Type::FunctionLiteral(function) => {
-                Some(if function.has_explicit_return_annotation(db) {
+                Some(if function.has_explicit_return_annotation(ctx) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
                 })
             }
             Type::BoundMethod(method) => {
-                Some(if method.function(db).has_explicit_return_annotation(db) {
+                Some(if method.function(db).has_explicit_return_annotation(ctx) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding

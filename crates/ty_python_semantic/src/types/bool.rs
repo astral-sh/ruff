@@ -115,7 +115,7 @@ impl<'db> Type<'db> {
                 // and a subclass could add a `__bool__` method.
                 Err(CallDunderError::MethodNotAvailable)
                     if let Type::NominalInstance(instance) = self
-                        && instance.class(ctx).is_final(db) =>
+                        && instance.class(ctx).is_final(ctx) =>
                 {
                     match self.try_call_dunder(
                         ctx,
@@ -217,11 +217,11 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_) => Truthiness::Ambiguous,
 
             Type::TypedDict(td) => {
-                if td.items(db).values().any(TypedDictField::is_required) {
+                if td.items(ctx).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
-                } else if td.openness(db).is_closed()
+                } else if td.openness(ctx).is_closed()
                     && td
-                        .items(db)
+                        .items(ctx)
                         .values()
                         .all(|field| !field.may_be_present(ctx))
                 {

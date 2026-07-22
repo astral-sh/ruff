@@ -542,7 +542,7 @@ impl<'db> ImplementationsFinder<'db> {
         let class_node = containing_scope.node(db).as_class()?;
         let class_definition = semantic_index(db, containing_scope.python_file(db))
             .expect_single_definition(class_node);
-        let class_ty = binding_type(db, class_definition);
+        let class_ty = binding_type(&ctx, class_definition);
         let root = extract_class_literal(&ctx, class_ty)?;
 
         ImplementationsFinder::for_member_roots(
@@ -574,7 +574,7 @@ impl<'db> ImplementationsFinder<'db> {
         if !is_reachable_implementation_definition(&ctx, class_definition) {
             return None;
         }
-        let root = extract_class_literal(&ctx, binding_type(db, class_definition))?;
+        let root = extract_class_literal(&ctx, binding_type(&ctx, class_definition))?;
 
         Some(ImplementationsFinder::for_class_roots(db, vec![root]))
     }
@@ -626,7 +626,7 @@ impl<'db> ImplementationsFinder<'db> {
             // Only references that resolve to a class object (a base class, annotation, `Animal()`, or
             // a name bound to a class) are class implementation requests; instances resolve to their
             // own definitions, whose type is the instance rather than the class object.
-            let ty = binding_type(db, *definition);
+            let ty = binding_type(ctx, *definition);
 
             let root = match ty {
                 Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => {
@@ -945,7 +945,7 @@ fn property_accessor_role_matches<'db>(
     }
 
     requested_role.is_none_or(|requested_role| {
-        binding_type(db, definition)
+        binding_type(ctx, definition)
             .as_property_instance()
             .and_then(|property| property.accessor_role(ctx, definition))
             .is_none_or(|definition_role| definition_role == requested_role)
@@ -974,11 +974,11 @@ fn member_implementation_definition<'db>(
     // Use the inferred function type to collapse overload declarations to their concrete
     // implementation. If inference cannot produce a function literal, keep the original `def` as a
     // conservative fallback.
-    let Some(function) = binding_type(db, definition).as_function_literal() else {
+    let Some(function) = binding_type(ctx, definition).as_function_literal() else {
         return Some(ResolvedDefinition::Definition(definition));
     };
 
-    let (_, implementation) = function.overloads_and_implementation(db);
+    let (_, implementation) = function.overloads_and_implementation(ctx);
     if implementation.is_some() {
         return Some(ResolvedDefinition::Definition(function.last_definition(db)));
     }
@@ -1195,7 +1195,7 @@ pub fn typed_dict_key_definition<'db>(
 ) -> Option<ResolvedDefinition<'db>> {
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let field = typed_dict.items(model.db()).get(key)?;
+    let field = typed_dict.items(&model.semantic_context()).get(key)?;
     let definition = field.first_declaration()?;
     Some(ResolvedDefinition::Definition(definition))
 }
@@ -1211,7 +1211,7 @@ pub fn typed_dict_key_hover<'db>(
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let owner = value_ty.display(&model.semantic_context()).to_string();
-    let field = typed_dict.items(model.db()).get(key)?;
+    let field = typed_dict.items(&model.semantic_context()).get(key)?;
     let docstring = field
         .first_declaration()
         .and_then(|declaration| declaration.docstring(model.db()));
@@ -1301,7 +1301,7 @@ pub fn definitions_and_overloads_for_function<'db>(
     {
         let ctx = &model.semantic_context();
         function_type
-            .iter_overloads_and_implementation(model.db())
+            .iter_overloads_and_implementation(ctx)
             .filter_map(|overload| overload.signature(ctx).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
@@ -2056,9 +2056,9 @@ mod resolve_definition {
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
-    use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
+    use crate::{Db, SemanticContext};
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -2152,6 +2152,7 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
     ) -> Option<String> {
+        let ctx = SemanticContext::from_file(db, definition.python_file(db));
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };
@@ -2161,7 +2162,7 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
-        let current_overload = binding_type(db, definition)
+        let current_overload = binding_type(&ctx, definition)
             .as_function_literal()?
             .literal(db)
             .last_definition;
@@ -2170,8 +2171,8 @@ mod resolve_definition {
         let implementation = use_def
             .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| {
-                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(db)
+                let ty = binding_type(&ctx, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(&ctx)
                     .any(|overload| overload == current_overload)
                     .then_some(ty)
             })
@@ -2836,8 +2837,9 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        for class_ty in reachable_class_literals_in_file(ctx, python_file) {
-            let bases = class_ty.explicit_bases(ctx);
+        let file_ctx = SemanticContext::from_file(db, python_file);
+        for class_ty in reachable_class_literals_in_file(&file_ctx, python_file) {
+            let bases = class_ty.explicit_bases(&file_ctx);
             let is_subtype = if target_is_object
                 && bases.is_empty()
                 && !class_ty.is_known(db, KnownClass::Object)
@@ -2845,7 +2847,7 @@ fn direct_subtypes<'db>(
                 true
             } else {
                 bases.iter().any(|base| {
-                    extract_class_literal(ctx, *base)
+                    extract_class_literal(&file_ctx, *base)
                         .is_some_and(|base_literal| base_literal == target_class)
                 })
             };
@@ -2886,7 +2888,7 @@ fn reachable_class_literals_in_file<'db>(
         }
 
         // Convert the definition's type into a ClassLiteral, dropping anything that doesn't produce a usable class object.
-        if let Some(class) = extract_class_literal(ctx, binding_type(db, definition)) {
+        if let Some(class) = extract_class_literal(ctx, binding_type(ctx, definition)) {
             classes.push(class);
         }
     }

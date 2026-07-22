@@ -283,12 +283,16 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             .ancestor_scopes(scope_id)
             .filter_map(|(_, scope)| scope.node().as_function())
             .filter_map(|node| {
-                infer_definition_types(self.db(), index.expect_single_definition(node))
-                    .undecorated_type()
-                    .and_then(Type::as_function_literal)
+                infer_definition_types(
+                    self.semantic_context(),
+                    index.expect_single_definition(node),
+                )
+                .undecorated_type()
+                .and_then(Type::as_function_literal)
             })
             .any(|function_ty| {
-                function_ty.has_known_decorator(self.db(), FunctionDecorators::NO_TYPE_CHECK)
+                function_ty
+                    .has_known_decorator(self.semantic_context(), FunctionDecorators::NO_TYPE_CHECK)
             })
     }
 

@@ -585,7 +585,7 @@ pub(crate) fn is_expandable_type<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>)
             {
                 return true;
             }
-            enum_metadata(db, class.class_literal(db)).is_some()
+            enum_metadata(ctx, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         Type::TypeAlias(alias) => is_expandable_type(ctx, alias.value_type(ctx)),

@@ -462,14 +462,14 @@ impl<'db> TypeVarInstance<'db> {
                     return true;
                 }
                 type_alias.value_type(state.ctx)
-            } else if let Some(generic_context) = type_alias.generic_context(db)
+            } else if let Some(generic_context) = type_alias.generic_context(state.ctx)
                 && generic_context.variables(db).any(|typevar| {
                     typevar_default_is_self_referential(state, typevar.typevar(db), self_identity)
                 })
             {
                 return true;
             } else {
-                type_alias.raw_value_type(db)
+                type_alias.raw_value_type(state.ctx)
             };
 
             type_is_self_referential_impl(state, value_type, self_identity)
@@ -514,26 +514,38 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" upper bound of a type variable instance.
     /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
+    fn lazy_bound_unchecked(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
+        let db = ctx.db();
+        if let Some(definition) = self.definition(db) {
+            debug_assert_eq!(
+                ctx.python_version(),
+                definition.python_file(db).python_version(db)
+            );
+        }
+        self.lazy_bound_unchecked_inner(db)
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_bound_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
+        let ctx = SemanticContext::from_file(db, definition.python_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+                definition_expression_type(&ctx, definition, typevar_node.bound.as_ref()?)
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("bound")?.value;
-                definition_expression_type(db, definition, expr)
+                definition_expression_type(&ctx, definition, expr)
             }
             _ => return None,
         };
@@ -542,7 +554,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn lazy_bound(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        let bound = self.lazy_bound_unchecked(ctx.db())?;
+        let bound = self.lazy_bound_unchecked(ctx)?;
 
         if bound.has_typevar_or_typevar_instance(ctx) {
             return None;
@@ -553,13 +565,27 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" constraints of a type variable instance.
     /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
+    fn lazy_constraints_unchecked(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> Option<TypeVarConstraints<'db>> {
+        let db = ctx.db();
+        if let Some(definition) = self.definition(db) {
+            debug_assert_eq!(
+                ctx.python_version(),
+                definition.python_file(db).python_version(db)
+            );
+        }
+        self.lazy_constraints_unchecked_inner(db)
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+    fn lazy_constraints_unchecked_inner(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
         let ctx = SemanticContext::from_file(db, definition.python_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
@@ -568,7 +594,7 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
                 let bound =
-                    definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+                    definition_expression_type(&ctx, definition, typevar_node.bound.as_ref()?);
                 if let Some(tuple) = bound.tuple_instance_spec(&ctx)
                     && let Tuple::Fixed(tuple) = tuple.into_owned()
                 {
@@ -587,7 +613,7 @@ impl<'db> TypeVarInstance<'db> {
                         .args
                         .iter()
                         .skip(1)
-                        .map(|arg| definition_expression_type(db, definition, arg))
+                        .map(|arg| definition_expression_type(&ctx, definition, arg))
                         .collect::<Box<_>>(),
                 )
             }
@@ -599,7 +625,7 @@ impl<'db> TypeVarInstance<'db> {
 
     fn lazy_constraints(self, ctx: &SemanticContext<'db>) -> Option<TypeVarConstraints<'db>> {
         let db = ctx.db();
-        let constraints = self.lazy_constraints_unchecked(db)?;
+        let constraints = self.lazy_constraints_unchecked(ctx)?;
 
         if constraints
             .elements(db)
@@ -614,8 +640,19 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
+    fn lazy_default_unchecked(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
+        let db = ctx.db();
+        if let Some(definition) = self.definition(db) {
+            debug_assert_eq!(
+                ctx.python_version(),
+                definition.python_file(db).python_version(db)
+            );
+        }
+        self.lazy_default_unchecked_inner(db)
+    }
+
     #[salsa::tracked(returns(copy), cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
-    fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_default_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
                 Type::NominalInstance(nominal_instance)
@@ -661,20 +698,21 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
+        let ctx = SemanticContext::from_file(db, definition.python_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.default.as_ref()?)
+                definition_expression_type(&ctx, definition, typevar_node.default.as_ref()?)
             }
             // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                let func_ty = definition_expression_type(db, definition, &call_expr.func);
+                let func_ty = definition_expression_type(&ctx, definition, &call_expr.func);
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
-                let default_type = definition_expression_type(db, definition, expr);
+                let default_type = definition_expression_type(&ctx, definition, expr);
                 if matches!(
                     known_class,
                     Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
@@ -688,13 +726,13 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::ParamSpec(paramspec) => {
                 let paramspec_node = paramspec.node(&module);
                 let default_ty =
-                    definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
+                    definition_expression_type(&ctx, definition, paramspec_node.default.as_ref()?);
                 convert_type_to_paramspec_value(db, default_ty)
             }
             // PEP 695 TypeVarTuple
             DefinitionKind::TypeVarTuple(typevartuple) => {
                 let typevartuple_node = typevartuple.node(&module);
-                definition_expression_type(db, definition, typevartuple_node.default.as_ref()?)
+                definition_expression_type(&ctx, definition, typevartuple_node.default.as_ref()?)
             }
             _ => return None,
         };
@@ -712,7 +750,7 @@ impl<'db> TypeVarInstance<'db> {
         ctx: &SemanticContext<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        let default = self.lazy_default_unchecked(ctx.db())?;
+        let default = self.lazy_default_unchecked(ctx)?;
 
         // Unlike bounds/constraints, default types are allowed to be generic
         // (https://typing.python.org/en/latest/spec/generics.html#defaults-for-type-parameters).
@@ -725,7 +763,8 @@ impl<'db> TypeVarInstance<'db> {
         Some(default)
     }
 
-    pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+    pub fn bind_pep695(self, ctx: &SemanticContext<'db>) -> Option<BoundTypeVarInstance<'db>> {
+        let db = ctx.db();
         if !matches!(
             self.identity(db).kind(db),
             TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
@@ -737,7 +776,7 @@ impl<'db> TypeVarInstance<'db> {
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
-        GenericContext::of_node(db, child.node(), index)?.binds_typevar(db, self)
+        GenericContext::of_node(ctx, child.node(), index)?.binds_typevar(db, self)
     }
 }
 
@@ -1155,7 +1194,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => polarity.compose_thunk(|| {
-                    match binding_type(db, definition).variance_of(ctx, self.identity(db)) {
+                    match binding_type(ctx, definition).variance_of(ctx, self.identity(db)) {
                         // When both directions are valid, the typing spec selects covariance.
                         TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                         variance => variance,

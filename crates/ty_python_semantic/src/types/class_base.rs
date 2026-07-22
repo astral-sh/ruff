@@ -301,7 +301,7 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
-                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    let fields = class.own_fields(ctx, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         ctx,
                         TupleType::heterogeneous(
@@ -417,7 +417,8 @@ impl<'db> ClassBase<'db> {
         )
     }
 
-    pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
+    pub(super) fn has_cyclic_mro(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         match self {
             ClassBase::Class(class) => {
                 let Some((class_literal, specialization)) = class.static_class_literal(db) else {
@@ -428,7 +429,7 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(db, specialization)
+                    .try_mro(ctx, specialization)
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Any

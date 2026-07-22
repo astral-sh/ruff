@@ -163,7 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
                 let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
-                    .items(db)
+                    .items(ctx)
                     .iter()
                     .map(|(name, field)| (name.clone(), field.declared_ty))
                     .collect();
@@ -326,7 +326,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let inferred_type =
+            definition_expression_type(self.semantic_context(), definition, call_expr);
         let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
             return;
         };

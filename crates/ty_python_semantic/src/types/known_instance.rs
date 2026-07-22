@@ -238,10 +238,9 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         ctx: &SemanticContext<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let db = ctx.db();
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(db).variance_of(ctx, typevar)
+                type_alias.raw_value_type(ctx).variance_of(ctx, typevar)
             }
             _ => TypeVarVariance::Bivariant,
         }

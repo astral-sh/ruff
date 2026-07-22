@@ -855,7 +855,7 @@ impl<'db> BoundSuperType<'db> {
                 // but here it seems like it's probably sound?
                 let mut key_builder = UnionBuilder::new(ctx);
                 let mut value_builder = UnionBuilder::new(ctx);
-                for (name, field) in td.items(db) {
+                for (name, field) in td.items(ctx) {
                     key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
                 }

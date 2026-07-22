@@ -31,10 +31,9 @@ enum ReflectedMethodPriority {
 /// This is intentionally conservative: a false negative only widens a binary operation's result,
 /// while a false positive could discard a valid normal-method result.
 fn has_exact_runtime_class<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> bool {
-    let db = ctx.db();
     match ty {
         Type::ClassLiteral(_) | Type::LiteralValue(_) => true,
-        Type::NominalInstance(instance) => instance.class(ctx).is_final(db),
+        Type::NominalInstance(instance) => instance.class(ctx).is_final(ctx),
         Type::TypeAlias(alias) => has_exact_runtime_class(ctx, alias.value_type(ctx)),
         _ => false,
     }

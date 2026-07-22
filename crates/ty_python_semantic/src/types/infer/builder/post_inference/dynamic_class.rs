@@ -24,7 +24,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let ty = binding_type(db, definition);
+    let ty = binding_type(context.semantic_context(), definition);
 
     // Check if it's a dynamic class with a Definition anchor.
     let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {
@@ -56,10 +56,14 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         let mut disjoint_bases = IncompatibleBases::default();
         let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
 
-        for (idx, base_type) in dynamic_class.explicit_bases(db).iter().enumerate() {
+        for (idx, base_type) in dynamic_class
+            .explicit_bases(context.semantic_context())
+            .iter()
+            .enumerate()
+        {
             // Convert to ClassType to access nearest_disjoint_base.
             if let Some(class_type) = base_type.to_class_type(ctx)
-                && let Some(disjoint_base) = class_type.nearest_disjoint_base(db)
+                && let Some(disjoint_base) = class_type.nearest_disjoint_base(ctx)
             {
                 disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
             }
