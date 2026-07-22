@@ -553,6 +553,9 @@ Us = TypeVarTuple("Us")
 # error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
 InvalidList = TypeAliasType("InvalidList", list[T], type_params=[T])
 
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidBare = TypeAliasType("InvalidBare", list[T], type_params=T)
+
 params = (T,)
 # error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
 InvalidTupleVariable = TypeAliasType("InvalidTupleVariable", list[T], type_params=params)
