@@ -82,11 +82,11 @@ pub(super) fn check_class<'db>(
     let scope = class.body_scope(db);
     let ctx = &context.semantic_context();
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(ctx, scope).collect();
-    let class_specialized = class.identity_specialization(db);
+    let class_specialized = class.identity_specialization(ctx);
     if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
         check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
     }
-    let enum_info = enum_metadata(db, class.into());
+    let enum_info = enum_metadata(ctx, class.into());
 
     #[expect(
         clippy::iter_over_hash_type,
@@ -132,7 +132,7 @@ fn check_inherited_method_conflicts<'db>(
     let ctx = &context.semantic_context();
 
     let mut direct_bases = Vec::new();
-    for base in class.explicit_bases(db) {
+    for base in class.explicit_bases(ctx) {
         match ClassBase::try_from_explicit_base(ctx, *base, Some(class.into())) {
             Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
                 direct_bases.push(base);
@@ -147,7 +147,7 @@ fn check_inherited_method_conflicts<'db>(
             _ => return,
         }
     }
-    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+    if direct_bases.len() < 2 || class.try_mro(ctx, None).is_err() {
         return;
     }
 
@@ -322,7 +322,6 @@ fn source_method_contract<'db>(
     receiver: Type<'db>,
     name: &Name,
 ) -> Option<(MethodDecorator, Type<'db>)> {
-    let db = ctx.db();
     // TODO: Check inherited conflicts involving properties and other attributes. For example:
     //
     // ```python
@@ -347,7 +346,7 @@ fn source_method_contract<'db>(
     let ty = Type::FunctionLiteral(function)
         .try_call_dunder_get(ctx, Some(receiver), receiver.to_meta_type(ctx))?
         .0;
-    Some((MethodDecorator::try_from_fn_type(db, function)?, ty))
+    Some((MethodDecorator::try_from_fn_type(ctx, function)?, ty))
 }
 
 /// Returns `true` when this source-level conflict involves a method replaced by `EnumType` during
@@ -400,18 +399,22 @@ fn conflicting_named_tuple_field_in_mro<'db>(
         let (superclass_literal, superclass_specialization) =
             superclass.class_literal_and_specialization(db);
 
-        if CodeGeneratorKind::NamedTuple.matches(db, superclass_literal) {
+        if CodeGeneratorKind::NamedTuple.matches(ctx, superclass_literal) {
             match superclass_literal {
                 ClassLiteral::Static(superclass_literal) => {
                     if let Some(field) = superclass_literal
-                        .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
+                        .own_fields(
+                            ctx,
+                            superclass_specialization,
+                            CodeGeneratorKind::NamedTuple,
+                        )
                         .get(field_name)
                     {
                         return Some((superclass, field.first_declaration));
                     }
                 }
                 ClassLiteral::DynamicNamedTuple(namedtuple) => {
-                    if namedtuple.field(db, field_name).is_some() {
+                    if namedtuple.field(ctx, field_name).is_some() {
                         return Some((superclass, namedtuple.definition(db)));
                     }
                 }
@@ -455,7 +458,7 @@ fn check_class_declaration<'db>(
     let Some((literal, _)) = class.static_class_literal(db) else {
         return;
     };
-    let class_kind = CodeGeneratorKind::from_class(db, literal.into());
+    let class_kind = CodeGeneratorKind::from_class(ctx, literal.into());
 
     // Check for prohibited `NamedTuple` attribute overrides.
     //
@@ -665,7 +668,7 @@ fn check_class_declaration<'db>(
                 {
                     continue;
                 }
-                method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
+                method_kind = CodeGeneratorKind::from_class(ctx, superclass_literal.into())
                     .map(MethodKind::Synthesized)
                     .unwrap_or_default();
             }
@@ -723,7 +726,7 @@ fn check_class_declaration<'db>(
                         );
 
                         if underlying_functions.iter().any(|function| {
-                            function.has_known_decorator(db, FunctionDecorators::FINAL)
+                            function.has_known_decorator(ctx, FunctionDecorators::FINAL)
                         }) && is_function_definition(db, superclass_scope, superclass_symbol_id)
                         {
                             Some((superclass, underlying_functions))
@@ -772,7 +775,7 @@ fn check_class_declaration<'db>(
 
             if configuration.check_attribute_liskov_violations() {
                 if let Some(superclass_variable_kind) =
-                    effective_superclass_variable_kind(db, superclass, member.name.clone())
+                    effective_superclass_variable_kind(ctx, superclass, &member.name)
                 {
                     if immediate_parent_variable_kind.is_none() {
                         immediate_parent_variable_kind =
@@ -994,7 +997,7 @@ fn method_override_types<'db>(
     let db = ctx.db();
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
-            let superclass_signature = superclass_method.function(db).signature(db);
+            let superclass_signature = superclass_method.function(db).signature(ctx);
             let receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1100,9 +1103,25 @@ fn superclass_variable_kind<'db>(
 /// class Sub(Intermediate):
 ///     x: ClassVar[int] = 2
 /// ```
+fn effective_superclass_variable_kind<'db>(
+    ctx: &SemanticContext<'db>,
+    superclass: ClassType<'db>,
+    name: &Name,
+) -> Option<VariableKind> {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        superclass
+            .class_literal(db)
+            .python_file(db)
+            .python_version(db)
+    );
+    effective_superclass_variable_kind_inner(db, superclass, name.clone())
+}
+
 #[allow(clippy::needless_pass_by_value)]
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn effective_superclass_variable_kind<'db>(
+fn effective_superclass_variable_kind_inner<'db>(
     db: &'db dyn Db,
     superclass: ClassType<'db>,
     name: Name,
@@ -1113,7 +1132,7 @@ fn effective_superclass_variable_kind<'db>(
             .iter_mro(ctx)
             .skip(1)
             .filter_map(ClassBase::into_class)
-            .find_map(|base| effective_superclass_variable_kind(db, base, name.clone()))
+            .find_map(|base| effective_superclass_variable_kind(ctx, base, &name))
     };
 
     let (superclass_literal, superclass_specialization) = superclass.static_class_literal(db)?;
@@ -1494,21 +1513,22 @@ struct LocalOverrideDefinition {
 
 impl LocalOverrideDefinition {
     fn from_function<'db>(
-        db: &'db dyn Db,
+        ctx: &SemanticContext<'db>,
         function: FunctionType<'db>,
         in_stub: bool,
         module: &ParsedModuleRef,
     ) -> Self {
-        let focus_definition = overriding_definition(db, function, in_stub);
+        let db = ctx.db();
+        let focus_definition = overriding_definition(ctx, function, in_stub);
 
         Self {
             focus_range: focus_definition.focus_range(db, module),
             any_definition_has_override_decorator: function
-                .has_known_decorator(db, FunctionDecorators::OVERRIDE),
+                .has_known_decorator(ctx, FunctionDecorators::OVERRIDE),
             focus_definition_has_override_decorator: focus_definition
                 .has_known_decorator(db, FunctionDecorators::OVERRIDE),
             focus_override_decorator_span: focus_definition
-                .find_known_decorator_span(db, KnownFunction::Override),
+                .find_known_decorator_span(ctx, KnownFunction::Override),
         }
     }
 }
@@ -1623,8 +1643,8 @@ fn extract_local_override_definitions<'db>(
         let function = member_functions
             .iter()
             .copied()
-            .find(|function| function.contains_definition(db, definition))
-            .or_else(|| infer_definition_types(db, definition).function_type(definition));
+            .find(|function| function.contains_definition(ctx, definition))
+            .or_else(|| infer_definition_types(ctx, definition).function_type(definition));
 
         let Some(function) = function else {
             continue;
@@ -1634,7 +1654,7 @@ fn extract_local_override_definitions<'db>(
             continue;
         }
         candidates.push(LocalOverrideDefinition::from_function(
-            db, function, in_stub, module,
+            ctx, function, in_stub, module,
         ));
         seen_function_types.push(function);
     }
@@ -1644,7 +1664,7 @@ fn extract_local_override_definitions<'db>(
     for function in member_functions {
         if !seen_function_types.contains(&function) {
             candidates.push(LocalOverrideDefinition::from_function(
-                db, function, in_stub, module,
+                ctx, function, in_stub, module,
             ));
         }
     }
@@ -1740,15 +1760,15 @@ fn is_local_member_function<'db>(
 }
 
 fn overriding_definition<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     function: FunctionType<'db>,
     in_stub: bool,
 ) -> OverloadLiteral<'db> {
-    let (_, implementation) = function.overloads_and_implementation(db);
+    let (_, implementation) = function.overloads_and_implementation(ctx);
     if !in_stub && let Some(implementation) = implementation {
         implementation
     } else {
-        function.first_overload_or_implementation(db)
+        function.first_overload_or_implementation(ctx)
     }
 }
 
@@ -1798,7 +1818,7 @@ fn check_post_init_signature<'db>(
     let ctx = &context.semantic_context();
 
     let init_var_fields = static_class
-        .fields(db, spec, policy)
+        .fields(ctx, spec, policy)
         .iter()
         .filter(|(_, field)| {
             matches!(

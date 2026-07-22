@@ -31,7 +31,8 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
+    let Some(function_type) =
+        infer_definition_types(context.semantic_context(), definition).function_type(definition)
     else {
         return;
     };

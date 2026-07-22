@@ -66,7 +66,7 @@ pub(crate) fn expand_type<'db>(
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
+            if let Some(enum_members) = enum_member_literals(ctx, class.class_literal(db), None) {
                 return Some(enum_members.collect());
             }
 

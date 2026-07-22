@@ -468,7 +468,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
-        if let Err(error) = enum_lit.try_mro(db) {
+        if let Err(error) = enum_lit.try_mro(ctx) {
             report_mro_error_kind(
                 &self.context,
                 error,
@@ -540,7 +540,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let ty = self.expression_type(value);
         let ctx = self.semantic_context();
         if let Some(class_lit) = ty.as_class_literal() {
-            if class_lit.is_typed_dict(db)
+            if class_lit.is_typed_dict(ctx)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
             {
                 builder.into_diagnostic(format_args!(

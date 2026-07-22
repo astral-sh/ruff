@@ -279,8 +279,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 if classvar_and_final
                                     && nearest_enclosing_class(self.db(), self.index, self.scope())
                                         .is_none_or(|class| {
-                                            !class.is_dataclass_like(self.db())
-                                                && !class.is_protocol(self.db())
+                                            !class.is_dataclass_like(self.semantic_context())
+                                                && !class.is_protocol(self.semantic_context())
                                         })
                                     && let Some(builder) = self
                                         .context

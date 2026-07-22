@@ -90,7 +90,7 @@ impl<'db> Mro<'db> {
         let db = ctx.db();
         let class = class_literal.apply_optional_specialization(ctx, specialization);
 
-        let original_bases = class_literal.explicit_bases(db);
+        let original_bases = class_literal.explicit_bases(ctx);
 
         match original_bases {
             // `builtins.object` is the special case:
@@ -115,7 +115,7 @@ impl<'db> Mro<'db> {
             // ```
             [] => {
                 // e.g. `class Foo[T]: ...` implicitly has `Generic` inserted into its bases
-                if class.has_pep_695_type_params(db) {
+                if class.has_pep_695_type_params(ctx) {
                     Ok(Self::from([
                         ClassBase::Class(class),
                         ClassBase::Generic,
@@ -135,7 +135,7 @@ impl<'db> Mro<'db> {
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
             [single_base]
-                if !class.has_pep_695_type_params(db)
+                if !class.has_pep_695_type_params(ctx)
                     && !matches!(
                         single_base,
                         Type::GenericAlias(_)
@@ -158,7 +158,7 @@ impl<'db> Mro<'db> {
                         )])))
                     },
                     |single_base| {
-                        if single_base.has_cyclic_mro(db) {
+                        if single_base.has_cyclic_mro(ctx) {
                             Err(StaticMroErrorKind::InheritanceCycle)
                         } else {
                             Ok(std::iter::once(ClassBase::Class(class))
@@ -211,13 +211,13 @@ impl<'db> Mro<'db> {
 
                 // `Generic` is implicitly added to the bases list of a class that has PEP-695 type parameters
                 // (documented at https://docs.python.org/3/reference/compound_stmts.html#generic-classes)
-                if class.has_pep_695_type_params(db) {
+                if class.has_pep_695_type_params(ctx) {
                     maybe_add_generic(&mut resolved_bases, original_bases, &[]);
                 }
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
                 for base in &resolved_bases {
-                    if base.has_cyclic_mro(db) {
+                    if base.has_cyclic_mro(ctx) {
                         return Err(StaticMroErrorKind::InheritanceCycle.into_mro_error(ctx, class));
                     }
                     seqs.push(base.mro(ctx, specialization).collect());
@@ -237,7 +237,7 @@ impl<'db> Mro<'db> {
                 // The rest of this function is dedicated to figuring out the best error message
                 // to report to the user.
 
-                if class.has_pep_695_type_params(db)
+                if class.has_pep_695_type_params(ctx)
                     && original_bases.iter().any(|base| {
                         matches!(
                             base,
@@ -347,8 +347,7 @@ impl<'db> Mro<'db> {
         ctx: &SemanticContext<'db>,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let db = ctx.db();
-        let original_bases = dynamic.explicit_bases(db);
+        let original_bases = dynamic.explicit_bases(ctx);
 
         // Convert Types to ClassBases, tracking any that fail conversion.
         let mut resolved_bases = Vec::with_capacity(original_bases.len());
@@ -384,7 +383,7 @@ impl<'db> Mro<'db> {
         // Build MRO sequences and check for inheritance cycles.
         let mut seqs = vec![VecDeque::from([self_base])];
         for base in &resolved_bases {
-            if base.has_cyclic_mro(db) {
+            if base.has_cyclic_mro(ctx) {
                 return Err(DynamicMroErrorKind::InheritanceCycle.into_error(ctx, dynamic));
             }
             seqs.push(base.mro(ctx, None).collect());
@@ -439,7 +438,6 @@ impl<'db> Mro<'db> {
         ctx: &SemanticContext<'db>,
         dynamic_enum: DynamicEnumLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let db = ctx.db();
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic_enum.into()));
 
         // Convert the functional enum bases (`type=` mixin first, enum base second)
@@ -484,7 +482,7 @@ impl<'db> Mro<'db> {
         // for the same pattern.
         let mut seqs = vec![VecDeque::from([self_base])];
         for base in &resolved_bases {
-            if base.has_cyclic_mro(db) {
+            if base.has_cyclic_mro(ctx) {
                 return Err(DynamicMroError {
                     kind: DynamicMroErrorKind::InheritanceCycle,
                     fallback_mro: fallback_mro(),
@@ -507,13 +505,12 @@ impl<'db> Mro<'db> {
         ctx: &SemanticContext<'db>,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Self {
-        let db = ctx.db();
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
         let mut result = vec![self_base];
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        for base_type in dynamic.explicit_bases(db) {
+        for base_type in dynamic.explicit_bases(ctx) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
             let base = ClassBase::try_from_explicit_base(ctx, *base_type, None)
                 .unwrap_or_else(ClassBase::unknown);
@@ -638,7 +635,7 @@ impl<'db> MroIterator<'db> {
                     let specialization = self.specialization.map(|specialization| {
                         specialization.tuple_runtime_element_specialization(&self.ctx)
                     });
-                    let mut full_mro_iter = match literal.try_mro(self.ctx.db(), specialization) {
+                    let mut full_mro_iter = match literal.try_mro(&self.ctx, specialization) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
@@ -646,7 +643,7 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::Dynamic(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.ctx.db()) {
+                    let mut full_mro_iter = match literal.try_mro(&self.ctx) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
@@ -654,17 +651,17 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
-                    let mut full_mro_iter = literal.mro(self.ctx.db()).iter();
+                    let mut full_mro_iter = literal.mro(&self.ctx).iter();
                     full_mro_iter.next();
                     full_mro_iter
                 }
                 ClassLiteral::DynamicTypedDict(literal) => {
-                    let mut full_mro_iter = literal.mro(self.ctx.db()).iter();
+                    let mut full_mro_iter = literal.mro(&self.ctx).iter();
                     full_mro_iter.next();
                     full_mro_iter
                 }
                 ClassLiteral::DynamicEnum(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.ctx.db()) {
+                    let mut full_mro_iter = match literal.try_mro(&self.ctx) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
@@ -851,7 +848,6 @@ fn check_generic_reorder_fixes_mro<'db>(
     resolved_bases: &[ClassBase<'db>],
     original_bases: &[Type<'db>],
 ) -> Option<usize> {
-    let db = ctx.db();
     // Only attempt an autofix if `Generic[]` appears exactly once in the original bases list.
     let single_index = original_bases
         .iter()
@@ -877,7 +873,7 @@ fn check_generic_reorder_fixes_mro<'db>(
     reordered.push_back(generic);
     let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
     for base in &reordered {
-        if base.has_cyclic_mro(db) {
+        if base.has_cyclic_mro(ctx) {
             return None;
         }
         seqs.push(base.mro(ctx, None).collect());

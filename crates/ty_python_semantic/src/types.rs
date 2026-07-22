@@ -182,6 +182,7 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
     let start = Instant::now();
 
     let index = semantic_index(db, file);
+    let ctx = SemanticContext::from_file(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
@@ -191,7 +192,7 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
             continue;
         }
 
-        let result = infer_scope_types(db, scope_id, TypeContext::default());
+        let result = infer_scope_types(&ctx, scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -219,17 +220,20 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
 }
 
 /// Infer the type of a binding.
-pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
-    let inference = infer_definition_types(db, definition);
+pub(crate) fn binding_type<'db>(
+    ctx: &SemanticContext<'db>,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let inference = infer_definition_types(ctx, definition);
     inference.binding_type(definition)
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.
 pub(crate) fn inferred_declaration<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
-    let inference = infer_definition_types(db, definition);
+    let inference = infer_definition_types(ctx, definition);
     inference.inferred_declaration(definition)
 }
 
@@ -240,21 +244,22 @@ pub(crate) fn inferred_declaration<'db>(
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
 fn definition_expression_type<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
+    let db = ctx.db();
     let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the definition scope
-        let inference = infer_definition_types(db, definition);
+        let inference = infer_definition_types(ctx, definition);
         if let Some(ty) = inference.try_expression_type(expression) {
             ty
         } else {
-            infer_deferred_types(db, definition).expression_type(expression)
+            infer_deferred_types(ctx, definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope
@@ -267,16 +272,17 @@ fn definition_expression_type<'db>(
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
 fn definition_expression_annotation<'db>(
-    db: &'db dyn Db,
+    ctx: &SemanticContext<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeAndQualifiers<'db> {
+    let db = ctx.db();
     let file = definition.python_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
-        let inference = infer_deferred_types(db, definition);
+        let inference = infer_deferred_types(ctx, definition);
         TypeAndQualifiers::new(
             inference.expression_type(expression),
             TypeOrigin::Declared,
@@ -711,7 +717,7 @@ impl<'db> PropertyInstanceType<'db> {
             accessor
                 .and_then(Type::as_function_literal)
                 .into_iter()
-                .flat_map(|function| function.iter_overloads_and_implementation(db))
+                .flat_map(|function| function.iter_overloads_and_implementation(ctx))
                 .filter_map(|overload| overload.signature(ctx).definition())
                 .any(|accessor_def| accessor_def == def)
         };
@@ -1340,9 +1346,8 @@ impl<'db> Type<'db> {
     }
 
     fn is_enum(&self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
         self.as_nominal_instance()
-            .is_some_and(|instance| enum_metadata(db, instance.class_literal(ctx)).is_some())
+            .is_some_and(|instance| enum_metadata(ctx, instance.class_literal(ctx)).is_some())
     }
 
     fn is_typealias_special_form(&self) -> bool {
@@ -1474,20 +1479,22 @@ impl<'db> Type<'db> {
     }
 
     /// Is a value of this type only usable in typing contexts?
-    pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
+    pub fn is_type_check_only(&self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
             Type::FunctionLiteral(f) => {
-                f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
+                f.has_known_decorator(ctx, FunctionDecorators::TYPE_CHECK_ONLY)
             }
             _ => false,
         }
     }
 
     /// Returns whether this type is marked as deprecated via `@warnings.deprecated`.
-    pub fn is_deprecated(&self, db: &'db dyn Db) -> bool {
+    pub fn is_deprecated(&self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         match self {
-            Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+            Type::FunctionLiteral(f) => f.implementation_deprecated(ctx).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
         }
@@ -2235,7 +2242,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) if literal.is_promotable() => {
                 literal.fallback_instance(ctx)
             }
-            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(ctx.db())),
+            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(ctx)),
             _ => self,
         }
     }
@@ -2243,7 +2250,7 @@ impl<'db> Type<'db> {
     /// Like [`Type::promote_singletons_recursively`], but does not recurse into nested types.
     fn promote_singletons_impl(self, ctx: &SemanticContext<'db>) -> Type<'db> {
         match self {
-            Type::NominalInstance(instance) if instance.is_singleton(ctx.db()) => {
+            Type::NominalInstance(instance) if instance.is_singleton(ctx) => {
                 UnionType::from_two_elements(ctx, self, Type::unknown())
             }
             _ => self,
@@ -2570,7 +2577,7 @@ impl<'db> Type<'db> {
                 false
             }
             Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => false,
-            Type::NominalInstance(instance) => instance.is_singleton(db),
+            Type::NominalInstance(instance) => instance.is_singleton(ctx),
             Type::PropertyInstance(_) => false,
             Type::Union(..) => {
                 // A single-element union, where the sole element was a singleton, would itself
@@ -2738,7 +2745,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
-            Type::ClassLiteral(class) if class.is_typed_dict(db) => {
+            Type::ClassLiteral(class) if class.is_typed_dict(ctx) => {
                 Some(class.typed_dict_member(ctx, None, name, policy))
             }
 
@@ -2777,7 +2784,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+            Type::GenericAlias(alias) if alias.is_typed_dict(ctx) => {
                 Some(alias.origin(db).typed_dict_member(ctx, None, name, policy))
             }
 
@@ -3506,10 +3513,10 @@ impl<'db> Type<'db> {
         // for every function and access context.
         if let Type::FunctionLiteral(function) = self {
             let db = ctx.db();
-            let descriptor_result = if function.is_classmethod(db) {
+            let descriptor_result = if function.is_classmethod(ctx) {
                 Type::BoundMethod(BoundMethodType::new(db, function, owner))
             } else if let Some(instance) = instance
-                && !function.is_staticmethod(db)
+                && !function.is_staticmethod(ctx)
             {
                 Type::BoundMethod(BoundMethodType::new(db, function, instance))
             } else {
@@ -4035,7 +4042,7 @@ impl<'db> Type<'db> {
                     _ => this
                         .nominal_class(ctx)
                         .map(|class| class.class_literal(db))
-                        .and_then(|class| class.into_enum_class(db)),
+                        .and_then(|class| class.into_enum_class(ctx)),
                 } && let Some(resolved_name) = enum_class.resolve_member(db, name)
                 {
                     return Place::bound(Type::enum_literal(EnumLiteralType::new(
@@ -4439,7 +4446,7 @@ impl<'db> Type<'db> {
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                         && let class_literal = instance.class_literal(ctx)
-                        && let Some(metadata) = enum_metadata(db, class_literal)
+                        && let Some(metadata) = enum_metadata(ctx, class_literal)
                         && !enums::class_defines_property(ctx, class_literal, name_str) =>
                 {
                     let is_enum_subclass = Type::ClassLiteral(class_literal)
@@ -4523,11 +4530,11 @@ impl<'db> Type<'db> {
                     // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
                     let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(ctx),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(ctx)
-                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(ctx)),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
@@ -4784,7 +4791,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let signature = bound_method.function(db).signature(ctx);
                 let self_instance = bound_method.self_instance(db);
                 // Class-based protocol member lookup has already specialized the method for this
                 // receiver. Bake an implicit positional receiver into the signature instead of
@@ -4967,7 +4974,7 @@ impl<'db> Type<'db> {
 
                 _ => CallableBinding::from_overloads(
                     self,
-                    function_type.signature(db).overloads.iter().cloned(),
+                    function_type.signature(ctx).overloads.iter().cloned(),
                 )
                 .into(),
             },
@@ -5120,7 +5127,7 @@ impl<'db> Type<'db> {
                 self,
                 Signature::new(
                     Parameters::standard([Parameter::positional_only(None)
-                        .with_annotated_type(newtype.base(db).instance_type(ctx))]),
+                        .with_annotated_type(newtype.base(ctx).instance_type(ctx))]),
                     Type::NewTypeInstance(newtype),
                 ),
             )
@@ -5500,7 +5507,7 @@ impl<'db> Type<'db> {
 
         let db = ctx.db();
         let class_literal = class.class_literal(db);
-        let class_generic_context = class_literal.generic_context(db);
+        let class_generic_context = class_literal.generic_context(ctx);
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
@@ -5521,8 +5528,8 @@ impl<'db> Type<'db> {
         // Checking TypedDict construction happens in `infer_call_expression_impl`.
         // We don't want to use the synthesized binding for type inference, so here we just
         // return a permissive fallback binding.
-        if class_literal.is_typed_dict(db)
-            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal)
+        if class_literal.is_typed_dict(ctx)
+            || class::CodeGeneratorKind::TypedDict.matches(ctx, class_literal)
         {
             return fallback_bindings();
         }
@@ -5568,8 +5575,8 @@ impl<'db> Type<'db> {
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
         let self_type = match self {
-            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
-                Type::from(class.identity_specialization(db))
+            Type::ClassLiteral(class) if class.generic_context(ctx).is_some() => {
+                Type::from(class.identity_specialization(ctx))
             }
             _ => self,
         };
@@ -6333,7 +6340,7 @@ impl<'db> Type<'db> {
                     }
                     let index = semantic_index(db, scope_id.python_file(db));
                     Ok(bind_typevar(
-                        db,
+                        ctx,
                         index,
                         scope_id.file_scope_id(db),
                         typevar_binding_context,
@@ -6799,7 +6806,7 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
-                if instance.is_singleton(db) {
+                if instance.is_singleton(ctx) {
                     self.promote_singletons_impl(ctx)
                 } else {
                     instance.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor)
@@ -6811,7 +6818,7 @@ impl<'db> Type<'db> {
             },
 
             Type::NewTypeInstance(newtype) => visitor.visit(ctx, self, type_mapping, || {
-                Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
+                Type::NewTypeInstance(newtype.map_base_class_type(ctx, |class_type| {
                     class_type.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor)
                 }))
             }),
@@ -6939,7 +6946,7 @@ impl<'db> Type<'db> {
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                     TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(db).expand_eagerly(ctx)
+                        alias.raw_value_type(ctx).expand_eagerly(ctx)
                     },
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
@@ -6962,7 +6969,7 @@ impl<'db> Type<'db> {
                                 .with_materialization_kind(db, Some(*materialization_kind));
                         }
                         Type::TypeAlias(alias.apply_specialization(
-                            db,
+                            ctx,
                             |generic_context| {
                                 alias
                                     .specialization(db)
@@ -7892,12 +7899,12 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
-                function_type.variance_of(db, typevar)
+                function_type.variance_of(ctx, typevar)
             }
 
             Type::BoundMethod(method_type) => {
                 // TODO: do we need to replace self?
-                method_type.function(db).variance_of(db, typevar)
+                method_type.function(db).variance_of(ctx, typevar)
             }
 
             Type::NominalInstance(nominal_instance_type) => {
@@ -8017,8 +8024,20 @@ fn self_typevar_owner_class_literal<'db>(
         .map(|class| class.class_literal(db))
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn class_mro_literals<'db>(
+    ctx: &SemanticContext<'db>,
+    class_literal: ClassLiteral<'db>,
+) -> &'db [ClassLiteral<'db>] {
+    let db = ctx.db();
+    debug_assert_eq!(
+        ctx.python_version(),
+        class_literal.python_file(db).python_version(db)
+    );
+    class_mro_literals_inner(db, class_literal)
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn class_mro_literals_inner<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
 ) -> Box<[ClassLiteral<'db>]> {
@@ -8094,7 +8113,7 @@ impl<'db> SelfBinding<'db> {
         // Check that the Self typevar's owner class is in the MRO of the self type's class.
         // If we can't determine either class, conservatively don't bind.
         self.class_literal.is_some_and(|class_literal| {
-            let class_mro = class_mro_literals(db, class_literal);
+            let class_mro = class_mro_literals(ctx, class_literal);
             self_typevar_owner_class_literal(ctx, bound_typevar)
                 .is_none_or(|owner_class| class_mro.contains(&owner_class))
         })
@@ -9323,13 +9342,12 @@ pub(super) fn determine_upper_bound<'db>(
     class_literal: ClassLiteral<'db>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {
-    let db = ctx.db();
     let upper_bound = class_literal
         .iter_mro(ctx)
         .take_while(|base| !is_known_base(*base))
         .filter_map(ClassBase::into_class)
         .last()
-        .unwrap_or_else(|| class_literal.unknown_specialization(db));
+        .unwrap_or_else(|| class_literal.unknown_specialization(ctx));
     Type::instance(ctx, upper_bound)
 }
 

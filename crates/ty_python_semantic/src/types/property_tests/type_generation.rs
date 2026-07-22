@@ -171,7 +171,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .into_enum_class(db)
+                    .into_enum_class(ctx)
                     .expect("`uuid.SafeUUID` is an enum");
                 Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
             }
@@ -180,7 +180,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(ctx)))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(ctx, instance.class_literal(ctx)))
                 );
                 ty
             }
@@ -293,7 +293,7 @@ fn newtype_instance<'db>(ctx: &SemanticContext<'db>, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
     let file = PythonFile::new(db, file, ctx.python_version());
-    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(ctx, file, name).place else {
         panic!(
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );

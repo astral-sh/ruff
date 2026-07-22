@@ -451,7 +451,7 @@ pub fn typed_dict_key_definition<'db>(
 ) -> Option<ResolvedDefinition<'db>> {
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let field = typed_dict.items(model.db()).get(key)?;
+    let field = typed_dict.items(&model.semantic_context()).get(key)?;
     let definition = field.first_declaration()?;
     Some(ResolvedDefinition::Definition(definition))
 }
@@ -467,7 +467,7 @@ pub fn typed_dict_key_hover<'db>(
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let owner = value_ty.display(&model.semantic_context()).to_string();
-    let field = typed_dict.items(model.db()).get(key)?;
+    let field = typed_dict.items(&model.semantic_context()).get(key)?;
     let docstring = field
         .first_declaration()
         .and_then(|declaration| declaration.docstring(model.db()));
@@ -557,7 +557,7 @@ pub fn definitions_and_overloads_for_function<'db>(
     {
         let ctx = &model.semantic_context();
         function_type
-            .iter_overloads_and_implementation(model.db())
+            .iter_overloads_and_implementation(ctx)
             .filter_map(|overload| overload.signature(ctx).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
@@ -1312,9 +1312,9 @@ mod resolve_definition {
     use tracing::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
-    use crate::Db;
     use crate::module_docstring;
     use crate::types::binding_type;
+    use crate::{Db, SemanticContext};
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -1408,6 +1408,7 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
     ) -> Option<String> {
+        let ctx = SemanticContext::from_file(db, definition.python_file(db));
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };
@@ -1417,7 +1418,7 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
-        let current_overload = binding_type(db, definition)
+        let current_overload = binding_type(&ctx, definition)
             .as_function_literal()?
             .literal(db)
             .last_definition;
@@ -1426,8 +1427,8 @@ mod resolve_definition {
         let implementation = use_def
             .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| {
-                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(db)
+                let ty = binding_type(&ctx, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(&ctx)
                     .any(|overload| overload == current_overload)
                     .then_some(ty)
             })
@@ -2075,7 +2076,7 @@ pub fn type_hierarchy_subtypes<'db>(
                 continue;
             }
 
-            let ty = crate::types::binding_type(db, def);
+            let ty = crate::types::binding_type(ctx, def);
             let Some(class_ty) = extract_class_literal(&file_ctx, ty) else {
                 continue;
             };

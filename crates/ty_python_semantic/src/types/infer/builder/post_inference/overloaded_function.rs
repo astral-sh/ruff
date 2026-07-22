@@ -54,7 +54,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+    if !function.has_known_decorator(ctx, FunctionDecorators::OVERLOAD) {
         return;
     }
 
@@ -75,7 +75,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     };
 
-    if !function.contains_definition(db, definition) {
+    if !function.contains_definition(ctx, definition) {
         // The public end-of-scope binding for this place can be a different overloaded function
         // value assigned to the same name. In that case, the current local overload definition is
         // shadowed, and checking the public function here would report against the wrong function.
@@ -92,7 +92,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    let (overloads, implementation) = function.overloads_and_implementation(db);
+    let (overloads, implementation) = function.overloads_and_implementation(ctx);
     if overloads.is_empty() {
         return;
     }
@@ -115,8 +115,8 @@ pub(crate) fn check_overloaded_function<'db>(
                 function_node.name
             ));
             diagnostic.set_primary_message("Only one overload defined here");
-            if let Some(decorator) =
-                single_overload.find_known_decorator_span(db, KnownFunction::Overload)
+            if let Some(decorator) = single_overload
+                .find_known_decorator_span(context.semantic_context(), KnownFunction::Overload)
             {
                 diagnostic.annotate(Annotation::secondary(decorator));
             }
@@ -129,7 +129,7 @@ pub(crate) fn check_overloaded_function<'db>(
     if implementation.is_none() && !context.in_stub() {
         let mut implementation_required = true;
 
-        if function.iter_overloads_and_implementation(db).all(|f| {
+        if function.iter_overloads_and_implementation(ctx).all(|f| {
             index.is_in_type_checking_block(
                 f.body_scope(db).file_scope_id(db),
                 f.node(db, context.file(), context.module()).range(),
@@ -142,7 +142,7 @@ pub(crate) fn check_overloaded_function<'db>(
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
         {
-            if class.is_protocol(db)
+            if class.is_protocol(ctx)
                 || ({
                     Type::ClassLiteral(class)
                         .is_subtype_of(ctx, KnownClass::ABCMeta.to_instance(ctx))
@@ -193,8 +193,8 @@ pub(crate) fn check_overloaded_function<'db>(
                         .secondary(function.focus_range(db, context.module()))
                         .message(format_args!("Missing here")),
                 );
-                if let Some(decorator) =
-                    function.find_known_decorator_span(db, KnownFunction::Overload)
+                if let Some(decorator) = function
+                    .find_known_decorator_span(context.semantic_context(), KnownFunction::Overload)
                 {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
@@ -222,7 +222,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     name = known_function.name()
                 ));
                 for known_function in [known_function, KnownFunction::Overload] {
-                    if let Some(decorator) = overload.find_known_decorator_span(db, known_function)
+                    if let Some(decorator) = overload
+                        .find_known_decorator_span(context.semantic_context(), known_function)
                     {
                         diagnostic.annotate(Annotation::secondary(decorator));
                     }
@@ -252,7 +253,9 @@ pub(crate) fn check_overloaded_function<'db>(
                         first overload",
                     name = known_function.name()
                 ));
-                if let Some(decorator) = overload.find_known_decorator_span(db, known_function) {
+                if let Some(decorator) =
+                    overload.find_known_decorator_span(context.semantic_context(), known_function)
+                {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
                 let file = function.file(db);

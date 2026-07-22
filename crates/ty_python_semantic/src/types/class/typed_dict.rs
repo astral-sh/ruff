@@ -48,10 +48,10 @@ pub(super) fn synthesize_typed_dict_method<'db>(
         "update" => Some(synthesize_typed_dict_update(ctx, typed_dict, fields())),
         "pop" => Some(synthesize_typed_dict_pop(ctx, typed_dict, fields())),
         "setdefault" => Some(synthesize_typed_dict_setdefault(ctx, typed_dict, fields())),
-        "clear" if typed_dict.supports_arbitrary_key_deletion(db) => Some(
+        "clear" if typed_dict.supports_arbitrary_key_deletion(ctx) => Some(
             synthesize_typed_dict_no_argument_method(db, typed_dict, Type::none(ctx)),
         ),
-        "popitem" if typed_dict.supports_arbitrary_key_deletion(db) => {
+        "popitem" if typed_dict.supports_arbitrary_key_deletion(ctx) => {
             let return_ty = Type::heterogeneous_tuple(
                 db,
                 [KnownClass::Str.to_instance(ctx), typed_dict.value_type(ctx)],
@@ -60,20 +60,20 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 db, typed_dict, return_ty,
             ))
         }
-        "__iter__" if typed_dict.openness(db).is_closed() => {
+        "__iter__" if typed_dict.openness(ctx).is_closed() => {
             let return_ty =
                 KnownClass::Iterator.to_specialized_instance(ctx, &[typed_dict.key_type(ctx)]);
             Some(synthesize_typed_dict_no_argument_method(
                 db, typed_dict, return_ty,
             ))
         }
-        "items" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "items" if !typed_dict.openness(ctx).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(ctx, typed_dict, "dict_items"),
         ),
-        "keys" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "keys" if !typed_dict.openness(ctx).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(ctx, typed_dict, "dict_keys"),
         ),
-        "values" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "values" if !typed_dict.openness(ctx).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(ctx, typed_dict, "dict_values"),
         ),
         "__or__" | "__ror__" | "__ior__" => {
@@ -138,7 +138,7 @@ fn synthesize_typed_dict_init<'db>(
         .collect();
 
     let keyword_rest_param = typed_dict
-        .explicit_extra_items(db)
+        .explicit_extra_items(ctx)
         .map(|extra_items| {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(extra_items.declared_ty)
@@ -226,7 +226,7 @@ fn synthesize_typed_dict_getitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(KnownClass::Str.to_instance(ctx)),
             ]),
-            if typed_dict.explicit_extra_items(db).is_some() {
+            if typed_dict.explicit_extra_items(ctx).is_some() {
                 typed_dict.value_type(ctx)
             } else {
                 Type::object()
@@ -313,7 +313,7 @@ fn synthesize_typed_dict_delitem<'db>(
         .iter()
         .filter(|(_, field)| !field.is_required() && !field.is_read_only())
         .peekable();
-    let supports_arbitrary_key_deletion = typed_dict.supports_arbitrary_key_deletion(db);
+    let supports_arbitrary_key_deletion = typed_dict.supports_arbitrary_key_deletion(ctx);
 
     if deletable_fields.peek().is_none() && !supports_arbitrary_key_deletion {
         let parameters = [
@@ -363,7 +363,7 @@ fn synthesize_typed_dict_get<'db>(
 ) -> Type<'db> {
     let db = ctx.db();
     let instance_ty = Type::TypedDict(typed_dict);
-    let fallback_value_ty = if typed_dict.openness(db).is_implicitly_open() {
+    let fallback_value_ty = if typed_dict.openness(ctx).is_implicitly_open() {
         Type::unknown()
     } else {
         typed_dict.value_type(ctx)
@@ -499,7 +499,7 @@ fn synthesize_typed_dict_update<'db>(
         })
         .chain(
             typed_dict
-                .explicit_extra_items(db)
+                .explicit_extra_items(ctx)
                 .filter(|extra_items| !extra_items.is_read_only())
                 .map(|extra_items| {
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -507,7 +507,7 @@ fn synthesize_typed_dict_update<'db>(
                 }),
         );
 
-    let update_patch_ty = Type::TypedDict(typed_dict.to_update_patch(db));
+    let update_patch_ty = Type::TypedDict(typed_dict.to_update_patch(ctx));
 
     let mapping_ty = typed_dict.dict_value_type(ctx).map(|value_ty| {
         KnownClass::Mapping
@@ -593,7 +593,7 @@ fn synthesize_typed_dict_pop<'db>(
         })
         .chain(
             typed_dict
-                .supports_arbitrary_key_deletion(db)
+                .supports_arbitrary_key_deletion(ctx)
                 .then(|| {
                     pop_overloads(KnownClass::Str.to_instance(ctx), typed_dict.value_type(ctx))
                 })
@@ -684,7 +684,7 @@ fn synthesize_typed_dict_view_method<'db>(
         .ignore_possibly_undefined()
         .and_then(Type::as_class_literal)
         .map(|class| {
-            class.apply_specialization(db, |generic_context| {
+            class.apply_specialization(ctx, |generic_context| {
                 generic_context
                     .specialize(db, &[typed_dict.key_type(ctx), typed_dict.value_type(ctx)])
             })
@@ -707,7 +707,7 @@ fn synthesize_typed_dict_merge<'db>(
     let first_overload_value_ty = if name == "__ior__"
         && let Type::TypedDict(typed_dict) = instance_ty
     {
-        Type::TypedDict(typed_dict.to_update_patch(db))
+        Type::TypedDict(typed_dict.to_update_patch(ctx))
     } else {
         instance_ty
     };
@@ -725,7 +725,7 @@ fn synthesize_typed_dict_merge<'db>(
 
     if name != "__ior__" {
         let partial_ty = if let Type::TypedDict(td) = instance_ty {
-            Type::TypedDict(td.to_partial(db))
+            Type::TypedDict(td.to_partial(ctx))
         } else {
             instance_ty
         };
@@ -924,19 +924,21 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
+    pub(crate) fn items(self, ctx: &SemanticContext<'db>) -> &'db TypedDictSchema<'db> {
+        let db = ctx.db();
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_schema(db, *definition)
+                deferred_functional_typed_dict_schema(ctx, *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
     }
 
-    pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
+    pub(crate) fn openness(self, ctx: &SemanticContext<'db>) -> TypedDictOpenness<'db> {
+        let db = ctx.db();
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_openness(db, *definition)
+                deferred_functional_typed_dict_openness(ctx, *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { openness, .. } => *openness,
         }
@@ -946,8 +948,17 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
     /// [self, `TypedDict`, object]
+    pub(crate) fn mro(self, ctx: &SemanticContext<'db>) -> &'db Mro<'db> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.scope(db).python_file(db).python_version(db)
+        );
+        self.mro_inner(db)
+    }
+
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
-    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
+    fn mro_inner(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let ctx = SemanticContext::from_file(db, self.scope(db).python_file(db));
         let object_class = ClassType::object(&ctx);
@@ -968,11 +979,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, ctx: &SemanticContext<'db>, name: &str) -> Member<'db> {
-        let db = ctx.db();
         let typed_dict =
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
         synthesize_typed_dict_method(ctx, typed_dict, name, || {
-            TypedDictFields::Dynamic(self.items(db))
+            TypedDictFields::Dynamic(self.items(ctx))
         })
         .map(Member::definitely_declared)
         .unwrap_or_default()

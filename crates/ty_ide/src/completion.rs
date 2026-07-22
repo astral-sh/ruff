@@ -488,7 +488,7 @@ impl<'db> CompletionBuilder<'db> {
     ) -> Completion<'db> {
         let ctx = SemanticContext::from_file(db, python_file);
         if let Some(ty) = self.ty {
-            self.is_type_check_only = ty.is_type_check_only(db);
+            self.is_type_check_only = ty.is_type_check_only(&ctx);
             // Tags completions with context-specific if they are
             // known to be usable in an exception context and we have
             // determined an `exception_ty`.
@@ -512,7 +512,7 @@ impl<'db> CompletionBuilder<'db> {
                     );
             }
 
-            self.deprecated = ty.is_deprecated(db);
+            self.deprecated = ty.is_deprecated(&ctx);
         }
         let kind = self
             .kind
@@ -1998,7 +1998,7 @@ fn add_class_arg_completions<'db>(
     let is_typed_dict = class_def
         .inferred_type(model)
         .and_then(Type::as_class_literal)
-        .is_some_and(|t| t.is_typed_dict(model.db()));
+        .is_some_and(|t| t.is_typed_dict(&ctx));
 
     // TODO: Handle PEP 728 that adds two extra keywords,
     // closed and extra_items.

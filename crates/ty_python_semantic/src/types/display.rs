@@ -819,7 +819,7 @@ impl<'db> TypeAliasType<'db> {
 
     /// Returns a source-style display of this type alias's declaration.
     pub fn display_declaration<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> impl Display + 'ctx {
-        let value_ty = self.raw_value_type(ctx.db());
+        let value_ty = self.raw_value_type(ctx);
         DisplayTypeAliasDeclaration {
             ctx,
             type_alias: self,
@@ -885,7 +885,7 @@ struct DisplayTypeAliasDeclaration<'ctx, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let generic_context = self.type_alias.generic_context(self.ctx.db());
+        let generic_context = self.type_alias.generic_context(self.ctx);
         let settings = self
             .settings
             .with_generic_context(self.ctx.db(), generic_context.as_ref());
@@ -1112,7 +1112,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.ctx.db());
                 let self_ty = bound_method.self_instance(self.ctx.db());
-                let bound_signatures = bound_method.bound_signatures(self.ctx.db());
+                let bound_signatures = bound_method.bound_signatures(self.ctx);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
@@ -1700,7 +1700,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
         visited.insert(self.ty);
         settings.visited_function_types = Rc::new(visited);
 
-        let signature = self.ty.signature(self.ctx.db());
+        let signature = self.ty.signature(self.ctx);
 
         match signature.overloads.as_slice() {
             [signature] => {

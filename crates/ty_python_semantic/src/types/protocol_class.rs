@@ -40,16 +40,22 @@ use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, 
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
-        self.is_protocol(db)
+    pub(super) fn into_protocol_class(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(ctx)
             .then_some(ProtocolClass(ClassType::NonGeneric(self.into())))
     }
 }
 
 impl<'db> ClassType<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
-        self.is_protocol(db).then_some(ProtocolClass(self))
+    pub(super) fn into_protocol_class(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(ctx).then_some(ProtocolClass(self))
     }
 }
 
@@ -72,8 +78,13 @@ impl<'db> ProtocolClass<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    pub(super) fn interface(self, ctx: &SemanticContext<'db>) -> ProtocolInterface<'db> {
+        let db = ctx.db();
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.class_literal(db).python_file(db).python_version(db)
+        );
         cached_protocol_interface(db, *self)
     }
 
@@ -112,7 +123,7 @@ impl<'db> ProtocolClass<'db> {
             .filter_map(ClassBase::into_class)
             .filter_map(|class| {
                 let (class_literal, specialization) = class.static_class_literal(db)?;
-                let protocol_class = class_literal.into_protocol_class(db)?;
+                let protocol_class = class_literal.into_protocol_class(ctx)?;
                 Some((
                     protocol_class.static_class_literal(db)?.0.body_scope(db),
                     specialization,
@@ -176,11 +187,12 @@ impl<'db> ProtocolClass<'db> {
         }
     }
 
-    pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_runtime_checkable(self, ctx: &SemanticContext<'db>) -> bool {
+        let db = ctx.db();
         self.static_class_literal(db)
             .is_some_and(|(class_literal, _)| {
                 class_literal
-                    .known_function_decorators(db)
+                    .known_function_decorators(ctx)
                     .contains(&KnownFunction::RuntimeCheckable)
             })
     }
@@ -223,13 +235,13 @@ impl<'db> ProtocolClass<'db> {
     /// class body, or are declared in a superclass of the protocol class.
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
-        let interface = self.interface(db);
+        let ctx = context.semantic_context();
+        let interface = self.interface(ctx);
         let Some((class_literal, _)) = self.static_class_literal(db) else {
             return;
         };
         let body_scope = class_literal.body_scope(db);
         let class_place_table = place_table(db, body_scope);
-        let ctx = context.semantic_context();
 
         for (symbol_id, mut bindings_iterator) in
             use_def_map(db, body_scope).all_end_of_scope_symbol_bindings()
@@ -2700,7 +2712,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let db = ctx.db();
         protocol
-            .interface(db)
+            .interface(ctx)
             .members(db)
             .when_all(ctx, self.constraints, |member| {
                 let required = member.capabilities(ctx).class;
@@ -3155,10 +3167,10 @@ fn cached_protocol_interface<'db>(
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
-                    || function.is_staticmethod(db)
-                    || function.is_classmethod(db) =>
+                    || function.is_staticmethod(&ctx)
+                    || function.is_classmethod(&ctx) =>
             {
-                ProtocolMemberData::method(&ctx, function.into_callable_type(db), definition)
+                ProtocolMemberData::method(&ctx, function.into_callable_type(&ctx), definition)
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
@@ -3238,11 +3250,11 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
     let db = ctx.db();
-    let target_interface = protocol.interface(db);
+    let target_interface = protocol.interface(ctx);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(db);
+            let source_interface = source_protocol.interface(ctx);
 
             source_interface.member_count(db) >= target_interface.member_count(db)
                 && target_interface

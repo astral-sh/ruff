@@ -202,7 +202,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .nominal_class(ctx)
                 .or_else(|| object_ty.to_class_type(ctx))
                 .and_then(|cls| cls.static_class_literal(db))
-                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
+                .is_some_and(|(class_literal, _)| {
+                    class_literal.is_dataclass_like(self.semantic_context())
+                });
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())

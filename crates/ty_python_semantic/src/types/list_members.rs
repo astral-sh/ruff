@@ -231,11 +231,11 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(ctx, newtype.concrete_base_type(ctx));
             }
 
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(ctx) => {
                 self.extend_with_type(ctx, KnownClass::TypedDictFallback.to_class_literal(ctx));
             }
 
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(ctx) => {
                 self.extend_with_type(ctx, KnownClass::TypedDictFallback.to_class_literal(ctx));
             }
 
@@ -432,7 +432,7 @@ impl<'db> AllMembers<'db> {
                             {
                                 continue;
                             }
-                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
+                            Type::ClassLiteral(class) if class.is_protocol(ctx) => continue,
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_)
                                 | KnownInstanceType::TypeAliasType(_)
@@ -598,8 +598,7 @@ impl<'db> AllMembers<'db> {
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
-        let db = ctx.db();
-        match CodeGeneratorKind::from_class(db, class_literal) {
+        match CodeGeneratorKind::from_class(ctx, class_literal) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
                     self.extend_with_type(ctx, KnownClass::NamedTupleFallback.to_instance(ctx));

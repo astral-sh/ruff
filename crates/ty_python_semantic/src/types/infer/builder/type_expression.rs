@@ -1313,15 +1313,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .unwrap_or_else(|| class_literal.default_specialization(ctx));
                             SubclassOfType::from(ctx, class_type)
                         } else {
-                            match class_literal.generic_context(self.db()) {
+                            match class_literal.generic_context(ctx) {
                                 Some(generic_context) => {
-                                    let db = self.db();
                                     let specialize = &|types: &[Option<Type<'db>>]| {
-                                        let class = class_literal.apply_specialization(db, |_| {
+                                        let class = class_literal.apply_specialization(ctx, |_| {
                                             generic_context
                                                 .specialize_partial(ctx, types.iter().copied())
                                         });
-                                        if class_literal.is_protocol(db) {
+                                        if class_literal.is_protocol(ctx) {
                                             match Type::instance(ctx, class) {
                                                 Type::ProtocolInstance(protocol) => {
                                                     SubclassOfType::from_protocol(protocol)
@@ -1595,7 +1594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
-                    match type_alias.generic_context(self.db()) {
+                    match type_alias.generic_context(self.semantic_context()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
                                 .infer_explicit_type_alias_type_specialization(
@@ -1626,7 +1625,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     type_alias.name(self.db())
                                 ));
                                 let secondary = self.context.secondary(&*subscript.value);
-                                let value_type = type_alias.raw_value_type(self.db());
+                                let value_type = type_alias.raw_value_type(self.semantic_context());
                                 if value_type.is_specialized_generic(self.db()) {
                                     diagnostic.annotate(secondary.message(format_args!(
                                         "Alias to `{}`, which is already specialized",
@@ -1770,7 +1769,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match (class.generic_context(self.db()), class.as_static()) {
+                match (
+                    class.generic_context(self.semantic_context()),
+                    class.as_static(),
+                ) {
                     (Some(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,

@@ -216,7 +216,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let inferred_type =
+            definition_expression_type(self.semantic_context(), definition, call_expr);
         let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
             return;
         };

@@ -54,7 +54,7 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn typing_self_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
         let db = ctx.db();
         let mut self_instance = self.self_instance(db);
-        if self.function(db).is_classmethod(db) {
+        if self.function(db).is_classmethod(ctx) {
             self_instance = self_instance
                 .to_instance_approximation(ctx)
                 .unwrap_or_else(Type::unknown);
@@ -70,20 +70,30 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
+    pub(crate) fn into_callable_type(self, ctx: &SemanticContext<'db>) -> CallableType<'db> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.function(db).python_file(db).python_version(db)
+        );
+        self.into_callable_type_inner(db)
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| CallableType::bottom(db),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+    fn into_callable_type_inner(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
+        let ctx = SemanticContext::from_file(db, function.python_file(db));
 
         CallableType::new(
             db,
-            self.bound_signatures(db),
+            self.bound_signatures_inner(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(db),
+                function.has_explicit_return_annotation(&ctx),
             ),
         )
     }
@@ -103,13 +113,25 @@ impl<'db> BoundMethodType<'db> {
             self.bound_signatures_with_receiver(ctx, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(db),
+                function.has_explicit_return_annotation(ctx),
             ),
         )
     }
 
+    pub(crate) fn bound_signatures(
+        self,
+        ctx: &SemanticContext<'db>,
+    ) -> &'db CallableSignature<'db> {
+        let db = ctx.db();
+        debug_assert_eq!(
+            ctx.python_version(),
+            self.function(db).python_file(db).python_version(db)
+        );
+        self.bound_signatures_inner(db)
+    }
+
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+    fn bound_signatures_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function = self.function(db);
         let ctx = SemanticContext::from_file(db, function.python_file(db));
         let typing_self_type = self.typing_self_type(&ctx);
@@ -125,7 +147,7 @@ impl<'db> BoundMethodType<'db> {
         typing_self_type: Type<'db>,
     ) -> CallableSignature<'db> {
         let db = ctx.db();
-        let function_signature = self.function(db).signature(db);
+        let function_signature = self.function(db).signature(ctx);
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -409,7 +431,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 .into_iter(),
             )),
             KnownBoundMethodType::FunctionTypeDunderCall(function) => Either::Left(Either::Right(
-                function.signature(db).overloads.iter().cloned(),
+                function.signature(ctx).overloads.iter().cloned(),
             )),
             KnownBoundMethodType::PropertyDunderSet(_) => {
                 Either::Right(std::iter::once(Signature::new(

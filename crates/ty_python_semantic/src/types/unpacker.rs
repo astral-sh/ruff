@@ -73,8 +73,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default());
+        let value_inference = infer_expression_types(
+            self.context.semantic_context(),
+            value.expression(),
+            TypeContext::default(),
+        );
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         if matches!(value.kind(), UnpackKind::Assign)

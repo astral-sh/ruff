@@ -1068,7 +1068,7 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.try_to_class_literal(ctx)
-            .map(|literal| Type::instance(ctx, literal.unknown_specialization(ctx.db())))
+            .map(|literal| Type::instance(ctx, literal.unknown_specialization(ctx)))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1110,11 +1110,11 @@ impl KnownClass {
             }
 
             class_literal
-                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+                .apply_specialization(ctx, |_| generic_context.specialize(db, specialization))
         }
 
         let class_literal = self.to_class_literal(ctx).as_class_literal()?.as_static()?;
-        let generic_context = class_literal.generic_context(ctx.db())?;
+        let generic_context = class_literal.generic_context(ctx)?;
         let specialization = specialization.into();
 
         Some(to_specialized_class_type_impl(
@@ -1910,7 +1910,9 @@ impl KnownClass {
                         };
 
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
+                        if CodeGeneratorKind::NamedTuple
+                            .matches(context.semantic_context(), enclosing_class.into())
+                        {
                             if let Some(builder) = context
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                             {
@@ -1947,7 +1949,7 @@ impl KnownClass {
                         };
 
                         let definition = index.expect_single_definition(first_param);
-                        let first_param = binding_type(db, definition);
+                        let first_param = binding_type(context.semantic_context(), definition);
 
                         let bound_super = BoundSuperType::build(
                             context.semantic_context(),
@@ -1964,7 +1966,9 @@ impl KnownClass {
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
-                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
+                            if CodeGeneratorKind::NamedTuple
+                                .matches(context.semantic_context(), enclosing_class.into())
+                            {
                                 if let Some(builder) = context
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                                 {

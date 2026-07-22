@@ -48,7 +48,7 @@ impl<'db> SubclassOfType<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
             SubclassOfInner::Class(class) => {
-                if class.is_final(db) {
+                if class.is_final(ctx) {
                     Type::from(class)
                 } else if class.is_object(db) {
                     Self::subclass_of_object(ctx)
@@ -144,9 +144,8 @@ impl<'db> SubclassOfType<'db> {
         let SubclassOfInner::Protocol(protocol) = self.subclass_of else {
             return None;
         };
-        let db = ctx.db();
         protocol
-            .interface(db)
+            .interface(ctx)
             .meta_write_requirement(ctx, Type::ProtocolInstance(protocol), name)
             .map(|(write_ty, mut qualifiers)| {
                 // `ClassVar` prohibits instance writes, not writes through the class object.
@@ -250,7 +249,7 @@ impl<'db> SubclassOfType<'db> {
     ) -> Option<PlaceAndQualifiers<'db>> {
         let db = ctx.db();
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(ctx, name)
+            && let Some(member) = protocol.interface(ctx).meta_member(ctx, name)
         {
             return Some(member);
         }
@@ -346,7 +345,7 @@ impl<'db> SubclassOfType<'db> {
         let db = ctx.db();
         self.subclass_of
             .into_class(ctx)
-            .is_some_and(|class| class.class_literal(db).is_typed_dict(db))
+            .is_some_and(|class| class.class_literal(db).is_typed_dict(ctx))
     }
 }
 
