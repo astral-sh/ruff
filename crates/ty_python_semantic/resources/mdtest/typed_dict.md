@@ -2768,6 +2768,67 @@ def _(value: ClearA | ClearB) -> None:
         reveal_type(clear_result(value))  # revealed: None
 ```
 
+Mixed unions must retain gradual evidence from their `TypedDict` members:
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, TypedDict
+
+GradualValueT = TypeVar("GradualValueT", covariant=True)
+GradualBoundedValueT = TypeVar("GradualBoundedValueT", bound=str, covariant=True)
+GradualConstrainedValueT = TypeVar("GradualConstrainedValueT", str, bytes, covariant=True)
+
+class GradualGetValue(Protocol[GradualValueT]):
+    def __getitem__(self, key: Literal["value"], /) -> GradualValueT: ...
+
+class GradualValue(TypedDict):
+    value: Any
+
+def get_gradual_value(value: GradualGetValue[GradualValueT]) -> GradualValueT:
+    raise NotImplementedError
+
+def get_bounded_value(value: GradualGetValue[GradualBoundedValueT]) -> GradualBoundedValueT:
+    raise NotImplementedError
+
+def get_constrained_value(
+    value: GradualGetValue[GradualConstrainedValueT],
+) -> GradualConstrainedValueT:
+    raise NotImplementedError
+
+def _(value: dict[str, Any] | GradualValue) -> None:
+    reveal_type(get_gradual_value(value))  # revealed: Any
+    get_gradual_value(value).strip()
+    reveal_type(get_bounded_value(value))  # revealed: Any
+    reveal_type(get_constrained_value(value))  # revealed: Any
+```
+
+Mixed-union protocol constraints must also preserve their original source ordering:
+
+```py
+from collections.abc import Iterator
+from typing import Protocol, TypeVar, TypedDict
+
+IterationValueT = TypeVar("IterationValueT", covariant=True)
+
+class IterableValues(Protocol[IterationValueT]):
+    def __iter__(self) -> Iterator[IterationValueT]: ...
+
+class Integers:
+    def __iter__(self) -> Iterator[int]:
+        raise NotImplementedError
+
+class StringValues(TypedDict):
+    value: str
+
+def get_iterated_value(value: IterableValues[IterationValueT]) -> IterationValueT:
+    raise NotImplementedError
+
+def integers_first(value: Integers | StringValues) -> None:
+    reveal_type(get_iterated_value(value))  # revealed: int | str
+
+def typed_dict_first(value: StringValues | Integers) -> None:
+    reveal_type(get_iterated_value(value))  # revealed: str | int
+```
+
 Rejected common-constraint probes must not affect fallback protocol inference:
 
 ```py
