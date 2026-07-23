@@ -1,0 +1,79 @@
+name: Stress vendored typeshed cache race
+
+permissions: {}
+
+on:
+  push:
+    branches:
+      - zb/stress-vendored-cache-race
+
+jobs:
+  cargo-test-other:
+    name: Stress Windows vendored typeshed cache
+    runs-on: namespace-profile-windows-2022-x86-64-16x32
+    timeout-minutes: 25
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          save-if: false
+          cache-bin: "false"
+      - name: Build the ty server integration test binary
+        run: cargo test -p ty_server --test e2e --all-features --no-run
+      - name: Race concurrent vendored typeshed extraction
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $binary = Get-ChildItem "target/debug/deps/e2e-*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $binary) {
+            throw "Could not locate the compiled ty server integration test binary"
+          }
+
+          $rounds = 60
+          $workers = 24
+
+          for ($round = 1; $round -le $rounds; $round++) {
+            $cacheRoot = Join-Path $env:RUNNER_TEMP "vendored-typeshed-race-$round"
+            New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null
+            $env:LOCALAPPDATA = $cacheRoot
+
+            $processes = foreach ($worker in 1..$workers) {
+              Start-Process `
+                -FilePath $binary.FullName `
+                -ArgumentList "type_hierarchy::chained_hierarchy", "--exact", "--nocapture" `
+                -RedirectStandardOutput (Join-Path $cacheRoot "worker-$worker.stdout") `
+                -RedirectStandardError (Join-Path $cacheRoot "worker-$worker.stderr") `
+                -NoNewWindow `
+                -PassThru
+            }
+
+            foreach ($process in $processes) {
+              $process.WaitForExit()
+            }
+
+            $failed = @($processes | Where-Object { $_.ExitCode -ne 0 })
+            if ($failed.Count -gt 0) {
+              Write-Host "Reproduced on round $round: $($failed.Count) of $workers workers failed"
+              Get-ChildItem $cacheRoot -Filter "*.stderr" | ForEach-Object {
+                $content = Get-Content $_.FullName -Raw
+                if ($content) {
+                  Write-Host "--- $($_.Name) ---"
+                  Write-Host $content
+                }
+              }
+              exit 1
+            }
+
+            Write-Host "Round $round/$rounds: all $workers workers passed"
+          }
+
+          Write-Host "No failure reproduced across $($rounds * $workers) test executions"
