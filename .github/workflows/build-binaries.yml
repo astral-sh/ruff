@@ -166,7 +166,7 @@ jobs:
 
   windows:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: windows-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-windows-2022-x86-64-16x32' || 'windows-latest' }}
     strategy:
       matrix:
         platform:
