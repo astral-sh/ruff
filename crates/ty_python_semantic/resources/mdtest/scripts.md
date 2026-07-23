@@ -126,3 +126,44 @@ print(missing)
 # error: [unresolved-reference]
 print(missing)
 ```
+
+# Valid blocks after invalid opening tags
+
+Invalid opening tags do not prevent a later valid metadata block from being recognized.
+
+```py
+value = 1  # /// script
+# [tool.ty.rules]
+# unresolved-reference = "error"
+# ///
+
+# /// script invalid
+# [tool.ty.rules]
+# unresolved-reference = "error"
+# ///
+
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "ignore"
+# ///
+
+print(missing)
+```
+
+# Valid blocks after unclosed blocks
+
+An earlier unclosed block does not prevent a later valid metadata block from being recognized.
+
+```py
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "error"
+value = 1
+
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "ignore"
+# ///
+
+print(missing)
+```
