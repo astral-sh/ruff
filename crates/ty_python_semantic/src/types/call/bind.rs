@@ -5571,14 +5571,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .then_some((inference, return_ty))
                     })
                     .collect();
-                let inference = returns.first()?.0;
+                // Argument checking still expects one valid specialization, so retain one path
+                // as its witness rather than merging mappings that may not validate the call.
+                // TODO: Preserve every valid inference for constructors, contextual inference,
+                // and other consumers that currently observe this arbitrary witness.
+                let witness_inference = returns.first()?.0;
                 let return_ty = IntersectionType::from_elements(
                     self.db,
                     returns.into_iter().map(|(_, return_ty)| return_ty),
                 );
-                Some((inference, return_ty))
+                Some((witness_inference, return_ty))
             });
 
+        // Fall back to one merged specialization when path refinement is disabled, unsupported,
+        // or produces no complete, static, independently valid paths. If the combined constraints
+        // are unsatisfiable, infer each argument separately to preserve useful diagnostics.
+        // TODO: Limit this fallback to unconstrained calls and diagnostic recovery once path
+        // inference tracks gradual evidence, supports ParamSpecs and recursive solutions, and
+        // preserves correlated partial applications.
         let (inference, return_ty) = path_result.unwrap_or_else(|| {
             let inference = match builder.build_inference_with(generic_context, &mut choose) {
                 Ok(inference) => inference,
