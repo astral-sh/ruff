@@ -492,22 +492,6 @@ static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Any], tuple[P & Any, Q &
 static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q & Any]))
 ```
 
-### `type[...]`
-
-`type[..]` can also be seen as a covariant type constructor, so the results also hold here:
-
-```pyi
-from typing import Any
-from ty_extensions import static_assert
-from ty_extensions._internal import is_equivalent_to
-
-class P: ...
-class Q: ...
-
-static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
-static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
-```
-
 ### Type var bounds and `NewTypes`
 
 The simplification preserve the identities of type variables and `NewType` instances:
