@@ -763,7 +763,7 @@ impl Error for LexicalError {}
 pub enum SuppressionKind {
     /// A `noqa` comment
     Noqa,
-    /// A `ruff:ignore` comment
+    /// A `ruff: ignore` comment
     Ignore,
 }
 
@@ -1060,7 +1060,7 @@ impl SuppressionEdit<'_> {
         }
         match self.suppression_kind {
             SuppressionKind::Noqa => write!(writer, "# noqa: ").unwrap(),
-            SuppressionKind::Ignore => write!(writer, "# ruff:ignore[").unwrap(),
+            SuppressionKind::Ignore => write!(writer, "# ruff: ignore[").unwrap(),
         }
         push_codes(
             writer,
@@ -1107,7 +1107,7 @@ fn generate_suppression_edit<'a>(
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
             existing_codes.extend(codes.iter().map(Code::as_str));
         }
-        // Add additional rule names to an existing `ruff:ignore` comment.
+        // Add additional rule names to an existing `ruff: ignore` comment.
         (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
             existing_codes.extend(comment.codes_as_str(locator.contents()));
@@ -3132,7 +3132,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff:ignore[missing-return-type-undocumented-public-function]
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff: ignore[missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3182,7 +3182,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import math  # noqa: F401  # ruff:ignore[noqa-comments]
+        import math  # noqa: F401  # ruff: ignore[noqa-comments]
 
         ```
         "
@@ -3213,7 +3213,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+        def unused(x):  # ruff: ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3243,7 +3243,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+        def unused(x):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
             pass
         ```
         "
@@ -3269,7 +3269,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import z  # ruff:ignore[unsorted-imports]
+        import z  # ruff: ignore[unsorted-imports]
         import c
         import a
         ```
@@ -3301,7 +3301,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
+        # ruff: ignore[ANN001, missing-return-type-undocumented-public-function]
         def public(x):
             """Return x."""
             return x

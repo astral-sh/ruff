@@ -2628,9 +2628,9 @@ fn add_ignore() -> Result<()> {
         test_code,
         @"
 
-        def first_square():
-            return [x * x for x in range(20)][0]  # ruff:ignore[unnecessary-iterable-allocation-for-first-element]
-        ",
+    def first_square():
+        return [x * x for x in range(20)][0]  # ruff: ignore[unnecessary-iterable-allocation-for-first-element]
+    ",
     );
 
     Ok(())
@@ -3744,18 +3744,18 @@ def foo():
             ])
             .pass_stdin(source),
         @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        # ruff:file-ignore[unused-import]
-        import os
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # ruff: file-ignore[unused-import]
+    import os
 
-        def foo():
-            value = 1  # ruff:ignore[unused-variable]
+    def foo():
+        value = 1  # ruff: ignore[unused-variable]
 
-        ----- stderr -----
-        Found 4 errors (4 fixed, 0 remaining).
-        ",
+    ----- stderr -----
+    Found 4 errors (4 fixed, 0 remaining).
+    ",
     );
 
     Ok(())
