@@ -332,16 +332,6 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
-    /// Returns `true` if this constraint set's root is the `always` terminal.
-    ///
-    /// This is only a cheap sufficient check. A nonterminal constraint set can also be always
-    /// satisfied, so `false` does not prove that the set is not always satisfied. Call
-    /// [`ConstraintSet::is_always_satisfied`] through [`Self::query`] when false negatives are not
-    /// acceptable.
-    pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
-        self.node == ALWAYS_TRUE
-    }
-
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -384,12 +374,37 @@ impl Default for OwnedRelationConstraintSet<'_> {
 }
 
 impl<'db> OwnedRelationConstraintSet<'db> {
+    /// Returns an owned relation that is unconditionally true.
+    pub(crate) fn always() -> Self {
+        Self {
+            positive_evidence: OwnedConstraintSet::always(),
+            negative_evidence: OwnedConstraintSet::default(),
+        }
+    }
+
+    /// Returns an owned relation that is unconditionally false.
+    pub(crate) fn never() -> Self {
+        Self {
+            positive_evidence: OwnedConstraintSet::default(),
+            negative_evidence: OwnedConstraintSet::always(),
+        }
+    }
+
+    /// Returns whether both roots are the terminals for unconditional truth.
+    pub(crate) fn is_trivially_always_true(&self) -> bool {
+        self.positive_evidence.node == ALWAYS_TRUE && self.negative_evidence.node == ALWAYS_FALSE
+    }
+
     pub(crate) fn query<F, R>(&self, f: F) -> R
     where
         F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, RelationConstraintSet<'db, 'c>) -> R,
     {
         let storage = ConstraintSetStorage {
-            compacted: self.positive_evidence.inner.clone(),
+            compacted: self
+                .positive_evidence
+                .inner
+                .clone()
+                .or_else(|| self.negative_evidence.inner.clone()),
             ..ConstraintSetStorage::default()
         };
         let builder = ConstraintSetBuilder {
@@ -400,6 +415,15 @@ impl<'db> OwnedRelationConstraintSet<'db> {
             negative_evidence: ConstraintSet::from_node(&builder, self.negative_evidence.node),
         };
         f(&builder, relation)
+    }
+
+    /// Returns the types referenced by either side of this relation.
+    pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        if self.positive_evidence.inner.is_some() {
+            self.positive_evidence.types()
+        } else {
+            self.negative_evidence.types()
+        }
     }
 }
 
@@ -653,6 +677,30 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
                 .positive_evidence
                 .reduce_inferable(db, builder, to_remove),
             negative_evidence: self.negative_evidence.for_all(db, builder, to_remove),
+        }
+    }
+
+    /// Applies a type mapping independently to the relation's positive and negative evidence.
+    pub(crate) fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            positive_evidence: self.positive_evidence.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
+            negative_evidence: self.negative_evidence.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
         }
     }
 }

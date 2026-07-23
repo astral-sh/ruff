@@ -1020,8 +1020,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 error = Some(ExplicitSpecializationError::UnsatisfiedBound);
                                 specialization_types.push(Some(Type::unknown()));
-                            } else {
+                            } else if relation.is_always_true(db) {
                                 specialization_types.push(Some(provided_type));
+                            } else {
+                                specialization_types.push(Some(Type::unknown()));
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
@@ -1058,8 +1060,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
                                 specialization_types.push(Some(Type::unknown()));
-                            } else {
+                            } else if relation.is_always_true(db) {
                                 specialization_types.push(Some(provided_type));
+                            } else {
+                                specialization_types.push(Some(Type::unknown()));
                             }
                         }
                         None => {

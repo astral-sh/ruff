@@ -2992,8 +2992,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
                     argument,
-                })
-            }
+                }),
+            TypeVarBoundOrConstraints::Constraints(constraints) => argument
+                .when_assignable_to(
+                    self.db,
+                    constraints.as_type(self.db),
+                    self.constraints,
+                    self.inferable,
+                )
+                .is_always_false(self.db)
+                .then_some(SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    argument,
+                }),
         }
     }
 
@@ -3549,6 +3560,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 argument: ty,
                             });
                         }
+                        if !relation.is_always_true(self.db) {
+                            return Ok(());
+                        }
                         self.add_type_mapping(bound_typevar, ty, polarity);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
@@ -3616,7 +3630,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 .is_always_satisfied(db, self.env)
                             };
 
-                            if is_satisfied {
+                            if relation.is_always_true(self.db) {
                                 // For the old solver, we use the constraint itself as the mapped
                                 // type, since the old solver's hash map stores solutions. For the
                                 // new solver's pending constraint set, we store the type that
@@ -3628,6 +3642,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.insert_pending_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
+                            if !relation.is_always_false(self.db) {
+                                has_unresolved_relation = true;
+                            }
+                        }
+                        if has_unresolved_relation {
+                            return Ok(());
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,

@@ -390,10 +390,25 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env)
     }
 
+    /// Return `true` only if assignability has unconditional negative evidence and no positive
+    /// evidence.
+    ///
+    /// This is not the Boolean negation of [`Type::is_assignable_to`]: both methods return `false`
+    /// when the relation is indeterminate or inconsistent.
+    pub(crate) fn has_only_negative_assignability_evidence(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
+        let constraints = ConstraintSetBuilder::new();
+        self.when_assignable_to(db, target, &constraints, InferableTypeVars::None)
+            .is_always_false(db)
+    }
+
     /// Re-run the assignability check with error context collection enabled.
     ///
-    /// This should normally be called when `is_assignable_to` has returned `false` and we
-    /// are now about to emit a diagnostic where additional context could be useful.
+    /// This should normally be called once incompatibility has been proved and we are about to
+    /// emit a diagnostic where additional context could be useful.
     ///
     /// This is a separate method so that we can skip this expensive check when diagnostics
     /// are suppressed.
@@ -492,11 +507,54 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns an _owned_ (i.e. salsa-cached) constraint set that describes when `self` is
+    /// Returns an owned, Salsa-cached relation result describing when `self` is constraint-set
+    /// assignable to `target`.
+    pub(super) fn when_constraint_set_assignable_to_owned_relation(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> Cow<'db, OwnedRelationConstraintSet<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _| OwnedRelationConstraintSet::always(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn when_constraint_set_assignable_to_owned_relation_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> OwnedRelationConstraintSet<'db> {
+            let constraints = ConstraintSetBuilder::new();
+            constraints.into_owned_relation(|constraints| {
+                let source = types.first(db);
+                let target = types.second(db);
+
+                source.has_relation_to_with_typevar_evaluation(
+                    db,
+                    target,
+                    constraints,
+                    InferableTypeVars::None,
+                    TypeRelation::Assignability,
+                    TypeVarEvaluation::Lazy,
+                )
+            })
+        }
+
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Cow::Owned(OwnedRelationConstraintSet::always());
+        }
+
+        Cow::Borrowed(when_constraint_set_assignable_to_owned_relation_impl(
+            db,
+            TypePair::new(db, self, target),
+        ))
+    }
+
+    /// Returns an _owned_ (i.e. Salsa-cached) constraint set that describes when `self` is
     /// constraint-set assignable to `target`.
     ///
-    /// Recursive relations are evaluated coinductively: a cycle is provisionally satisfied until
-    /// another part of the relation produces a contradiction.
+    /// This compatibility query retains only successful valuations. It is kept separate from
+    /// [`Type::when_constraint_set_assignable_to_owned_relation`] so its widely used Salsa values
+    /// do not retain the negative-evidence graph.
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,

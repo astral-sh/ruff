@@ -1753,6 +1753,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_type)
+                } else {
+                    if !should_preserve_inferred_binding_type(inferred_ty)
+                        // TODO We currently can't distinguish here between "no declared type" and
+                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
+                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
+                        // but use inferred type if there is no declared type.
+                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && assignability.is_always_true(self.db())
+                        && declared_type.is_assignable_to(self.db(), inferred_ty)
+                    {
+                        (declared_ty, declared_type)
+                    } else {
+                        (declared_ty, inferred_ty)
+                    }
                 }
             }
         };
@@ -4208,6 +4222,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                     declared_ty
+                } else {
+                    value_ty
                 }
             } else {
                 annotated.inner_type()

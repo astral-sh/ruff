@@ -124,14 +124,14 @@ fn merge_receiver_constraints<'db>(
     // merely falls through to the merge below. Retaining such a nonterminal set is also important:
     // its presence makes signature comparison use lazy typevar evaluation.
     match (
-        first.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-        second.filter(|constraints| !constraints.is_trivially_always_satisfied()),
+        first.filter(|constraints| !constraints.is_trivially_always_true()),
+        second.filter(|constraints| !constraints.is_trivially_always_true()),
     ) {
         (None, None) => None,
         (Some(constraints), None) | (None, Some(constraints)) => Some((*constraints).clone()),
         (Some(first), Some(second)) => {
             let constraints = ConstraintSetBuilder::new();
-            Some(constraints.into_owned(|builder| {
+            Some(constraints.into_owned_relation(|builder| {
                 builder
                     .load(db, env, first)
                     .and(db, builder, || builder.load(db, env, second))
@@ -608,7 +608,7 @@ pub struct Signature<'db> {
     source_overload_index: Option<NonZeroU32>,
 
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
-    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    receiver_constraints: Option<OwnedRelationConstraintSet<'db>>,
 
     /// Parameters, in source order.
     ///
@@ -629,7 +629,9 @@ pub(crate) enum ParameterConsistency<'db> {
     /// The parameters are compatible.
     Consistent,
     /// The parameters are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
+    Incompatible(ErrorContextTree<'db>),
+    /// The relation did not produce an exclusively compatible or incompatible result.
+    Unresolved,
 }
 
 /// Whether one callable signature's return type is compatible with another's.
@@ -637,7 +639,9 @@ pub(crate) enum ReturnTypeConsistency<'db> {
     /// The return types are compatible.
     Consistent,
     /// The return types are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
+    Incompatible(ErrorContextTree<'db>),
+    /// The relation did not produce an exclusively compatible or incompatible result.
+    Unresolved,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -1203,7 +1207,7 @@ impl<'db> Signature<'db> {
             if receiver_typevar.is_some_and(|typevar| {
                 Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
             }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                return std::borrow::Cow::Owned(OwnedRelationConstraintSet::never());
             }
             receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
         });
@@ -1262,7 +1266,7 @@ impl<'db> Signature<'db> {
             return false;
         }
 
-        !match domain {
+        match domain {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
             }
@@ -1412,7 +1416,7 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
-        self_type
+        !self_type
             .when_assignable_to(
                 db,
                 env,
@@ -1533,7 +1537,7 @@ impl<'db> Signature<'db> {
 
     fn map_constraints(
         db: &'db dyn Db,
-        constraints: &OwnedConstraintSet<'db>,
+        constraints: &OwnedRelationConstraintSet<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
@@ -1555,7 +1559,7 @@ impl<'db> Signature<'db> {
     pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.receiver_constraints
             .iter()
-            .flat_map(OwnedConstraintSet::types)
+            .flat_map(OwnedRelationConstraintSet::types)
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
@@ -1764,8 +1768,10 @@ impl<'db> Signature<'db> {
 
         if is_consistent {
             ParameterConsistency::Consistent
+        } else if relation.is_always_false(db) {
+            ParameterConsistency::Incompatible(checker.into_error_context())
         } else {
-            ParameterConsistency::Inconsistent(checker.into_error_context())
+            ParameterConsistency::Unresolved
         }
     }
 
@@ -1800,8 +1806,10 @@ impl<'db> Signature<'db> {
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
+        } else if relation.is_always_false(db) {
+            ReturnTypeConsistency::Incompatible(checker.into_error_context())
         } else {
-            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
+            ReturnTypeConsistency::Unresolved
         }
     }
 
