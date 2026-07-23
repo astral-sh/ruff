@@ -13,7 +13,8 @@ This section concentrates on deriving the main results while the next section co
 cases.
 
 ```pyi
-from typing import Any
+from typing import Any, Coroutine, Sequence
+from types import CoroutineType
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
@@ -381,11 +382,14 @@ We can encode these relations in ty assertions:
 class InvariantSubOfCoBase[T](CoSub[T]):
     def push(self, x: T) -> None: ...
 
-# TODO: both should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(CoBase[P] & Top[CoSub[Any]], CoSub[P]))
-# error: [static-assert-error]
+static_assert(is_equivalent_to(Top[CoSub[Any]] & CoBase[P], CoSub[P]))
+
 static_assert(is_equivalent_to(CoBase[P] & Top[InvariantSubOfCoBase[Any]], Top[InvariantSubOfCoBase[P & Any]]))
+static_assert(is_equivalent_to(Top[InvariantSubOfCoBase[Any]] & CoBase[P], Top[InvariantSubOfCoBase[P & Any]]))
+
+static_assert(is_equivalent_to(Sequence[int] & Top[tuple[Any, ...]], tuple[int, ...]))
+static_assert(is_equivalent_to(Sequence[int] & Top[list[Any]], Top[list[int & Any]]))
 ```
 
 Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar, but now we
@@ -413,11 +417,13 @@ Again, we can encode the results in ty assertions:
 class InvariantSubOfContraBase[T](ContraSub[T]):
     def get(self) -> T: ...
 
-# TODO: both should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(ContraBase[P] & Top[ContraSub[Any]], ContraSub[P]))
-# error: [static-assert-error]
+static_assert(is_equivalent_to(Top[ContraSub[Any]] & ContraBase[P], ContraSub[P]))
+
 static_assert(is_equivalent_to(ContraBase[P] & Top[InvariantSubOfContraBase[Any]], Top[InvariantSubOfContraBase[P | Any]]))
+static_assert(is_equivalent_to(Top[InvariantSubOfContraBase[Any]] & ContraBase[P], Top[InvariantSubOfContraBase[P | Any]]))
+
+static_assert(is_equivalent_to(Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]], CoroutineType[str, int, bytes]))
 ```
 
 Finally, we look at the invariant `Base` case (item 5). Here, we need `X` to be equal to `P`, and so
@@ -432,9 +438,8 @@ In ty assertions:
 ```pyi
 class InvariantSubOfInvariantBase[T](InvariantBase[T]): ...
 
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(InvariantBase[P] & Top[InvariantSubOfInvariantBase[Any]], InvariantSubOfInvariantBase[P]))
+static_assert(is_equivalent_to(Top[InvariantSubOfInvariantBase[Any]] & InvariantBase[P], InvariantSubOfInvariantBase[P]))
 ```
 
 ## Edge cases
