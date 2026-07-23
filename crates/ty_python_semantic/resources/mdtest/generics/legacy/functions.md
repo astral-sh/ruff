@@ -1355,7 +1355,9 @@ from ty_extensions import Intersection
 
 class Base: ...
 class Sub1(Base): ...
-class Sub2(Base): ...
+class SuperclassOfSub2(Base): ...
+class Sub2(SuperclassOfSub2): ...
+class SubclassOfSub2(Sub2): ...
 class Unrelated1: ...
 class Unrelated2: ...
 
@@ -1390,6 +1392,13 @@ def first_constrained(x: Sequence[Constrained]) -> Constrained:
     return x[0]
 
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    # `Constrained` is not solved to `Sub1 & Sub2`, which would not be a valid declared constraint.
+    # The call is solved separately with `Sub1` and `Sub2`, then the return types are intersected.
+    reveal_type(first_constrained(x))  # revealed: Sub1 & Sub2
+
+def _(x: Intersection[Sequence[Sub1], Sequence[SubclassOfSub2]]) -> None:
+    # A constrained typevar must solve the second path to its declared `Sub2` constraint, not to
+    # `SubclassOfSub2`; the two separately inferred return types are then intersected.
     reveal_type(first_constrained(x))  # revealed: Sub1 & Sub2
 
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
@@ -1424,6 +1433,17 @@ def _(x: Intersection[Box[Unrelated1], Marker]) -> None:
     # error: [invalid-argument-type] "Argument to function `unbox` is incorrect: Argument type `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(unbox(x))  # revealed: Unknown
 
+# Each argument independently selects a valid constraint, but invariance requires both arguments
+# to select the same one.
+def unbox_pair(x: Box[Constrained], y: Box[Constrained]) -> Constrained:
+    raise NotImplementedError
+
+def _(x: Intersection[Box[Sub1], Marker], y: Intersection[Box[Sub2], Marker]) -> None:
+    # TODO: Both errors should report the incompatible constraints instead of expecting `Box[Sub1 | Sub2]`.
+    # error: [invalid-argument-type] "Argument to function `unbox_pair` is incorrect: Expected `Box[Sub1 | Sub2]`, found `Box[Sub1] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `unbox_pair` is incorrect: Expected `Box[Sub1 | Sub2]`, found `Box[Sub2] & Marker`"
+    reveal_type(unbox_pair(x, y))  # revealed: Sub1 | Sub2
+
 # Contravariant inference contributes upper-bound evidence instead. Matching elements contribute to
 # the result; if every element rules out the constraints, report the constraint violation.
 
@@ -1437,6 +1457,18 @@ def sink_constrained(x: ConstrainedSink[Constrained]) -> Constrained:
 
 def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Sub2]]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub1 & Sub2
+
+# Contravariance allows a sink of a superclass to select the `Sub2` constraint.
+def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[SuperclassOfSub2]]) -> None:
+    reveal_type(sink_constrained(x))  # revealed: Sub1 & Sub2
+
+def _(x: Intersection[ConstrainedSink[SuperclassOfSub2], Marker]) -> None:
+    reveal_type(sink_constrained(x))  # revealed: Sub2
+
+# A sink of a strict subclass cannot accept every `Sub2`, so it cannot select that constraint.
+def _(x: Intersection[ConstrainedSink[SubclassOfSub2], Marker]) -> None:
+    # error: [invalid-argument-type] "Argument to function `sink_constrained` is incorrect: Argument type `SubclassOfSub2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
+    reveal_type(sink_constrained(x))  # revealed: Unknown
 
 def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Unrelated1]]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub1
@@ -1481,17 +1513,19 @@ def f(x: IntSource) -> None:
 
 # A constructor's synthetic `cls` argument can contain an inferable class type variable even
 # when its declared `cls` parameter is specialized to a concrete type.
+class ConcreteElement: ...
+
 class FixedReceiverConstructor(Generic[ElementT]):
     item: ElementT
 
     def __new__(
-        cls: "type[FixedReceiverConstructor[B]]",
+        cls: "type[FixedReceiverConstructor[ConcreteElement]]",
         value: Source[ElementT],
     ) -> "FixedReceiverConstructor[ElementT]":
         return object.__new__(cls)
 
-def _(value: Intersection[Source[A], Source[B]]) -> None:
-    reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[B]
+def _(value: Intersection[Source[A], Source[ConcreteElement]]) -> None:
+    reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[ConcreteElement]
 ```
 
 Generic constructors still reconstruct their return type from a single inferred specialization, so
