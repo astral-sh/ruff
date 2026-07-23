@@ -1,8 +1,8 @@
-use indexmap::IndexMap;
 use ruff_text_size::{TextRange, TextSize};
 use strum_macros::EnumIter;
 
 use self::syntax::{indentation, starts_with_markdown_list_item};
+use crate::FxIndexMap;
 
 pub(super) mod google;
 mod numpy;
@@ -14,7 +14,7 @@ pub(in crate::docstring) mod syntax;
 ///
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
-pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
     let mut parameters = google::parameter_documentation(normalized_source);
     parameters.extend(numpy::parameter_documentation(normalized_source));
     parameters.extend(rst::parameter_documentation(normalized_source));
