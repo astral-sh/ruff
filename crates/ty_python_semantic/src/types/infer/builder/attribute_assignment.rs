@@ -58,6 +58,7 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
     BadDunderSet {
         failure: CallError<'db>,
         descriptor_ty: Type<'db>,
+        includes_descriptor_argument: bool,
     },
     PossiblyMissing,
     BadSetAttr {
@@ -592,6 +593,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
                         failure: CallError(kind, bindings),
                         descriptor_ty,
+                        includes_descriptor_argument: false,
                     });
                 }
                 false
@@ -631,6 +633,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
                         failure: error,
                         descriptor_ty,
+                        includes_descriptor_argument: true,
                     });
                 }
                 false
@@ -793,6 +796,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AssignmentAttributeWriteDiagnostic::BadDunderSet {
                 failure,
                 descriptor_ty,
+                includes_descriptor_argument,
             } => {
                 report_bad_dunder_set_call(
                     &self.builder.context,
@@ -800,6 +804,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.attribute,
                     self.object_ty,
                     descriptor_ty,
+                    includes_descriptor_argument,
                     self.target,
                     self.value,
                 );

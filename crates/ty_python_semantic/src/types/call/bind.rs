@@ -114,18 +114,13 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
     }
 
     fn get_range(&self, node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> TextRange {
+        let argument_index = argument_index.map(|index| index + self.argument_index_offset);
         self.overrides
             .and_then(|overrides| {
                 argument_index.and_then(|index| overrides.argument_ranges.get(index))
             })
             .copied()
-            .unwrap_or_else(|| {
-                BindingError::get_node(
-                    node,
-                    argument_index.map(|index| index + self.argument_index_offset),
-                )
-                .range()
-            })
+            .unwrap_or_else(|| BindingError::get_node(node, argument_index).range())
     }
 }
 

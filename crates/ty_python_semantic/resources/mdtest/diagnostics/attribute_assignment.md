@@ -283,10 +283,10 @@ instance.attr = "also wrong"
 
 ```snapshot
 error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
-  --> src/mdtest_snippet.py:11:1
+  --> src/mdtest_snippet.py:11:17
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^ Expected `int`, found `Literal["wrong"]`
+   |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
    |
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: Function defined here

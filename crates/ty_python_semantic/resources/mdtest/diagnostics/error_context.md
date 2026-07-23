@@ -1597,10 +1597,10 @@ c.x = (1, b"")  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
- --> src/mdtest_snippet.py:8:1
+ --> src/mdtest_snippet.py:8:7
   |
 8 | c.x = (1, b"")  # snapshot
-  | ^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
   |
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`

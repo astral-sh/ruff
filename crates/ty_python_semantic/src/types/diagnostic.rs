@@ -1715,6 +1715,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     attribute: &str,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
+    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
     value: &ast::Expr,
 ) {
@@ -1740,6 +1741,11 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
+        let argument_ranges = if includes_descriptor_argument {
+            &[target.range(), target.value.range(), value.range()][..]
+        } else {
+            &[target.value.range(), value.range()][..]
+        };
         dunder_set_failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -1753,7 +1759,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
                     "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
                     descriptor_type.display(db)
                 ),
-                argument_ranges: &[target.value.range(), value.range()],
+                argument_ranges,
             },
         );
     }
