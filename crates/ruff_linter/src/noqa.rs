@@ -19,8 +19,10 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
+use crate::preview::is_human_readable_names_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
+use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
 
 /// Generates an array of edits that matches the length of `diagnostics`.
@@ -39,6 +41,7 @@ pub fn generate_suppression_edits(
     line_ending: LineEnding,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
@@ -51,6 +54,7 @@ pub fn generate_suppression_edits(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
     build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
 }
@@ -780,6 +784,7 @@ pub(crate) fn add_suppression(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Result<usize> {
     let (count, output) = add_suppression_inner(
         path,
@@ -792,6 +797,7 @@ pub(crate) fn add_suppression(
         reason,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     fs::write(path, output)?;
@@ -810,6 +816,7 @@ fn add_suppression_inner(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -827,6 +834,7 @@ fn add_suppression_inner(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     let edits =
@@ -938,6 +946,7 @@ impl Ranged for ExistingDirective<'_> {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn find_suppression_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
@@ -946,6 +955,7 @@ fn find_suppression_comments<'a>(
     noqa_line_for: &NoqaMapping,
     suppressions: &'a Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<SuppressionComment<'a>>> {
     // List of suppression comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
@@ -1023,7 +1033,8 @@ fn find_suppression_comments<'a>(
 
         let identifier = match suppression_kind {
             SuppressionKind::Noqa => code.as_str(),
-            SuppressionKind::Ignore => message.name(),
+            SuppressionKind::Ignore if is_human_readable_names_enabled(preview) => message.name(),
+            SuppressionKind::Ignore => code.as_str(),
         };
 
         comments_by_line.push(Some(SuppressionComment {
@@ -1368,6 +1379,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
@@ -1423,6 +1435,7 @@ mod tests {
             None,
             &suppressions,
             suppression_kind,
+            settings.preview,
         )
     }
 
@@ -3328,6 +3341,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -3354,6 +3368,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -3387,6 +3402,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -3420,6 +3436,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -3453,6 +3470,7 @@ print(
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,
@@ -3487,6 +3505,7 @@ bar =
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,
