@@ -138,7 +138,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> different_violations.py:6:13
       |
-    6 | reveal_type(x)  # ty:ignore[undefined-reveal]
+    6 | reveal_type(x)  # ty: ignore[undefined-reveal]
       |             ^ `Unknown`
       |
 
