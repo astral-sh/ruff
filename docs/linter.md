@@ -541,7 +541,7 @@ lines, run Ruff with `--add-noqa`:
 $ ruff check /path/to/file.py --add-noqa
 ```
 
-The `--add-noqa` flag adds `noqa` directives with rule codes. To add `ruff:ignore` comments with
+The `--add-noqa` flag adds `noqa` directives with rule codes. To add `ruff: ignore` comments with
 human-readable rule names instead, use `--add-ignore` with preview mode enabled.
 
 ### isort action comments

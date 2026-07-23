@@ -648,7 +648,7 @@ Options:
           Enable automatic additions of `noqa` directives to failing lines.
           Optionally provide a reason to append after the codes
       --add-ignore[=<REASON>]
-          Enable automatic additions of `ruff:ignore` comments to failing
+          Enable automatic additions of `ruff: ignore` comments to failing
           lines. Optionally provide a reason to append after the rule names.
           Requires preview mode
       --show-files

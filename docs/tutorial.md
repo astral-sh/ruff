@@ -361,7 +361,7 @@ index 71fca60c8d..e92d839f1b 100644
 +from typing import Iterable  # noqa: UP035
 ```
 
-To add `# ruff:ignore[...]` comments with human-readable rule names instead, use the
+To add `# ruff: ignore[...]` comments with human-readable rule names instead, use the
 `--add-ignore` flag with preview mode enabled.
 
 ## Integrations

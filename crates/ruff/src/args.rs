@@ -467,7 +467,7 @@ pub struct CheckCommand {
         conflicts_with = "diff",
     )]
     pub add_noqa: Option<String>,
-    /// Enable automatic additions of `ruff:ignore` comments to failing lines.
+    /// Enable automatic additions of `ruff: ignore` comments to failing lines.
     /// Optionally provide a reason to append after the rule names.
     /// Requires preview mode.
     #[arg(
