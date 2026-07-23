@@ -279,15 +279,52 @@ impl<'a> Dependency<'a> {
         };
 
         let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
-            let arguments = depends_arguments(metadata_element, semantic)?;
-
-            // Arguments to `Depends` can be empty if the dependency is a class
-            // that FastAPI will call to create an instance of the class itself.
-            // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
-            if arguments.is_empty() {
-                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+            if let Some(arguments) = depends_arguments(metadata_element, semantic) {
+                // Arguments to `Depends` can be empty if the dependency is a class
+                // that FastAPI will call to create an instance of the class itself.
+                // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
+                if arguments.is_empty() {
+                    Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+                } else {
+                    Self::from_depends_call(arguments, semantic)
+                }
+            } else if let Expr::Name(name) = metadata_element {
+                // The metadata element is a bare name, e.g.:
+                //   `AssignedDepends = Depends(find_item)`
+                // Resolve the binding to decide how to handle it.
+                let binding = semantic.only_binding(name).map(|id| semantic.binding(id))?;
+                match &binding.kind {
+                    // A function or class defined in scope, or an import — not a `Depends`.
+                    BindingKind::FunctionDefinition(_)
+                    | BindingKind::ClassDefinition(_)
+                    | BindingKind::Import(_)
+                    | BindingKind::FromImport(_) => None,
+                    // A plain assignment — check if the RHS is a `Depends(...)` call and
+                    // treat it exactly like an inline `Depends` if so.
+                    BindingKind::Assignment => {
+                        let rhs = binding
+                            .statement(semantic)
+                            .and_then(|stmt| stmt.as_assign_stmt())
+                            .map(|assign| assign.value.as_ref())?;
+                        if let Some(arguments) = depends_arguments(rhs, semantic) {
+                            if arguments.is_empty() {
+                                Self::from_dependency_name(
+                                    tuple.elts.first()?.as_name_expr()?,
+                                    semantic,
+                                )
+                            } else {
+                                Self::from_depends_call(arguments, semantic)
+                            }
+                        } else {
+                            // RHS is not a `Depends` call — treat as unknown to avoid false positives.
+                            Some(Self::Unknown)
+                        }
+                    }
+                    // Anything else we can't reason about.
+                    _ => Some(Self::Unknown),
+                }
             } else {
-                Self::from_depends_call(arguments, semantic)
+                None
             }
         });
 
