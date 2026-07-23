@@ -51,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// However, the issue is that you may often want to change semantics
 /// by adding a missing comma. Thus, the fix is always marked as unsafe.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct ImplicitStringConcatenationInCollectionLiteral;
 
 impl Violation for ImplicitStringConcatenationInCollectionLiteral {

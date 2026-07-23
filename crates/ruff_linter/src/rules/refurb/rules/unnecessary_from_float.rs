@@ -61,7 +61,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
