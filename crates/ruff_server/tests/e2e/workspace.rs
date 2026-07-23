@@ -79,6 +79,19 @@ ignore = ["F401"]
                 }
               }
             ],
+            "ignore_edit": {
+              "newText": "  # ruff:ignore[F401]\n",
+              "range": {
+                "end": {
+                  "character": 0,
+                  "line": 1
+                },
+                "start": {
+                  "character": 9,
+                  "line": 0
+                }
+              }
+            },
             "noqa_edit": {
               "newText": "  # noqa: F401\n",
               "range": {

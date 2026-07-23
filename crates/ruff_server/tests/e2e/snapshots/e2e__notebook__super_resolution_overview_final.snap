@@ -40,6 +40,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[I002]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: I002\n",
           "range": {
@@ -78,6 +91,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "data": {
         "code": "RUF900",
         "edits": [],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[RUF900]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: RUF900\n",
           "range": {
@@ -130,6 +156,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[RUF901]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: RUF901\n",
           "range": {
@@ -182,6 +221,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[RUF902]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: RUF902\n",
           "range": {
@@ -220,6 +272,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "data": {
         "code": "RUF903",
         "edits": [],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[RUF903]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: RUF903\n",
           "range": {
@@ -258,6 +323,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "data": {
         "code": "RUF950",
         "edits": [],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[RUF950]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 71,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: RUF950\n",
           "range": {
@@ -313,6 +391,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[I001]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 23,
+              "line": 0
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: I001\n",
           "range": {
@@ -367,6 +458,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[E703]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 6
+            },
+            "start": {
+              "character": 30,
+              "line": 5
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -423,6 +527,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[E703]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 4
+            },
+            "start": {
+              "character": 23,
+              "line": 3
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -475,6 +592,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[E703]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 9
+            },
+            "start": {
+              "character": 23,
+              "line": 8
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -527,6 +657,19 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "ignore_edit": {
+          "newText": "  # ruff:ignore[F541]\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 8
+            },
+            "start": {
+              "character": 25,
+              "line": 7
+            }
+          }
+        },
         "noqa_edit": {
           "newText": "  # noqa: F541\n",
           "range": {

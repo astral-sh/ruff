@@ -121,7 +121,8 @@ preview = true
         .collect();
 
     assert!(titles.contains(&"Ruff (unused-import): Remove unused import: `os`"));
-    assert!(titles.contains(&"Ruff (unused-import): Disable for this line"));
+    assert!(titles.contains(&"Ruff (unused-import): Disable for this line (ruff:ignore)"));
+    assert!(titles.contains(&"Ruff (unused-import): Disable for this line (noqa)"));
 
     Ok(())
 }

@@ -73,7 +73,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         if snapshot.client_settings().noqa_comments()
             && supported_code_actions.contains(&SupportedCodeAction::QuickFix)
         {
-            response.extend(noqa_comments(&snapshot, &fixes));
+            response.extend(suppression_comments(&snapshot, &fixes));
         }
 
         if snapshot.client_settings().fix_all() {
@@ -156,11 +156,20 @@ fn quick_fix(
         .collect()
 }
 
-fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<CodeActionResponse> {
+fn suppression_comments(
+    snapshot: &DocumentSnapshot,
+    fixes: &[DiagnosticFix],
+) -> Vec<CodeActionResponse> {
     fixes
         .iter()
-        .filter_map(|fix| {
-            let edit = fix.noqa_edit.clone()?;
+        .flat_map(|fix| {
+            [
+                ("ruff:ignore", fix, fix.ignore_edit.as_ref()),
+                ("noqa", fix, fix.noqa_edit.as_ref()),
+            ]
+        })
+        .filter_map(|(kind, fix, edit)| {
+            let edit = edit?.clone();
 
             let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
 
@@ -173,7 +182,10 @@ fn noqa_comments(snapshot: &DocumentSnapshot, fixes: &[DiagnosticFix]) -> Vec<Co
                 .ok()?;
 
             Some(CodeActionResponse::CodeAction(types::CodeAction {
-                title: format!("{DIAGNOSTIC_NAME} ({}): Disable for this line", fix.code),
+                title: format!(
+                    "{DIAGNOSTIC_NAME} ({}): Disable for this line ({kind})",
+                    fix.code
+                ),
                 kind: Some(types::CodeActionKind::QuickFix),
                 edit: Some(tracker.into_workspace_edit()),
                 diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
