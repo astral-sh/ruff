@@ -447,7 +447,7 @@ struct ApplicableFix {
     /// Gets fixed to:
     ///
     /// ```py
-    /// enumerate(0, "1")  # ty:ignore[invalid-argument-type]
+    /// enumerate(0, "1")  # ty: ignore[invalid-argument-type]
     /// ```
     ///
     /// In which case `fixed_diagnostics` is 2.
@@ -832,7 +832,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        a = b + 10  # ty:ignore[unresolved-reference]
+        a = b + 10  # ty: ignore[unresolved-reference]
         ```
         ");
     }
@@ -849,7 +849,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        a = b + 10 + c  # ty:ignore[unresolved-reference]
+        a = b + 10 + c  # ty: ignore[unresolved-reference]
         ```
         ");
     }
@@ -868,7 +868,7 @@ mod tests {
 
         ```py
         import sys
-        a = b + 10 + sys.veeersion  # ty:ignore[unresolved-attribute, unresolved-reference]
+        a = b + 10 + sys.veeersion  # ty: ignore[unresolved-attribute, unresolved-reference]
         ```
         ");
     }
@@ -967,8 +967,8 @@ mod tests {
 
         test(
             a = 10,
-            c = "unknown"  # ty:ignore[unknown-argument]
-        )  # ty:ignore[missing-argument]
+            c = "unknown"  # ty: ignore[unknown-argument]
+        )  # ty: ignore[missing-argument]
         ```
         "#);
     }
@@ -1013,8 +1013,8 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
             )
         ```
         "#);
@@ -1056,8 +1056,8 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
             ); missing  # ty: ignore[unresolved-reference]
         ```
         "#
@@ -1094,7 +1094,7 @@ class B(A):
             def test(
                 self,
                 b: str
-            ) -> A.b:  # ty:ignore[invalid-method-override, unresolved-attribute]
+            ) -> A.b:  # ty: ignore[invalid-method-override, unresolved-attribute]
                 pass
         ```
         "#);
@@ -1130,7 +1130,7 @@ class B(A):
             def test(  # ty:ignore[unresolved-reference, invalid-method-override]
                 self,
                 b: str
-            ) -> A.b:  # ty:ignore[unresolved-attribute]
+            ) -> A.b:  # ty: ignore[unresolved-attribute]
                 pass
         ```
 
@@ -1179,7 +1179,7 @@ class B(A):
         ## Fixed source
 
         ```py
-        value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
         ```
 
         ## Diagnostics after applying fixes
@@ -1187,7 +1187,7 @@ class B(A):
         warning[unused-ignore-comment]: Unused `ty: ignore` without a code
          --> test.py:1:18
           |
-        1 | value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        1 | value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Remove the unused suppression comment
