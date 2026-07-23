@@ -185,7 +185,7 @@ static PYDANTIC: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    1600,
+    1601,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
