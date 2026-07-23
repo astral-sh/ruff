@@ -132,6 +132,7 @@ pub(crate) fn noqa_comments(
 
     // If some codes are external, return without a fix.
     if has_external_codes {
+        diagnostic.info("Automatic fix is unavailable because external codes are present.");
         return;
     }
 
@@ -145,6 +146,10 @@ pub(crate) fn noqa_comments(
     //
     // by converting it to a valid `ruff: ignore` comment.
     if has_unused_codes {
+        diagnostic.info(
+            "Automatic fix is unavailable because unused codes are present. \
+			 Consider enabling `RUF100` to remove them.",
+        );
         return;
     }
 
