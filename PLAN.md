@@ -5,7 +5,7 @@
 - [x] PR 0's C0/E1–E6 behavior basis already exists on the parent stack.
 - [x] PR 1B's visitor-driven `PathAssignments` implementation is already merged into `main`.
 - [x] Phase 2 — Refactor `TypeVarSet` to retain identity-keyed bound instances.
-- [ ] Phase 3 — Implement the minimal existential-atom representation, ownership, and display.
+- [x] Phase 3 — Implement the minimal existential-atom representation, ownership, and display.
 
 The former Phase 1 `Atom::Range` refactor ([astral-sh/ruff#27111](https://github.com/astral-sh/ruff/pull/27111), `dcreager/refactor-atoms`) is **superseded and is not a prerequisite**. It has been moved out of this stack. `dcreager/inferable-instances` is based directly on `dcreager/quant-tests`; the implementation therefore still uses `ConstraintId`, `Constraint`, and the existing range-constraint arenas. Do not reintroduce the single shared `Atom` payload arena described by that earlier design.
 
@@ -253,7 +253,7 @@ The earlier phase replaced the existing constraint arena with a shared arena con
 
 ## Phase 3 — Implement the minimal existential-atom representation, ownership, and display
 
-**Status:** pending.
+**Status:** complete.
 
 **Dependency:** the independently reviewable Phase 2 `TypeVarSet` representation refactor, existing PR 0, and merged PR 1B. The superseded `Atom::Range` refactor is not a dependency.
 
@@ -297,6 +297,8 @@ Do not implement semantic type mapping (`ConstraintSet::apply_type_mapping_impl`
 **Open decisions:** refine exact graph-display connector alignment and identify any further explicitly justified exceptions to range-only invariant failures. Regression coverage should remain minimal and behavioral rather than prescribing storage or implementation details.
 
 **Exit criteria:** existential relations have the agreed minimal representation, ownership, and display; existing range representations and behavior remain intact; production `reduce_inferable`, `for_all`, and mdtest quantifier entry points retain their current behavior; `ConstraintSet` has no companion domain; and all relevant tests pass. Do not expand these criteria without a concrete top-line requirement.
+
+**Validation note:** five focused existential-representation tests cover dependent declared bounds, additional and empty-binder domains, opaque Boolean composition, concise and nested/shared graph display, compacted ownership and overlays, cross-builder loading, post-load atom allocation, the single-node load path, and explicit range-only invariant failures. The quantification and constraint-ordering mdtests, crate Clippy checks, and full `ty_python_semantic` suite pass (773 passed, 35 skipped). No snapshot expectations changed.
 
 ## Validation for every implementation phase
 
