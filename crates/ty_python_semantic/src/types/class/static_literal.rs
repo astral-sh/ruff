@@ -62,7 +62,7 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    attribute_scopes,
+    ProgramFile, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -404,11 +404,12 @@ impl<'db> StaticClassLiteral<'db> {
     )]
     fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let python_file = scope.python_file(db);
+        let program_file = scope.program_file(db);
+        let python_file = program_file.python_file(db);
         let parsed = parsed_module(db, python_file).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, python_file);
+            let index = semantic_index(db, program_file);
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(db, index, definition, type_params)
         })
@@ -522,6 +523,10 @@ impl<'db> StaticClassLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.body_scope(db).program_file(db)
+    }
+
     /// Return the original [`ast::StmtClassDef`] node associated with this class
     ///
     /// ## Note
@@ -533,7 +538,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.python_file(db));
+        let index = semantic_index(db, body_scope.program_file(db));
         index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
@@ -625,12 +630,13 @@ impl<'db> StaticClassLiteral<'db> {
                 class.name(db)
             );
 
-            let python_file = class.python_file(db);
+            let program_file = class.program_file(db);
+            let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
             let class_stmt = class.node(db, &module);
 
             let class_definition =
-                semantic_index(db, python_file).expect_single_definition(class_stmt);
+                semantic_index(db, program_file).expect_single_definition(class_stmt);
             expanded_class_base_entries(db, class.known(db), class_stmt, class_definition)
                 .into_iter()
                 .map(ExpandedClassBaseEntry::ty)
@@ -716,7 +722,8 @@ impl<'db> StaticClassLiteral<'db> {
     fn decorators_inner(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
-        let python_file = self.python_file(db);
+        let program_file = self.program_file(db);
+        let python_file = program_file.python_file(db);
         let module = parsed_module(db, python_file).load(db);
 
         let class_stmt = self.node(db, &module);
@@ -725,7 +732,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let class_definition =
-            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, self.program_file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .decorator_list
@@ -749,10 +756,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// Iterate through the decorators on this class, returning the index of the first one
     /// that is either `@dataclass` or `@dataclass(...)`.
     pub(crate) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
-        let python_file = self.python_file(db);
+        let program_file = self.program_file(db);
+        let python_file = program_file.python_file(db);
         let module = parsed_module(db, python_file).load(db);
         let class_stmt = self.node(db, &module);
-        let class_definition = semantic_index(db, python_file).expect_single_definition(class_stmt);
+        let class_definition =
+            semantic_index(db, program_file).expect_single_definition(class_stmt);
 
         class_stmt.decorator_list.iter().position(|decorator| {
             let decorator_callable = decorator
@@ -1073,8 +1082,9 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-            let python_file = class.python_file(db);
-            let env = ProgramEnvironment::from_file(python_file);
+            let program_file = class.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -2777,8 +2787,9 @@ impl<'db> StaticClassLiteral<'db> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
-        let python_file = class_body_scope.python_file(db);
-        let env = &ProgramEnvironment::from_file(python_file);
+        let program_file = class_body_scope.program_file(db);
+        let python_file = program_file.python_file(db);
+        let env = &ProgramEnvironment::from_file(program_file);
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
@@ -2790,7 +2801,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut provenance = Provenance::Unknown;
 
         let module = parsed_module(db, python_file).load(db);
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, program_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
@@ -3594,10 +3605,10 @@ impl<'db> StaticClassLiteral<'db> {
             return TypeVarVariance::Bivariant;
         }
         let class_body_scope = self.body_scope(db);
-        let python_file = class_body_scope.python_file(db);
+        let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version(db);
 
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, program_file);
 
         let explicit_bases_variances = self
             .explicit_bases(db)
@@ -3792,7 +3803,7 @@ impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.python_file(db));
+    let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {

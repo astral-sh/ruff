@@ -5,8 +5,8 @@ use lsp_types::{
 };
 use ruff_db::PythonFile;
 use ty_ide::selection_range;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -42,7 +42,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
-        let python_file = PythonFile::new(db, file, db.python_version());
+        let python_file = PythonFile::new(db, file, Program::get(db).python_version(db));
 
         let mut results = Vec::new();
 

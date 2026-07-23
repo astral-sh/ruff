@@ -50,7 +50,7 @@ use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{global_scope, place_table, use_def_map};
+use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -1477,8 +1477,8 @@ pub(super) fn note_numbers_module_not_supported<'db>(
         let file = target_instance
             .class(db, env)
             .class_literal(db)
-            .python_file(db);
-        if let Some(module) = file_to_module(db, file)
+            .program_file(db);
+        if let Some(module) = file_to_module(db, file.resolver_file(db))
             && module.is_known(db, KnownModule::Numbers)
         {
             let is_numeric = value_ty.is_subtype_of(
@@ -4736,6 +4736,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
     mut diagnostic: LintDiagnosticGuard,
     value_type: Type,
     attr: &str,
@@ -4748,7 +4749,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
         return;
     };
     let module = module_ty.module(db);
-    let Some(file) = module.python_file(db) else {
+    let Some(file) = module.file(db) else {
         return;
     };
     let Some(search_path) = module.search_path(db) else {
@@ -4761,7 +4762,8 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // We populate place_table entries for stdlib items across all known versions and platforms,
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
-    let symbol_table = place_table(db, global_scope(db, file));
+    let program_file = ProgramFile::new(db, file, env.program(db));
+    let symbol_table = place_table(db, global_scope(db, program_file));
     let Some(symbol) = symbol_table.symbol_by_name(attr) else {
         return;
     };

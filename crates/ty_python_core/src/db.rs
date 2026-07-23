@@ -21,9 +21,7 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{
-        Db as ModuleResolverDb, FallibleStrategy, SearchPathSettings, SearchPaths,
-    };
+    use ty_module_resolver::{Db as ModuleResolverDb, FallibleStrategy, SearchPathSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     use crate::platform::PythonPlatform;
@@ -93,11 +91,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

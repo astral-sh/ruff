@@ -30,7 +30,7 @@ pub mod vendored;
 /// This is the key for [`parsed::parsed_module`]. Including the Python version allows the same
 /// file to be parsed for different versions within a single Salsa revision without sharing an
 /// incompatible AST or syntax diagnostics.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, revisions = usize::MAX, heap_size = ruff_memory_usage::heap_size)]
 pub struct PythonFile<'db> {
     #[returns(copy)]
     pub file: File,

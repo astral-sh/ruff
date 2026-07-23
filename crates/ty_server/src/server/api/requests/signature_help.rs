@@ -11,10 +11,9 @@ use lsp_types::{
     Documentation, ParameterInformation, ParameterInformationLabel, SignatureHelp,
     SignatureHelpParams, SignatureInformation, Uri,
 };
-use ruff_db::PythonFile;
 use ty_ide::signature_help;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 pub(crate) struct SignatureHelpRequestHandler;
 
@@ -57,7 +56,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
         let resolved_capabilities = snapshot.resolved_client_capabilities();
 
         let Some(signature_help_info) =
-            signature_help(db, PythonFile::new(db, file, db.python_version()), offset)
+            signature_help(db, Program::get(db).program_file(db, file), offset)
         else {
             return Ok(None);
         };

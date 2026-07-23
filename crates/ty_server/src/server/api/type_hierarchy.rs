@@ -1,7 +1,6 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
-use ruff_db::PythonFile;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::PositionEncoding;
 use crate::document::{ToRangeExt, resolve_file_uri_range};
@@ -35,7 +34,7 @@ pub(crate) fn hierarchy_handler(
         ) else {
             continue;
         };
-        let file = PythonFile::new(db, file, db.python_version());
+        let file = Program::get(db).program_file(db, file);
         let hierarchy_types = match hierarchy_kind {
             TypeHierarchyKind::Subtypes => ty_ide::type_hierarchy_subtypes(db, file, offset),
             TypeHierarchyKind::Supertypes => ty_ide::type_hierarchy_supertypes(db, file, offset),

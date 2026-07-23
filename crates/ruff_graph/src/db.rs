@@ -7,7 +7,8 @@ use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
+use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{FallibleStrategy, ResolverEnvironment, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -26,6 +27,13 @@ pub struct ModuleDb {
 }
 
 impl ModuleDb {
+    pub(crate) fn resolver_environment(
+        &self,
+        python_version: PythonVersion,
+    ) -> ResolverEnvironment<'_> {
+        ResolverEnvironment::new(self, python_version, self.search_paths.as_ref())
+    }
+
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots<S>(
         system: S,
@@ -79,11 +87,7 @@ impl SourceDb for ModuleDb {
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for ModuleDb {
-    fn search_paths(&self) -> &SearchPaths {
-        &self.search_paths
-    }
-}
+impl ty_module_resolver::Db for ModuleDb {}
 
 #[salsa::db]
 impl salsa::Database for ModuleDb {}

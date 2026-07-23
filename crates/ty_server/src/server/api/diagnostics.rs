@@ -12,7 +12,6 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
 };
@@ -21,6 +20,7 @@ use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
 use ty_project::{Db as _, ProjectDatabase};
+use ty_python_core::program::Program;
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
@@ -402,7 +402,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, PythonFile::new(db, file, db.python_version()));
+    let unnecessary_hints = hints(db, Program::get(db).program_file(db, file));
 
     Some(Diagnostics {
         items: diagnostics,

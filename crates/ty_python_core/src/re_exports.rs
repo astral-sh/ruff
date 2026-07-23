@@ -22,24 +22,23 @@
 
 use ruff_db::parsed::parsed_module;
 
-use ruff_db::PythonFile;
 use ruff_python_ast::{
     self as ast,
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 
-use crate::Db;
+use crate::{Db, ProgramFile};
 
 #[salsa::tracked(
     returns(deref),
     cycle_initial=|_, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size)
 ]
-pub(super) fn exported_names(db: &dyn Db, file: PythonFile<'_>) -> Box<[Name]> {
-    let module = parsed_module(db, file).load(db);
+pub(super) fn exported_names(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Name]> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
 
@@ -53,17 +52,17 @@ pub(super) fn exported_names(db: &dyn Db, file: PythonFile<'_>) -> Box<[Name]> {
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    program_file: ProgramFile<'db>,
     visiting_stub_file: bool,
     exports: FxHashMap<&'db Name, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
 impl<'db> ExportFinder<'db> {
-    fn new(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             db,
-            file,
+            program_file: file,
             visiting_stub_file: file.file(db).is_stub(db),
             exports: FxHashMap::default(),
             dunder_all: DunderAll::NotPresent,
@@ -250,20 +249,35 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     if &name.name.id == "*" {
                         if !found_star {
                             found_star = true;
-                            for export in
-                                ModuleName::from_import_statement(self.db, self.file, node)
-                                    .ok()
-                                    .and_then(|module_name| {
-                                        resolve_module(self.db, self.file, &module_name)
+                            let db = self.db;
+                            let program_file = self.program_file;
+                            let file = program_file.file(db);
+                            let resolver_environment = program_file.resolver_environment(db);
+                            for export in ModuleName::from_import_statement(
+                                db,
+                                ImportingFile::File(file, resolver_environment),
+                                node,
+                            )
+                            .ok()
+                            .and_then(|module_name| {
+                                resolve_module(
+                                    db,
+                                    ImportingFile::File(file, resolver_environment),
+                                    &module_name,
+                                )
+                            })
+                            .iter()
+                            .flat_map(|module| {
+                                module
+                                    .file(db)
+                                    .map(|file| {
+                                        exported_names(
+                                            db,
+                                            ProgramFile::new(db, file, resolver_environment),
+                                        )
                                     })
-                                    .iter()
-                                    .flat_map(|module| {
-                                        module
-                                            .python_file(self.db)
-                                            .map(|file| exported_names(self.db, file))
-                                            .unwrap_or_default()
-                                    })
-                            {
+                                    .unwrap_or_default()
+                            }) {
                                 self.possibly_add_export(export, PossibleExportKind::Normal);
                             }
                         }

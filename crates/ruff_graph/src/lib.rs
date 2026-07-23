@@ -48,7 +48,8 @@ impl ModuleImports {
 
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
-        let resolver = Resolver::new(db, path, python_version);
+        let environment = db.resolver_environment(python_version);
+        let resolver = Resolver::new(db, path, environment);
         for import in imports {
             for resolved in resolver.resolve(import) {
                 if let Some(path) = resolved.as_system_path() {

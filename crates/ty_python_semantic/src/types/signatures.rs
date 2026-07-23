@@ -74,7 +74,7 @@ fn function_signature_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -92,7 +92,7 @@ fn function_signature_type_expression_flags<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeExpressionFlags {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -5337,7 +5337,7 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let index = semantic_index(db, function_definition.python_file(db));
+        let index = semantic_index(db, function_definition.program_file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
@@ -5668,13 +5668,13 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::{FunctionType, KnownClass, LiteralValueType};
-    use ruff_db::PythonFile;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
-        let module = PythonFile::new(db, module, db.python_version());
+        let module = ProgramFile::new(db, module, db.program_environment().program(db));
         global_symbol(db, module, "f")
             .place
             .expect_type()

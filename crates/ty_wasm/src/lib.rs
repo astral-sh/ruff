@@ -279,7 +279,7 @@ impl Workspace {
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
         Ok(hints(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
         )
         .into_iter()
         .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
@@ -339,7 +339,7 @@ impl Workspace {
 
         let Some(targets) = goto_type_definition(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(Vec::new());
@@ -367,7 +367,7 @@ impl Workspace {
 
         let Some(targets) = goto_declaration(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(Vec::new());
@@ -395,7 +395,7 @@ impl Workspace {
 
         let Some(targets) = goto_definition(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(Vec::new());
@@ -423,7 +423,7 @@ impl Workspace {
 
         let Some(targets) = find_references(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
             true,
         ) else {
@@ -467,7 +467,7 @@ impl Workspace {
 
         let Some(range) = can_rename(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(None);
@@ -492,13 +492,13 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
-        let python_file = PythonFile::new(&self.db, file_id.file, self.db.python_version());
+        let program_file = Program::get(&self.db).program_file(&self.db, file_id.file);
 
-        if can_rename(&self.db, python_file, offset).is_none() {
+        if can_rename(&self.db, program_file, offset).is_none() {
             return Ok(Vec::new());
         }
 
-        let Some(rename_results) = rename(&self.db, python_file, offset, new_name) else {
+        let Some(rename_results) = rename(&self.db, program_file, offset, new_name) else {
             return Ok(Vec::new());
         };
 
@@ -525,7 +525,7 @@ impl Workspace {
 
         let Some(range_info) = hover(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(None);
@@ -558,13 +558,13 @@ impl Workspace {
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let settings = ty_ide::CompletionSettings::default();
-        let python_file = PythonFile::new(&self.db, file_id.file, self.db.python_version());
-        let env = ProgramEnvironment::from_file(python_file);
+        let program_file = Program::get(&self.db).program_file(&self.db, file_id.file);
+        let env = ProgramEnvironment::from_file(program_file);
         let completions = ty_ide::completion(
             &self.db,
             &settings,
             CompletionCapabilities::default(),
-            python_file,
+            program_file,
             offset,
         );
 
@@ -608,7 +608,7 @@ impl Workspace {
 
         let result = inlay_hints(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
             // TODO: Provide a way to configure this
             &InlayHintSettings {
@@ -667,7 +667,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             None,
         );
 
@@ -694,7 +694,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             Some(range.to_text_range(&index, &source, self.position_encoding)?),
         );
 
@@ -731,7 +731,7 @@ impl Workspace {
             actions.extend(
                 ty_ide::code_actions(
                     &self.db,
-                    PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+                    Program::get(&self.db).program_file(&self.db, file_id.file),
                     range,
                     diagnostic.inner.id().as_str(),
                 )
@@ -768,7 +768,7 @@ impl Workspace {
 
         let Some(signature_help_info) = signature_help(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(None);
@@ -819,7 +819,7 @@ impl Workspace {
 
         let Some(targets) = document_highlights(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            Program::get(&self.db).program_file(&self.db, file_id.file),
             offset,
         ) else {
             return Ok(Vec::new());

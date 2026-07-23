@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri};
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 use types::CodeActionKind;
 
 use crate::db::Db;
@@ -43,7 +42,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
-        let python_file = PythonFile::new(db, file, db.python_version());
+        let python_file = Program::get(db).program_file(db, file);
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {

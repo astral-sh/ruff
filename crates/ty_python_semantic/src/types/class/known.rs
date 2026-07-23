@@ -13,7 +13,6 @@ use crate::{
         known_instance::DeprecatedInstance,
     },
 };
-use ruff_db::PythonFile;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashSet;
@@ -21,7 +20,7 @@ use std::{
     borrow::Cow,
     sync::{LazyLock, Mutex},
 };
-use ty_module_resolver::{KnownModule, file_to_module};
+use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
@@ -1569,7 +1568,7 @@ impl KnownClass {
 
     pub(crate) fn try_from_file_and_name(
         db: &dyn Db,
-        file: PythonFile<'_>,
+        file: ImportingFile<'_>,
         class_name: &str,
     ) -> Option<Self> {
         // We assert that this match is exhaustive over the right-hand side in the unit test
@@ -1647,8 +1646,16 @@ impl KnownClass {
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
-            "EnumType" if file.python_version(db) >= PythonVersion::PY311 => &[Self::EnumType],
-            "StrEnum" if file.python_version(db) >= PythonVersion::PY311 => &[Self::StrEnum],
+            "EnumType"
+                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                &[Self::EnumType]
+            }
+            "StrEnum"
+                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                &[Self::StrEnum]
+            }
             "IntEnum" => &[Self::IntEnum],
             "Flag" => &[Self::Flag],
             "IntFlag" => &[Self::IntFlag],
@@ -1682,8 +1689,8 @@ impl KnownClass {
             _ => return None,
         };
 
-        let module = file_to_module(db, file)?.known(db)?;
-        let python_version = file.python_version(db);
+        let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
+        let python_version = file.resolver_environment(db).python_version(db);
 
         candidates
             .iter()
@@ -1967,7 +1974,7 @@ struct KnownClassArgument {
     class: KnownClass,
 
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
@@ -2076,6 +2083,7 @@ mod tests {
                 source: PythonVersionSource::default(),
             });
         let python_version = db.python_version();
+        let program = db.program_environment().program(&db);
         for class in KnownClass::iter() {
             if class.canonical_module(python_version).is_third_party() {
                 continue;
@@ -2083,7 +2091,7 @@ mod tests {
             let class_name = class.name(python_version);
             let class_module = resolve_module_confident(
                 &db,
-                python_version,
+                program,
                 &class.canonical_module(python_version).name(),
             )
             .unwrap();
@@ -2091,7 +2099,7 @@ mod tests {
             assert_eq!(
                 KnownClass::try_from_file_and_name(
                     &db,
-                    class_module.python_file(&db).unwrap(),
+                    ImportingFile::File(class_module.file(&db).unwrap(), program),
                     class_name
                 ),
                 Some(class),

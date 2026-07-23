@@ -1,5 +1,6 @@
 use crate::config::{Analysis, Rules, ScriptOptions};
 use camino::{Utf8Component, Utf8PathBuf};
+use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::source::source_text;
@@ -8,13 +9,12 @@ use ruff_db::system::{
     WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, PythonFile};
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
-use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
+use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::Db as _;
 use ty_python_core::program::Program;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -48,10 +48,6 @@ impl Db {
 
         db.settings = Some(Settings::new(&db));
         db
-    }
-
-    pub(crate) fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
     }
 
     fn settings(&self) -> Settings {
@@ -117,11 +113,7 @@ impl SourceDb for Db {
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for Db {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for Db {}
 
 #[salsa::db]
 impl ty_python_core::Db for Db {
@@ -137,7 +129,7 @@ impl SemanticDb for Db {
             return Vec::new();
         }
 
-        check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
+        check_file_unwrap(self, Program::get(self).program_file(self, file))
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
