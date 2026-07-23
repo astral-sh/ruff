@@ -1,5 +1,5 @@
 use super::builder::TypeInferenceBuilder;
-use crate::db::tests::{TestDb, setup_db};
+use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
@@ -8,6 +8,7 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_python_ast::PythonVersion;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -81,6 +82,74 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
+}
+
+#[test]
+fn same_file_at_different_python_versions() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .build()?;
+    db.write_dedented(
+        "src/main.py",
+        r#"
+        import sys
+
+        from typing import reveal_type
+        from zipfile._path import Path
+
+        if sys.version_info >= (3, 12):
+            from py312_dependency import value
+        else:
+            from py311_dependency import value
+
+        type Alias = int
+
+        reveal_type(value)
+        "#,
+    )?;
+    db.write_dedented("src/py311_dependency.py", "value: str = 'py311'")?;
+    db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
+
+    let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
+    let py311 = PythonFile::new(&db, file, PythonVersion::PY311);
+    let py312 = PythonFile::new(&db, file, PythonVersion::PY312);
+
+    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+        let diagnostics = crate::check_file_unwrap(&db, file);
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.id() == DiagnosticId::InvalidSyntax),
+            expect_invalid_syntax,
+            "{diagnostics:#?}"
+        );
+        assert_eq!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.primary_message().contains("zipfile._path")),
+            expect_unresolved_import,
+            "{diagnostics:#?}"
+        );
+
+        let revealed = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
+            .and_then(Diagnostic::primary_annotation)
+            .and_then(|annotation| annotation.get_message());
+        assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
+        assert_eq!(
+            diagnostics.len(),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            "{diagnostics:#?}"
+        );
+    };
+
+    check(py311, "`str`", true, true);
+    check(py312, "`int`", false, false);
+    check(py311, "`str`", true, true);
+
+    Ok(())
 }
 
 #[test]
