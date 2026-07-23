@@ -9,7 +9,7 @@
 
 use ty_module_resolver::KnownModule;
 
-use super::call::CallArguments;
+use super::call::{Bindings, CallArguments, CallDunderError};
 use super::callable::CallableTypeKind;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
@@ -118,6 +118,44 @@ pub(super) enum ClassAttributeWriteMember<'db> {
     /// `has_instance_attribute` distinguishes assigning an instance-only declaration through the
     /// class from assigning a wholly unknown attribute.
     Unresolved { has_instance_attribute: bool },
+}
+
+/// The outcome of binding an attribute write against `__setattr__`.
+pub(super) enum SetAttrWriteRequirement<'a, 'db> {
+    /// At least one setter overload accepts the write.
+    Callable(&'a Bindings<'db>),
+    /// The selected setter never returns, so the write cannot complete.
+    Terminal,
+    /// The setter exists, but the call cannot be bound.
+    Invalid,
+    /// No setter was found.
+    Missing,
+}
+
+/// Interprets a bound `__setattr__` call consistently for assignments and protocol writes.
+///
+/// Terminal setters take precedence over other outcomes; possibly-unbound setters remain callable
+/// so their matching overloads can still govern the write.
+pub(super) fn setattr_write_requirement<'a, 'db>(
+    db: &'db dyn Db,
+    result: &'a Result<Bindings<'db>, CallDunderError<'db>>,
+) -> SetAttrWriteRequirement<'a, 'db> {
+    let returns_never = match result {
+        Ok(bindings) => bindings.return_type(db).is_never(),
+        Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+    };
+    if returns_never {
+        return SetAttrWriteRequirement::Terminal;
+    }
+
+    match result {
+        Ok(bindings) => SetAttrWriteRequirement::Callable(bindings),
+        Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+            SetAttrWriteRequirement::Callable(bindings)
+        }
+        Err(CallDunderError::CallError(..)) => SetAttrWriteRequirement::Invalid,
+        Err(CallDunderError::MethodNotAvailable) => SetAttrWriteRequirement::Missing,
+    }
 }
 
 /// How an explicitly resolved member accepts a write.

@@ -2523,11 +2523,51 @@ class MetaWithGetAttrAndSetAttr(type):
 class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
 
 ClassWithDynamicX.x = 1
-# TODO: this should pass once metaclass setters are considered for protocol writes.
-dynamic_x: HasMutableXProperty = ClassWithDynamicX  # error: [invalid-assignment]
+dynamic_x: HasMutableXProperty = ClassWithDynamicX
 ```
 
-Once metaclass setters are considered, one with an incompatible value type must still be rejected:
+Separate setter overloads can cover a union write type, and a variadic setter can accept any of its
+members:
+
+```py
+class MetaWithOverloadedValueSetAttr(type):
+    def __getattr__(cls, attr: str) -> object:
+        return object()
+
+    @overload
+    def __setattr__(cls, attr: str, value: int) -> None: ...
+    @overload
+    def __setattr__(cls, attr: str, value: str) -> None: ...
+    def __setattr__(cls, attr: str, value: int | str) -> None: ...
+
+class ClassWithOverloadedValueSetAttr(metaclass=MetaWithOverloadedValueSetAttr): ...
+
+overloaded_value_x: HasIntOrStrWriteProperty = ClassWithOverloadedValueSetAttr
+
+class InstanceWithOverloadedValueSetAttr:
+    def __getattr__(self, attr: str) -> object:
+        return object()
+
+    @overload
+    def __setattr__(self, attr: str, value: int) -> None: ...
+    @overload
+    def __setattr__(self, attr: str, value: str) -> None: ...
+    def __setattr__(self, attr: str, value: int | str) -> None: ...
+
+static_assert(is_subtype_of(InstanceWithOverloadedValueSetAttr, HasIntOrStrWriteProperty))
+
+class MetaWithVariadicSetAttr(type):
+    def __getattr__(cls, attr: str) -> object:
+        return object()
+
+    def __setattr__(cls, *args: object) -> None: ...
+
+class ClassWithVariadicSetAttr(metaclass=MetaWithVariadicSetAttr): ...
+
+variadic_x: HasIntOrStrWriteProperty = ClassWithVariadicSetAttr
+```
+
+A metaclass setter with an incompatible value type is rejected:
 
 ```py
 class MetaWithUnsuitableSetAttr(type):
@@ -2556,8 +2596,7 @@ class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
 terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr
 ```
 
-Once metaclass setters are considered, an overload for a different attribute must not make the class
-satisfy the protocol:
+An overload for a different attribute must not make the class satisfy the protocol:
 
 ```py
 from typing import Literal
@@ -2578,9 +2617,22 @@ class ClassWithOverloadedSetAttr(metaclass=MetaWithOverloadedSetAttr): ...
 
 ClassWithOverloadedSetAttr.x = 1
 static_assert(not is_subtype_of(TypeOf[ClassWithOverloadedSetAttr], HasMutableXProperty))
+
+class InstanceWithOverloadedSetAttr:
+    def __getattr__(self, attr: str) -> int:
+        return 1
+
+    @overload
+    def __setattr__(self, attr: Literal["x"], value: Any) -> None: ...
+    @overload
+    def __setattr__(self, attr: Literal["y"], value: int) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(self, attr: str, value: object) -> None: ...
+
+static_assert(not is_subtype_of(InstanceWithOverloadedSetAttr, HasMutableXProperty))
 ```
 
-A generic metaclass setter can satisfy a writable property protocol:
+A generic metaclass setter should satisfy a writable property protocol:
 
 ```py
 from typing import TypeVar
@@ -2596,8 +2648,15 @@ class MetaWithGenericSetAttr(type):
 class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
 
 ClassWithGenericSetAttr.x = 1
-# TODO: this should pass once metaclass setters are considered for protocol writes.
-generic_x: HasMutableXProperty = ClassWithGenericSetAttr  # error: [invalid-assignment]
+generic_x: HasMutableXProperty = ClassWithGenericSetAttr
+
+class InstanceWithGenericSetAttr:
+    def __getattr__(self, attr: str) -> int:
+        return 1
+
+    def __setattr__(self, attr: str, value: T) -> None: ...
+
+static_assert(is_subtype_of(InstanceWithGenericSetAttr, HasMutableXProperty))
 ```
 
 For static checking, an explicit attribute declaration takes precedence over `__setattr__`. This
