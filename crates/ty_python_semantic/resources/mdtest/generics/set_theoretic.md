@@ -287,3 +287,17 @@ static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
+
+`type[...]` is a covariant type constructor, so its intersections can be distributed over their type
+arguments.
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class P: ...
+
+static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
+static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
+```
