@@ -22,7 +22,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
  7 |         return NotBoolable()
  8 | 
  9 | # error: [unsupported-bool-conversion]
-10 | (A(),) == (A(),)
+10 | reveal_type((A(),) == (A(),))  # revealed: bool
+11 | # error: [unsupported-bool-conversion]
+12 | reveal_type((A(), "x") == (A(), "y"))  # revealed: Literal[False]
+13 | # error: [unsupported-bool-conversion]
+14 | reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
+15 | def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
+16 |     reveal_type(left is right)  # revealed: bool
+17 |     reveal_type(left is not right)  # revealed: bool
 ```
 
 # Diagnostics
@@ -53,10 +60,32 @@ help
 
 ```
 error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
-  --> src/mdtest_snippet.py:10:1
+  --> src/mdtest_snippet.py:10:13
    |
-10 | (A(),) == (A(),)
-   | ^^^^^^^^^^^^^^^^
+10 | reveal_type((A(),) == (A(),))  # revealed: bool
+   |             ^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
+
+```
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:12:13
+   |
+12 | reveal_type((A(), "x") == (A(), "y"))  # revealed: Literal[False]
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+info: `__bool__` on `NotBoolable` must be callable
+
+```
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:14:13
+   |
+14 | reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
+   |             ^^^^^^^^^^^^^^^^^^
    |
 info: `__bool__` on `NotBoolable` must be callable
 

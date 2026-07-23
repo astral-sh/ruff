@@ -5163,7 +5163,7 @@ def _(x: Foo):
         pass
 ```
 
-## Protocols are never singleton types, and are never single-valued types
+## Protocols are never singleton types
 
 It *might* be possible to have a singleton protocol-instance type...?
 
@@ -5173,14 +5173,13 @@ worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
 from typing import Protocol, Callable
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 
 class WeirdAndWacky(Protocol):
     @property
     def __class__(self) -> Callable[[], None]: ...
 
 reveal_type(is_singleton(WeirdAndWacky))  # revealed: Literal[False]
-reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 ```
 
 ## Integration test: `typing.SupportsIndex` and `typing.Sized`
