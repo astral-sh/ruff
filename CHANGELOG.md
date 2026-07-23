@@ -16,7 +16,7 @@ guide and overview of the changes!
 - Ruff can now format Python code blocks in Markdown files and will do this by default. See the
     [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
 
-- Ruff now supports `ruff: ignore` comments the ends of lines, like `noqa` comments, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import` (`F401`)](https://docs.astral.sh/ruff/rules/unused-import/) diagnostic:
+- Ruff now supports `ruff: ignore` comments at the ends of lines, like `noqa` comments, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import` (`F401`)](https://docs.astral.sh/ruff/rules/unused-import/) diagnostic:
 
     ```py
     import math  # ruff: ignore[F401]
