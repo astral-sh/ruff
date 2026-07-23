@@ -40,7 +40,6 @@ compact_str = { workspace = true, features = ["serde"] }
 crossbeam = { workspace = true }
 get-size2 = { workspace = true, features = ["ordermap", "parking_lot"] }
 globset = { workspace = true }
-memchr = { workspace = true }
 notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
 parking_lot = { workspace = true }

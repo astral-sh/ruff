@@ -4784,7 +4784,6 @@ dependencies = [
  "get-size2",
  "globset",
  "insta",
- "memchr",
  "notify",
  "ordermap",
  "parking_lot",
