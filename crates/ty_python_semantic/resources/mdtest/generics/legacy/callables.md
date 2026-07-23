@@ -258,8 +258,10 @@ outside_callable(int_identity)("string")
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-Each overload independently validates the same call, specializing `T` to `str` or `bytes`. The
-return type must satisfy both specializations, so their intersection is `Never`.
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, TypeVar, overload
