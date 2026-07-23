@@ -187,8 +187,6 @@ Memory report:
 =======SALSA QUERIES=======
 `dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
     metadata=[X.XXMB]   fields=[X.XXMB]   count=1
-`Program::resolver_environment_ -> ty_module_resolver::environment::ResolverEnvironment<'_>`
-    metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]
     struct metadata = [X.XXMB]
