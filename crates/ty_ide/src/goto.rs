@@ -256,15 +256,11 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(
-        db: &'db dyn crate::Db,
-        env: &SemanticEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> Option<Self> {
+    pub(crate) fn from_ty(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
         let ty_def = ty.definition(env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.python_file(db)?)
+                ResolvedDefinition::Module(module.python_file(env.db())?)
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)

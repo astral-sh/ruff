@@ -106,10 +106,10 @@ pub fn hover<'db>(
             | Type::TypeAlias(alias) => {
                 let value_ty = alias.value_type(&env);
 
-                alias_docstring = Definitions::from_ty(db, &env, ty)
+                alias_docstring = Definitions::from_ty(&env, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| {
-                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
+                        Definitions::from_ty(&env, value_ty).and_then(|def| def.docstring(db))
                     });
 
                 HoverContent::TypeAlias { alias, qualifiers }
