@@ -132,6 +132,20 @@ def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Unio
     reveal_type(b)  # revealed: type[BasicUser | ProUser | C | str]
 ```
 
+## Intersection of classes
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class A: ...
+class B: ...
+
+static_assert(is_equivalent_to(type[A & B], type[A] & type[B]))
+static_assert(is_equivalent_to(type[A] & type[Any], type[A & Any]))
+```
+
 ## Special case for `None`
 
 The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
