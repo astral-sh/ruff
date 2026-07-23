@@ -45,12 +45,14 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
-    /// Possible edit to add a suppression comment which will disable this diagnostic.
+    /// Possible edit to add a `ruff:ignore` comment which will disable this diagnostic.
+    pub(crate) ignore_edit: Option<lsp_types::TextEdit>,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that may have quick fix
-/// edits available, `noqa` comment edits, or both.
+/// edits available, suppression comment edits, or both.
 #[derive(Clone, Debug)]
 pub(crate) struct DiagnosticFix {
     /// The original diagnostic to be fixed
@@ -62,7 +64,9 @@ pub(crate) struct DiagnosticFix {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// Possible edit to add a suppression comment which will disable this diagnostic.
+    /// Possible edit to add a `ruff:ignore` comment which will disable this diagnostic.
+    pub(crate) ignore_edit: Option<lsp_types::TextEdit>,
+    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -101,7 +105,8 @@ pub(crate) fn check(
 
     let CheckResult {
         diagnostics,
-        suppression_edits,
+        ignore_edits,
+        noqa_edits,
         document,
     } = result;
     let document_uri = query.make_key().into_uri();
@@ -131,13 +136,15 @@ pub(crate) fn check(
             .or_default();
     }
 
-    let mut suppression_edits = suppression_edits.into_iter();
+    let mut ignore_edits = ignore_edits.into_iter();
+    let mut noqa_edits = noqa_edits.into_iter();
     let lsp_diagnostics = diagnostics.into_iter().filter_map(|message| {
-        let suppression_edit = suppression_edits.next().flatten();
+        let ignore_edit = ignore_edits.next().flatten();
+        let noqa_edit = noqa_edits.next().flatten();
         if message.is_invalid_syntax() && !show_syntax_errors {
             None
         } else {
-            Some(to_lsp_diagnostic(&message, suppression_edit, &context))
+            Some(to_lsp_diagnostic(&message, ignore_edit, noqa_edit, &context))
         }
     });
 
@@ -225,7 +232,7 @@ fn check_python(
         &suppressions,
     );
 
-    let suppression_edits = generate_suppression_edits(
+    let ignore_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -234,20 +241,27 @@ fn check_python(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
-        if is_human_readable_names_enabled(settings.linter.preview)
-            && !settings.output_prefer_rule_codes
-        {
-            SuppressionKind::Ignore
-        } else {
-            SuppressionKind::Noqa
-        },
+        SuppressionKind::Ignore,
+        settings.linter.preview,
+    );
+    let noqa_edits = generate_suppression_edits(
+        &document_path,
+        &diagnostics,
+        &locator,
+        indexer.comment_ranges(),
+        &settings.linter.external,
+        &directives.noqa_line_for,
+        stylist.line_ending(),
+        &suppressions,
+        SuppressionKind::Noqa,
         settings.linter.preview,
     );
     let index = locator.to_index().clone();
 
     CheckResult {
         diagnostics,
-        suppression_edits,
+        ignore_edits,
+        noqa_edits,
         document: CheckedDocument::Python {
             source: source_kind,
             index,
@@ -279,7 +293,8 @@ fn check_toml<'a>(
 
     CheckResult {
         diagnostics,
-        suppression_edits: Vec::new(),
+        ignore_edits: Vec::new(),
+        noqa_edits: Vec::new(),
         document: CheckedDocument::Toml(document),
     }
 }
@@ -304,6 +319,7 @@ pub(crate) fn fixes_for_diagnostics(
                 fixed_diagnostic,
                 code: associated_data.code,
                 title: associated_data.title,
+                ignore_edit: associated_data.ignore_edit,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
             }))
@@ -345,7 +361,8 @@ impl CheckedDocument<'_> {
 
 struct CheckResult<'a> {
     diagnostics: Vec<Diagnostic>,
-    suppression_edits: Vec<Option<Edit>>,
+    ignore_edits: Vec<Option<Edit>>,
+    noqa_edits: Vec<Option<Edit>>,
     document: CheckedDocument<'a>,
 }
 
@@ -365,6 +382,7 @@ struct LspDiagnosticContext<'a> {
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
     diagnostic: &Diagnostic,
+    ignore_edit: Option<Edit>,
     noqa_edit: Option<Edit>,
     context: &LspDiagnosticContext,
 ) -> (usize, lsp_types::Diagnostic) {
@@ -396,7 +414,7 @@ fn to_lsp_diagnostic(
         )
     };
 
-    let data = (fix.is_some() || noqa_edit.is_some())
+    let data = (fix.is_some() || ignore_edit.is_some() || noqa_edit.is_some())
         .then(|| {
             let edits = fix
                 .into_iter()
@@ -406,13 +424,14 @@ fn to_lsp_diagnostic(
                     new_text: edit.content().unwrap_or_default().to_string(),
                 })
                 .collect();
-            let noqa_edit = noqa_edit.map(|noqa_edit| lsp_types::TextEdit {
-                range: diagnostic_edit_range(noqa_edit.range(), context),
-                new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
-            });
+            let suppression_edit = |edit: Edit| lsp_types::TextEdit {
+                range: diagnostic_edit_range(edit.range(), context),
+                new_text: edit.into_content().unwrap_or_default().into_string(),
+            };
             serde_json::to_value(AssociatedDiagnosticData {
                 title: suggestion.unwrap_or(name).to_string(),
-                noqa_edit,
+                ignore_edit: ignore_edit.map(suppression_edit),
+                noqa_edit: noqa_edit.map(suppression_edit),
                 edits,
                 code: code.clone(),
             })
@@ -666,7 +685,7 @@ mod tests {
             supports_related_information: true,
             settings: &settings,
         };
-        let (_, lsp_diagnostic) = to_lsp_diagnostic(&diagnostic, None, &context);
+        let (_, lsp_diagnostic) = to_lsp_diagnostic(&diagnostic, None, None, &context);
 
         assert_eq!(
             lsp_diagnostic.message,
