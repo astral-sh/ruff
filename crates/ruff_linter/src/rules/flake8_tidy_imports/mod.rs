@@ -268,9 +268,18 @@ mod tests {
             from __future__ import annotations
 
             import os
+            import this, typing
+            lazy import this, typing
+            import a, typing, b
+            import this, typing  # noqa: F401
 
             if True:
                 import email
+                import sitecustomize, typing_extensions
+
+            if True: import this, typing
+            if True: \
+                import this, typing
 
             with manager():
                 from foo import bar
@@ -294,9 +303,23 @@ mod tests {
             from __future__ import annotations
 
             lazy import os
+            import this
+            lazy import typing
+            import this
+            lazy import typing
+            import a
+            lazy import typing
+            import b
+            import this, typing  # noqa: F401
 
             if True:
                 lazy import email
+                import sitecustomize
+                lazy import typing_extensions
+
+            if True: import this, typing
+            if True: \
+                import this, typing
 
             with manager():
                 lazy from foo import bar
@@ -326,7 +349,17 @@ mod tests {
             Path::new("flake8_tidy_imports/TID254_fix.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    require_lazy: ImportSelector::Selection(ImportSelection::All(AllImports::All)),
+                    require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
+                        "os".to_string(),
+                        "typing".to_string(),
+                        "email".to_string(),
+                        "typing_extensions".to_string(),
+                        "foo".to_string(),
+                    ])),
+                    ban_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
+                        "sitecustomize".to_string(),
+                        "this".to_string(),
+                    ])),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
@@ -335,7 +368,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 3);
+        assert_eq!(diagnostics.len(), 10);
         assert_eq!(fixed.source_code(), expected);
     }
 
@@ -345,6 +378,8 @@ mod tests {
             r#"
             import foo
             import foo.bar
+            import foo, foo.bar
+            import foo.bar, foo
 
             from foo import bar
             from foo import baz
@@ -354,6 +389,8 @@ mod tests {
             r#"
             import foo
             lazy import foo.bar
+            import foo, foo.bar
+            import foo.bar, foo
 
             lazy from foo import bar
             from foo import baz
@@ -381,7 +418,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics.len(), 4);
         assert_eq!(fixed.source_code(), expected);
     }
 
