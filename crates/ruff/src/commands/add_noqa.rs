@@ -1,14 +1,13 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
 use ruff_linter::SuppressionKind;
 use ruff_linter::linter::add_suppressions_to_path;
-use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -79,14 +78,6 @@ pub(crate) fn add_noqa(
                 )
             {
                 return Ok(0);
-            }
-            if matches!(suppression_kind, SuppressionKind::Ignore)
-                && !is_human_readable_names_enabled(settings.linter.preview)
-            {
-                bail!(
-                    "`--add-ignore` requires preview mode, but preview is disabled for `{}`",
-                    path.display()
-                );
             }
             let source_kind = match SourceKind::from_path(path, source_type) {
                 Ok(Some(source_kind)) => source_kind,

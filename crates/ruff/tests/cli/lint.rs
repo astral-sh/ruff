@@ -2614,7 +2614,6 @@ fn add_ignore() -> Result<()> {
         fixture
             .check_command()
             .arg("--select=RUF015")
-            .arg("--preview")
             .arg("--add-ignore"),
         @"
         success: true
@@ -2633,36 +2632,9 @@ fn add_ignore() -> Result<()> {
         @"
 
     def first_square():
-        return [x * x for x in range(20)][0]  # ruff: ignore[unnecessary-iterable-allocation-for-first-element]
+        return [x * x for x in range(20)][0]  # ruff: ignore[RUF015]
     ",
     );
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_requires_preview() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file("noqa.py", "import os\n")?;
-
-    assert_cmd_snapshot!(
-        fixture
-            .check_command()
-            .arg("--select=F401")
-            .arg("--add-ignore"),
-        @"
-        success: false
-        exit_code: 2
-        ----- stdout -----
-
-        ----- stderr -----
-        ruff failed
-          Cause: `--add-ignore` requires preview mode, but preview is disabled for `[TMP]/noqa.py`
-        ",
-    );
-
-    let test_code = fixture.read_file("noqa.py")?;
-    insta::assert_snapshot!(test_code, @"import os");
 
     Ok(())
 }
