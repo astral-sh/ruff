@@ -5291,6 +5291,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
+    /// Infers a specialization for this callable and updates its return type.
+    ///
+    /// When `allow_path_return_inference` is true, independently valid specialization paths may
+    /// refine the return type. Partial application disables this because the remaining parameters
+    /// must stay correlated with their corresponding return types.
+    ///
+    /// TODO: Remove `allow_path_return_inference` once partial application can represent each
+    /// specialization as a correlated callable alternative.
     fn infer_specialization(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -5531,9 +5539,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             maybe_promote(typevar, bounds)
         };
         let original_return_ty = self.return_ty;
-        let can_refine_paths = allow_path_return_inference
-            && builder.has_actual_intersection_constraint()
-            && self.argument_relations_are_fully_static();
+        let can_refine_paths =
+            allow_path_return_inference && self.argument_relations_are_fully_static();
         let path_result = can_refine_paths
             .then(|| builder.build_inference_paths_with(generic_context, &mut choose))
             .flatten()
