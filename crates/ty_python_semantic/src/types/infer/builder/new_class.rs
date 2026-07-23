@@ -80,7 +80,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(
                     "Invalid argument to parameter 1 (`name`) of `types.new_class()`",
                 );
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
                     name_type.display(db)
                 ));

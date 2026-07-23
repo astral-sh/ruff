@@ -243,7 +243,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `defaults` of `namedtuple()`"
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Expected `Iterable[Any] | None`, found `{}`",
                             kw_type.display(db)
                         ));
@@ -260,7 +260,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `rename` of `namedtuple()`"
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Expected `bool`, found `{}`",
                             kw_type.display(db)
                         ));
@@ -280,7 +280,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `module` of `namedtuple()`"
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Expected `str | None`, found `{}`",
                             kw_type.display(db)
                         ));
@@ -335,7 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `typename` of `{kind}()`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
@@ -464,7 +464,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `field_names` of `namedtuple()`"
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str` or an iterable of strings, found `{}`",
                     fields_type.display(db)
                 ));
@@ -511,7 +511,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let mut diagnostic =
                 builder.into_diagnostic(format_args!("Too many defaults for `namedtuple()`"));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Got {defaults_count} default values but only {num_fields} field names"
             ));
             diagnostic.info("This will raise `TypeError` at runtime");
@@ -564,7 +564,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let mut diagnostic = builder.into_diagnostic(
                         "Invalid argument to parameter `fields` of `NamedTuple()`",
                     );
-                    diagnostic.set_primary_message("`fields` must be a literal list or tuple");
+                    diagnostic
+                        .set_primary_annotation_message("`fields` must be a literal list or tuple");
                 }
                 return NamedTupleSpec::unknown(db);
             }
@@ -600,7 +601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(
                             "Invalid argument to parameter `fields` of `NamedTuple()`",
                         );
-                        diagnostic.set_primary_message(
+                        diagnostic.set_primary_annotation_message(
                             "`fields` must be a sequence of literal lists or tuples",
                         );
                     }
@@ -626,7 +627,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let mut diagnostic = builder.into_diagnostic(
                         "Invalid argument to parameter `fields` of `NamedTuple()`",
                     );
-                    diagnostic.set_primary_message(
+                    diagnostic.set_primary_annotation_message(
                         "Each element in `fields` must be a length-2 tuple or list",
                     );
                 }
@@ -662,7 +663,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, name_expr) {
                     let mut diagnostic =
                         builder.into_diagnostic("Invalid `NamedTuple` field name definition");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "Expected a string literal for the field name, found `{}`",
                         name_type.display(db)
                     ));
@@ -707,7 +708,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Duplicate field name `{field_name}` in `{kind}()`"
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Field `{field_name}` already defined; will raise `ValueError` at runtime"
                 ));
             }
@@ -718,21 +719,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Field name `{field_name}` in `{kind}()` cannot start with an underscore"
                 ));
-                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+                diagnostic.set_primary_annotation_message("Will raise `ValueError` at runtime");
             } else if is_keyword(field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Field name `{field_name}` in `{kind}()` cannot be a Python keyword"
                 ));
-                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+                diagnostic.set_primary_annotation_message("Will raise `ValueError` at runtime");
             } else if !is_identifier(field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Field name `{field_name}` in `{kind}()` is not a valid identifier"
                 ));
-                diagnostic.set_primary_message("Will raise `ValueError` at runtime");
+                diagnostic.set_primary_annotation_message("Will raise `ValueError` at runtime");
             }
         }
     }

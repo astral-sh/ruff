@@ -230,7 +230,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 ResizeTupleError::TooManyValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Too many values to unpack");
-                                    diag.set_primary_message(format_args!(
+                                    diag.set_primary_annotation_message(format_args!(
                                         "Expected {}",
                                         target_len.display_minimum(),
                                     ));
@@ -241,7 +241,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 ResizeTupleError::TooFewValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Not enough values to unpack");
-                                    diag.set_primary_message(format_args!(
+                                    diag.set_primary_annotation_message(format_args!(
                                         "Expected {}",
                                         target_len.display_minimum(),
                                     ));

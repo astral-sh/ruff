@@ -1736,12 +1736,12 @@ class B(A):
 
         assert_eq!(diagnostic.id(), LINT_ID);
         assert_eq!(
-            diagnostic.primary_message(),
+            diagnostic.headline_message(),
             "Variable `a` should be named `b`."
         );
 
         assert_eq!(convergence_diagnostic.id(), DiagnosticId::InternalError);
-        assert_snapshot!(convergence_diagnostic.primary_message(), @"Fixes failed to converge after 10 iterations.");
+        assert_snapshot!(convergence_diagnostic.headline_message(), @"Fixes failed to converge after 10 iterations.");
 
         // It should keep the source text from the last allowed fix iteration.
         assert_eq!(&*source_text(&db, file), "a = 10");
@@ -1813,12 +1813,12 @@ class B(A):
 
         assert_eq!(diagnostic.id(), LINT_ID);
         assert_eq!(
-            diagnostic.primary_message(),
+            diagnostic.headline_message(),
             "Variable `b` should be named `c`."
         );
 
         assert_eq!(syntax_error.id(), DiagnosticId::InternalError);
-        assert_snapshot!(syntax_error.primary_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
+        assert_snapshot!(syntax_error.headline_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
 
         // It should revert the source to the last known error free version.
         assert_eq!(&*source_text(&db, file), "b = 10");

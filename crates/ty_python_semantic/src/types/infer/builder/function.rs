@@ -491,7 +491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Useless body for `@overload`-decorated function `{}`",
                     function.name
                 ));
-                diagnostic.set_primary_message("This statement will never be executed");
+                diagnostic.set_primary_annotation_message("This statement will never be executed");
                 diagnostic.info(
                     "`@overload`-decorated functions are solely for type checkers \
                     and must be overwritten at runtime by a non-`@overload`-decorated implementation",
@@ -925,7 +925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let mut diag = builder.into_diagnostic(format_args!(
                                     "`{name}.kwargs` is valid only in `**kwargs` annotation",
                                 ));
-                                diag.set_primary_message(format_args!(
+                                diag.set_primary_annotation_message(format_args!(
                                     "Did you mean `{name}.args`?"
                                 ));
                                 add_type_expression_reference_link(diag);
@@ -1054,7 +1054,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "`{name}.args` is valid only in `*args` annotation",
                             ));
-                            diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
+                            diag.set_primary_annotation_message(format_args!(
+                                "Did you mean `{name}.kwargs`?"
+                            ));
                             add_type_expression_reference_link(diag);
                         }
                         KnownClass::Dict.to_specialized_instance(

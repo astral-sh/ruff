@@ -462,7 +462,7 @@ fn match_reveal_type_diagnostic(
             return false;
         }
 
-        let primary_message = diagnostic.primary_message();
+        let headline_message = diagnostic.headline_message();
         let Some(primary_annotation) =
             (diagnostic.primary_annotation()).and_then(|a| a.get_message())
         else {
@@ -473,7 +473,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_type, reveal_protocol_interface
         if matches!(
-            primary_message,
+            headline_message,
             "Revealed type" | "Revealed protocol interface"
         ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
             primary_annotation == expected_reveal_type_message
@@ -483,7 +483,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
         if matches!(
-            primary_message,
+            headline_message,
             "Assignability holds" | "Subtyping holds" | "Revealed MRO"
         ) && expected_reveal_type
             .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)

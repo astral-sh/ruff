@@ -481,7 +481,7 @@ fn report_typed_dict_field_override<'db>(
         ))
     };
 
-    diagnostic.set_primary_message(format_args!("{reason}"));
+    diagnostic.set_primary_annotation_message(format_args!("{reason}"));
 
     if own_field_definition.is_none() {
         add_definition_subdiagnostic(

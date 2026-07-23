@@ -113,7 +113,7 @@ pub(crate) fn check_overloaded_function<'db>(
                 "Overloaded function `{}` requires at least two overloads",
                 function_node.name
             ));
-            diagnostic.set_primary_message("Only one overload defined here");
+            diagnostic.set_primary_annotation_message("Only one overload defined here");
             if let Some(decorator) =
                 single_overload.find_known_decorator_span(db, KnownFunction::Overload)
             {

@@ -128,7 +128,7 @@ impl<'db> BoundSuperError<'db> {
                         _ => {
                             let mut diagnostic =
                                 builder.into_diagnostic("Argument is not a valid class");
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Argument has type `{}`",
                                 pivot_class.display(context.db())
                             ));
