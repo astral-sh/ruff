@@ -28,6 +28,126 @@ def _(x: A, y: A | None):
     reveal_type(y)  # revealed: A | None
 ```
 
+## Narrowing tagged unions of nominal classes by attribute identity
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+from typing import Literal, NewType
+
+@dataclass
+class Foo:
+    tag: Literal[False]
+
+@dataclass
+class Bar:
+    tag: Literal[True]
+
+@dataclass
+class UnknownTag:
+    tag: bool
+
+def boolean_tags(value: Foo | Bar):
+    if value.tag is True:
+        reveal_type(value)  # revealed: Bar
+    else:
+        reveal_type(value)  # revealed: Foo
+
+    if value.tag is not True:
+        reveal_type(value)  # revealed: Foo
+    else:
+        reveal_type(value)  # revealed: Bar
+
+    if True is value.tag:
+        reveal_type(value)  # revealed: Bar
+    else:
+        reveal_type(value)  # revealed: Foo
+
+    if True is not value.tag:
+        reveal_type(value)  # revealed: Foo
+    else:
+        reveal_type(value)  # revealed: Bar
+
+def ambiguous_tag(value: Foo | Bar | UnknownTag):
+    if value.tag is True:
+        reveal_type(value)  # revealed: Bar | UnknownTag
+    else:
+        reveal_type(value)  # revealed: Foo | UnknownTag
+
+def nonsingleton_tag(value: Foo | Bar, tag: bool):
+    if value.tag is tag:
+        reveal_type(value)  # revealed: Foo | Bar
+    else:
+        reveal_type(value)  # revealed: Foo | Bar
+
+def overwritten_tagged_union(value: Foo | Bar | bool):
+    if isinstance(value, (Foo, Bar)):
+        if (value := value.tag) is True:
+            reveal_type(value)  # revealed: Literal[True]
+        else:
+            reveal_type(value)  # revealed: Literal[False]
+
+def tagged_union_rebound_by_comparator(value: Foo | Bar | bool):
+    if isinstance(value, (Foo, Bar)):
+        if value.tag is (value := True):
+            reveal_type(value)  # revealed: Literal[True]
+        else:
+            reveal_type(value)  # revealed: Literal[True]
+
+def tagged_union_with_unrelated_assignment(value: Foo | Bar):
+    if value.tag is (tag := True):
+        reveal_type(value)  # revealed: Bar
+        reveal_type(tag)  # revealed: Literal[True]
+    else:
+        reveal_type(value)  # revealed: Foo
+        reveal_type(tag)  # revealed: Literal[True]
+
+class MissingTag:
+    tag: None
+
+class PresentTag:
+    tag: str
+
+def optional_tags(value: MissingTag | PresentTag):
+    if value.tag is None:
+        reveal_type(value)  # revealed: MissingTag
+    else:
+        reveal_type(value)  # revealed: PresentTag
+
+class Tag(Enum):
+    FOO = 1
+    BAR = 2
+
+class EnumFoo:
+    tag: Literal[Tag.FOO]
+
+class EnumBar:
+    tag: Literal[Tag.BAR]
+
+def enum_tags(value: EnumFoo | EnumBar):
+    if value.tag is Tag.FOO:
+        reveal_type(value)  # revealed: EnumFoo
+    else:
+        reveal_type(value)  # revealed: EnumBar
+
+BoolTag = NewType("BoolTag", bool)
+
+class NewTypeTag:
+    tag: BoolTag
+
+def newtype_tags(value: Foo | Bar | NewTypeTag):
+    if value.tag is True:
+        reveal_type(value)  # revealed: Bar | NewTypeTag
+    else:
+        reveal_type(value)  # revealed: Foo | NewTypeTag
+
+def nonsingleton_newtype_tag(value: Foo | Bar, tag: BoolTag):
+    if value.tag is tag:
+        reveal_type(value)  # revealed: Foo | Bar
+    else:
+        reveal_type(value)  # revealed: Foo | Bar
+```
+
 ## `is` in chained comparisons
 
 ```py

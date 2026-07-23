@@ -1044,6 +1044,12 @@ fn necessary_sequence_pattern_type<'db>(
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum NominalAttributeComparison {
+    Equality,
+    Identity,
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -3081,7 +3087,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
                     let overlaps_only_at_runtime = |rhs_element| {
                         element.is_disjoint_from(self.db, rhs_element)
-                            && !element.is_disjoint_from_for_identity(self.db, rhs_element)
+                            && element
+                                .identity_comparison_truthiness(self.db, rhs_element)
+                                .may_be_true()
                     };
                     let has_runtime_only_overlap = match rhs_resolved {
                         Type::Union(union) => union
@@ -3274,30 +3282,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
-            && let rhs_identity_is_singleton = rhs_identity_ty.is_singleton(self.db)
-            && let rhs_is_correlated_singleton = (!rhs_identity_is_singleton
-                && matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
-                && rhs_ty.is_singleton(self.db))
-            && (is_positive_check || rhs_is_correlated_singleton || rhs_identity_is_singleton)
         {
             let filtered = union.filter(self.db, |elem| {
                 elem.tuple_instance_spec(self.db)
                     .and_then(|spec| spec.py_index(self.db, index).ok())
                     .is_none_or(|el_ty| {
-                        if is_positive_check {
-                            // `is X` context: keep tuples where element could be X
-                            !el_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
-                        } else if rhs_is_correlated_singleton {
-                            // Preserve the shared specialization instead of excluding every
-                            // constraint in the projected union.
-                            !el_ty.is_subtype_of(self.db, rhs_ty)
-                        } else {
-                            // `is not X` context: keep tuples where element is not always X
-                            !el_ty
-                                .identity_comparison_type(self.db)
-                                .is_subtype_of(self.db, rhs_identity_ty)
-                        }
+                        el_ty
+                            .identity_comparison_truthiness(self.db, rhs_ty)
+                            .negate_if(!is_positive_check)
+                            .may_be_true()
                     })
             });
             if filtered != Type::Union(union) {
@@ -3401,6 +3394,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if let ast::Expr::Subscript(subscript) = comparators[0].expression_value() {
                 narrow_subscript(subscript, inference.expression_type(&**left));
             }
+        }
+
+        if let [
+            operator @ (ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot),
+        ] = &**ops
+        {
+            let comparison = if matches!(operator, ast::CmpOp::Is | ast::CmpOp::IsNot) {
+                NominalAttributeComparison::Identity
+            } else {
+                NominalAttributeComparison::Equality
+            };
+            let is_positive_comparison =
+                is_positive == matches!(operator, ast::CmpOp::Eq | ast::CmpOp::Is);
 
             let mut narrow_attribute = |attribute: &ast::ExprAttribute, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*attribute.value);
@@ -3410,13 +3416,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     &attribute.value,
                     attribute.attr.id(),
                     other_type,
-                    is_equality,
+                    comparison,
+                    is_positive_comparison,
                 ) {
                     insert_narrowing_constraint(&mut constraints, place, constraint);
                 }
             };
 
-            if let ast::Expr::Attribute(attribute) = &**left {
+            if let ast::Expr::Attribute(attribute) = &**left
+                && comparators[0].as_named_expr().is_none_or(|named| {
+                    PlaceExpr::try_from_expr(&named.target)
+                        != PlaceExpr::try_from_expr(&attribute.value)
+                })
+            {
                 narrow_attribute(attribute, inference.expression_type(&comparators[0]));
             }
 
@@ -4037,6 +4049,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 &attribute.value,
                 attribute.attr.id(),
                 value_ty,
+                NominalAttributeComparison::Equality,
                 is_positive,
             ) {
                 constraints.insert(place, constraint);
@@ -4294,22 +4307,32 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         attribute_value_expr: &ast::Expr,
         attribute_name: &str,
         rhs_type: Type<'db>,
-        is_equality: bool,
+        comparison: NominalAttributeComparison,
+        is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
             return None;
         };
-        if !is_supported_tag_literal(rhs_type) {
+
+        if comparison == NominalAttributeComparison::Equality && !is_supported_tag_literal(rhs_type)
+        {
             return None;
         }
 
         let narrowed = union.filter(self.db, |element| {
             nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
-                if is_equality {
-                    !is_supported_tag_literal(attribute_type)
-                        || !attribute_type.is_disjoint_from(self.db, rhs_type)
-                } else {
-                    !attribute_type.is_subtype_of(self.db, rhs_type)
+                match (comparison, is_positive) {
+                    (NominalAttributeComparison::Equality, true) => {
+                        !is_supported_tag_literal(attribute_type)
+                            || !attribute_type.is_disjoint_from(self.db, rhs_type)
+                    }
+                    (NominalAttributeComparison::Equality, false) => {
+                        !attribute_type.is_subtype_of(self.db, rhs_type)
+                    }
+                    (NominalAttributeComparison::Identity, is_positive) => attribute_type
+                        .identity_comparison_truthiness(self.db, rhs_type)
+                        .negate_if(!is_positive)
+                        .may_be_true(),
                 }
             })
         });

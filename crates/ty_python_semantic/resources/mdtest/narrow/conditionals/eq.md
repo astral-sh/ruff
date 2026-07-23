@@ -1430,6 +1430,28 @@ def overwritten_tagged_union(value: A | B | bool):
             reveal_type(value)  # revealed: Literal[True]
         else:
             reveal_type(value)  # revealed: Literal[False]
+
+def overwritten_tagged_union_attribute(value: A | B | str):
+    if isinstance(value, (A, B)):
+        if (value := value.tag) == "a":
+            reveal_type(value)  # revealed: Literal["a"]
+        else:
+            reveal_type(value)  # revealed: Literal["b"]
+
+def tagged_union_rebound_by_comparator(value: A | B | str):
+    if isinstance(value, (A, B)):
+        if value.tag == (value := "a"):
+            reveal_type(value)  # revealed: Literal["a"]
+        else:
+            reveal_type(value)  # revealed: Literal["a"]
+
+def tagged_union_with_unrelated_assignment(value: A | B):
+    if value.tag == (tag := "a"):
+        reveal_type(value)  # revealed: A
+        reveal_type(tag)  # revealed: Literal["a"]
+    else:
+        reveal_type(value)  # revealed: B
+        reveal_type(tag)  # revealed: Literal["a"]
 ```
 
 ## Union with `Any`
