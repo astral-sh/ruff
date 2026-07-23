@@ -33,6 +33,8 @@ pub(crate) enum TypingReference {
     /// The reference is in a runtime-evaluated context, but the
     /// `lint.flake8-type-checking.quote-annotations` setting is enabled.
     Quote,
+    /// The reference is in a runtime-ambiguous context.
+    RuntimeAmbiguous,
     /// The reference is in a typing-only context.
     TypingOnly,
 }
@@ -58,6 +60,11 @@ impl TypingReference {
             // type definition to be considered a typing reference
             if !reference.in_type_definition() {
                 return Self::Runtime;
+            }
+
+            if reference.in_runtime_ambiguous_annotation() {
+                kind = Self::RuntimeAmbiguous;
+                continue;
             }
 
             if reference.in_typing_only_annotation() || reference.in_string_type_definition() {

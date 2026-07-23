@@ -2280,11 +2280,17 @@ pub struct Flake8TypeCheckingOptions {
     /// (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to
     /// this list (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
     /// models from being moved into type-checking blocks.
+    ///
+    /// For some use-cases like SQLAlchemy's `Mapped` it makes more sense to
+    /// mark the class as runtime-ambiguous, by prefixing the qualified name with
+    /// a tilde (`~`). This way ruff will assume the annotations already contain
+    /// all of the correct forward references, and will not attempt to move related
+    /// imports and/or quote annotations.
     #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
+            runtime-evaluated-base-classes = ["pydantic.BaseModel", "~sqlalchemy.orm.DeclarativeBase"]
         "#
     )]
     pub runtime_evaluated_base_classes: Option<Vec<String>>,
@@ -2309,6 +2315,9 @@ pub struct Flake8TypeCheckingOptions {
     /// ```
     ///
     /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
+    ///
+    /// Just like with `runtime-evaluated-base-classes` it's possible to mark
+    /// decorators as runtime-ambiguous by prefixing them with a tilde (`~`).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -2373,13 +2382,33 @@ pub struct Flake8TypeCheckingOptions {
 
 impl Flake8TypeCheckingOptions {
     pub fn into_settings(self) -> flake8_type_checking::settings::Settings {
+        let base_classes = self.runtime_evaluated_base_classes.unwrap_or_default();
+        let decorators = self.runtime_evaluated_decorators.unwrap_or_default();
         flake8_type_checking::settings::Settings {
             strict: self.strict.unwrap_or(false),
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_required_base_classes: base_classes
+                .iter()
+                .filter(|&name| !name.starts_with('~'))
+                .cloned()
+                .collect(),
+            runtime_required_decorators: decorators
+                .iter()
+                .filter(|&name| !name.starts_with('~'))
+                .cloned()
+                .collect(),
+            runtime_ambiguous_base_classes: base_classes
+                .iter()
+                .filter(|&name| name.starts_with('~'))
+                .map(|name| name[1..].to_string())
+                .collect(),
+            runtime_ambiguous_decorators: decorators
+                .iter()
+                .filter(|&name| name.starts_with('~'))
+                .map(|name| name[1..].to_string())
+                .collect(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
@@ -4396,7 +4425,7 @@ impl From<LintOptionsWire> for LintOptions {
 
 #[cfg(test)]
 mod tests {
-    use crate::options::{Flake8SelfOptions, Flake8TidyImportsOptions};
+    use crate::options::{Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions};
     use ruff_linter::rules::flake8_self;
     use ruff_linter::rules::flake8_tidy_imports::settings::{
         AllImports, ImportSelection, ImportSelector, ImportSelectorSettings,
@@ -4506,6 +4535,36 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
+        );
+    }
+
+    #[test]
+    fn flake8_type_checking_runtime_evaluated_parsing() {
+        let settings = Flake8TypeCheckingOptions {
+            runtime_evaluated_base_classes: Some(vec![
+                "pydantic.BaseModel".to_string(),
+                "~sqlalchemy.orm.DeclarativeBase".to_string(),
+            ]),
+            runtime_evaluated_decorators: Some(vec!["foo.bar".to_string(), "~baz.qux".to_string()]),
+            ..Default::default()
+        }
+        .into_settings();
+
+        assert_eq!(
+            settings.runtime_required_base_classes,
+            vec!["pydantic.BaseModel".to_string()]
+        );
+        assert_eq!(
+            settings.runtime_ambiguous_base_classes,
+            vec!["sqlalchemy.orm.DeclarativeBase".to_string()]
+        );
+        assert_eq!(
+            settings.runtime_required_decorators,
+            vec!["foo.bar".to_string()]
+        );
+        assert_eq!(
+            settings.runtime_ambiguous_decorators,
+            vec!["baz.qux".to_string()]
         );
     }
 }
