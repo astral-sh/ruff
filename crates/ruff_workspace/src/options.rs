@@ -107,6 +107,23 @@ pub struct Options {
     )]
     pub output_format: Option<OutputFormat>,
 
+    /// The docstring convention to use globally across all tools that
+    /// inspect docstrings (e.g., `pydocstyle`).
+    ///
+    /// This is the tool-agnostic equivalent of
+    /// [`lint.pydocstyle.convention`](#lint_pydocstyle_convention). When both
+    /// are set, the more specific `lint.pydocstyle.convention` takes
+    /// precedence.
+    #[option(
+        default = r#"null"#,
+        value_type = r#""google" | "numpy" | "pep257""#,
+        example = r#"
+            # Use Google-style docstrings.
+            docstring-convention = "google"
+        "#
+    )]
+    pub docstring_convention: Option<Convention>,
+
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
     /// Only includes automatic fixes unless `--unsafe-fixes` is provided.

@@ -25,6 +25,7 @@ use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, RuleResolutionError, Specificity};
+use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
@@ -181,6 +182,7 @@ pub struct Configuration {
     pub output_format: Option<OutputFormat>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<RequiredVersion>,
+    pub docstring_convention: Option<Convention>,
     pub extension: Option<ExtensionMapping>,
     pub show_fixes: Option<bool>,
 
@@ -290,7 +292,15 @@ impl Configuration {
                 .unwrap_or(analyze_defaults.type_checking_imports),
         };
 
-        let lint = self.lint;
+        let mut lint = self.lint;
+
+        if let Some(global_convention) = self.docstring_convention {
+            let pydocstyle = lint
+                .pydocstyle
+                .get_or_insert_with(PydocstyleOptions::default);
+            pydocstyle.convention = pydocstyle.convention.or(Some(global_convention));
+        }
+
         let lint_preview = lint.preview.unwrap_or(global_preview);
 
         let line_length = self.line_length.unwrap_or_default();
@@ -613,6 +623,7 @@ impl Configuration {
                 .transpose()?,
             preview: options.preview.map(PreviewMode::from),
             required_version: options.required_version,
+            docstring_convention: options.docstring_convention,
             respect_gitignore: options.respect_gitignore,
             show_fixes: options.show_fixes,
             src: options
@@ -681,6 +692,7 @@ impl Configuration {
                 .or(config.per_file_target_version),
             preview: self.preview.or(config.preview),
             extension: self.extension.or(config.extension),
+            docstring_convention: self.docstring_convention.or(config.docstring_convention),
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
@@ -1806,7 +1818,7 @@ mod tests {
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
 
-    use crate::configuration::{LintConfiguration, RuleSelection};
+    use crate::configuration::{Configuration, LintConfiguration, RuleSelection};
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
@@ -2297,6 +2309,47 @@ mod tests {
             true,
         )?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn global_docstring_convention_applies_when_no_local() -> Result<()> {
+        use ruff_linter::rules::pydocstyle::settings::Convention;
+
+        let config = Configuration {
+            docstring_convention: Some(Convention::Google),
+            ..Configuration::default()
+        };
+
+        let settings = config.into_settings(std::path::Path::new("."))?;
+        assert_eq!(
+            settings.linter.pydocstyle.convention(),
+            Some(Convention::Google)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_docstring_convention_overrides_global() -> Result<()> {
+        use ruff_linter::rules::pydocstyle::settings::Convention;
+
+        let config = Configuration {
+            docstring_convention: Some(Convention::Google),
+            lint: LintConfiguration {
+                pydocstyle: Some(PydocstyleOptions {
+                    convention: Some(Convention::Numpy),
+                    ..PydocstyleOptions::default()
+                }),
+                ..LintConfiguration::default()
+            },
+            ..Configuration::default()
+        };
+
+        let settings = config.into_settings(std::path::Path::new("."))?;
+        assert_eq!(
+            settings.linter.pydocstyle.convention(),
+            Some(Convention::Numpy)
+        );
         Ok(())
     }
 }
