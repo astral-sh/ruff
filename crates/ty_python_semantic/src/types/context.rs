@@ -274,6 +274,7 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 
     source: LintSource,
+    message_override: Option<String>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -362,6 +363,22 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // is via this impl, which can only run at most
         // once.
         let mut diag = self.diag.take().unwrap();
+
+        if let Some(message_override) = self.message_override.take() {
+            let original_message = diag
+                .primary_annotation()
+                .and_then(Annotation::get_message)
+                .is_none_or(str::is_empty)
+                .then(|| diag.headline_message().to_string());
+            if let Some(original_message) = original_message
+                && let Some(annotation) = diag.primary_annotation_mut()
+            {
+                annotation.set_message(original_message);
+            }
+
+            diag.set_headline_message(message_override);
+            diag.clear_concise_message();
+        }
 
         if self.ctx.db().verbose() {
             let rule = diag.id();
@@ -514,7 +531,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
     ///
-    /// If a message override is present, `message` is retained on the primary annotation.
+    /// If a message override is present, it is applied when the diagnostic is finalized. `message`
+    /// is retained on the primary annotation if the annotation has no message, and any custom
+    /// concise message is discarded.
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
@@ -523,31 +542,24 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         // We add the primary annotation here (because it's required). Without a message
         // override, its optional message can be added later via `set_primary_annotation_message`.
         let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
-        let mut diag = if let Some((message_override, info)) = self.message_override {
-            let mut diag = Diagnostic::new(
-                DiagnosticId::Lint(self.id.name()),
-                self.severity,
-                message_override,
-            );
-            diag.annotate(Annotation::primary(primary_span).message(message));
+        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
+        diag.annotate(Annotation::primary(primary_span));
+        let message_override = self.message_override.map(|(message, info)| {
             diag.info(info);
-            diag
-        } else {
-            let mut diag =
-                Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
-            diag.annotate(Annotation::primary(primary_span));
-            diag
-        };
+            message
+        });
         diag.set_documentation_url(Some(self.id.documentation_url()));
         LintDiagnosticGuard {
             ctx: self.ctx,
             source: self.source,
             diag: Some(diag),
+            message_override,
         }
     }
 
-    /// Replace the headline message and add an info sub-diagnostic while retaining the original
-    /// message on the primary annotation.
+    /// Replace the headline message when the diagnostic is finalized and add an info
+    /// sub-diagnostic. The original message is retained on the primary annotation if it has no
+    /// message.
     pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
         self.message_override = Some((message, info.to_string()));
         self
@@ -595,5 +607,77 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         let diag = Diagnostic::new(self.id, self.severity, message);
 
         DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+    use ruff_text_size::Ranged;
+    use ty_python_core::global_scope;
+
+    use super::InferContext;
+    use crate::db::tests::TestDbBuilder;
+    use crate::types::diagnostic::INVALID_ARGUMENT_TYPE;
+
+    #[test]
+    fn message_override_is_applied_after_diagnostic_is_constructed() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file("/src/test.py", "value = 1\n")
+            .build()?;
+        let file = system_path_to_file(&db, "/src/test.py")?;
+        let module = parsed_module(&db, file).load(&db);
+        let context = InferContext::new(&db, global_scope(&db, file), &module);
+        let range = module.syntax().body[0].range();
+
+        let mut overridden = context
+            .report_lint(&INVALID_ARGUMENT_TYPE, range)
+            .expect("lint should be enabled")
+            .with_message_override("Replacement message".to_string(), "Implicit call context")
+            .into_diagnostic("Original message");
+        overridden.set_primary_annotation_message("Original detail");
+        overridden.set_concise_message("Stale concise message");
+        assert_eq!(overridden.headline_message(), "Original message");
+        drop(overridden);
+
+        let mut without_primary_message = context
+            .report_lint(&INVALID_ARGUMENT_TYPE, range)
+            .expect("lint should be enabled")
+            .with_message_override(
+                "Replacement without detail".to_string(),
+                "Implicit call context",
+            )
+            .into_diagnostic("Original without detail");
+        without_primary_message.set_concise_message("Another stale concise message");
+        assert_eq!(
+            without_primary_message.headline_message(),
+            "Original without detail"
+        );
+        drop(without_primary_message);
+
+        let mut ordinary = context
+            .report_lint(&INVALID_ARGUMENT_TYPE, range)
+            .expect("lint should be enabled")
+            .into_diagnostic("Ordinary message");
+        ordinary.set_primary_annotation_message("Ordinary detail");
+        ordinary.set_concise_message("Custom concise message");
+        drop(ordinary);
+
+        let diagnostics = context.finish().into_diagnostics();
+        assert_eq!(
+            diagnostics[0].concise_message().to_string(),
+            "Replacement message: Original detail"
+        );
+        assert_eq!(
+            diagnostics[1].concise_message().to_string(),
+            "Replacement without detail: Original without detail"
+        );
+        assert_eq!(
+            diagnostics[2].concise_message().to_string(),
+            "Custom concise message"
+        );
+
+        Ok(())
     }
 }
