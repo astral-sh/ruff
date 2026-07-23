@@ -162,6 +162,7 @@ pub(crate) fn check(
         } else {
             SuppressionKind::Noqa
         },
+        settings.linter.preview,
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,

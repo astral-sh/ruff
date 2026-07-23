@@ -468,8 +468,8 @@ pub struct CheckCommand {
     )]
     pub add_noqa: Option<String>,
     /// Enable automatic additions of `ruff: ignore` comments to failing lines.
-    /// Optionally provide a reason to append after the rule names.
-    /// Requires preview mode.
+    /// Optionally provide a reason to append after the codes.
+    /// In preview, add suppression comments with rule names instead.
     #[arg(
         long,
         value_name = "REASON",
