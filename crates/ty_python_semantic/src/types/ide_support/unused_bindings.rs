@@ -1,7 +1,7 @@
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
-use crate::{Db, SemanticContext};
+use crate::{Db, SemanticEnvironment};
 use get_size2::GetSize;
 use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
@@ -46,7 +46,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
 }
 
 fn function_scope_is_overload_declaration(
-    ctx: &SemanticContext<'_>,
+    env: &SemanticEnvironment<'_>,
     index: &SemanticIndex<'_>,
     file_scope_id: FileScopeId,
 ) -> bool {
@@ -56,7 +56,7 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    function_known_decorator_flags(ctx, definition).contains(FunctionDecorators::OVERLOAD)
+    function_known_decorator_flags(env, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
@@ -79,7 +79,7 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
     let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
-    let ctx = SemanticContext::from_file(db, file);
+    let env = SemanticEnvironment::from_file(db, file);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -99,7 +99,7 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
                 crate::types::function::function_has_stub_body(function.node(&parsed))
             });
         let function_is_overload_declaration =
-            function_scope_is_overload_declaration(&ctx, index, file_scope_id);
+            function_scope_is_overload_declaration(&env, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
         // Loop headers are synthesized before the loop body definitions they point to;
@@ -118,7 +118,7 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
 
                 let loop_header = use_def_map.loop_header(loop_header_definition.loop_header_id());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
-                    if is_reachable(&ctx, use_def_map, live_binding.reachability_constraint()) {
+                    if is_reachable(&env, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
                     }
                 }

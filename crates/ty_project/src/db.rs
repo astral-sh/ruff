@@ -653,7 +653,7 @@ pub(crate) mod testing {
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource, SemanticContext};
+    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource, SemanticEnvironment};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -736,8 +736,8 @@ pub(crate) mod testing {
             Program::get(self).python_version(self)
         }
 
-        pub fn semantic_context(&self) -> SemanticContext<'_> {
-            SemanticContext::from_program(self, self.python_version())
+        pub fn semantic_environment(&self) -> SemanticEnvironment<'_> {
+            SemanticEnvironment::from_program(self, self.python_version())
         }
 
         /// Takes the salsa events.

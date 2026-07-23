@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -43,18 +43,18 @@ impl<'db> Type<'db> {
 
     pub(crate) fn try_upcast_to_callable(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<CallableTypes<'db>> {
-        self.try_upcast_to_callable_with_policy(ctx, UpcastPolicy::default())
+        self.try_upcast_to_callable_with_policy(env, UpcastPolicy::default())
     }
 
     pub(crate) fn try_upcast_to_callable_with_recursive_fallback(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         recursive_definition: Option<Definition<'db>>,
     ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
-            ctx,
+            env,
             UpcastPolicy::default(),
             CallableUpcastContext {
                 recursive_definition,
@@ -64,11 +64,11 @@ impl<'db> Type<'db> {
 
     pub(crate) fn try_upcast_to_callable_with_policy(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
-            ctx,
+            env,
             policy,
             CallableUpcastContext::default(),
         )
@@ -76,13 +76,13 @@ impl<'db> Type<'db> {
 
     fn try_upcast_to_callable_with_policy_and_context(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         policy: UpcastPolicy,
         context: CallableUpcastContext<'db>,
     ) -> Option<CallableTypes<'db>> {
-        let db = ctx.db();
+        let db = env.db();
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_upcast_to_callable_with_policy_and_context(ctx, policy, context);
+            return fallback.try_upcast_to_callable_with_policy_and_context(env, policy, context);
         }
 
         match self {
@@ -98,26 +98,26 @@ impl<'db> Type<'db> {
             ))),
 
             Type::FunctionLiteral(function_literal)
-                if context.is_recursive_reference(ctx, function_literal) =>
+                if context.is_recursive_reference(env, function_literal) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
             Type::FunctionLiteral(function_literal) => {
-                Some(CallableTypes::one(function_literal.into_callable_type(ctx)))
+                Some(CallableTypes::one(function_literal.into_callable_type(env)))
             }
             Type::BoundMethod(bound_method)
-                if context.is_recursive_reference(ctx, bound_method.function(db)) =>
+                if context.is_recursive_reference(env, bound_method.function(db)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
             Type::BoundMethod(bound_method) => {
-                Some(CallableTypes::one(bound_method.into_callable_type(ctx)))
+                Some(CallableTypes::one(bound_method.into_callable_type(env)))
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
-                        ctx,
+                        env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
@@ -128,7 +128,7 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
-                        .try_upcast_to_callable_with_policy_and_context(ctx, policy, context)
+                        .try_upcast_to_callable_with_policy_and_context(env, policy, context)
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
                         .map(|callables| callables.map(|callable| callable.into_regular(db)))
@@ -138,36 +138,36 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class_literal) => Some(
                 class_literal
-                    .identity_specialization(ctx)
-                    .into_callable(ctx),
+                    .identity_specialization(env)
+                    .into_callable(env),
             ),
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(ctx)),
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(env)),
 
             Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(ctx)
-                .try_upcast_to_callable_with_policy_and_context(ctx, policy, context),
+                .concrete_base_type(env)
+                .try_upcast_to_callable_with_policy_and_context(env, policy, context),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
                     db,
-                    Signature::new(Parameters::top(), subclass_of_ty.to_instance(ctx)),
+                    Signature::new(Parameters::top(), subclass_of_ty.to_instance(env)),
                 )))
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(ctx)),
+                SubclassOfInner::Class(class) => Some(class.into_callable(env)),
                 SubclassOfInner::Protocol(protocol) => protocol
                     .class_origin()
-                    .map(|origin| (*origin).into_callable(ctx)),
+                    .map(|origin| (*origin).into_callable(env)),
                 SubclassOfInner::TypeVar(tvar) => {
-                    match tvar.typevar(db).bound_or_constraints(ctx) {
+                    match tvar.typevar(db).bound_or_constraints(env) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             let upcast_callables = bound
-                                .to_meta_type(ctx)
+                                .to_meta_type(env)
                                 .try_upcast_to_callable_with_policy_and_context(
-                                    ctx, policy, context,
+                                    env, policy, context,
                                 )?;
                             Some(upcast_callables.map(|callable| {
                                 let signatures = callable
@@ -186,9 +186,9 @@ impl<'db> Type<'db> {
                             let mut callables = SmallVec::new();
                             for constraint in constraints.elements(db) {
                                 let element_upcast = constraint
-                                    .to_meta_type(ctx)
+                                    .to_meta_type(env)
                                     .try_upcast_to_callable_with_policy_and_context(
-                                        ctx, policy, context,
+                                        env, policy, context,
                                     )?;
                                 for callable in element_upcast.into_inner() {
                                     let signatures =
@@ -221,7 +221,7 @@ impl<'db> Type<'db> {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
                     let element_callable = element
-                        .try_upcast_to_callable_with_policy_and_context(ctx, policy, context)?;
+                        .try_upcast_to_callable_with_policy_and_context(env, policy, context)?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -229,24 +229,24 @@ impl<'db> Type<'db> {
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
-                    .enum_class_instance(ctx)
-                    .try_upcast_to_callable_with_policy_and_context(ctx, policy, context),
+                    .enum_class_instance(env)
+                    .try_upcast_to_callable_with_policy_and_context(env, policy, context),
                 _ => None,
             },
 
             Type::TypeAlias(alias) => alias
-                .value_type(ctx)
-                .try_upcast_to_callable_with_policy_and_context(ctx, policy, context),
+                .value_type(env)
+                .try_upcast_to_callable_with_policy_and_context(env, policy, context),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
-                if context.is_recursive_reference(ctx, function) =>
+                if context.is_recursive_reference(env, function) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
 
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
                 db,
-                CallableSignature::from_overloads(method.signatures(ctx)),
+                CallableSignature::from_overloads(method.signatures(env)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
             ))),
@@ -254,7 +254,7 @@ impl<'db> Type<'db> {
             Type::WrapperDescriptor(wrapper_descriptor) => {
                 Some(CallableTypes::one(CallableType::new(
                     db,
-                    CallableSignature::from_overloads(wrapper_descriptor.signatures(ctx)),
+                    CallableSignature::from_overloads(wrapper_descriptor.signatures(env)),
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
                 )))
@@ -265,7 +265,7 @@ impl<'db> Type<'db> {
                     db,
                     Signature::new(
                         Parameters::standard([Parameter::positional_only(None)
-                            .with_annotated_type(newtype.base(ctx).instance_type(ctx))]),
+                            .with_annotated_type(newtype.base(env).instance_type(env))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))
@@ -286,14 +286,14 @@ impl<'db> Type<'db> {
             ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::Intersection(intersection) => intersection
-                .finite_alternative_union(ctx)
+                .finite_alternative_union(env)
                 .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(ctx, policy)
+                    alternatives.try_upcast_to_callable_with_policy(env, policy)
                 }),
 
             Type::EnumComplement(complement) => complement
-                .remaining_literal_union(ctx)
-                .try_upcast_to_callable_with_policy_and_context(ctx, policy, context),
+                .remaining_literal_union(env)
+                .try_upcast_to_callable_with_policy_and_context(env, policy, context),
 
             // TODO
             Type::DataclassDecorator(_)
@@ -315,11 +315,11 @@ struct CallableUpcastContext<'db> {
 impl<'db> CallableUpcastContext<'db> {
     fn is_recursive_reference(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         function: FunctionType<'db>,
     ) -> bool {
         self.recursive_definition
-            .is_some_and(|definition| function.contains_definition(ctx, definition))
+            .is_some_and(|definition| function.contains_definition(env, definition))
     }
 }
 
@@ -451,13 +451,13 @@ pub struct CallableType<'db> {
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: CallableType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
+    let db = env.db();
     for signature in &ty.signatures(db).overloads {
-        walk_signature(ctx, signature, visitor);
+        walk_signature(env, signature, visitor);
     }
 }
 
@@ -541,23 +541,26 @@ impl<'db> CallableType<'db> {
 
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         Some(Self::new(
             db,
-            CallableSignature::partially_apply(ctx, overloads)?,
+            CallableSignature::partially_apply(env, overloads)?,
             CallableTypeKind::Regular,
             CallableFunctionProvenance::None,
         ))
     }
 
     /// Reifies this callable as the nominal `functools.partial[T]` instance for its return type.
-    pub(crate) fn into_functools_partial_instance(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        let return_ty = self.signatures(db).overload_return_type_or_unknown(ctx);
-        KnownClass::FunctoolsPartial.to_specialized_instance(ctx, &[return_ty])
+    pub(crate) fn into_functools_partial_instance(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Type<'db> {
+        let db = env.db();
+        let return_ty = self.signatures(db).overload_return_type_or_unknown(env);
+        KnownClass::FunctoolsPartial.to_specialized_instance(env, &[return_ty])
     }
 
     /// Wraps this reduced callable as a synthetic `functools.partial(...)` instance type.
@@ -573,17 +576,17 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn bind_self(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
-        let db = ctx.db();
+        let db = env.db();
         if self.is_dunder_paramspec(db) {
             return self.into_regular(db);
         }
 
         CallableType::new(
             db,
-            self.signatures(db).bind_self(ctx, self_type),
+            self.signatures(db).bind_self(env, self_type),
             self.kind(db),
             self.provenance(db),
         )
@@ -609,23 +612,23 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn apply_self(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
-        self.apply_self_with_receiver(ctx, self_type, self_type)
+        self.apply_self_with_receiver(env, self_type, self_type)
     }
 
     pub(crate) fn apply_self_with_receiver(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
-        let db = ctx.db();
+        let db = env.db();
         CallableType::new(
             db,
             self.signatures(db)
-                .apply_self_with_receiver(ctx, receiver_type, self_type),
+                .apply_self_with_receiver(env, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
         )
@@ -646,15 +649,15 @@ impl<'db> CallableType<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         Some(CallableType::new(
             db,
             self.signatures(db)
-                .recursive_type_normalized_impl(ctx, div, nested)?,
+                .recursive_type_normalized_impl(env, div, nested)?,
             self.kind(db),
             self.provenance(db),
         ))
@@ -662,12 +665,12 @@ impl<'db> CallableType<'db> {
 
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
             return replacements.get(&self).copied().unwrap_or(self);
         }
@@ -675,7 +678,7 @@ impl<'db> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db)
-                .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
             self.kind(db),
             self.provenance(db),
         )
@@ -683,14 +686,14 @@ impl<'db> CallableType<'db> {
 
     pub(super) fn find_legacy_typevars_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let db = ctx.db();
+        let db = env.db();
         self.signatures(db)
-            .find_legacy_typevars_impl(ctx, binding_context, typevars, visitor);
+            .find_legacy_typevars_impl(env, binding_context, typevars, visitor);
     }
 }
 
@@ -739,9 +742,9 @@ impl<'db> CallableTypes<'db> {
         self.0.iter()
     }
 
-    pub(crate) fn into_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn into_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(ctx, self.0.into_iter().map(Type::Callable))
+        UnionType::from_elements(env, self.0.into_iter().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
@@ -794,25 +797,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
     pub(super) fn check_callable_pair(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = ctx.db();
+        let db = env.db();
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
-        self.check_callable_signature_pair(ctx, source.signatures(db), target.signatures(db))
+        self.check_callable_signature_pair(env, source.signatures(db), target.signatures(db))
     }
 
     pub(super) fn check_callables_vs_callable(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         source: &CallableTypes<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        source.iter().when_all(ctx, self.constraints, |element| {
-            self.check_callable_pair(ctx, *element, target)
+        source.iter().when_all(env, self.constraints, |element| {
+            self.check_callable_pair(env, *element, target)
         })
     }
 }

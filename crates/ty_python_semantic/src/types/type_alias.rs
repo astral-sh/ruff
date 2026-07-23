@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use std::fmt::Write;
 
 use crate::{
@@ -38,11 +38,11 @@ pub struct PEP695TypeAliasType<'db> {
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
 pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(ctx, type_alias.value_type(ctx));
+    visitor.visit_type(env, type_alias.value_type(env));
 }
 
 #[salsa::tracked]
@@ -54,15 +54,15 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.apply_function_specialization(ctx, self.raw_value_type(ctx))
+    pub(crate) fn value_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.apply_function_specialization(env, self.raw_value_type(env))
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
-    pub(super) fn raw_value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.rhs_scope(db).program(db));
+    pub(super) fn raw_value_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.rhs_scope(db).program(db));
         self.raw_value_type_inner(db)
     }
 
@@ -70,27 +70,31 @@ impl<'db> PEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let ctx = SemanticContext::from_file(db, alias.rhs_scope(db).python_file(db));
-            value.cycle_normalized(&ctx, *previous, cycle)
+            let env = SemanticEnvironment::from_file(db, alias.rhs_scope(db).python_file(db));
+            value.cycle_normalized(&env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn raw_value_type_inner(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let ctx = SemanticContext::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
         let module = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(&ctx, definition, &type_alias_stmt_node.node(&module).value)
+        definition_expression_type(&env, definition, &type_alias_stmt_node.node(&module).value)
     }
 
-    fn apply_function_specialization(self, ctx: &SemanticContext<'db>, ty: Type<'db>) -> Type<'db> {
-        let db = ctx.db();
-        if let Some(generic_context) = self.generic_context(ctx) {
+    fn apply_function_specialization(
+        self,
+        env: &SemanticEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let db = env.db();
+        if let Some(generic_context) = self.generic_context(env) {
             let specialization = self
                 .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(ctx, None));
+                .unwrap_or_else(|| generic_context.default_specialization(env, None));
             let type_mapping = match specialization.materialization_kind(db) {
                 None => {
                     TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
@@ -102,7 +106,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             };
 
             ty.apply_type_mapping_impl(
-                ctx,
+                env,
                 &type_mapping,
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
@@ -114,11 +118,11 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     pub(crate) fn apply_specialization(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> PEP695TypeAliasType<'db> {
-        let db = ctx.db();
-        match self.generic_context(ctx) {
+        let db = env.db();
+        match self.generic_context(env) {
             None => self,
 
             Some(generic_context) => {
@@ -142,16 +146,19 @@ impl<'db> PEP695TypeAliasType<'db> {
         self.specialization(db).is_some()
     }
 
-    pub(crate) fn generic_context(self, ctx: &SemanticContext<'db>) -> Option<GenericContext<'db>> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.rhs_scope(db).program(db));
+    pub(crate) fn generic_context(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<GenericContext<'db>> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.rhs_scope(db).program(db));
         self.generic_context_inner(db)
     }
 
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     fn generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let ctx = SemanticContext::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
         let parsed = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
@@ -162,7 +169,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .map(|type_params| {
                 let index = semantic_index(db, scope.python_file(db));
                 let definition = index.expect_single_definition(type_alias_stmt_node);
-                GenericContext::from_type_params(&ctx, index, definition, type_params)
+                GenericContext::from_type_params(&env, index, definition, type_params)
             })
     }
 }
@@ -183,11 +190,11 @@ pub struct ManualPEP695TypeAliasType<'db> {
 impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
 
 pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(ctx, type_alias.value_type(ctx));
+    visitor.visit_type(env, type_alias.value_type(env));
 }
 
 #[salsa::tracked]
@@ -196,9 +203,9 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     ///
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
-    pub(crate) fn value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
+    pub(crate) fn value_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.definition(db).program(db));
         self.value_type_inner(db)
     }
 
@@ -206,8 +213,8 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
-            let ctx = SemanticContext::from_file(db, alias.definition(db).python_file(db));
-            value.cycle_normalized(&ctx, *previous, cycle)
+            let env = SemanticEnvironment::from_file(db, alias.definition(db).python_file(db));
+            value.cycle_normalized(&env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -225,8 +232,8 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
             return Type::unknown();
         };
-        let ctx = SemanticContext::from_file(db, definition.python_file(db));
-        definition_expression_type(&ctx, definition, value_arg)
+        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        definition_expression_type(&env, definition, value_arg)
     }
 }
 
@@ -239,7 +246,7 @@ pub enum TypeAliasType<'db> {
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
@@ -248,10 +255,10 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(ctx, type_alias, visitor);
+            walk_pep_695_type_alias(env, type_alias, visitor);
         }
         TypeAliasType::ManualPEP695(type_alias) => {
-            walk_manual_pep_695_type_alias(ctx, type_alias, visitor);
+            walk_manual_pep_695_type_alias(env, type_alias, visitor);
         }
     }
 }
@@ -272,17 +279,17 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub fn value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub fn value_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.value_type(ctx),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(ctx),
+            TypeAliasType::PEP695(type_alias) => type_alias.value_type(env),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(env),
         }
     }
 
-    pub(crate) fn raw_value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn raw_value_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(ctx),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(ctx),
+            TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(env),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(env),
         }
     }
 
@@ -306,10 +313,13 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn generic_context(self, ctx: &SemanticContext<'db>) -> Option<GenericContext<'db>> {
+    pub(crate) fn generic_context(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<GenericContext<'db>> {
         // TODO: Add support for generic non-PEP695 type aliases.
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.generic_context(ctx),
+            TypeAliasType::PEP695(type_alias) => type_alias.generic_context(env),
             TypeAliasType::ManualPEP695(_) => None,
         }
     }
@@ -323,12 +333,12 @@ impl<'db> TypeAliasType<'db> {
 
     pub(crate) fn apply_specialization(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.apply_specialization(ctx, f))
+                TypeAliasType::PEP695(type_alias.apply_specialization(env, f))
             }
             TypeAliasType::ManualPEP695(_) => self,
         }
@@ -343,11 +353,11 @@ impl<'db> TypeAliasType<'db> {
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
     fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.definition(db).program(db));
         self.variance_of_owner(db, typevar)
     }
 }
@@ -364,9 +374,9 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let ctx = SemanticContext::from_file(db, self.definition(db).python_file(db));
-        let Some(generic_context) = self.generic_context(&ctx) else {
-            return self.value_type(&ctx).variance_of(&ctx, typevar);
+        let env = SemanticEnvironment::from_file(db, self.definition(db).python_file(db));
+        let Some(generic_context) = self.generic_context(&env) else {
+            return self.value_type(&env).variance_of(&env, typevar);
         };
 
         // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
@@ -375,13 +385,13 @@ impl<'db> TypeAliasType<'db> {
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
         {
-            return self.raw_value_type(&ctx).variance_of(&ctx, typevar);
+            return self.raw_value_type(&env).variance_of(&env, typevar);
         }
 
-        let raw_value_type = self.raw_value_type(&ctx);
+        let raw_value_type = self.raw_value_type(&env);
         let specialization = self
             .specialization(db)
-            .unwrap_or_else(|| generic_context.default_specialization(&ctx, None));
+            .unwrap_or_else(|| generic_context.default_specialization(&env, None));
 
         // For external typevars, variance flows through the specialization arguments. Expanding
         // the specialized alias body here can create ever-larger recursive alias applications.
@@ -390,8 +400,8 @@ impl<'db> TypeAliasType<'db> {
             .zip(specialization.types(db))
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
-                    .variance_of(&ctx, alias_typevar.identity(db))
-                    .compose_thunk(|| argument_ty.variance_of(&ctx, typevar))
+                    .variance_of(&env, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(&env, typevar))
             })
             .collect()
     }

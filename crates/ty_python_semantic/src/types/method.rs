@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -37,13 +37,13 @@ pub struct BoundMethodType<'db> {
 impl get_size2::GetSize for BoundMethodType<'_> {}
 
 pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     method: BoundMethodType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
-    visitor.visit_function_type(ctx, method.function(db));
-    visitor.visit_type(ctx, method.self_instance(db));
+    let db = env.db();
+    visitor.visit_function_type(env, method.function(db));
+    visitor.visit_type(env, method.self_instance(db));
 }
 
 #[salsa::tracked]
@@ -51,12 +51,12 @@ impl<'db> BoundMethodType<'db> {
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
     /// This is normally the bound-instance type (the type of `self` or `cls`), but if the bound method is
     /// a `@classmethod`, then it should be an instance of that bound-instance type.
-    pub(crate) fn typing_self_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
+    pub(crate) fn typing_self_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
         let mut self_instance = self.self_instance(db);
-        if self.function(db).is_classmethod(ctx) {
+        if self.function(db).is_classmethod(env) {
             self_instance = self_instance
-                .to_instance_approximation(ctx)
+                .to_instance_approximation(env)
                 .unwrap_or_else(Type::unknown);
         }
         self_instance
@@ -70,9 +70,9 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
-    pub(crate) fn into_callable_type(self, ctx: &SemanticContext<'db>) -> CallableType<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.function(db).program(db));
+    pub(crate) fn into_callable_type(self, env: &SemanticEnvironment<'db>) -> CallableType<'db> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.function(db).program(db));
         self.into_callable_type_inner(db)
     }
 
@@ -83,14 +83,14 @@ impl<'db> BoundMethodType<'db> {
     )]
     fn into_callable_type_inner(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
-        let ctx = SemanticContext::from_file(db, function.python_file(db));
+        let env = SemanticEnvironment::from_file(db, function.python_file(db));
 
         CallableType::new(
             db,
             self.bound_signatures_inner(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(&ctx),
+                function.has_explicit_return_annotation(&env),
             ),
         )
     }
@@ -98,50 +98,50 @@ impl<'db> BoundMethodType<'db> {
     /// Converts this bound method into a callable using separate runtime-receiver and `Self` types.
     pub(crate) fn into_callable_type_with_receiver(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        let db = ctx.db();
+        let db = env.db();
         let function = self.function(db);
 
         CallableType::new(
             db,
-            self.bound_signatures_with_receiver(ctx, receiver_type, typing_self_type),
+            self.bound_signatures_with_receiver(env, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(ctx),
+                function.has_explicit_return_annotation(env),
             ),
         )
     }
 
     pub(crate) fn bound_signatures(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> &'db CallableSignature<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.function(db).program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.function(db).program(db));
         self.bound_signatures_inner(db)
     }
 
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     fn bound_signatures_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function = self.function(db);
-        let ctx = SemanticContext::from_file(db, function.python_file(db));
-        let typing_self_type = self.typing_self_type(&ctx);
+        let env = SemanticEnvironment::from_file(db, function.python_file(db));
+        let typing_self_type = self.typing_self_type(&env);
         let receiver_type = self.self_instance(db);
 
-        self.bound_signatures_with_receiver(&ctx, receiver_type, typing_self_type)
+        self.bound_signatures_with_receiver(&env, receiver_type, typing_self_type)
     }
 
     fn bound_signatures_with_receiver(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableSignature<'db> {
-        let db = ctx.db();
-        let function_signature = self.function(db).signature(ctx);
+        let db = env.db();
+        let function_signature = self.function(db).signature(env);
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -152,7 +152,7 @@ impl<'db> BoundMethodType<'db> {
                 return CallableSignature::from_overloads(function_signature.overloads.iter().map(
                     |signature| {
                         signature.bind_self_with_receiver(
-                            ctx,
+                            env,
                             Some(receiver_type),
                             Some(typing_self_type),
                         )
@@ -164,10 +164,10 @@ impl<'db> BoundMethodType<'db> {
                 function_signature
                     .overloads
                     .iter()
-                    .filter(|signature| signature.can_bind_self_to(ctx, receiver_type))
+                    .filter(|signature| signature.can_bind_self_to(env, receiver_type))
                     .map(|signature| {
                         signature.bind_self_with_receiver(
-                            ctx,
+                            env,
                             Some(receiver_type),
                             Some(typing_self_type),
                         )
@@ -176,7 +176,7 @@ impl<'db> BoundMethodType<'db> {
         };
 
         CallableSignature::single(signature.bind_self_with_receiver(
-            ctx,
+            env,
             Some(receiver_type),
             Some(typing_self_type),
         ))
@@ -184,17 +184,17 @@ impl<'db> BoundMethodType<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         Some(Self::new(
             db,
             self.function(db)
-                .recursive_type_normalized_impl(ctx, div, nested)?,
+                .recursive_type_normalized_impl(env, div, nested)?,
             self.self_instance(db)
-                .recursive_type_normalized_impl(ctx, div, true)?,
+                .recursive_type_normalized_impl(env, div, true)?,
         ))
     }
 }
@@ -202,18 +202,18 @@ impl<'db> BoundMethodType<'db> {
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_bound_method_pair(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         source: BoundMethodType<'db>,
         target: BoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = ctx.db();
+        let db = env.db();
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
-        self.check_function_pair(ctx, source.function(db), target.function(db))
-            .and(ctx, self.constraints, || {
-                self.check_type_pair(ctx, target.self_instance(db), source.self_instance(db))
+        self.check_function_pair(env, source.function(db), target.function(db))
+            .and(env, self.constraints, || {
+                self.check_type_pair(env, target.self_instance(db), source.self_instance(db))
             })
     }
 }
@@ -255,29 +255,29 @@ pub enum KnownBoundMethodType<'db> {
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     method_wrapper: KnownBoundMethodType<'db>,
     visitor: &V,
 ) {
     match method_wrapper {
         KnownBoundMethodType::FunctionTypeDunderGet(function) => {
-            visitor.visit_function_type(ctx, function);
+            visitor.visit_function_type(env, function);
         }
         KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-            visitor.visit_function_type(ctx, function);
+            visitor.visit_function_type(env, function);
         }
         KnownBoundMethodType::PropertyDunderGet(property) => {
-            visitor.visit_property_instance_type(ctx, property);
+            visitor.visit_property_instance_type(env, property);
         }
         KnownBoundMethodType::PropertyDunderSet(property) => {
-            visitor.visit_property_instance_type(ctx, property);
+            visitor.visit_property_instance_type(env, property);
         }
         KnownBoundMethodType::PropertyDunderDelete(property) => {
-            visitor.visit_property_instance_type(ctx, property);
+            visitor.visit_property_instance_type(env, property);
         }
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(
-                ctx,
+                env,
                 LiteralValueType::promotable(LiteralValueTypeKind::String(string_literal)).into(),
             );
         }
@@ -297,34 +297,34 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 impl<'db> KnownBoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(ctx, div, nested)?,
+                    function.recursive_type_normalized_impl(env, div, nested)?,
                 ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(ctx, div, nested)?,
+                    function.recursive_type_normalized_impl(env, div, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(ctx, div, nested)?,
+                    property.recursive_type_normalized_impl(env, div, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(ctx, div, nested)?,
+                    property.recursive_type_normalized_impl(env, div, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderDelete(property) => {
                 Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(ctx, div, nested)?,
+                    property.recursive_type_normalized_impl(env, div, nested)?,
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)
@@ -370,9 +370,9 @@ impl<'db> KnownBoundMethodType<'db> {
     /// If the bound method type is overloaded, it may have multiple signatures.
     pub(super) fn signatures(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> impl Iterator<Item = Signature<'db>> {
-        let db = ctx.db();
+        let db = env.db();
         let object_type_form = || TypeFormType::from_type_expression(db, Type::object());
 
         match self {
@@ -401,9 +401,9 @@ impl<'db> KnownBoundMethodType<'db> {
                     Signature::new(
                         Parameters::standard([
                             Parameter::positional_only(Some(Name::new_static("instance")))
-                                .with_annotated_type(Type::none(ctx)),
+                                .with_annotated_type(Type::none(env)),
                             Parameter::positional_only(Some(Name::new_static("owner")))
-                                .with_annotated_type(KnownClass::Type.to_instance(ctx)),
+                                .with_annotated_type(KnownClass::Type.to_instance(env)),
                         ]),
                         Type::unknown(),
                     ),
@@ -413,11 +413,11 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(Type::object()),
                             Parameter::positional_only(Some(Name::new_static("owner")))
                                 .with_annotated_type(UnionType::from_two_elements(
-                                    ctx,
-                                    KnownClass::Type.to_instance(ctx),
-                                    Type::none(ctx),
+                                    env,
+                                    KnownClass::Type.to_instance(env),
+                                    Type::none(env),
                                 ))
-                                .with_default_type(Type::none(ctx)),
+                                .with_default_type(Type::none(env)),
                         ]),
                         Type::unknown(),
                     ),
@@ -425,7 +425,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 .into_iter(),
             )),
             KnownBoundMethodType::FunctionTypeDunderCall(function) => Either::Left(Either::Right(
-                function.signature(ctx).overloads.iter().cloned(),
+                function.signature(env).overloads.iter().cloned(),
             )),
             KnownBoundMethodType::PropertyDunderSet(_) => {
                 Either::Right(std::iter::once(Signature::new(
@@ -452,26 +452,26 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::standard([
                         Parameter::positional_only(Some(Name::new_static("prefix")))
                             .with_annotated_type(UnionType::from_two_elements(
-                                ctx,
-                                KnownClass::Str.to_instance(ctx),
-                                Type::homogeneous_tuple(db, KnownClass::Str.to_instance(ctx)),
+                                env,
+                                KnownClass::Str.to_instance(env),
+                                Type::homogeneous_tuple(db, KnownClass::Str.to_instance(env)),
                             )),
                         Parameter::positional_only(Some(Name::new_static("start")))
                             .with_annotated_type(UnionType::from_two_elements(
-                                ctx,
-                                KnownClass::SupportsIndex.to_instance(ctx),
-                                Type::none(ctx),
+                                env,
+                                KnownClass::SupportsIndex.to_instance(env),
+                                Type::none(env),
                             ))
-                            .with_default_type(Type::none(ctx)),
+                            .with_default_type(Type::none(env)),
                         Parameter::positional_only(Some(Name::new_static("end")))
                             .with_annotated_type(UnionType::from_two_elements(
-                                ctx,
-                                KnownClass::SupportsIndex.to_instance(ctx),
-                                Type::none(ctx),
+                                env,
+                                KnownClass::SupportsIndex.to_instance(env),
+                                Type::none(env),
                             ))
-                            .with_default_type(Type::none(ctx)),
+                            .with_default_type(Type::none(env)),
                     ]),
-                    KnownClass::Bool.to_instance(ctx),
+                    KnownClass::Bool.to_instance(env),
                 )))
             }
 
@@ -485,7 +485,7 @@ impl<'db> KnownBoundMethodType<'db> {
                         Parameter::positional_only(Some(Name::new_static("upper_bound")))
                             .with_annotated_type(object_type_form()),
                     ]),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
 
@@ -493,7 +493,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::empty(),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
 
@@ -505,7 +505,7 @@ impl<'db> KnownBoundMethodType<'db> {
                         Parameter::positional_only(Some(Name::new_static("of")))
                             .with_annotated_type(object_type_form()),
                     ]),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
 
@@ -514,8 +514,8 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::standard([Parameter::positional_only(Some(Name::new_static(
                         "other",
                     )))
-                    .with_annotated_type(KnownClass::ConstraintSet.to_instance(ctx))]),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    .with_annotated_type(KnownClass::ConstraintSet.to_instance(env))]),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
 
@@ -528,7 +528,7 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         Type::homogeneous_tuple(db, Type::object()),
                     ))]),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
 
@@ -536,15 +536,15 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([Parameter::keyword_only(Name::new_static("inferable"))
                         .with_annotated_type(UnionType::from_two_elements(
-                            ctx,
+                            env,
                             TypeFormType::from_type_expression(
                                 db,
                                 Type::homogeneous_tuple(db, Type::object()),
                             ),
-                            Type::none(ctx),
+                            Type::none(env),
                         ))
-                        .with_default_type(Type::none(ctx))]),
-                    KnownClass::Bool.to_instance(ctx),
+                        .with_default_type(Type::none(env))]),
+                    KnownClass::Bool.to_instance(env),
                 )))
             }
 
@@ -561,12 +561,12 @@ impl<'db> KnownBoundMethodType<'db> {
                         ),
                     ]),
                     UnionType::from_two_elements(
-                        ctx,
+                        env,
                         Type::homogeneous_tuple(
                             db,
-                            KnownClass::ConstraintSetSolution.to_instance(ctx),
+                            KnownClass::ConstraintSetSolution.to_instance(env),
                         ),
-                        Type::none(ctx),
+                        Type::none(env),
                     ),
                 )))
             }
@@ -579,12 +579,12 @@ impl<'db> KnownBoundMethodType<'db> {
                             Type::homogeneous_tuple(db, Type::object()),
                         ))]),
                     UnionType::from_two_elements(
-                        ctx,
+                        env,
                         Type::homogeneous_tuple(
                             db,
-                            KnownClass::ConstraintSetSolution.to_instance(ctx),
+                            KnownClass::ConstraintSetSolution.to_instance(env),
                         ),
-                        Type::none(ctx),
+                        Type::none(env),
                     ),
                 )))
             }
@@ -592,7 +592,7 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::empty(),
-                    KnownClass::ConstraintSet.to_instance(ctx),
+                    KnownClass::ConstraintSet.to_instance(env),
                 )))
             }
         }
@@ -602,7 +602,7 @@ impl<'db> KnownBoundMethodType<'db> {
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_known_bound_method_pair(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         source: KnownBoundMethodType<'db>,
         target: KnownBoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -610,12 +610,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(source_function),
                 KnownBoundMethodType::FunctionTypeDunderGet(target_function),
-            ) => self.check_function_pair(ctx, source_function, target_function),
+            ) => self.check_function_pair(env, source_function, target_function),
 
             (
                 KnownBoundMethodType::FunctionTypeDunderCall(source_function),
                 KnownBoundMethodType::FunctionTypeDunderCall(target_function),
-            ) => self.check_function_pair(ctx, source_function, target_function),
+            ) => self.check_function_pair(env, source_function, target_function),
 
             (
                 KnownBoundMethodType::PropertyDunderGet(source_property),
@@ -628,7 +628,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             | (
                 KnownBoundMethodType::PropertyDunderDelete(source_property),
                 KnownBoundMethodType::PropertyDunderDelete(target_property),
-            ) => self.check_property_instance_pair(ctx, source_property, target_property),
+            ) => self.check_property_instance_pair(env, source_property, target_property),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 ConstraintSet::from_bool(self.constraints, source == target)
@@ -729,7 +729,7 @@ pub enum WrapperDescriptorKind {
 impl WrapperDescriptorKind {
     pub(super) fn signatures<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> impl Iterator<Item = Signature<'db>> {
         /// Similar to what we do in [`KnownBoundMethod::signatures`],
         /// here we also model `types.FunctionType.__get__` (or builtins.property.__get__),
@@ -740,12 +740,12 @@ impl WrapperDescriptorKind {
         /// [`KnownBoundMethod::signatures`], since that one is just this signature
         /// with the `self` parameters removed.
         fn dunder_get_signatures<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             class: KnownClass,
         ) -> [Signature<'db>; 2] {
-            let type_instance = KnownClass::Type.to_instance(ctx);
-            let none = Type::none(ctx);
-            let descriptor = class.to_instance(ctx);
+            let type_instance = KnownClass::Type.to_instance(env);
+            let none = Type::none(env);
+            let descriptor = class.to_instance(env);
             [
                 Signature::new(
                     Parameters::standard([
@@ -766,7 +766,7 @@ impl WrapperDescriptorKind {
                             .with_annotated_type(Type::object()),
                         Parameter::positional_only(Some(Name::new_static("owner")))
                             .with_annotated_type(UnionType::from_two_elements(
-                                ctx,
+                                env,
                                 type_instance,
                                 none,
                             ))
@@ -779,17 +779,17 @@ impl WrapperDescriptorKind {
 
         match self {
             WrapperDescriptorKind::FunctionTypeDunderGet => {
-                Either::Left(dunder_get_signatures(ctx, KnownClass::FunctionType).into_iter())
+                Either::Left(dunder_get_signatures(env, KnownClass::FunctionType).into_iter())
             }
             WrapperDescriptorKind::PropertyDunderGet => {
-                Either::Left(dunder_get_signatures(ctx, KnownClass::Property).into_iter())
+                Either::Left(dunder_get_signatures(env, KnownClass::Property).into_iter())
             }
             WrapperDescriptorKind::PropertyDunderSet => {
                 let object = Type::object();
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
                         Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(KnownClass::Property.to_instance(ctx)),
+                            .with_annotated_type(KnownClass::Property.to_instance(env)),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(object),
                         Parameter::positional_only(Some(Name::new_static("value")))
@@ -802,7 +802,7 @@ impl WrapperDescriptorKind {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
                         Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(KnownClass::Property.to_instance(ctx)),
+                            .with_annotated_type(KnownClass::Property.to_instance(env)),
                         Parameter::positional_only(Some(Name::new_static("instance")))
                             .with_annotated_type(Type::object()),
                     ]),

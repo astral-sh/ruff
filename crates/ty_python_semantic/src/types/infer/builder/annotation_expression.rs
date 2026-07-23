@@ -176,7 +176,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let inferred = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -240,7 +240,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                             let in_type_expression = inferred
                                 .inner_type()
-                                .in_type_expression(ctx, self.scope(), None, self.inference_flags())
+                                .in_type_expression(env, self.scope(), None, self.inference_flags())
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
@@ -279,8 +279,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 if classvar_and_final
                                     && nearest_enclosing_class(self.db(), self.index, self.scope())
                                         .is_none_or(|class| {
-                                            !class.is_dataclass_like(self.semantic_context())
-                                                && !class.is_protocol(self.semantic_context())
+                                            !class.is_dataclass_like(self.semantic_environment())
+                                                && !class.is_protocol(self.semantic_environment())
                                         })
                                     && let Some(builder) = self
                                         .context
@@ -292,7 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
 
                                 if qualifier == TypeQualifier::ClassVar
-                                    && type_and_qualifiers.inner_type().has_non_self_typevar(ctx)
+                                    && type_and_qualifiers.inner_type().has_non_self_typevar(env)
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                 {

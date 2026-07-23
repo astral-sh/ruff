@@ -30,25 +30,25 @@ use ty_python_core::semantic_index;
 
 /// The database and Python environment used by a semantic operation.
 #[derive(Clone)]
-pub struct SemanticContext<'db> {
+pub struct SemanticEnvironment<'db> {
     db: &'db dyn Db,
-    environment: Cell<PythonEnvironmentSource>,
+    environment: Cell<ProgramSource>,
 }
 
-impl<'db> SemanticContext<'db> {
-    /// Creates a context that lazily obtains its Python version from `file`.
+impl<'db> SemanticEnvironment<'db> {
+    /// Creates an environment that lazily obtains its Python version from `file`.
     pub fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             db,
-            environment: Cell::new(PythonEnvironmentSource::File(file.as_id())),
+            environment: Cell::new(ProgramSource::File(file.as_id())),
         }
     }
 
-    /// Creates a context with an already-established program.
+    /// Creates an environment with an already-established program.
     pub const fn from_program(db: &'db dyn Db, program: Program) -> Self {
         Self {
             db,
-            environment: Cell::new(PythonEnvironmentSource::Program(program)),
+            environment: Cell::new(ProgramSource::Program(program)),
         }
     }
 
@@ -62,14 +62,13 @@ impl<'db> SemanticContext<'db> {
     #[inline]
     pub fn program(&self) -> Program {
         match self.environment.get() {
-            PythonEnvironmentSource::Program(program) => program,
-            PythonEnvironmentSource::File(file) => {
+            ProgramSource::Program(program) => program,
+            ProgramSource::File(file) => {
                 cold_path();
                 // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
                 // re-wrapping it for this ingredient read restores that database lifetime.
                 let program = PythonFile::from_id(file).python_version(self.db);
-                self.environment
-                    .set(PythonEnvironmentSource::Program(program));
+                self.environment.set(ProgramSource::Program(program));
                 program
             }
         }
@@ -83,7 +82,7 @@ impl<'db> SemanticContext<'db> {
 }
 
 #[derive(Clone, Copy)]
-enum PythonEnvironmentSource {
+enum ProgramSource {
     Program(Program),
     // Salsa interned handles are thin `Id` wrappers, so converting between `PythonFile` and `Id`
     // is an inlined representation change with no database lookup. Keeping the lifetime-bearing
@@ -105,7 +104,7 @@ enum PythonEnvironmentSource {
 /// [`InferContext::finish`] and the returned diagnostics must be stored
 /// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
-    semantic_context: &'ast SemanticContext<'db>,
+    semantic_environment: &'ast SemanticEnvironment<'db>,
     scope: ScopeId<'db>,
     file: File,
     python_file: PythonFile<'db>,
@@ -119,18 +118,18 @@ pub(crate) struct InferContext<'db, 'ast> {
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
     pub(crate) fn new(
-        semantic_context: &'ast SemanticContext<'db>,
+        semantic_environment: &'ast SemanticEnvironment<'db>,
         scope: ScopeId<'db>,
         file: File,
         python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
-        let db = semantic_context.db();
+        let db = semantic_environment.db();
         debug_assert_eq!(scope.python_file(db), python_file);
         debug_assert_eq!(python_file.file(db), file);
 
         Self {
-            semantic_context,
+            semantic_environment,
             scope,
             module,
             file,
@@ -154,13 +153,13 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[inline]
-    pub(crate) fn semantic_context(&self) -> &'ast SemanticContext<'db> {
-        self.semantic_context
+    pub(crate) fn semantic_environment(&self) -> &'ast SemanticEnvironment<'db> {
+        self.semantic_environment
     }
 
     #[inline]
     pub(crate) fn program(&self) -> Program {
-        self.semantic_context.program()
+        self.semantic_environment.program()
     }
 
     /// The module for which the types are inferred.
@@ -192,7 +191,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     #[inline]
     pub(crate) fn db(&self) -> &'db dyn Db {
-        self.semantic_context.db()
+        self.semantic_environment.db()
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
@@ -295,15 +294,17 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             .filter_map(|(_, scope)| scope.node().as_function())
             .filter_map(|node| {
                 infer_definition_types(
-                    self.semantic_context(),
+                    self.semantic_environment(),
                     index.expect_single_definition(node),
                 )
                 .undecorated_type()
                 .and_then(Type::as_function_literal)
             })
             .any(|function_ty| {
-                function_ty
-                    .has_known_decorator(self.semantic_context(), FunctionDecorators::NO_TYPE_CHECK)
+                function_ty.has_known_decorator(
+                    self.semantic_environment(),
+                    FunctionDecorators::NO_TYPE_CHECK,
+                )
             })
     }
 
@@ -314,7 +315,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     fn is_range_reachable(&self, range: TextRange) -> bool {
         let index = semantic_index(self.db(), self.python_file);
         let scope_id = self.scope.file_scope_id(self.db());
-        is_range_reachable(self.semantic_context(), index, scope_id, range)
+        is_range_reachable(self.semantic_environment(), index, scope_id, range)
     }
 
     /// Are we currently inferring types in a stub file?

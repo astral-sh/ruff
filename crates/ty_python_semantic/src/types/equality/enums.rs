@@ -9,7 +9,7 @@ use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
     LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
 };
-use crate::{Db, FxOrderMap, FxOrderSet, SemanticContext};
+use crate::{Db, FxOrderMap, FxOrderSet, SemanticEnvironment};
 
 use super::{
     ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics,
@@ -23,22 +23,22 @@ use super::{
 /// Same-class domains compare compact member sets directly, while comparisons spanning multiple
 /// classes project their members onto runtime comparison keys.
 pub(super) fn evaluate_enum_domains<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     target: Type<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let target = EnumDomainSet::from_type(ctx, target)?;
-    let other = EnumDomainSet::from_type(ctx, other)?;
+    let target = EnumDomainSet::from_type(env, target)?;
+    let other = EnumDomainSet::from_type(env, other)?;
     if let (Some(target), Some(other)) = (target.single(), other.single())
         && target.enum_class == other.enum_class
     {
-        return SameEnumComparison::new(ctx, target.clone(), other.clone(), operator)
-            .evaluate(ctx, branch, operator);
+        return SameEnumComparison::new(env, target.clone(), other.clone(), operator)
+            .evaluate(env, branch, operator);
     }
 
-    ProjectedEnumComparison::new(ctx, target, &other, operator)?.evaluate(ctx, branch, operator)
+    ProjectedEnumComparison::new(env, target, &other, operator)?.evaluate(env, branch, operator)
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -53,7 +53,7 @@ struct SameEnumComparison<'db> {
 
 impl<'db> SameEnumComparison<'db> {
     fn new(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         left: EnumValueSet<'db>,
         right: EnumValueSet<'db>,
         operator: ComparisonOperator,
@@ -64,7 +64,7 @@ impl<'db> SameEnumComparison<'db> {
         Self {
             left,
             right,
-            profile: same_enum_comparison_profile(ctx, enum_class, operator),
+            profile: same_enum_comparison_profile(env, enum_class, operator),
         }
     }
 
@@ -93,11 +93,11 @@ impl<'db> SameEnumComparison<'db> {
 
     fn evaluate(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
-        let db = ctx.db();
+        let db = env.db();
         match self.truthiness(db, operator)? {
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
@@ -105,14 +105,14 @@ impl<'db> SameEnumComparison<'db> {
                 Some(ComparisonResult::Ambiguous)
             }
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => Some(
-                ComparisonResult::CanNarrow(self.right.restriction_type(ctx)),
+                ComparisonResult::CanNarrow(self.right.restriction_type(env)),
             ),
             Truthiness::Ambiguous => Some(self.right.singleton_type(db).map_or(
                 ComparisonResult::Ambiguous,
                 |singleton| {
                     ComparisonResult::CanNarrow(
-                        IntersectionBuilder::new(ctx)
-                            .add_positive(self.left.restriction_type(ctx))
+                        IntersectionBuilder::new(env)
+                            .add_positive(self.left.restriction_type(env))
                             .add_negative(singleton)
                             .build(),
                     )
@@ -165,17 +165,17 @@ impl<'db> EnumValueSet<'db> {
     /// This deliberately does not use subtyping: a `NewType` over an enum is a subtype of the
     /// enum but remains disjoint from the enum's literal members.
     fn from_type(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         ty: Type<'db>,
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
         fn from_type_inner<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<EnumValueSet<'db>> {
-            let db = ctx.db();
-            let value_set = match ty.resolve_type_alias(ctx) {
+            let db = env.db();
+            let value_set = match ty.resolve_type_alias(env) {
                 Type::LiteralValue(literal) => {
                     let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
                         return None;
@@ -191,7 +191,7 @@ impl<'db> EnumValueSet<'db> {
                     }
                 }
                 Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(ctx).into_enum_class(ctx)?,
+                    enum_class: instance.class_literal(env).into_enum_class(env)?,
                     members: EnumValueSetMembers::All,
                 },
                 Type::EnumComplement(complement) => EnumValueSet {
@@ -199,10 +199,10 @@ impl<'db> EnumValueSet<'db> {
                     members: EnumValueSetMembers::AllExcept(complement),
                 },
                 Type::Union(union) => {
-                    EnumValueSet::from_union(ctx, union.elements(db), active_types)?
+                    EnumValueSet::from_union(env, union.elements(db), active_types)?
                 }
                 Type::Intersection(intersection) => {
-                    EnumValueSet::from_intersection(ctx, intersection, active_types)?
+                    EnumValueSet::from_intersection(env, intersection, active_types)?
                 }
                 _ => return None,
             };
@@ -213,7 +213,7 @@ impl<'db> EnumValueSet<'db> {
         if !active_types.insert(ty) {
             return None;
         }
-        let value_set = from_type_inner(ctx, ty, active_types);
+        let value_set = from_type_inner(env, ty, active_types);
         active_types.remove(&ty);
         value_set
     }
@@ -222,14 +222,14 @@ impl<'db> EnumValueSet<'db> {
     ///
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         elements: &[Type<'db>],
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderMap::default();
         for element in elements {
-            let value_set = Self::from_type(ctx, *element, active_types)?;
+            let value_set = Self::from_type(env, *element, active_types)?;
             if let Some(enum_class) = enum_class
                 && enum_class != value_set.enum_class
             {
@@ -289,13 +289,13 @@ impl<'db> EnumValueSet<'db> {
 
     /// Extract the enum restriction while discarding unrelated positive intersection state.
     fn from_intersection(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         intersection: IntersectionType<'db>,
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
-        let db = ctx.db();
-        if let Some(complement) = intersection.enum_complement(ctx) {
-            return Self::from_type(ctx, Type::EnumComplement(complement), active_types);
+        let db = env.db();
+        if let Some(complement) = intersection.enum_complement(env) {
+            return Self::from_type(env, Type::EnumComplement(complement), active_types);
         }
 
         // Other intersection components can only reduce the represented enum values. Ignoring
@@ -303,7 +303,7 @@ impl<'db> EnumValueSet<'db> {
         let mut value_sets = intersection
             .positive(db)
             .iter()
-            .filter_map(|positive| Self::from_type(ctx, *positive, active_types));
+            .filter_map(|positive| Self::from_type(env, *positive, active_types));
         let value_set = value_sets.next()?;
         value_sets
             .all(|other| other.enum_class == value_set.enum_class)
@@ -392,19 +392,19 @@ impl<'db> EnumValueSet<'db> {
     }
 
     /// Reconstruct a constraint containing only this enum value restriction.
-    fn restriction_type(&self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
+    fn restriction_type(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
         match &self.members {
             EnumValueSetMembers::All => self
                 .enum_class
                 .class_literal(db)
-                .to_non_generic_instance(ctx),
+                .to_non_generic_instance(env),
             EnumValueSetMembers::One { name, promotable } => {
                 self.member_type(db, name, *promotable)
             }
             EnumValueSetMembers::Included(members) => members
                 .iter()
-                .fold(UnionBuilder::new(ctx), |builder, (name, promotable)| {
+                .fold(UnionBuilder::new(env), |builder, (name, promotable)| {
                     builder.add(self.member_type(db, name, *promotable))
                 })
                 .build(),
@@ -459,14 +459,14 @@ struct EnumDomainSet<'db> {
 }
 
 impl<'db> EnumDomainSet<'db> {
-    fn from_type(ctx: &SemanticContext<'db>, ty: Type<'db>) -> Option<Self> {
+    fn from_type(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(ctx, ty, active_types) {
+            if let Some(domain) = EnumValueSet::from_type(env, ty, active_types) {
                 domains.push(domain);
                 return Some(());
             }
@@ -474,30 +474,30 @@ impl<'db> EnumDomainSet<'db> {
             if !active_types.insert(ty) {
                 return None;
             }
-            let result = collect_union(ctx, ty, domains, active_types);
+            let result = collect_union(env, ty, domains, active_types);
             active_types.remove(&ty);
             result
         }
 
         fn collect_union<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
-            let db = ctx.db();
-            let Type::Union(union) = ty.resolve_type_alias(ctx) else {
+            let db = env.db();
+            let Type::Union(union) = ty.resolve_type_alias(env) else {
                 return None;
             };
             for element in union.elements(db) {
-                collect(ctx, *element, domains, active_types)?;
+                collect(env, *element, domains, active_types)?;
             }
             Some(())
         }
 
         let mut domains = Vec::new();
         let mut active_types = FxHashSet::default();
-        collect(ctx, ty, &mut domains, &mut active_types)?;
+        collect(env, ty, &mut domains, &mut active_types)?;
         (!domains.is_empty()).then_some(Self { domains })
     }
 
@@ -510,39 +510,39 @@ impl<'db> EnumDomainSet<'db> {
 
     fn key_projection(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         operator: ComparisonOperator,
     ) -> Option<EnumKeyProjection<'db>> {
         let mut projection = EnumKeyProjection::default();
         for domain in &self.domains {
-            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
+            domain.add_keys_to_projection(env, operator, &mut projection)?;
         }
         Some(projection)
     }
 
-    fn restriction_type(&self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    fn restriction_type(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         self.domains
             .iter()
-            .fold(UnionBuilder::new(ctx), |builder, domain| {
-                builder.add(domain.restriction_type(ctx))
+            .fold(UnionBuilder::new(env), |builder, domain| {
+                builder.add(domain.restriction_type(env))
             })
             .build()
     }
 
     fn restrict_for_equality(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(ctx);
+        let mut builder = UnionBuilder::new(env);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
-            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
+            domain.add_keys_to_projection(env, operator, &mut projection)?;
             if projection.unknowns_may_overlap(other) {
-                builder = builder.add(domain.restriction_type(ctx));
-            } else if let Some(retained) = domain.retain_keys(ctx, operator, &other.keys).ok()? {
-                builder = builder.add(retained.restriction_type(ctx));
+                builder = builder.add(domain.restriction_type(env));
+            } else if let Some(retained) = domain.retain_keys(env, operator, &other.keys).ok()? {
+                builder = builder.add(retained.restriction_type(env));
             }
         }
         Some(builder.build())
@@ -551,19 +551,19 @@ impl<'db> EnumDomainSet<'db> {
     /// Return the known subset of `self` that compares equal to `other`'s single key.
     fn known_equal_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(ctx);
+        let mut builder = UnionBuilder::new(env);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
-            domain.add_keys_to_projection(ctx, operator, &mut projection)?;
+            domain.add_keys_to_projection(env, operator, &mut projection)?;
             if projection.unknowns_may_overlap(other) {
                 continue;
             }
-            if let Some(retained) = domain.retain_keys(ctx, operator, &other.keys).ok()? {
-                builder = builder.add(retained.restriction_type(ctx));
+            if let Some(retained) = domain.retain_keys(env, operator, &other.keys).ok()? {
+                builder = builder.add(retained.restriction_type(env));
             }
         }
         Some(builder.build())
@@ -579,13 +579,13 @@ struct ProjectedEnumComparison<'db> {
 
 impl<'db> ProjectedEnumComparison<'db> {
     fn new(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         left: EnumDomainSet<'db>,
         right: &EnumDomainSet<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        let left_projection = left.key_projection(ctx, operator)?;
-        let right_projection = right.key_projection(ctx, operator)?;
+        let left_projection = left.key_projection(env, operator)?;
+        let right_projection = right.key_projection(env, operator)?;
         Some(Self {
             left,
             left_projection,
@@ -610,7 +610,7 @@ impl<'db> ProjectedEnumComparison<'db> {
 
     fn evaluate(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
@@ -620,16 +620,16 @@ impl<'db> ProjectedEnumComparison<'db> {
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
                 Some(ComparisonResult::CanNarrow(
                     self.left
-                        .restrict_for_equality(ctx, operator, &self.right_projection)?,
+                        .restrict_for_equality(env, operator, &self.right_projection)?,
                 ))
             }
             Truthiness::Ambiguous if self.right_projection.single_key().is_some() => {
                 let equal_left =
                     self.left
-                        .known_equal_type(ctx, operator, &self.right_projection)?;
+                        .known_equal_type(env, operator, &self.right_projection)?;
                 Some(ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(ctx)
-                        .add_positive(self.left.restriction_type(ctx))
+                    IntersectionBuilder::new(env)
+                        .add_positive(self.left.restriction_type(env))
                         .add_negative(equal_left)
                         .build(),
                 ))
@@ -720,12 +720,12 @@ impl<'db> EnumKeyProjection<'db> {
 impl<'db> EnumValueSet<'db> {
     fn add_keys_to_projection(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         operator: ComparisonOperator,
         projection: &mut EnumKeyProjection<'db>,
     ) -> Option<()> {
-        let db = ctx.db();
-        let profile = enum_class_key_profile(ctx, self.enum_class, operator);
+        let db = env.db();
+        let profile = enum_class_key_profile(env, self.enum_class, operator);
         let semantics = profile.semantics?;
         let key_domain = EnumComparisonKeyDomain::new(self.enum_class, semantics);
 
@@ -756,12 +756,12 @@ impl<'db> EnumValueSet<'db> {
 
     fn retain_keys(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         operator: ComparisonOperator,
         keys: &FxHashSet<EnumComparisonKey<'db>>,
     ) -> Result<Option<Self>, ()> {
-        let db = ctx.db();
-        let profile = enum_class_key_profile(ctx, self.enum_class, operator);
+        let db = env.db();
+        let profile = enum_class_key_profile(env, self.enum_class, operator);
         let semantics = profile.semantics.ok_or(())?;
         let mut included = FxOrderMap::default();
         for (name, scalar_key) in &profile.members {
@@ -795,12 +795,12 @@ struct EnumClassKeyProfile<'db> {
 
 /// Cache each class's modeled comparison keys independently of any particular operand pair.
 fn enum_class_key_profile<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> &'db EnumClassKeyProfile<'db> {
-    let db = ctx.db();
-    debug_assert_eq!(ctx.program(), enum_class.class_literal(db).program(db));
+    let db = env.db();
+    debug_assert_eq!(env.program(), enum_class.class_literal(db).program(db));
     enum_class_key_profile_inner(db, enum_class, operator)
 }
 
@@ -810,10 +810,10 @@ fn enum_class_key_profile_inner<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> EnumClassKeyProfile<'db> {
-    let ctx = SemanticContext::from_file(db, enum_class.class_literal(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).python_file(db));
     let semantics = KnownComparisonSemantics::of_instance(
-        &ctx,
-        enum_class.class_literal(db).to_non_generic_instance(&ctx),
+        &env,
+        enum_class.class_literal(db).to_non_generic_instance(&env),
         operator,
     );
     let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class
@@ -823,7 +823,7 @@ fn enum_class_key_profile_inner<'db>(
             (
                 name.clone(),
                 semantics.and_then(|semantics| {
-                    enum_literal_value(&ctx, EnumLiteralType::new(db, enum_class, name))
+                    enum_literal_value(&env, EnumLiteralType::new(db, enum_class, name))
                         .and_then(|value| enum_comparison_key(semantics, value))
                 }),
             )
@@ -854,12 +854,12 @@ struct SameEnumComparisonProfile {
 }
 
 fn same_enum_comparison_profile<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
-    let db = ctx.db();
-    debug_assert_eq!(ctx.program(), enum_class.class_literal(db).program(db));
+    let db = env.db();
+    debug_assert_eq!(env.program(), enum_class.class_literal(db).program(db));
     same_enum_comparison_profile_inner(db, enum_class, operator)
 }
 
@@ -869,8 +869,8 @@ fn same_enum_comparison_profile_inner<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
-    let ctx = SemanticContext::from_file(db, enum_class.class_literal(db).python_file(db));
-    let profile = enum_class_key_profile(&ctx, enum_class, operator);
+    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).python_file(db));
+    let profile = enum_class_key_profile(&env, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
         Some(KnownComparisonSemantics::Object) if !enum_class.aliases_are_known(db) => {

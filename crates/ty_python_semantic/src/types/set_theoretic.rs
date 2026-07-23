@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use itertools::Either;
 
 use std::convert::Infallible;
@@ -28,13 +28,13 @@ pub struct UnionType<'db> {
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     union: UnionType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
+    let db = env.db();
     for element in union.elements(db) {
-        visitor.visit_type(ctx, *element);
+        visitor.visit_type(env, *element);
     }
 }
 
@@ -48,7 +48,7 @@ impl<'db> UnionType<'db> {
     ///
     /// For performance reasons, consider using [`UnionType::from_two_elements`] if
     /// the union is constructed from exactly two elements.
-    pub fn from_elements<I, T>(ctx: &SemanticContext<'db>, elements: I) -> Type<'db>
+    pub fn from_elements<I, T>(env: &SemanticEnvironment<'db>, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -57,7 +57,7 @@ impl<'db> UnionType<'db> {
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
-                let mut builder = UnionBuilder::new(ctx);
+                let mut builder = UnionBuilder::new(env);
                 builder.add_in_place(first.into());
                 builder.add_in_place(second.into());
                 for element in iter_elements {
@@ -73,37 +73,41 @@ impl<'db> UnionType<'db> {
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
-    pub fn from_two_elements(ctx: &SemanticContext<'db>, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+    pub fn from_two_elements(
+        env: &SemanticEnvironment<'db>,
+        a: Type<'db>,
+        b: Type<'db>,
+    ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, id, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(&SemanticContext::from_program(db, types.program(db)), *previous, cycle)
+                result.cycle_normalized(&SemanticEnvironment::from_program(db, types.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let ctx = SemanticContext::from_program(db, types.program(db));
-            UnionBuilder::new(&ctx)
+            let env = SemanticEnvironment::from_program(db, types.program(db));
+            UnionBuilder::new(&env)
                 .add(types.first(db))
                 .add(types.second(db))
                 .build()
         }
 
-        let db = ctx.db();
-        union_from_two_elements(db, TypePair::new(db, ctx.program(), a, b))
+        let db = env.db();
+        union_from_two_elements(db, TypePair::new(db, env.program(), a, b))
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
     pub(crate) fn from_elements_leave_aliases<I, T>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         elements: I,
     ) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let mut builder = UnionBuilder::new(ctx).unpack_aliases(false);
+        let mut builder = UnionBuilder::new(env).unpack_aliases(false);
         for element in elements {
             builder.add_in_place(element.into());
         }
@@ -120,20 +124,20 @@ impl<'db> UnionType<'db> {
     /// Recursively expands aliases that expose top-level union elements.
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
-    pub(crate) fn expand_aliases(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn expand_aliases(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(ctx, self.elements(ctx.db()).iter().copied())
+        Self::from_elements(env, self.elements(env.db()).iter().copied())
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         elements: I,
     ) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let mut builder = UnionBuilder::new(ctx).cycle_recovery(true);
+        let mut builder = UnionBuilder::new(env).cycle_recovery(true);
         for element in elements {
             builder.add_in_place(element.into());
         }
@@ -146,14 +150,14 @@ impl<'db> UnionType<'db> {
     /// As soon as a `None` element in the iterable is encountered,
     /// the function short-circuits and returns `None`.
     pub(crate) fn try_from_elements<I, T>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         elements: I,
     ) -> Option<Type<'db>>
     where
         I: IntoIterator<Item = Option<T>>,
         T: Into<Type<'db>>,
     {
-        let mut builder = UnionBuilder::new(ctx);
+        let mut builder = UnionBuilder::new(env);
         for element in elements {
             builder.add_in_place(element?.into());
         }
@@ -164,27 +168,27 @@ impl<'db> UnionType<'db> {
     /// and create a new union from the resulting set of types.
     pub(crate) fn map(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let Ok(mapped) =
-            self.try_map_impl(ctx, |element| Ok::<_, Infallible>(transform_fn(element)));
+            self.try_map_impl(env, |element| Ok::<_, Infallible>(transform_fn(element)));
         mapped
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
     pub(crate) fn map_leave_aliases(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let db = ctx.db();
+        let db = env.db();
         let elements = self.elements(db);
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
-                let mut builder = UnionBuilder::new(ctx).unpack_aliases(false);
+                let mut builder = UnionBuilder::new(env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
@@ -210,25 +214,25 @@ impl<'db> UnionType<'db> {
     /// the function short-circuits and returns `None`.
     pub(crate) fn try_map(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        self.try_map_impl(ctx, |element| transform_fn(element).ok_or(()))
+        self.try_map_impl(env, |element| transform_fn(element).ok_or(()))
             .ok()
     }
 
     fn try_map_impl<E>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
     ) -> Result<Type<'db>, E> {
-        let db = ctx.db();
+        let db = env.db();
         let elements = self.elements(db);
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
-                let mut builder = UnionBuilder::new(ctx);
+                let mut builder = UnionBuilder::new(env);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
@@ -247,11 +251,11 @@ impl<'db> UnionType<'db> {
 
     pub(crate) fn to_instance(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         let mut is_exact = true;
-        let instance = self.try_map(ctx, |element| {
-            let projection = element.to_instance(ctx)?;
+        let instance = self.try_map(env, |element| {
+            let projection = element.to_instance(env)?;
             is_exact &= projection.is_exact();
             Some(projection.into_inner())
         })?;
@@ -262,8 +266,11 @@ impl<'db> UnionType<'db> {
     ///
     /// The returned type is broader than the literal types themselves. For example, the
     /// supertype for `Literal["a"] | Literal["b"]` is `LiteralString`.
-    pub(crate) fn common_literal_supertype(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        let db = ctx.db();
+    pub(crate) fn common_literal_supertype(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let db = env.db();
         // Do not use `Type::literal_fallback_instance` here: it also falls back from function
         // literals to `FunctionType`. Since `FunctionType.__call__` is gradual, it can be
         // assignable to a callable that the function literal's precise signature is not.
@@ -271,7 +278,7 @@ impl<'db> UnionType<'db> {
         // supertype proves the relation for every literal in the union.
         let supertype = |element: &Type<'db>| match element {
             Type::LiteralValue(literal) if literal.is_string() => Some(Type::literal_string()),
-            Type::LiteralValue(literal) => Some(literal.fallback_instance(ctx)),
+            Type::LiteralValue(literal) => Some(literal.fallback_instance(env)),
             _ => None,
         };
 
@@ -296,11 +303,11 @@ impl<'db> UnionType<'db> {
 
     pub(crate) fn map_with_boundness(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        let db = ctx.db();
-        let mut builder = UnionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = UnionBuilder::new(env);
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
@@ -352,11 +359,11 @@ impl<'db> UnionType<'db> {
 
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        let db = ctx.db();
-        let mut builder = UnionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = UnionBuilder::new(env);
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
@@ -415,12 +422,12 @@ impl<'db> UnionType<'db> {
 
     pub(crate) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
-        let db = ctx.db();
-        let mut builder = UnionBuilder::new(ctx)
+        let db = env.db();
+        let mut builder = UnionBuilder::new(env)
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
@@ -428,7 +435,7 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(ctx, div, nested)?;
+                let ty = ty.recursive_type_normalized_impl(env, div, nested)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
@@ -442,7 +449,7 @@ impl<'db> UnionType<'db> {
                     continue;
                 }
                 builder.add_in_place(
-                    ty.recursive_type_normalized_impl(ctx, div, nested)
+                    ty.recursive_type_normalized_impl(env, div, nested)
                         .unwrap_or(div),
                 );
                 empty = false;
@@ -483,19 +490,19 @@ pub(crate) enum KnownUnion {
 }
 
 impl KnownUnion {
-    pub(crate) fn to_type<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn to_type<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(
-                ctx,
-                KnownClass::Int.to_instance(ctx),
-                KnownClass::Float.to_instance(ctx),
+                env,
+                KnownClass::Int.to_instance(env),
+                KnownClass::Float.to_instance(env),
             ),
             KnownUnion::Complex => UnionType::from_elements(
-                ctx,
+                env,
                 [
-                    KnownClass::Int.to_instance(ctx),
-                    KnownClass::Float.to_instance(ctx),
-                    KnownClass::Complex.to_instance(ctx),
+                    KnownClass::Int.to_instance(env),
+                    KnownClass::Float.to_instance(env),
+                    KnownClass::Complex.to_instance(env),
                 ],
             ),
         }
@@ -736,56 +743,62 @@ impl get_size2::GetSize for IntersectionType<'_> {}
 const MAX_INTERSECTION_DNF_TERMS: usize = 4;
 
 pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     intersection: IntersectionType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
+    let db = env.db();
     for element in intersection.positive(db) {
-        visitor.visit_type(ctx, *element);
+        visitor.visit_type(env, *element);
     }
     for element in intersection.negative(db) {
-        visitor.visit_type(ctx, *element);
+        visitor.visit_type(env, *element);
     }
 }
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
     /// Return the compact enum-complement view of this intersection, if it has one.
-    pub(crate) fn enum_complement(self, ctx: &SemanticContext<'db>) -> Option<EnumComplement<'db>> {
+    pub(crate) fn enum_complement(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<EnumComplement<'db>> {
         EnumComplement::from_intersection_parts(
-            ctx,
-            self.positive(ctx.db()),
-            self.negative(ctx.db()),
+            env,
+            self.positive(env.db()),
+            self.negative(env.db()),
         )
     }
 
     /// Return the exact finite alternatives represented by this intersection, if available.
-    pub fn finite_alternatives(self, ctx: &SemanticContext<'db>) -> Option<Vec<Type<'db>>> {
-        self.enum_complement(ctx)
-            .map(|complement| complement.remaining_literal_types(ctx))
+    pub fn finite_alternatives(self, env: &SemanticEnvironment<'db>) -> Option<Vec<Type<'db>>> {
+        self.enum_complement(env)
+            .map(|complement| complement.remaining_literal_types(env))
     }
 
     /// Return the exact finite alternative union represented by this intersection, if available.
-    pub(crate) fn finite_alternative_union(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        Some(self.enum_complement(ctx)?.remaining_literal_union(ctx))
+    pub(crate) fn finite_alternative_union(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        Some(self.enum_complement(env)?.remaining_literal_union(env))
     }
 
     /// Return the finite alternatives only if they remain concise enough for display.
     pub(crate) fn finite_alternatives_for_display(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         max_literals: usize,
     ) -> Option<Vec<Type<'db>>> {
-        self.enum_complement(ctx)?
-            .remaining_literal_types_for_display(ctx, max_literals)
+        self.enum_complement(env)?
+            .remaining_literal_types_for_display(env, max_literals)
     }
 
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
     ///
     /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if
     /// the intersection is constructed from exactly two elements.
-    pub(crate) fn from_elements<I, T>(ctx: &SemanticContext<'db>, elements: I) -> Type<'db>
+    pub(crate) fn from_elements<I, T>(env: &SemanticEnvironment<'db>, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -795,7 +808,7 @@ impl<'db> IntersectionType<'db> {
         if let Some(first) = elements_iter.next() {
             if let Some(second) = elements_iter.next() {
                 let mut builder =
-                    IntersectionBuilder::new(ctx).positive_elements([first.into(), second.into()]);
+                    IntersectionBuilder::new(env).positive_elements([first.into(), second.into()]);
                 for element in elements_iter {
                     builder.add_positive_in_place(element.into());
                 }
@@ -818,7 +831,7 @@ impl<'db> IntersectionType<'db> {
     ///
     /// Like [`from_elements`][Self::from_elements], a successful result is exact.
     pub(crate) fn bounded_from_elements<I, T>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         elements: I,
     ) -> Option<Type<'db>>
     where
@@ -836,21 +849,21 @@ impl<'db> IntersectionType<'db> {
             // there is a single union, the product of all union counts should be reasonable, even
             // if it exceeds the budget below. In both cases, just return the precise answer
             // without considering the budget.
-            return Some(Self::from_elements(ctx, elements));
+            return Some(Self::from_elements(env, elements));
         }
 
         let non_union_elements = elements.clone().filter(|element| !element.is_union());
-        let initial = Self::from_elements(ctx, non_union_elements);
+        let initial = Self::from_elements(env, non_union_elements);
         let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
             if new_ty.is_never()
                 || candidates
                     .iter()
-                    .any(|old| new_ty.is_redundant_with(ctx, *old))
+                    .any(|old| new_ty.is_redundant_with(env, *old))
             {
                 return Some(());
             }
 
-            candidates.retain(|old| !old.is_redundant_with(ctx, new_ty));
+            candidates.retain(|old| !old.is_redundant_with(env, new_ty));
             if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
                 return None;
             }
@@ -872,8 +885,8 @@ impl<'db> IntersectionType<'db> {
 
             next.clear();
             for candidate in &frontier {
-                for alternative in clause.elements(ctx.db()) {
-                    let refined = Self::from_two_elements(ctx, *candidate, *alternative);
+                for alternative in clause.elements(env.db()) {
+                    let refined = Self::from_two_elements(env, *candidate, *alternative);
                     insert_candidate(&mut next, refined).or(skip_budget_check)?;
                 }
             }
@@ -885,12 +898,12 @@ impl<'db> IntersectionType<'db> {
             std::mem::swap(&mut frontier, &mut next);
         }
 
-        Some(UnionType::from_elements(ctx, frontier))
+        Some(UnionType::from_elements(env, frontier))
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     pub(crate) fn from_two_elements(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         a: Type<'db>,
         b: Type<'db>,
     ) -> Type<'db> {
@@ -898,38 +911,38 @@ impl<'db> IntersectionType<'db> {
             returns(copy),
             cycle_initial=|_, id, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(&SemanticContext::from_program(db, types.program(db)), *previous, cycle)
+                result.cycle_normalized(&SemanticEnvironment::from_program(db, types.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let ctx = SemanticContext::from_program(db, types.program(db));
-            IntersectionBuilder::new(&ctx)
+            let env = SemanticEnvironment::from_program(db, types.program(db));
+            IntersectionBuilder::new(&env)
                 .positive_elements([types.first(db), types.second(db)])
                 .build()
         }
 
-        let db = ctx.db();
-        intersection_from_two_elements(db, TypePair::new(db, ctx.program(), a, b))
+        let db = env.db();
+        intersection_from_two_elements(db, TypePair::new(db, env.program(), a, b))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         let positive = if nested {
             self.positive(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(ctx, div, nested))
+                .map(|ty| ty.recursive_type_normalized_impl(env, div, nested))
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
             self.positive(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(ctx, div, nested)
+                    ty.recursive_type_normalized_impl(env, div, nested)
                         .unwrap_or(div)
                 })
                 .collect()
@@ -937,10 +950,10 @@ impl<'db> IntersectionType<'db> {
 
         let negative = if nested {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(ctx, div, nested))?
+                .try_map(|ty| ty.recursive_type_normalized_impl(env, div, nested))?
         } else {
             self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(ctx, div, nested)
+                ty.recursive_type_normalized_impl(env, div, nested)
                     .unwrap_or(div)
             })
         };
@@ -966,11 +979,11 @@ impl<'db> IntersectionType<'db> {
     /// negative elements unchanged.
     pub(crate) fn map_positive(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let db = ctx.db();
-        let mut builder = IntersectionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = IntersectionBuilder::new(env);
         for ty in self.positive(db) {
             builder.add_positive_in_place(transform_fn(ty));
         }
@@ -985,8 +998,8 @@ impl<'db> IntersectionType<'db> {
     ///
     /// Negative instance constraints are not transferred: an object not satisfying `P` does not
     /// imply that other instances of its class cannot satisfy `P`.
-    pub(crate) fn try_dunder_class(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        let db = ctx.db();
+    pub(crate) fn try_dunder_class(self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
+        let db = env.db();
         if !self.iter_positive(db).any(|positive| {
             matches!(
                 positive,
@@ -996,20 +1009,20 @@ impl<'db> IntersectionType<'db> {
             return None;
         }
 
-        let mut builder = IntersectionBuilder::new(ctx);
+        let mut builder = IntersectionBuilder::new(env);
         for positive in self.iter_positive(db) {
-            builder.add_positive_in_place(positive.dunder_class(ctx));
+            builder.add_positive_in_place(positive.dunder_class(env));
         }
         Some(builder.build())
     }
 
     pub(crate) fn map_with_boundness(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        let db = ctx.db();
-        let mut builder = IntersectionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = IntersectionBuilder::new(env);
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
@@ -1057,11 +1070,11 @@ impl<'db> IntersectionType<'db> {
 
     pub(crate) fn map_with_boundness_and_qualifiers(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        let db = ctx.db();
-        let mut builder = IntersectionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = IntersectionBuilder::new(env);
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
@@ -1120,10 +1133,10 @@ impl<'db> IntersectionType<'db> {
     /// have been replaced by their concrete base types.
     pub(crate) fn with_expanded_typevars_and_newtypes(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Type<'db> {
-        let db = ctx.db();
-        expand_intersection_typevars_and_newtypes(ctx, self.positive(db), self.negative(db))
+        let db = env.db();
+        expand_intersection_typevars_and_newtypes(env, self.positive(db), self.negative(db))
     }
 
     pub fn iter_positive(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
@@ -1162,14 +1175,14 @@ impl<'db> IntersectionType<'db> {
     /// `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child` instances too.
     pub(crate) fn to_instance(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
-        let db = ctx.db();
-        let mut builder = IntersectionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = IntersectionBuilder::new(env);
         let mut has_projected_positive = false;
         let mut is_exact = self.negative(db).is_empty();
         for positive in self.iter_positive(db) {
-            if let Some(projection) = positive.to_instance(ctx) {
+            if let Some(projection) = positive.to_instance(env) {
                 has_projected_positive = true;
                 is_exact &= projection.is_exact();
                 builder.add_positive_in_place(projection.into_inner());
@@ -1194,21 +1207,21 @@ impl<'db> IntersectionType<'db> {
 }
 
 fn expand_intersection_typevars_and_newtypes<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     positive: &FxOrderSet<Type<'db>>,
     negative: &NegativeIntersectionElements<'db>,
 ) -> Type<'db> {
-    let db = ctx.db();
-    let mut builder = IntersectionBuilder::new(ctx);
+    let db = env.db();
+    let mut builder = IntersectionBuilder::new(env);
     for &element in positive {
         match element {
             Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(ctx) {
+                match tvar.typevar(db).bound_or_constraints(env) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         builder.add_positive_in_place(bound);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder.add_positive_in_place(constraints.as_type(ctx));
+                        builder.add_positive_in_place(constraints.as_type(env));
                     }
                     // Type variables without bounds or constraints implicitly have `object`
                     // as their upper bound, and adding `object` to an intersection is always a no-op
@@ -1216,7 +1229,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                 }
             }
             Type::NewTypeInstance(newtype) => {
-                builder.add_positive_in_place(newtype.concrete_base_type(ctx));
+                builder.add_positive_in_place(newtype.concrete_base_type(env));
             }
             _ => builder.add_positive_in_place(element),
         }

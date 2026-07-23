@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 use crate::{
-    Db, SemanticContext,
+    Db, SemanticEnvironment,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
@@ -138,16 +138,16 @@ fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersi
 ///
 /// This includes the string form, iterables of strings, iterables of
 /// iterable-like `(name, value)` pairs, and mappings from `str` to values.
-fn enum_names_type<'db>(ctx: &SemanticContext<'db>) -> Type<'db> {
-    let str_type = KnownClass::Str.to_instance(ctx);
-    let iterable_str = KnownClass::Iterable.to_specialized_instance(ctx, &[str_type]);
-    let iterable_object = KnownClass::Iterable.to_specialized_instance(ctx, &[Type::object()]);
+fn enum_names_type<'db>(env: &SemanticEnvironment<'db>) -> Type<'db> {
+    let str_type = KnownClass::Str.to_instance(env);
+    let iterable_str = KnownClass::Iterable.to_specialized_instance(env, &[str_type]);
+    let iterable_object = KnownClass::Iterable.to_specialized_instance(env, &[Type::object()]);
     let iterable_iterable_object =
-        KnownClass::Iterable.to_specialized_instance(ctx, &[iterable_object]);
+        KnownClass::Iterable.to_specialized_instance(env, &[iterable_object]);
     let mapping_str_object = KnownClass::Mapping
-        .to_specialized_instance(ctx, &[KnownClass::Str.to_instance(ctx), Type::object()]);
+        .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), Type::object()]);
     UnionType::from_elements(
-        ctx,
+        env,
         [
             str_type,
             iterable_str,
@@ -168,12 +168,12 @@ fn first_enum_auto_value<'db>(
     start: EnumStart,
 ) -> Type<'db> {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &*name.to_lowercase()),
         _ => match start {
             EnumStart::Literal(start) => Type::int_literal(start),
-            EnumStart::DynamicInt => KnownClass::Int.to_instance(ctx),
+            EnumStart::DynamicInt => KnownClass::Int.to_instance(env),
         },
     }
 }
@@ -192,12 +192,12 @@ fn next_auto_value<'db>(
     last_int_value: Option<i64>,
 ) -> Type<'db> {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     match base_class {
         KnownClass::StrEnum => Type::string_literal(db, &*name.to_lowercase()),
         _ => {
             let Some(last) = last_int_value else {
-                return KnownClass::Int.to_instance(ctx);
+                return KnownClass::Int.to_instance(env);
             };
             match base_class {
                 KnownClass::Flag | KnownClass::IntFlag => {
@@ -210,13 +210,13 @@ fn next_auto_value<'db>(
                             .checked_shl(shift)
                             .and_then(|value| i64::try_from(value).ok())
                             .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(ctx))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(env))
                     }
                 }
                 _ => last
                     .checked_add(1)
                     .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(ctx)),
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(env)),
             }
         }
     }
@@ -261,7 +261,7 @@ fn apply_generated_type_mixin_member_values<'db>(
         return None;
     };
 
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     match class.known(db) {
         Some(KnownClass::Str) => Some(
             members
@@ -269,8 +269,8 @@ fn apply_generated_type_mixin_member_values<'db>(
                 .map(|(name, value)| {
                     let value = if let Some(literal) = value.as_int_literal() {
                         Type::string_literal(db, literal.to_compact_string())
-                    } else if value.is_assignable_to(ctx, KnownClass::Int.to_instance(ctx)) {
-                        KnownClass::Str.to_instance(ctx)
+                    } else if value.is_assignable_to(env, KnownClass::Int.to_instance(env)) {
+                        KnownClass::Str.to_instance(env)
                     } else {
                         return None;
                     };
@@ -282,8 +282,8 @@ fn apply_generated_type_mixin_member_values<'db>(
             members
                 .into_iter()
                 .map(|(name, value)| {
-                    let value = if value.is_assignable_to(ctx, KnownClass::Int.to_instance(ctx)) {
-                        KnownClass::Bytes.to_instance(ctx)
+                    let value = if value.is_assignable_to(env, KnownClass::Int.to_instance(env)) {
+                        KnownClass::Bytes.to_instance(env)
                     } else {
                         return None;
                     };
@@ -295,8 +295,8 @@ fn apply_generated_type_mixin_member_values<'db>(
             members
                 .into_iter()
                 .map(|(name, value)| {
-                    if value.is_assignable_to(ctx, KnownClass::Int.to_instance(ctx)) {
-                        Some((name, KnownClass::Float.to_instance(ctx)))
+                    if value.is_assignable_to(env, KnownClass::Int.to_instance(env)) {
+                        Some((name, KnownClass::Float.to_instance(env)))
                     } else {
                         None
                     }
@@ -326,14 +326,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let Some(name) = &kw.arg else {
                 continue;
             };
-            let ctx = self.semantic_context();
-            let python_version = ctx.python_version();
+            let env = self.semantic_environment();
+            let python_version = env.python_version();
             if !enum_functional_call_keyword_is_valid(name.as_str(), python_version)
                 && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
             {
                 builder.into_diagnostic(format_args!(
                     "Argument `{name}` does not match any known parameter of function `{base_name}`",
-                    base_name = base_class.name(ctx.python_version()),
+                    base_name = base_class.name(env.python_version()),
                 ));
             }
         }
@@ -353,7 +353,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             builder.into_diagnostic(format_args!(
                 "Multiple values provided for parameter `value` of `{base_name}()`",
-                base_name = base_class.name(self.semantic_context().python_version()),
+                base_name = base_class.name(self.semantic_environment().python_version()),
             ));
         }
         if args.len() >= 2
@@ -364,7 +364,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             builder.into_diagnostic(format_args!(
                 "Multiple values provided for parameter `names` of `{base_name}()`",
-                base_name = base_class.name(self.semantic_context().python_version()),
+                base_name = base_class.name(self.semantic_environment().python_version()),
             ));
         }
 
@@ -375,7 +375,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         let name_arg = name_arg?;
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
 
         let Some(names_arg) = names_arg else {
             for arg in args {
@@ -393,7 +393,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_enum_mixin_argument(&keyword.value, base_class);
             }
 
-            let python_version = self.semantic_context().python_version();
+            let python_version = self.semantic_environment().python_version();
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(format_args!(
                     "Missing required argument `names` to `{base_name}()`",
@@ -401,7 +401,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            return Some(base_class.to_instance(ctx));
+            return Some(base_class.to_instance(env));
         };
 
         for arg in args {
@@ -429,7 +429,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
                 args.len(),
-                base_name = base_class.name(self.semantic_context().python_version()),
+                base_name = base_class.name(self.semantic_environment().python_version()),
             ));
         }
 
@@ -438,7 +438,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|name_literal| name_literal.value(db));
 
-        if (name.is_some() || name_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx)))
+        if (name.is_some() || name_ty.is_assignable_to(env, KnownClass::Str.to_instance(env)))
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && Some(assigned_name.as_str()) != name
@@ -446,7 +446,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_mismatched_type_name(
                 &self.context,
                 name_arg,
-                base_class.name(self.semantic_context().python_version()),
+                base_class.name(self.semantic_environment().python_version()),
                 &assigned_name,
                 name,
                 name_ty,
@@ -464,12 +464,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
         // instead of synthesizing a `DynamicEnumLiteral`.
         let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
-            return SubclassOfType::try_from_type(ctx, base_class.to_class_literal(ctx));
+            return SubclassOfType::try_from_type(env, base_class.to_class_literal(env));
         };
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
-        if let Err(error) = enum_lit.try_mro(ctx) {
+        if let Err(error) = enum_lit.try_mro(env) {
             report_mro_error_kind(
                 &self.context,
                 error,
@@ -491,17 +491,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_type = self.expression_type(name_arg);
 
         let Some(name_literal) = name_type.as_string_literal() else {
-            let ctx = self.semantic_context();
-            if !name_type.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
+            let env = self.semantic_environment();
+            if !name_type.is_assignable_to(env, KnownClass::Str.to_instance(env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`",
-                    base_name = base_class.name(ctx.python_version())
+                    base_name = base_class.name(env.python_version())
                 ));
                 diagnostic.set_primary_message(format_args!(
                     "Expected `str`, found `{}`",
-                    name_type.display(ctx)
+                    name_type.display(env)
                 ));
             }
             return None;
@@ -516,15 +516,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return EnumStart::Literal(literal);
         }
 
-        let ctx = self.semantic_context();
-        if ty.is_assignable_to(ctx, KnownClass::Int.to_instance(ctx)) {
+        let env = self.semantic_environment();
+        if ty.is_assignable_to(env, KnownClass::Int.to_instance(env)) {
             return EnumStart::DynamicInt;
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
             builder.into_diagnostic(format_args!(
                 "Expected `int` for `start` argument, got `{}`",
-                ty.display(ctx),
+                ty.display(env),
             ));
         }
 
@@ -538,32 +538,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
         let ty = self.expression_type(value);
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         if let Some(class_lit) = ty.as_class_literal() {
-            if class_lit.is_typed_dict(ctx)
+            if class_lit.is_typed_dict(env)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
             {
                 builder.into_diagnostic(format_args!(
                     "TypedDict class `{}` cannot be used as an enum mixin",
-                    ty.display(ctx),
+                    ty.display(env),
                 ));
                 return (None, false);
             }
 
-            let Some(mixin_class) = ty.to_class_type(ctx) else {
+            let Some(mixin_class) = ty.to_class_type(env) else {
                 return (Some(ty), true);
             };
-            let Some(enum_base) = base_class.to_class_literal(ctx).to_class_type(ctx) else {
+            let Some(enum_base) = base_class.to_class_literal(env).to_class_type(env) else {
                 return (Some(ty), true);
             };
             let constraints = ConstraintSetBuilder::new();
-            if !mixin_class.could_coexist_in_mro_with(ctx, enum_base, &constraints)
+            if !mixin_class.could_coexist_in_mro_with(env, enum_base, &constraints)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
             {
                 builder.into_diagnostic(format_args!(
                     "Class `{}` cannot be used as an enum mixin with `{}`",
                     mixin_class.name(db),
-                    base_class.name(self.semantic_context().python_version()),
+                    base_class.name(self.semantic_environment().python_version()),
                 ));
                 return (None, false);
             }
@@ -577,7 +577,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
             builder.into_diagnostic(format_args!(
                 "Expected a class for `type` argument, got `{}`",
-                ty.display(ctx),
+                ty.display(env),
             ));
         }
 
@@ -714,8 +714,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return self.parse_enum_members_from_dict(dict, base_class);
         }
 
-        let ctx = self.semantic_context();
-        if ty.is_dynamic() || ty.is_assignable_to(ctx, enum_names_type(ctx)) {
+        let env = self.semantic_environment();
+        if ty.is_dynamic() || ty.is_assignable_to(env, enum_names_type(env)) {
             EnumMembersArgParseResult::Unknown
         } else {
             EnumMembersArgParseResult::Invalid
@@ -821,7 +821,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut members = Vec::with_capacity(dict.items.len());
         let mut last_int_value = Some(0);
         let mut has_opaque_keys = false;
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         for item in &dict.items {
             let Some(key) = &item.key else {
                 return EnumMembersArgParseResult::Invalid;
@@ -829,7 +829,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
                 if key_ty.is_dynamic()
-                    || key_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
+                    || key_ty.is_assignable_to(env, KnownClass::Str.to_instance(env))
                 {
                     has_opaque_keys = true;
                     continue;
@@ -887,8 +887,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         let name_ty = self.expression_type(name_expr);
-        let ctx = self.semantic_context();
-        name_ty.is_dynamic() || name_ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
+        let env = self.semantic_environment();
+        name_ty.is_dynamic() || name_ty.is_assignable_to(env, KnownClass::Str.to_instance(env))
     }
 
     /// Classifies one element from a sequence-form `names` argument.
@@ -904,8 +904,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
             return SequenceEnumMember::PairKnown(name, value);
         }
-        let ctx = self.semantic_context();
-        if ty.is_dynamic() || ty.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx)) {
+        let env = self.semantic_environment();
+        if ty.is_dynamic() || ty.is_assignable_to(env, KnownClass::Str.to_instance(env)) {
             return SequenceEnumMember::NameOpaque;
         }
         if self.is_potential_explicit_enum_member(elt) {
@@ -919,17 +919,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         names_arg: &ast::Expr,
         base_class: KnownClass,
     ) {
-        let base_name = base_class.name(self.semantic_context().python_version());
+        let base_name = base_class.name(self.semantic_environment().python_version());
         let names_ty = self.expression_type(names_arg);
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, names_arg) {
-            let ctx = self.semantic_context();
+            let env = self.semantic_environment();
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `names` of `{base_name}()`"
             ));
             diagnostic.set_primary_message(format_args!(
                 "Expected `{}`, found `{}`",
-                enum_names_type(ctx).display(ctx),
-                names_ty.display(ctx),
+                enum_names_type(env).display(env),
+                names_ty.display(env),
             ));
         }
     }

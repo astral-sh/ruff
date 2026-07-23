@@ -76,7 +76,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for module_name in module_name.ancestors() {
                     if let Some(version_range) = typeshed_versions.exact(&module_name) {
                         // We know it is a stdlib module on *some* Python versions...
-                        let python_version = self.semantic_context().python_version();
+                        let python_version = self.semantic_environment().python_version();
                         if !version_range.contains(python_version) {
                             // ...But not on *this* Python version.
                             diagnostic.info(format_args!(
@@ -238,7 +238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
-                let inferred = infer_definition_types(self.semantic_context(), *definition);
+                let inferred = infer_definition_types(self.semantic_environment(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
@@ -380,7 +380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = module_literal.static_member(self.semantic_context(), name)
+            } = module_literal.static_member(self.semantic_environment(), name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them

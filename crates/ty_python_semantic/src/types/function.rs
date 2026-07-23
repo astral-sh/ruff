@@ -49,7 +49,7 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
-use crate::{Program, SemanticContext};
+use crate::{Program, SemanticEnvironment};
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -387,10 +387,10 @@ impl<'db> OverloadLiteral<'db> {
     /// that matches the given predicate.
     pub(super) fn find_decorator_span(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         predicate: impl Fn(Type<'db>) -> bool,
     ) -> Option<Span> {
-        let db = ctx.db();
+        let db = env.db();
         let definition = self.definition(db);
         let file = definition.file(db);
         self.node(
@@ -402,7 +402,7 @@ impl<'db> OverloadLiteral<'db> {
         .iter()
         .find(|decorator| {
             predicate(definition_expression_type(
-                ctx,
+                env,
                 definition,
                 &decorator.expression,
             ))
@@ -414,11 +414,11 @@ impl<'db> OverloadLiteral<'db> {
     /// that matches the given [`KnownFunction`].
     pub(super) fn find_known_decorator_span(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         needle: KnownFunction,
     ) -> Option<Span> {
-        let db = ctx.db();
-        self.find_decorator_span(ctx, |ty| {
+        let db = env.db();
+        self.find_decorator_span(env, |ty| {
             ty.as_function_literal()
                 .is_some_and(|f| f.is_known(db, needle))
         })
@@ -453,8 +453,8 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
     /// previous overload.
-    fn previous_overload(self, ctx: &SemanticContext<'db>) -> Option<FunctionLiteral<'db>> {
-        let db = ctx.db();
+    fn previous_overload(self, env: &SemanticEnvironment<'db>) -> Option<FunctionLiteral<'db>> {
+        let db = env.db();
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
@@ -473,7 +473,7 @@ impl<'db> OverloadLiteral<'db> {
             ty: Type::FunctionLiteral(previous_type),
             definedness: Definedness::AlwaysDefined,
             ..
-        }) = place_from_bindings(ctx, use_def.bindings_at_use(use_id)).place
+        }) = place_from_bindings(env, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
@@ -507,11 +507,11 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(crate) fn signature(self, ctx: &SemanticContext<'db>) -> Signature<'db> {
-        let db = ctx.db();
+    pub(crate) fn signature(self, env: &SemanticEnvironment<'db>) -> Signature<'db> {
+        let db = env.db();
         let scope = self.body_scope(db);
         let python_file = self.python_file(db);
-        let mut signature = self.raw_signature(ctx, ReturnCallableTypeVarScope::Public);
+        let mut signature = self.raw_signature(env, ReturnCallableTypeVarScope::Public);
         let module = parsed_module(db, python_file).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, python_file);
@@ -519,7 +519,7 @@ impl<'db> OverloadLiteral<'db> {
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
-            signature = signature.wrap_coroutine_return_type(ctx);
+            signature = signature.wrap_coroutine_return_type(env);
         }
 
         signature
@@ -538,7 +538,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     pub(super) fn raw_signature(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
@@ -549,13 +549,13 @@ impl<'db> OverloadLiteral<'db> {
         /// - Either the next parameter after `self`/`cls` uses the PEP-484 convention,
         ///   or the enclosing class is a `Protocol` class
         fn has_implicitly_positional_only_first_param<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             literal: OverloadLiteral<'db>,
             node: &ast::StmtFunctionDef,
             scope: FileScopeId,
             index: &SemanticIndex,
         ) -> bool {
-            let db = ctx.db();
+            let db = env.db();
             let parameters = &node.parameters;
 
             if !parameters.posonlyargs.is_empty() {
@@ -593,11 +593,11 @@ impl<'db> OverloadLiteral<'db> {
             // then `self`/`cls` are only implicitly positional-only if
             // it is a protocol class.
             original_class_type(db, class_definition)
-                .map(|class_literal| class_literal.default_specialization(ctx))
-                .is_some_and(|class| class.is_protocol(ctx))
+                .map(|class_literal| class_literal.default_specialization(env))
+                .is_some_and(|class| class.is_protocol(env))
         }
 
-        let db = ctx.db();
+        let db = env.db();
         let scope = self.body_scope(db);
         let python_file = self.python_file(db);
         let module = parsed_module(db, python_file).load(db);
@@ -605,12 +605,12 @@ impl<'db> OverloadLiteral<'db> {
         let definition = self.definition(db);
         let index = semantic_index(db, python_file);
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(ctx, index, definition, type_params)
+            GenericContext::from_type_params(env, index, definition, type_params)
         });
         let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
-            ctx,
+            env,
             self,
             function_stmt_node,
             file_scope_id,
@@ -618,7 +618,7 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         let mut raw_signature = Signature::from_function(
-            ctx,
+            env,
             pep695_ctx,
             definition,
             function_stmt_node,
@@ -643,7 +643,7 @@ impl<'db> OverloadLiteral<'db> {
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
             let class_literal = original_class_type(db, class_def)?;
-            let class_is_generic = class_literal.generic_context(ctx).is_some();
+            let class_is_generic = class_literal.generic_context(env).is_some();
             let class_is_fallback = class_literal
                 .known(db)
                 .is_some_and(KnownClass::is_fallback_class);
@@ -670,7 +670,7 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.python_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(ctx, scope_id, typevar_binding_context, class.into())
+                let typing_self = typing_self(env, scope_id, typevar_binding_context, class.into())
                     .expect(
                         "We should always find the surrounding class \
                      for an implicit self: Self annotation",
@@ -678,7 +678,7 @@ impl<'db> OverloadLiteral<'db> {
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
-                        ctx,
+                        env,
                         SubclassOfInner::TypeVar(typing_self),
                     ))
                 } else {
@@ -689,11 +689,11 @@ impl<'db> OverloadLiteral<'db> {
                 // class" as the implicit annotation instead.
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
-                        ctx,
+                        env,
                         SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),
                     ))
                 } else {
-                    Some(class_literal.to_non_generic_instance(ctx))
+                    Some(class_literal.to_non_generic_instance(env))
                 }
             }
         });
@@ -754,12 +754,15 @@ pub struct FunctionLiteral<'db> {
 }
 
 impl<'db> FunctionLiteral<'db> {
-    pub(super) fn new(ctx: &SemanticContext<'db>, last_definition: OverloadLiteral<'db>) -> Self {
-        let db = ctx.db();
+    pub(super) fn new(
+        env: &SemanticEnvironment<'db>,
+        last_definition: OverloadLiteral<'db>,
+    ) -> Self {
+        let db = env.db();
         Self {
             last_definition,
             overloaded: last_definition.is_overload(db)
-                || last_definition.previous_overload(ctx).is_some(),
+                || last_definition.previous_overload(env).is_some(),
         }
     }
 
@@ -776,11 +779,11 @@ impl<'db> FunctionLiteral<'db> {
 
     fn has_known_decorator(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         decorator: FunctionDecorators,
     ) -> bool {
-        let db = ctx.db();
-        self.iter_overloads_and_implementation(ctx)
+        let db = env.db();
+        self.iter_overloads_and_implementation(env)
             .any(|overload| overload.decorators(db).contains(decorator))
     }
 
@@ -789,10 +792,10 @@ impl<'db> FunctionLiteral<'db> {
     /// Checking if an overload is deprecated requires deeper call analysis.
     fn implementation_deprecated(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<DeprecatedInstance<'db>> {
-        let db = ctx.db();
-        let (_overloads, implementation) = self.overloads_and_implementation(ctx);
+        let db = env.db();
+        let (_overloads, implementation) = self.overloads_and_implementation(env);
         implementation.and_then(|overload| overload.deprecated(db))
     }
 
@@ -810,7 +813,7 @@ impl<'db> FunctionLiteral<'db> {
 
     fn overloads_and_implementation(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
@@ -821,11 +824,11 @@ impl<'db> FunctionLiteral<'db> {
             db: &'db dyn Db,
             self_overload: OverloadLiteral<'db>,
         ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-            let ctx = SemanticContext::from_file(db, self_overload.python_file(db));
+            let env = SemanticEnvironment::from_file(db, self_overload.python_file(db));
             let mut current = self_overload;
             let mut overloads = vec![];
 
-            while let Some(previous) = current.previous_overload(&ctx) {
+            while let Some(previous) = current.previous_overload(&env) {
                 let overload = previous.last_definition;
                 overloads.push(overload);
                 current = overload;
@@ -848,24 +851,24 @@ impl<'db> FunctionLiteral<'db> {
             return (&[], Some(self.last_definition));
         }
 
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.last_definition.program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.last_definition.program(db));
         let (overloads, implementation) =
             overloads_and_implementation_inner(db, self.last_definition);
         (overloads.as_ref(), *implementation)
     }
 
-    fn has_separate_implementation(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
+    fn has_separate_implementation(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         !self.last_definition.is_overload(db)
-            && self.last_definition.previous_overload(ctx).is_some()
+            && self.last_definition.previous_overload(env).is_some()
     }
 
     fn iter_overloads_and_implementation(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
-        let (overloads, implementation) = self.overloads_and_implementation(ctx);
+        let (overloads, implementation) = self.overloads_and_implementation(env);
         overloads.iter().copied().chain(implementation)
     }
 
@@ -880,17 +883,17 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn signature(self, ctx: &SemanticContext<'db>) -> CallableSignature<'db> {
+    fn signature(self, env: &SemanticEnvironment<'db>) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
-        let (overloads, implementation) = self.overloads_and_implementation(ctx);
+        let (overloads, implementation) = self.overloads_and_implementation(env);
         if let Some(implementation) = implementation
             && overloads.is_empty()
         {
-            return CallableSignature::single(implementation.signature(ctx));
+            return CallableSignature::single(implementation.signature(env));
         }
 
-        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(ctx)))
+        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(env)))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -901,8 +904,8 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn last_definition_signature(self, ctx: &SemanticContext<'db>) -> Signature<'db> {
-        self.last_definition.signature(ctx)
+    fn last_definition_signature(self, env: &SemanticEnvironment<'db>) -> Signature<'db> {
+        self.last_definition.signature(env)
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
@@ -917,11 +920,11 @@ impl<'db> FunctionLiteral<'db> {
     /// over-invalidation.
     fn last_definition_raw_signature(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
         self.last_definition
-            .raw_signature(ctx, return_callable_typevar_scope)
+            .raw_signature(env, return_callable_typevar_scope)
     }
 
     /// Return `Some()` if this function is an abstract method.
@@ -934,20 +937,20 @@ impl<'db> FunctionLiteral<'db> {
     /// `raise NotImplementedError` statement.
     pub(super) fn as_abstract_method(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
-        let db = ctx.db();
-        if self.has_known_decorator(ctx, FunctionDecorators::ABSTRACT_METHOD) {
+        let db = env.db();
+        if self.has_known_decorator(env, FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
         if self.definition(db).file(db).is_stub(db) {
             return None;
         }
-        if !enclosing_class.is_protocol(ctx) {
+        if !enclosing_class.is_protocol(env) {
             return None;
         }
-        match self.body_kind(ctx) {
+        match self.body_kind(env) {
             FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
             FunctionBodyKind::AlwaysRaisesNotImplementedError => {
                 Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
@@ -960,28 +963,28 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
-    fn body_kind(self, ctx: &SemanticContext<'db>) -> FunctionBodyKind {
+    fn body_kind(self, env: &SemanticEnvironment<'db>) -> FunctionBodyKind {
         #[salsa::tracked(returns(copy))]
         fn implementation_body_kind<'db>(
             db: &'db dyn Db,
             implementation: OverloadLiteral<'db>,
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
-            let ctx = SemanticContext::from_file(db, definition.python_file(db));
+            let env = SemanticEnvironment::from_file(db, definition.python_file(db));
             let file = definition.file(db);
             let module = parsed_module(db, definition.python_file(db)).load(db);
             let node = implementation.node(db, file, &module);
-            function_body_kind(&ctx, node, |expr| {
-                definition_expression_type(&ctx, definition, expr)
+            function_body_kind(&env, node, |expr| {
+                definition_expression_type(&env, definition, expr)
             })
         }
 
-        let (_, implementation) = self.overloads_and_implementation(ctx);
+        let (_, implementation) = self.overloads_and_implementation(env);
         let Some(implementation) = implementation else {
             return FunctionBodyKind::Stub;
         };
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), implementation.program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), implementation.program(db));
         implementation_body_kind(db, implementation)
     }
 
@@ -992,11 +995,11 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// Methods defined in stub files are never considered to have trivial bodies,
     /// since stubs use `...` as a placeholder regardless of the runtime implementation.
-    pub(crate) fn has_trivial_body(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
+    pub(crate) fn has_trivial_body(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         !self.definition(db).file(db).is_stub(db)
             && matches!(
-                self.body_kind(ctx),
+                self.body_kind(env),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )
     }
@@ -1010,14 +1013,14 @@ impl<'db> FunctionLiteral<'db> {
 /// over-invalidation. Cross-module callers should use the tracked
 /// [`FunctionType::last_definition_raw_signature`] query instead.
 pub(super) fn same_module_uncached_raw_signature<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     function: FunctionType<'db>,
     return_callable_typevar_scope: ReturnCallableTypeVarScope,
 ) -> Signature<'db> {
-    let db = ctx.db();
+    let db = env.db();
     function
         .literal(db)
-        .last_definition_raw_signature(ctx, return_callable_typevar_scope)
+        .last_definition_raw_signature(env, return_callable_typevar_scope)
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.
@@ -1091,18 +1094,18 @@ pub struct FunctionType<'db> {
 impl get_size2::GetSize for FunctionType<'_> {}
 
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     function: FunctionType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
+    let db = env.db();
     if let Some(callable_signature) = function.updated_signature(db) {
         for signature in &callable_signature.overloads {
-            walk_signature(ctx, signature, visitor);
+            walk_signature(env, signature, visitor);
         }
     }
     if let Some(signature) = function.updated_implementation_signature(db) {
-        walk_signature(ctx, signature, visitor);
+        walk_signature(env, signature, visitor);
     }
 }
 
@@ -1122,17 +1125,17 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn with_inherited_generic_context(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         let updated_signature = self
-            .signature(ctx)
+            .signature(env)
             .with_inherited_generic_context(db, inherited_generic_context);
         let literal = self.literal(db);
         let updated_implementation_signature =
-            literal.has_separate_implementation(ctx).then(|| {
-                self.last_definition_signature(ctx)
+            literal.has_separate_implementation(env).then(|| {
+                self.last_definition_signature(env)
                     .clone()
                     .with_inherited_generic_context(db, inherited_generic_context)
             });
@@ -1148,12 +1151,12 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
@@ -1169,21 +1172,21 @@ impl<'db> FunctionType<'db> {
         ) {
             (
                 self.updated_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor)
+                    signature.apply_type_mapping_impl(env, type_mapping, tcx, visitor)
                 }),
                 self.updated_implementation_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor)
+                    signature.apply_type_mapping_impl(env, type_mapping, tcx, visitor)
                 }),
             )
         } else {
             (
                 Some(
-                    self.signature(ctx)
-                        .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    self.signature(env)
+                        .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 ),
-                literal.has_separate_implementation(ctx).then(|| {
-                    self.last_definition_signature(ctx).apply_type_mapping_impl(
-                        ctx,
+                literal.has_separate_implementation(env).then(|| {
+                    self.last_definition_signature(env).apply_type_mapping_impl(
+                        env,
                         type_mapping,
                         tcx,
                         visitor,
@@ -1277,25 +1280,25 @@ impl<'db> FunctionType<'db> {
     /// conditions.
     pub(crate) fn has_known_decorator(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         decorator: FunctionDecorators,
     ) -> bool {
-        self.literal(ctx.db()).has_known_decorator(ctx, decorator)
+        self.literal(env.db()).has_known_decorator(env, decorator)
     }
 
     /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
-    pub(crate) fn is_classmethod(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
-        self.iter_overloads_and_implementation(ctx)
+    pub(crate) fn is_classmethod(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
+        self.iter_overloads_and_implementation(env)
             .any(|overload| overload.is_classmethod(db))
     }
 
     /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
     /// static method.
-    pub(crate) fn is_staticmethod(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
-        self.iter_overloads_and_implementation(ctx)
+    pub(crate) fn is_staticmethod(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
+        self.iter_overloads_and_implementation(env)
             .any(|overload| overload.is_staticmethod(db))
     }
 
@@ -1309,9 +1312,9 @@ impl<'db> FunctionType<'db> {
     /// Checking if an overload is deprecated requires deeper call analysis.
     pub(crate) fn implementation_deprecated(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<DeprecatedInstance<'db>> {
-        self.literal(ctx.db()).implementation_deprecated(ctx)
+        self.literal(env.db()).implementation_deprecated(env)
     }
 
     /// Returns the [`Definition`] of the implementation or first overload of this function.
@@ -1340,11 +1343,11 @@ impl<'db> FunctionType<'db> {
     /// implementation.
     pub(crate) fn contains_definition(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         definition: Definition<'db>,
     ) -> bool {
-        let db = ctx.db();
-        self.iter_overloads_and_implementation(ctx)
+        let db = env.db();
+        self.iter_overloads_and_implementation(env)
             .any(|overload| overload.definition(db) == definition)
     }
 
@@ -1397,8 +1400,8 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns `true` if this function has a trivial body.
-    pub(crate) fn has_trivial_body(self, ctx: &SemanticContext<'db>) -> bool {
-        self.literal(ctx.db()).has_trivial_body(ctx)
+    pub(crate) fn has_trivial_body(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.literal(env.db()).has_trivial_body(env)
     }
 
     /// Returns `true` if any overload or implementation has an explicit return annotation.
@@ -1412,9 +1415,9 @@ impl<'db> FunctionType<'db> {
     /// def replace(cls) -> object:
     ///     return object()
     /// ```
-    pub(crate) fn has_explicit_return_annotation(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
-        self.iter_overloads_and_implementation(ctx)
+    pub(crate) fn has_explicit_return_annotation(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
+        self.iter_overloads_and_implementation(env)
             .any(|overload| overload.has_explicit_return_annotation(db))
     }
 
@@ -1422,26 +1425,26 @@ impl<'db> FunctionType<'db> {
     /// function. The overload signatures will be in source order.
     pub(crate) fn overloads_and_implementation(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
-        self.literal(ctx.db()).overloads_and_implementation(ctx)
+        self.literal(env.db()).overloads_and_implementation(env)
     }
 
     /// Returns an iterator of all of the definitions of this function, including both overload
     /// signatures and any implementation, all in source order.
     pub(crate) fn iter_overloads_and_implementation(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
-        self.literal(ctx.db())
-            .iter_overloads_and_implementation(ctx)
+        self.literal(env.db())
+            .iter_overloads_and_implementation(env)
     }
 
     pub(crate) fn first_overload_or_implementation(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> OverloadLiteral<'db> {
-        self.iter_overloads_and_implementation(ctx)
+        self.iter_overloads_and_implementation(env)
             .next()
             .expect("A function must have at least one overload/implementation")
     }
@@ -1458,28 +1461,28 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    pub(crate) fn signature(self, ctx: &SemanticContext<'db>) -> &'db CallableSignature<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.program(db));
+    pub(crate) fn signature(self, env: &SemanticEnvironment<'db>) -> &'db CallableSignature<'db> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.program(db));
         self.signature_inner(db)
     }
 
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, id, function: FunctionType<'db>| {
-            let ctx = SemanticContext::from_file(db, function.python_file(db));
-            CallableSignature::cycle_initial(&ctx, id)
+            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            CallableSignature::cycle_initial(&env, id)
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
-            let ctx = SemanticContext::from_file(db, function.python_file(db));
-            value.cycle_normalized(&ctx, previous, cycle)
+            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            value.cycle_normalized(&env, previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn signature_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db).cloned().unwrap_or_else(|| {
-            let ctx = SemanticContext::from_file(db, self.python_file(db));
-            self.literal(db).signature(&ctx)
+            let env = SemanticEnvironment::from_file(db, self.python_file(db));
+            self.literal(db).signature(&env)
         })
     }
 
@@ -1489,11 +1492,11 @@ impl<'db> FunctionType<'db> {
     /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
     pub(crate) fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.program(db));
         self.variance_of_inner(db, typevar)
     }
 
@@ -1507,8 +1510,8 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let ctx = SemanticContext::from_file(db, self.python_file(db));
-        self.signature(&ctx).variance_of(&ctx, typevar)
+        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        self.signature(&env).variance_of(&env, typevar)
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -1522,10 +1525,10 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     pub(crate) fn last_definition_signature(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> &'db Signature<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.program(db));
         self.last_definition_signature_inner(db)
     }
 
@@ -1535,16 +1538,16 @@ impl<'db> FunctionType<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn last_definition_signature_inner(self, db: &'db dyn Db) -> Signature<'db> {
-        let ctx = SemanticContext::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.python_file(db));
         let literal = self.literal(db);
-        if literal.has_separate_implementation(&ctx) {
+        if literal.has_separate_implementation(&env) {
             self.updated_implementation_signature(db)
                 .cloned()
-                .unwrap_or_else(|| literal.last_definition_signature(&ctx))
+                .unwrap_or_else(|| literal.last_definition_signature(&env))
         } else {
             self.updated_signature(db)
                 .and_then(|signature| signature.overloads.last().cloned())
-                .unwrap_or_else(|| literal.last_definition_signature(&ctx))
+                .unwrap_or_else(|| literal.last_definition_signature(&env))
         }
     }
 
@@ -1553,11 +1556,11 @@ impl<'db> FunctionType<'db> {
     /// return-position `Callable` stay bound to the function or move to the returned callable.
     pub(super) fn last_definition_raw_signature(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> &'db Signature<'db> {
-        let db = ctx.db();
-        debug_assert_eq!(ctx.program(), self.program(db));
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.program(db));
         self.last_definition_raw_signature_inner(db, return_callable_typevar_scope)
     }
 
@@ -1571,16 +1574,16 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
-        let ctx = SemanticContext::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.python_file(db));
         self.literal(db)
-            .last_definition_raw_signature(&ctx, return_callable_typevar_scope)
+            .last_definition_raw_signature(&env, return_callable_typevar_scope)
     }
 
     /// Return the kind for this function when it is converted into a [`CallableType`].
-    pub(crate) fn callable_type_kind(self, ctx: &SemanticContext<'db>) -> CallableTypeKind {
-        if self.is_classmethod(ctx) {
+    pub(crate) fn callable_type_kind(self, env: &SemanticEnvironment<'db>) -> CallableTypeKind {
+        if self.is_classmethod(env) {
             CallableTypeKind::ClassMethodLike
-        } else if self.is_staticmethod(ctx) {
+        } else if self.is_staticmethod(env) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
@@ -1588,14 +1591,14 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
-    pub(crate) fn into_callable_type(self, ctx: &SemanticContext<'db>) -> CallableType<'db> {
-        let db = ctx.db();
+    pub(crate) fn into_callable_type(self, env: &SemanticEnvironment<'db>) -> CallableType<'db> {
+        let db = env.db();
         CallableType::new(
             db,
-            self.signature(ctx),
-            self.callable_type_kind(ctx),
+            self.signature(env),
+            self.callable_type_kind(env),
             CallableFunctionProvenance::from_function_return_annotation(
-                self.has_explicit_return_annotation(ctx),
+                self.has_explicit_return_annotation(env),
             ),
         )
     }
@@ -1611,24 +1614,24 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn find_legacy_typevars_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let signatures = self.signature(ctx);
+        let signatures = self.signature(env);
         for signature in &signatures.overloads {
-            signature.find_legacy_typevars_impl(ctx, binding_context, typevars, visitor);
+            signature.find_legacy_typevars_impl(env, binding_context, typevars, visitor);
         }
     }
 
     pub(crate) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         visit_recursive_type_normalization(
             self.literal(db),
             nested,
@@ -1637,14 +1640,14 @@ impl<'db> FunctionType<'db> {
                 let literal = self.literal(db);
                 let updated_signature = match self.updated_signature(db) {
                     Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(ctx, div, nested)?)
+                        Some(signature.recursive_type_normalized_impl(env, div, nested)?)
                     }
                     None => None,
                 };
                 let updated_implementation_signature =
                     match self.updated_implementation_signature(db) {
                         Some(signature) => {
-                            Some(signature.recursive_type_normalized_impl(ctx, div, nested)?)
+                            Some(signature.recursive_type_normalized_impl(env, div, nested)?)
                         }
                         None => None,
                     };
@@ -1662,26 +1665,26 @@ impl<'db> FunctionType<'db> {
 
     pub(super) fn as_abstract_method(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
-        self.literal(ctx.db())
-            .as_abstract_method(ctx, enclosing_class)
+        self.literal(env.db())
+            .as_abstract_method(env, enclosing_class)
     }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_function_pair(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         source: FunctionType<'db>,
         target: FunctionType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = ctx.db();
+        let db = env.db();
         if source.literal(db) != target.literal(db) {
             return self.never();
         }
-        self.check_callable_signature_pair(ctx, source.signature(ctx), target.signature(ctx))
+        self.check_callable_signature_pair(env, source.signature(env), target.signature(env))
     }
 }
 
@@ -1702,13 +1705,13 @@ fn check_classinfo_in_isinstance<'db>(
     classinfo: Type<'db>,
     classinfo_expr: Option<&ast::Expr>,
 ) {
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     match classinfo {
         Type::ClassLiteral(class) => {
-            if class.is_typed_dict(ctx) {
+            if class.is_typed_dict(env) {
                 report_runtime_check_against_typed_dict(context, call_expression, class, function);
-            } else if let Some(protocol_class) = class.into_protocol_class(ctx) {
-                if !protocol_class.is_runtime_checkable(ctx) {
+            } else if let Some(protocol_class) = class.into_protocol_class(env) {
+                if !protocol_class.is_runtime_checkable(env) {
                     report_runtime_check_against_non_runtime_checkable_protocol(
                         context,
                         call_expression,
@@ -1716,7 +1719,7 @@ fn check_classinfo_in_isinstance<'db>(
                         function,
                     );
                 } else if function == KnownFunction::IsSubclass {
-                    let non_method_members = protocol_class.interface(ctx).non_method_members(db);
+                    let non_method_members = protocol_class.interface(env).non_method_members(db);
                     if !non_method_members.is_empty() {
                         report_issubclass_check_against_protocol_with_non_method_members(
                             context,
@@ -1748,7 +1751,7 @@ fn check_classinfo_in_isinstance<'db>(
             );
         }
         Type::NominalInstance(nominal)
-            if let Some(tuple_spec) = nominal.tuple_spec(context.semantic_context()) =>
+            if let Some(tuple_spec) = nominal.tuple_spec(context.semantic_environment()) =>
         {
             let element_exprs = match classinfo_expr {
                 Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
@@ -1782,12 +1785,12 @@ fn report_invalid_union_type_elements<'db>(
     union_type_expr: Option<&ast::Expr>,
 ) {
     fn find_invalid_elements<'db>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         function: KnownFunction,
         ty: Type<'db>,
         invalid_elements: &mut Vec<Type<'db>>,
     ) {
-        let db = ctx.db();
+        let db = env.db();
         match ty {
             Type::ClassLiteral(_) => {}
             Type::NominalInstance(instance)
@@ -1796,10 +1799,10 @@ fn report_invalid_union_type_elements<'db>(
             // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
             Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                match instance.value_expression_types(ctx) {
+                match instance.value_expression_types(env) {
                     Ok(value_expression_types) => {
                         for element in value_expression_types {
-                            find_invalid_elements(ctx, function, element, invalid_elements);
+                            find_invalid_elements(env, function, element, invalid_elements);
                         }
                     }
                     Err(_) => {
@@ -1812,8 +1815,8 @@ fn report_invalid_union_type_elements<'db>(
     }
 
     let mut invalid_elements = vec![];
-    let ctx = context.semantic_context();
-    find_invalid_elements(ctx, function, union_type, &mut invalid_elements);
+    let env = context.semantic_environment();
+    find_invalid_elements(env, function, union_type, &mut invalid_elements);
 
     let Some((first_invalid_element, other_invalid_elements)) = invalid_elements.split_first()
     else {
@@ -1841,11 +1844,11 @@ fn report_invalid_union_type_elements<'db>(
 
     // When we have a secondary annotation pointing at the UnionType expression,
     // "the union" is unambiguous. Otherwise, spell out the union type in the message.
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     let union_suffix = match (&union_type_expr, union_type) {
         (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
             match instance.union_type(db) {
-                Ok(ty) => format!(" `{}`", ty.display(ctx)),
+                Ok(ty) => format!(" `{}`", ty.display(env)),
                 Err(_) => String::new(),
             }
         }
@@ -1855,16 +1858,16 @@ fn report_invalid_union_type_elements<'db>(
     match other_invalid_elements {
         [] => diagnostic.info(format_args!(
             "Element `{}` in the union{union_suffix} is not a class object",
-            first_invalid_element.display(ctx)
+            first_invalid_element.display(env)
         )),
         [single] => diagnostic.info(format_args!(
             "Elements `{}` and `{}` in the union{union_suffix} are not class objects",
-            first_invalid_element.display(ctx),
-            single.display(ctx),
+            first_invalid_element.display(env),
+            single.display(env),
         )),
         _ => diagnostic.info(format_args!(
             "Element `{}` in the union{union_suffix}, and {} more elements, are not class objects",
-            first_invalid_element.display(ctx),
+            first_invalid_element.display(env),
             other_invalid_elements.len(),
         )),
     }
@@ -1875,14 +1878,14 @@ fn report_invalid_union_type_elements<'db>(
 /// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
 /// instead.
 fn is_instance_truthiness<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     class: ClassLiteral<'db>,
 ) -> Truthiness {
-    let db = ctx.db();
+    let db = env.db();
     let is_instance = |ty: &Type<'_>| {
         ty.as_nominal_instance()
-            .is_some_and(|instance| instance.class(ctx).is_subtype_of_class_literal(ctx, class))
+            .is_some_and(|instance| instance.class(env).is_subtype_of_class_literal(env, class))
     };
 
     let always_true_if = |test: bool| {
@@ -1905,19 +1908,19 @@ fn is_instance_truthiness<'db>(
         // Along the way, short-circuit to `AlwaysTrue` if we find any positive element
         // that is always true.
         Type::Intersection(intersection) => {
-            let mut effective = IntersectionBuilder::new(ctx);
+            let mut effective = IntersectionBuilder::new(env);
             let mut found_tvars_or_newtypes = false;
 
             for &positive in intersection.positive(db) {
-                if is_instance_truthiness(ctx, positive, class).is_always_true() {
+                if is_instance_truthiness(env, positive, class).is_always_true() {
                     return Truthiness::AlwaysTrue;
                 } else if let Type::TypeVar(tvar) = positive {
-                    match tvar.typevar(db).bound_or_constraints(ctx) {
+                    match tvar.typevar(db).bound_or_constraints(env) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             effective.add_positive_in_place(bound);
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            effective.add_positive_in_place(constraints.as_type(ctx));
+                            effective.add_positive_in_place(constraints.as_type(env));
                         }
                         // A typevar without bounds/constraints has `object` as its implicit upper bound,
                         // and adding `object` to an intersection is a no-op
@@ -1926,7 +1929,7 @@ fn is_instance_truthiness<'db>(
                     found_tvars_or_newtypes = true;
                 } else if let Type::NewTypeInstance(newtype) = positive {
                     found_tvars_or_newtypes = true;
-                    effective.add_positive_in_place(newtype.concrete_base_type(ctx));
+                    effective.add_positive_in_place(newtype.concrete_base_type(env));
                 } else {
                     effective.add_positive_in_place(positive);
                 }
@@ -1937,7 +1940,7 @@ fn is_instance_truthiness<'db>(
             }
 
             for &negative in intersection.negative(db) {
-                if is_instance_truthiness(ctx, negative, class).is_always_true() {
+                if is_instance_truthiness(env, negative, class).is_always_true() {
                     return Truthiness::AlwaysFalse;
                 }
                 effective.add_negative_in_place(negative);
@@ -1948,42 +1951,42 @@ fn is_instance_truthiness<'db>(
             if effective == ty {
                 Truthiness::Ambiguous
             } else {
-                is_instance_truthiness(ctx, effective, class)
+                is_instance_truthiness(env, effective, class)
             }
         }
 
         Type::EnumComplement(complement) => {
-            is_instance_truthiness(ctx, complement.to_intersection(ctx), class)
+            is_instance_truthiness(env, complement.to_intersection(env), class)
         }
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
         Type::NewTypeInstance(newtype) => {
-            always_true_if(is_instance(&newtype.concrete_base_type(ctx)))
+            always_true_if(is_instance(&newtype.concrete_base_type(env)))
         }
 
         Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
             always_true_if(
-                ty.literal_fallback_instance(ctx)
+                ty.literal_fallback_instance(env)
                     .as_ref()
                     .is_some_and(is_instance),
             )
         }
 
-        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(ctx))),
+        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(env))),
 
-        Type::TypeAlias(alias) => is_instance_truthiness(ctx, alias.value_type(ctx), class),
+        Type::TypeAlias(alias) => is_instance_truthiness(env, alias.value_type(env), class),
 
-        Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(ctx) {
-            None => is_instance_truthiness(ctx, Type::object(), class),
+        Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(env) {
+            None => is_instance_truthiness(env, Type::object(), class),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_instance_truthiness(ctx, bound, class)
+                is_instance_truthiness(env, bound, class)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => always_true_if(
                 constraints
                     .elements(db)
                     .iter()
-                    .all(|c| is_instance_truthiness(ctx, *c, class).is_always_true()),
+                    .all(|c| is_instance_truthiness(env, *c, class).is_always_true()),
             ),
         },
 
@@ -2026,57 +2029,57 @@ fn is_instance_truthiness<'db>(
 ///         return True
 /// ```
 fn is_instance_tuple_exhaustive<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     classinfo: Type<'db>,
 ) -> bool {
-    let Some(tuple) = classinfo.tuple_instance_spec(ctx) else {
+    let Some(tuple) = classinfo.tuple_instance_spec(env) else {
         return false;
     };
     if tuple.is_variadic() {
         return false;
     }
 
-    is_instance_tuple_covers(ctx, &tuple, ty, &ActiveRecursionDetector::default())
+    is_instance_tuple_covers(env, &tuple, ty, &ActiveRecursionDetector::default())
 }
 
 fn is_instance_tuple_covers<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     tuple: &TupleSpec<'db>,
     ty: Type<'db>,
     recursion_guard: &ActiveRecursionDetector<Type<'db>>,
 ) -> bool {
-    let db = ctx.db();
+    let db = env.db();
     match ty {
         Type::TypeAlias(alias) => recursion_guard.visit(
             &ty,
             || true,
-            || is_instance_tuple_covers(ctx, tuple, alias.value_type(ctx), recursion_guard),
+            || is_instance_tuple_covers(env, tuple, alias.value_type(env), recursion_guard),
         ),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_instance_tuple_covers(ctx, tuple, *element, recursion_guard)),
+            .all(|element| is_instance_tuple_covers(env, tuple, *element, recursion_guard)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| is_instance_tuple_covers(ctx, tuple, *element, recursion_guard)),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(ctx) {
+            .any(|element| is_instance_tuple_covers(env, tuple, *element, recursion_guard)),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(env) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                is_instance_tuple_covers(ctx, tuple, bound, recursion_guard)
+                is_instance_tuple_covers(env, tuple, bound, recursion_guard)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 constraints.elements(db).iter().all(|constraint| {
-                    is_instance_tuple_covers(ctx, tuple, *constraint, recursion_guard)
+                    is_instance_tuple_covers(env, tuple, *constraint, recursion_guard)
                 })
             }
-            None => is_instance_tuple_covers(ctx, tuple, Type::object(), recursion_guard),
+            None => is_instance_tuple_covers(env, tuple, Type::object(), recursion_guard),
         },
         ty => tuple.fixed_elements().any(|element| {
             let Type::ClassLiteral(class) = element else {
                 return false;
             };
-            is_instance_truthiness(ctx, ty, *class).is_always_true()
+            is_instance_truthiness(env, ty, *class).is_always_true()
         }),
     }
 }
@@ -2101,7 +2104,7 @@ pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
 /// In all cases, we allow a docstring as the first statement in the function body;
 /// the analysis is only done on the remaining statements if the first is a docstring.
 pub(super) fn function_body_kind<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     node: &ast::StmtFunctionDef,
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> FunctionBodyKind {
@@ -2121,11 +2124,11 @@ pub(super) fn function_body_kind<'db>(
         } = raise
     {
         if infer_type(exc).is_subtype_of(
-            ctx,
+            env,
             UnionType::from_two_elements(
-                ctx,
-                KnownClass::NotImplementedError.to_class_literal(ctx),
-                KnownClass::NotImplementedError.to_instance(ctx),
+                env,
+                KnownClass::NotImplementedError.to_class_literal(env),
+                KnownClass::NotImplementedError.to_instance(env),
             ),
         ) {
             return FunctionBodyKind::AlwaysRaisesNotImplementedError;
@@ -2399,10 +2402,10 @@ impl KnownFunction {
 
         match self {
             KnownFunction::RevealType => {
-                let ctx = context.semantic_context();
+                let env = context.semantic_environment();
                 let revealed_type = overload
                     .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(ctx), |builder, (_, ty)| builder.add(ty))
+                    .fold(UnionBuilder::new(env), |builder, (_, ty)| builder.add(ty))
                     .build();
                 report_revealed_type(
                     context,
@@ -2419,8 +2422,8 @@ impl KnownFunction {
                 let Some(member) = literal.as_string() else {
                     return;
                 };
-                let ctx = context.semantic_context();
-                let ty_members = all_members(ctx, *ty);
+                let env = context.semantic_environment();
+                let ty_members = all_members(env, *ty);
                 overload.set_return_type(Type::bool_literal(
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
@@ -2430,13 +2433,13 @@ impl KnownFunction {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
-                let ctx = context.semantic_context();
-                let asserted_ty = asserted_ty.project_type_form(ctx);
-                if actual_ty.is_equivalent_to(ctx, asserted_ty) {
+                let env = context.semantic_environment();
+                let asserted_ty = asserted_ty.project_type_form(env);
+                if actual_ty.is_equivalent_to(env, asserted_ty) {
                     return;
                 }
                 let diagnostic =
-                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(ctx, asserted_ty) {
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(env, asserted_ty) {
                         &TYPE_ASSERTION_FAILURE
                     } else {
                         &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
@@ -2444,7 +2447,7 @@ impl KnownFunction {
                 if let Some(builder) = context.report_lint(diagnostic, call_expression) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
-                        asserted_ty.display(ctx),
+                        asserted_ty.display(env),
                     ));
 
                     diagnostic.annotate(
@@ -2456,28 +2459,28 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type is `{}`",
-                            actual_ty.display(ctx)
+                            actual_ty.display(env)
                         )),
                     );
 
-                    if actual_ty.is_subtype_of(ctx, asserted_ty) {
+                    if actual_ty.is_subtype_of(env, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display(ctx),
-                            inferred_type = actual_ty.display(ctx),
+                            asserted_type = asserted_ty.display(env),
+                            inferred_type = actual_ty.display(env),
                         ));
                     } else {
                         diagnostic.info(format_args!(
                             "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display(ctx),
-                            inferred_type = actual_ty.display(ctx),
+                            asserted_type = asserted_ty.display(env),
+                            inferred_type = actual_ty.display(env),
                         ));
                     }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display(ctx),
-                        asserted_ty.display(ctx),
+                        actual_ty.display(env),
+                        asserted_ty.display(env),
                     ));
                 }
             }
@@ -2486,8 +2489,8 @@ impl KnownFunction {
                 let [Some(actual_ty)] = parameter_types else {
                     return;
                 };
-                let ctx = context.semantic_context();
-                if actual_ty.is_equivalent_to(ctx, Type::Never) {
+                let env = context.semantic_environment();
+                if actual_ty.is_equivalent_to(env, Type::Never) {
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
@@ -2503,17 +2506,17 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type of argument is `{}`",
-                            actual_ty.display(ctx)
+                            actual_ty.display(env)
                         )),
                     );
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
-                        inferred_type = actual_ty.display(ctx),
+                        inferred_type = actual_ty.display(env),
                     ));
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` is not equivalent to `Never`",
-                        actual_ty.display(ctx),
+                        actual_ty.display(env),
                     ));
                 }
             }
@@ -2522,8 +2525,8 @@ impl KnownFunction {
                 let [Some(parameter_ty), message] = parameter_types else {
                     return;
                 };
-                let ctx = context.semantic_context();
-                let truthiness = match parameter_ty.try_bool(ctx) {
+                let env = context.semantic_environment();
+                let truthiness = match parameter_ty.try_bool(env) {
                     Ok(truthiness) => truthiness,
                     Err(err) => {
                         err.report_diagnostic(
@@ -2553,20 +2556,20 @@ impl KnownFunction {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             is always falsy",
-                            parameter_ty = parameter_ty.display(ctx)
+                            parameter_ty = parameter_ty.display(env)
                         ))
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
-                            parameter_ty = parameter_ty.display(ctx)
+                            parameter_ty = parameter_ty.display(env)
                         ))
                     };
                     if let Some(condition) = call_argument_node(call_expression, "condition", 0) {
                         diagnostic.annotate(
                             Annotation::secondary(context.span(condition)).message(format_args!(
                                 "Inferred type of argument is `{}`",
-                                parameter_ty.display(ctx)
+                                parameter_ty.display(env)
                             )),
                         );
                     }
@@ -2577,15 +2580,15 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
-                let ctx = context.semantic_context();
-                let casted_type = casted_type.project_type_form(ctx);
-                if source_type.is_equivalent_to(ctx, casted_type)
-                    && non_any_dynamic_content(ctx, *source_type).is_absent()
-                    && non_any_dynamic_content(ctx, casted_type).is_absent()
+                let env = context.semantic_environment();
+                let casted_type = casted_type.project_type_form(env);
+                if source_type.is_equivalent_to(env, casted_type)
+                    && non_any_dynamic_content(env, *source_type).is_absent()
+                    && non_any_dynamic_content(env, casted_type).is_absent()
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        let source_display = source_type.display(ctx).to_string();
-                        let casted_display = casted_type.display(ctx).to_string();
+                        let source_display = source_type.display(env).to_string();
+                        let casted_display = casted_type.display(env).to_string();
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Value is already of type `{casted_display}`",
                         ));
@@ -2627,7 +2630,7 @@ impl KnownFunction {
                 let [Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
-                if class.is_protocol(context.semantic_context()) {
+                if class.is_protocol(context.semantic_environment()) {
                     return;
                 }
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
@@ -2637,10 +2640,10 @@ impl KnownFunction {
                 let [Some(param_type)] = parameter_types else {
                     return;
                 };
-                let ctx = context.semantic_context();
+                let env = context.semantic_environment();
                 let Some(protocol_class) = param_type
-                    .to_class_type(ctx)
-                    .and_then(|class| class.into_protocol_class(ctx))
+                    .to_class_type(env)
+                    .and_then(|class| class.into_protocol_class(env))
                 else {
                     report_bad_argument_to_protocol_interface(
                         context,
@@ -2659,7 +2662,7 @@ impl KnownFunction {
                     );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
-                        protocol_class.interface(ctx).display(ctx)
+                        protocol_class.interface(env).display(env)
                     )));
                 }
             }
@@ -2712,7 +2715,7 @@ impl KnownFunction {
                 if let Some(builder) =
                     context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                 {
-                    let ctx = context.semantic_context();
+                    let env = context.semantic_environment();
                     let mut diag = builder.into_diagnostic("Revealed MRO");
                     let span = context.span(
                         call_argument_node(call_expression, "cls", 0)
@@ -2720,18 +2723,18 @@ impl KnownFunction {
                     );
                     let mut message = String::new();
                     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-                        ctx,
+                        env,
                         classes
                             .iter()
-                            .flat_map(|class| class.iter_mro(ctx))
+                            .flat_map(|class| class.iter_mro(env))
                             .filter_map(ClassBase::into_class),
                     );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
-                        for class in class.iter_mro(ctx) {
+                        for class in class.iter_mro(env) {
                             message.push_str(
                                 &class
-                                    .display_with(ctx, display_settings.clone())
+                                    .display_with(env, display_settings.clone())
                                     .to_string(),
                             );
                             // Omit the comma for the last element (which is always `object`)
@@ -2773,29 +2776,29 @@ impl KnownFunction {
                 );
 
                 if self == KnownFunction::IsInstance {
-                    let ctx = context.semantic_context();
+                    let env = context.semantic_environment();
                     let truthiness = match second_argument {
                         Type::ClassLiteral(class) => {
-                            is_instance_truthiness(ctx, *first_arg, *class)
+                            is_instance_truthiness(env, *first_arg, *class)
                         }
                         Type::SpecialForm(
                             SpecialFormType::TypingCallable
                             | SpecialFormType::CollectionsAbcCallable,
                         ) => {
                             let callable_top =
-                                Type::Callable(CallableType::unknown(db)).top_materialization(ctx);
-                            if first_arg.is_subtype_of(ctx, callable_top) {
+                                Type::Callable(CallableType::unknown(db)).top_materialization(env);
+                            if first_arg.is_subtype_of(env, callable_top) {
                                 Truthiness::AlwaysTrue
                             } else {
                                 Truthiness::Ambiguous
                             }
                         }
-                        _ if is_instance_tuple_exhaustive(ctx, *first_arg, *second_argument) => {
+                        _ if is_instance_tuple_exhaustive(env, *first_arg, *second_argument) => {
                             Truthiness::AlwaysTrue
                         }
                         _ => Truthiness::Ambiguous,
                     };
-                    overload.set_return_type(Type::from_truthiness(ctx, truthiness));
+                    overload.set_return_type(Type::from_truthiness(env, truthiness));
                 }
             }
 
@@ -2844,8 +2847,8 @@ impl KnownFunction {
                     _ => return,
                 };
 
-                let ctx = context.semantic_context();
-                if !class.has_ordering_method_in_mro(ctx) {
+                let env = context.semantic_environment();
+                if !class.has_ordering_method_in_mro(env) {
                     report_invalid_total_ordering_call(
                         context,
                         class.class_literal(db),
@@ -2870,12 +2873,12 @@ pub(super) fn report_revealed_type<'db>(
     argument_node: impl Ranged,
 ) {
     if let Some(builder) = context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info) {
-        let ctx = context.semantic_context();
+        let env = context.semantic_environment();
         let mut diag = builder.into_diagnostic("Revealed type");
         diag.annotate(
             Annotation::primary(context.span(argument_node)).message(format_args!(
                 "`{}`",
-                revealed_type.display_with(ctx, DisplaySettings::default().preserve_long_unions())
+                revealed_type.display_with(env, DisplaySettings::default().preserve_long_unions())
             )),
         );
     }
@@ -2960,7 +2963,7 @@ pub(crate) mod tests {
             }
 
             let function_definition =
-                known_module_symbol(&db.semantic_context(), module, function_name)
+                known_module_symbol(&db.semantic_environment(), module, function_name)
                     .place
                     .expect_type()
                     .expect_function_literal()

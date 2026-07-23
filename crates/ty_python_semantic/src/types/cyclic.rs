@@ -35,7 +35,7 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::Specialization;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
-use crate::{Db, SemanticContext};
+use crate::{Db, SemanticEnvironment};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -49,8 +49,8 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn to_type_identity(self, ctx: &SemanticContext<'db>) -> TypeIdentity<'db> {
-        self.recursive_identity(ctx)
+    pub(crate) fn to_type_identity(self, env: &SemanticEnvironment<'db>) -> TypeIdentity<'db> {
+        self.recursive_identity(env)
             .unwrap_or(TypeIdentity::NonRecursive(self))
     }
 
@@ -80,9 +80,9 @@ impl<'db> Type<'db> {
     #[inline(always)]
     pub(crate) fn recursive_identity(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<TypeIdentity<'db>> {
-        let db = ctx.db();
+        let db = env.db();
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -94,13 +94,13 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) if alias.is_recursive(ctx) => {
+            Type::TypeAlias(alias) if alias.is_recursive(env) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
-            Type::ProtocolInstance(protocol) if protocol.is_recursive(ctx) => {
+            Type::ProtocolInstance(protocol) if protocol.is_recursive(env) => {
                 Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
             }
-            Type::TypedDict(typed_dict) if typed_dict.is_recursive(ctx) => {
+            Type::TypedDict(typed_dict) if typed_dict.is_recursive(env) => {
                 let definition = typed_dict.definition(db)?;
                 Some(TypeIdentity::RecursiveTypedDict(definition))
             }
@@ -118,9 +118,9 @@ struct DefinitionReferenceVisitor<'db> {
 
 impl<'db> DefinitionReferenceVisitor<'db> {
     /// Returns whether the definition represented by `ty` references `target`.
-    fn references(ctx: &SemanticContext<'db>, ty: Type<'db>, target: Definition<'db>) -> bool {
+    fn references(env: &SemanticEnvironment<'db>, ty: Type<'db>, target: Definition<'db>) -> bool {
         let visitor = Self::new(target);
-        visitor.visit_definition_body(ctx, ty);
+        visitor.visit_definition_body(env, ty);
         visitor.found.get()
     }
 
@@ -155,20 +155,20 @@ impl<'db> DefinitionReferenceVisitor<'db> {
 
     fn visit_specialization(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         specialization: Specialization<'db>,
     ) {
-        let db = ctx.db();
+        let db = env.db();
         for ty in specialization.types(db) {
-            self.visit_type(ctx, *ty);
+            self.visit_type(env, *ty);
         }
     }
 
-    fn visit_definition_body(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
+    fn visit_definition_body(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
         match ty {
-            Type::TypeAlias(alias) => self.visit_type_alias_type(ctx, alias),
-            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(ctx, protocol),
-            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(ctx, typed_dict),
+            Type::TypeAlias(alias) => self.visit_type_alias_type(env, alias),
+            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(env, protocol),
+            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(env, typed_dict),
             _ => {}
         }
     }
@@ -179,8 +179,8 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
         false
     }
 
-    fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
-        let db = ctx.db();
+    fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
+        let db = env.db();
         if self.found.get() {
             return;
         }
@@ -192,50 +192,54 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
             }
 
             if let Some(specialization) = specialization {
-                self.visit_specialization(ctx, specialization);
+                self.visit_specialization(env, specialization);
             }
 
             if !self.found.get() {
                 self.active_definitions.visit(
                     &definition,
                     || {},
-                    || self.visit_definition_body(ctx, ty),
+                    || self.visit_definition_body(env, ty),
                 );
             }
         } else {
-            walk_type_with_recursion_guard(ctx, ty, self, &self.visited_types);
+            walk_type_with_recursion_guard(env, ty, self, &self.visited_types);
         }
     }
 
     fn visit_protocol_instance_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) {
         if let Some(class) = protocol.class_origin() {
-            class.walk_recursive_member_types(ctx, self);
+            class.walk_recursive_member_types(env, self);
         }
     }
 
-    fn visit_type_alias_type(&self, ctx: &SemanticContext<'db>, alias: TypeAliasType<'db>) {
-        self.visit_type(ctx, alias.raw_value_type(ctx));
+    fn visit_type_alias_type(&self, env: &SemanticEnvironment<'db>, alias: TypeAliasType<'db>) {
+        self.visit_type(env, alias.raw_value_type(env));
     }
 
-    fn visit_typed_dict_type(&self, ctx: &SemanticContext<'db>, typed_dict: TypedDictType<'db>) {
-        for field in typed_dict.items(ctx).values() {
-            self.visit_type(ctx, field.declared_ty);
+    fn visit_typed_dict_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        typed_dict: TypedDictType<'db>,
+    ) {
+        for field in typed_dict.items(env).values() {
+            self.visit_type(env, field.declared_ty);
         }
-        if let Some(extra_items) = typed_dict.explicit_extra_items(ctx) {
-            self.visit_type(ctx, extra_items.declared_ty);
+        if let Some(extra_items) = typed_dict.explicit_extra_items(env) {
+            self.visit_type(env, extra_items.declared_ty);
         }
     }
 }
 
 impl<'db> TypeAliasType<'db> {
-    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
+    fn is_recursive(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         DefinitionReferenceVisitor::references(
-            ctx,
+            env,
             Type::TypeAlias(self.unspecialized(db)),
             self.definition(db),
         )
@@ -248,8 +252,8 @@ impl<'db> ProtocolInstanceType<'db> {
         Some(origin.definition(db))
     }
 
-    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
+    fn is_recursive(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         let Some(class) = self.class_origin() else {
             return false;
         };
@@ -259,14 +263,14 @@ impl<'db> ProtocolInstanceType<'db> {
         let definition = origin.definition(db);
         // Inspect the definition without its current specialization. Otherwise, a finite
         // type such as `Protocol[Protocol[int]]` would appear recursive.
-        let unspecialized = Type::instance(ctx, ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(ctx, unspecialized, definition)
+        let unspecialized = Type::instance(env, ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(env, unspecialized, definition)
     }
 }
 
 impl<'db> TypedDictType<'db> {
-    fn is_recursive(self, ctx: &SemanticContext<'db>) -> bool {
-        let db = ctx.db();
+    fn is_recursive(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         let Some(class) = self.defining_class() else {
             return false;
         };
@@ -277,7 +281,7 @@ impl<'db> TypedDictType<'db> {
         // Inspect the definition without its current specialization for the same reason as
         // protocols above.
         let unspecialized = Type::typed_dict(ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(ctx, unspecialized, definition)
+        DefinitionReferenceVisitor::references(env, unspecialized, definition)
     }
 }
 
@@ -294,7 +298,7 @@ pub trait HasIdentity<'db> {
     }
 
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
-    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id;
+    fn to_identity(&self, env: &SemanticEnvironment<'db>) -> Self::Id;
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
@@ -304,8 +308,8 @@ impl<'db> HasIdentity<'db> for Type<'db> {
         self.may_share_type_identity(db, *other)
     }
 
-    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
-        Type::to_type_identity(*self, ctx)
+    fn to_identity(&self, env: &SemanticEnvironment<'db>) -> Self::Id {
+        Type::to_type_identity(*self, env)
     }
 }
 
@@ -318,8 +322,8 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
         self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
     }
 
-    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
-        (self.0.to_type_identity(ctx), self.1.to_type_identity(ctx))
+    fn to_identity(&self, env: &SemanticEnvironment<'db>) -> Self::Id {
+        (self.0.to_type_identity(env), self.1.to_type_identity(env))
     }
 }
 
@@ -335,11 +339,11 @@ where
             && self.2.may_share_type_identity(db, other.2)
     }
 
-    fn to_identity(&self, ctx: &SemanticContext<'db>) -> Self::Id {
+    fn to_identity(&self, env: &SemanticEnvironment<'db>) -> Self::Id {
         (
-            self.0.to_type_identity(ctx),
+            self.0.to_type_identity(env),
             self.1,
-            self.2.to_type_identity(ctx),
+            self.2.to_type_identity(env),
         )
     }
 }
@@ -380,8 +384,8 @@ where
     T: Hash + Eq + Clone + HasIdentity<'db>,
 {
     #[inline]
-    pub fn visit(&self, ctx: &SemanticContext<'db>, item: T, compute: impl FnOnce() -> R) -> R {
-        match self.begin_visit(ctx, item) {
+    pub fn visit(&self, env: &SemanticEnvironment<'db>, item: T, compute: impl FnOnce() -> R) -> R {
+        match self.begin_visit(env, item) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
@@ -398,11 +402,11 @@ where
     #[inline]
     pub(super) fn try_visit(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         item: T,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit(ctx, item) {
+        match self.begin_visit(env, item) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
@@ -412,8 +416,8 @@ where
         }
     }
 
-    fn begin_visit(&self, ctx: &SemanticContext<'db>, item: T) -> CycleDetectorVisit<T, R> {
-        let db = ctx.db();
+    fn begin_visit(&self, env: &SemanticEnvironment<'db>, item: T) -> CycleDetectorVisit<T, R> {
+        let db = env.db();
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -432,9 +436,9 @@ where
         } else {
             // Deriving an identity can require a structural definition walk. Defer it until a
             // cheap candidate match shows that another active item could form a cycle.
-            let identity = item.to_identity(ctx);
+            let identity = item.to_identity(env);
             if candidates.any(|active| {
-                active.identity.get_or_init(|| active.item.to_identity(ctx)) == &identity
+                active.identity.get_or_init(|| active.item.to_identity(env)) == &identity
             }) {
                 return CycleDetectorVisit::Cycle(item);
             }
@@ -507,11 +511,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     #[inline]
     pub(crate) fn visit_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         ty: Type<'db>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match self.begin_visit(ctx, ty) {
+        match self.begin_visit(env, ty) {
             TypeTransformerVisit::Ready(result) => result,
             TypeTransformerVisit::Pending(ty) => {
                 let result = compute();
@@ -520,12 +524,16 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
     }
 
-    fn begin_visit(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) -> TypeTransformerVisit<'db> {
+    fn begin_visit(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> TypeTransformerVisit<'db> {
         if let Some(result) = self.cache.borrow().get(&ty) {
             return TypeTransformerVisit::Ready(*result);
         }
 
-        let identity = ty.to_type_identity(ctx);
+        let identity = ty.to_type_identity(env);
         let seen = self.seen.borrow();
         if seen
             .iter()
@@ -695,7 +703,7 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CycleDetector, CycleDetectorVisit, Db, HasIdentity, SemanticContext, TypeIdentity,
+        CycleDetector, CycleDetectorVisit, Db, HasIdentity, SemanticEnvironment, TypeIdentity,
     };
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
@@ -713,7 +721,7 @@ mod tests {
     impl<'db> HasIdentity<'db> for u8 {
         type Id = Self;
 
-        fn to_identity(&self, _ctx: &SemanticContext<'db>) -> Self::Id {
+        fn to_identity(&self, _ctx: &SemanticEnvironment<'db>) -> Self::Id {
             *self
         }
     }
@@ -754,7 +762,7 @@ mod tests {
             self.value % 2 == other.value % 2
         }
 
-        fn to_identity(&self, _ctx: &SemanticContext<'db>) -> Self::Id {
+        fn to_identity(&self, _ctx: &SemanticEnvironment<'db>) -> Self::Id {
             self.identity_calls.set(self.identity_calls.get() + 1);
             self.value
         }
@@ -766,17 +774,17 @@ mod tests {
     impl<'db> HasIdentity<'db> for ConstantIdentityItem {
         type Id = ();
 
-        fn to_identity(&self, _ctx: &SemanticContext<'db>) -> Self::Id {}
+        fn to_identity(&self, _ctx: &SemanticEnvironment<'db>) -> Self::Id {}
     }
 
-    fn global_instance_type<'db>(ctx: &SemanticContext<'db>, name: &str) -> Type<'db> {
-        let db = ctx.db();
+    fn global_instance_type<'db>(env: &SemanticEnvironment<'db>, name: &str) -> Type<'db> {
+        let db = env.db();
         let file = system_path_to_file(db, "/src/a.py").unwrap();
-        let file = PythonFile::new(db, file, ctx.python_version());
-        global_symbol(ctx, file, name)
+        let file = PythonFile::new(db, file, env.python_version());
+        global_symbol(env, file, name)
             .place
             .expect_type()
-            .to_instance_approximation(ctx)
+            .to_instance_approximation(env)
             .unwrap()
     }
 
@@ -808,18 +816,18 @@ class RecursivePropertySetter[T](Protocol):
         )
         .unwrap();
 
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
 
         assert_eq!(
-            global_instance_type(&ctx, "GenericProperty").recursive_identity(&ctx),
+            global_instance_type(&env, "GenericProperty").recursive_identity(&env),
             None
         );
         assert!(matches!(
-            global_instance_type(&ctx, "RecursiveProperty").recursive_identity(&ctx),
+            global_instance_type(&env, "RecursiveProperty").recursive_identity(&env),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
         assert!(matches!(
-            global_instance_type(&ctx, "RecursivePropertySetter").recursive_identity(&ctx),
+            global_instance_type(&env, "RecursivePropertySetter").recursive_identity(&env),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
     }
@@ -827,28 +835,28 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn caches_results_and_spills_after_two_entries() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let detector = Detector::new(0);
 
-        assert_eq!(detector.visit(&ctx, 1, || 10), 10);
-        assert_eq!(detector.visit(&ctx, 1, || 40), 10);
-        assert_eq!(detector.visit(&ctx, 2, || 20), 20);
+        assert_eq!(detector.visit(&env, 1, || 10), 10);
+        assert_eq!(detector.visit(&env, 1, || 40), 10);
+        assert_eq!(detector.visit(&env, 2, || 20), 20);
         assert!(!detector.cache.borrow().is_spilled());
-        assert_eq!(detector.visit(&ctx, 3, || 30), 30);
+        assert_eq!(detector.visit(&env, 3, || 30), 30);
         assert!(detector.cache.borrow().is_spilled());
 
-        assert_eq!(detector.visit(&ctx, 2, || 40), 20);
-        assert_eq!(detector.visit(&ctx, 3, || 40), 30);
+        assert_eq!(detector.visit(&env, 2, || 40), 20);
+        assert_eq!(detector.visit(&env, 3, || 40), 30);
     }
 
     #[test]
     fn nested_visit_short_circuits_on_cycle() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let detector = Detector::new(0);
 
         assert_eq!(
-            detector.visit(&ctx, 1, || detector.visit(&ctx, 1, || 20) + 10),
+            detector.visit(&env, 1, || detector.visit(&env, 1, || 20) + 10),
             10
         );
     }
@@ -856,13 +864,13 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn computes_each_active_identity_once() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&ctx, CountingIdentityItem::new(1, &identity_calls), || {
-                detector.visit(&ctx, CountingIdentityItem::new(3, &identity_calls), || 1)
+            detector.visit(&env, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&env, CountingIdentityItem::new(3, &identity_calls), || 1)
             }),
             1
         );
@@ -872,13 +880,13 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn skips_identity_for_distinct_candidates() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&ctx, CountingIdentityItem::new(1, &identity_calls), || {
-                detector.visit(&ctx, CountingIdentityItem::new(2, &identity_calls), || 1)
+            detector.visit(&env, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(&env, CountingIdentityItem::new(2, &identity_calls), || 1)
             }),
             1
         );
@@ -888,16 +896,16 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn skips_identity_without_a_distinct_active_item() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&ctx, CountingIdentityItem::new(1, &identity_calls), || 1),
+            detector.visit(&env, CountingIdentityItem::new(1, &identity_calls), || 1),
             1
         );
         assert_eq!(
-            detector.visit(&ctx, CountingIdentityItem::new(1, &identity_calls), || 2),
+            detector.visit(&env, CountingIdentityItem::new(1, &identity_calls), || 2),
             1
         );
         assert_eq!(identity_calls.get(), 0);
@@ -906,33 +914,33 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn different_items_with_same_identity_form_cycle() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
 
         let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(&ctx, ConstantIdentityItem(1))
+            detector.begin_visit(&env, ConstantIdentityItem(1))
         else {
             panic!("the first identity should be pending");
         };
-        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(&ctx, ConstantIdentityItem(2))
+        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(&env, ConstantIdentityItem(2))
         else {
             panic!("a different item with the same identity should form a cycle");
         };
         assert_eq!(item.0, 2);
         detector.finish_visit(pending, 1);
 
-        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&ctx, ConstantIdentityItem(1))
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&env, ConstantIdentityItem(1))
         else {
             panic!("the first identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 1);
         let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(&ctx, ConstantIdentityItem(2))
+            detector.begin_visit(&env, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be pending after the first is finished");
         };
         detector.finish_visit(pending, 2);
-        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&ctx, ConstantIdentityItem(2))
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&env, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be ready after the pending visit is finished");
         };

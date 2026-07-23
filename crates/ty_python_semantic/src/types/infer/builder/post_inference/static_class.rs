@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
@@ -87,7 +87,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     };
 
     // Check that the class does not have a cyclic definition
-    if let Some(inheritance_cycle) = class.inheritance_cycle(context.semantic_context()) {
+    if let Some(inheritance_cycle) = class.inheritance_cycle(context.semantic_environment()) {
         if inheritance_cycle.is_participant()
             && let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
         {
@@ -102,10 +102,10 @@ pub(crate) fn check_static_class_definitions<'db>(
         return;
     }
 
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
     // Check that the class is not an enum and generic
-    if is_enum_class_by_inheritance(ctx, class) && class.generic_context(ctx).is_some() {
+    if is_enum_class_by_inheritance(env, class) && class.generic_context(env).is_some() {
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_ENUM, class_node) {
             builder.into_diagnostic(format_args!(
                 "Enum class `{}` cannot be generic",
@@ -114,14 +114,14 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let class_kind = CodeGeneratorKind::from_class(ctx, class.into());
+    let class_kind = CodeGeneratorKind::from_class(env, class.into());
 
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
     if class_kind == Some(CodeGeneratorKind::NamedTuple) {
         let mut field_with_default_encountered = None;
 
-        for (field_name, field) in class.own_fields(ctx, None, CodeGeneratorKind::NamedTuple) {
+        for (field_name, field) in class.own_fields(env, None, CodeGeneratorKind::NamedTuple) {
             if field_name.starts_with('_') {
                 report_named_tuple_field_with_leading_underscore(
                     context,
@@ -149,7 +149,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let is_protocol = class.is_protocol(ctx);
+    let is_protocol = class.is_protocol(env);
 
     if let Some(disjoint_base_decorator) = class_node.decorator_list.iter().find(|decorator| {
         file_expression_type(&decorator.expression)
@@ -177,7 +177,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check for invalid `@dataclass` applications.
     if class.dataclass_params(db).is_some() {
-        if class.has_named_tuple_class_in_mro(ctx) {
+        if class.has_named_tuple_class_in_mro(env) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`NamedTuple` class `{}` cannot be decorated with `@dataclass`",
@@ -186,7 +186,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 diagnostic
                     .info("An exception will be raised when instantiating the class at runtime");
             }
-        } else if class.is_typed_dict(ctx) {
+        } else if class.is_typed_dict(env) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "`TypedDict` class `{}` cannot be decorated with `@dataclass`",
@@ -196,7 +196,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     "An exception will often be raised when instantiating the class at runtime",
                 );
             }
-        } else if is_enum_class_by_inheritance(ctx, class) {
+        } else if is_enum_class_by_inheritance(env, class) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Enum class `{}` cannot be decorated with `@dataclass`",
@@ -227,7 +227,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - If the class is a protocol class: check for inheritance from a non-protocol class
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
     let expanded_base_entries =
-        expanded_class_base_entries(ctx, class.known(db), class_node, class_definition);
+        expanded_class_base_entries(env, class.known(db), class_node, class_definition);
     let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
@@ -315,7 +315,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
-                    && let Some(generic_context) = class.generic_context(ctx)
+                    && let Some(generic_context) = class.generic_context(env)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
                             let declared_variance = typevar.typevar(db).explicit_variance(db)?;
@@ -323,7 +323,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 return None;
                             }
                             let required_variance =
-                                base_alias.variance_of(ctx, typevar.identity(db));
+                                base_alias.variance_of(env, typevar.identity(db));
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -351,12 +351,12 @@ pub(crate) fn check_static_class_definitions<'db>(
             _ => continue,
         };
 
-        if let Some(disjoint_base) = base_class.nearest_disjoint_base(ctx) {
+        if let Some(disjoint_base) = base_class.nearest_disjoint_base(env) {
             disjoint_bases.insert(disjoint_base, i, base_class.class_literal(db));
         }
 
         if is_protocol {
-            if !base_class.is_protocol(ctx)
+            if !base_class.is_protocol(env)
                 && !base_class.is_object(db)
                 && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
@@ -367,7 +367,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 ));
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
-            if !base_class.class_literal(db).is_typed_dict(ctx)
+            if !base_class.class_literal(db).is_typed_dict(env)
                 && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -383,12 +383,12 @@ pub(crate) fn check_static_class_definitions<'db>(
                         .message(format_args!("`{}` defined here", base_class.name(db))),
                 );
             }
-            if base_class.class_literal(db).is_typed_dict(ctx) {
+            if base_class.class_literal(db).is_typed_dict(env) {
                 direct_typed_dict_bases.push(base_class);
             }
         }
 
-        if base_class.is_final(ctx)
+        if base_class.is_final(env)
             && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
             builder.into_diagnostic(format_args!(
@@ -400,8 +400,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         if let Some((base_class_literal, _)) = base_class.static_class_literal(db)
             && let (Some(base_is_frozen), Some(class_is_frozen)) = (
-                base_class_literal.is_frozen_dataclass(ctx),
-                class.is_frozen_dataclass(ctx),
+                base_class_literal.is_frozen_dataclass(env),
+                class.is_frozen_dataclass(env),
             )
             && base_is_frozen != class_is_frozen
         {
@@ -415,10 +415,10 @@ pub(crate) fn check_static_class_definitions<'db>(
             );
         }
 
-        if let Some(ordered_base_class) = ordered_dataclass_base_class(ctx, base_class) {
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(env, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
-            if !class.has_own_comparison_methods(ctx)
+            if !class.has_own_comparison_methods(env)
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
@@ -438,8 +438,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check for starred variable-length tuples that cannot be unpacked
     for base in class_node.bases() {
         if let ast::Expr::Starred(starred) = base
-            && let starred_ty = definition_expression_type(ctx, class_definition, &starred.value)
-            && let Some(tuple_spec) = starred_ty.tuple_instance_spec(ctx)
+            && let starred_ty = definition_expression_type(env, class_definition, &starred.value)
+            && let Some(tuple_spec) = starred_ty.tuple_instance_spec(env)
             && !matches!(tuple_spec.as_ref(), Tuple::Fixed(_))
         {
             report_unsupported_base(context, base, starred_ty, class);
@@ -448,7 +448,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's MRO is resolvable
     let mut inconsistent_generic_bases = false;
-    match class.try_mro(ctx, None) {
+    match class.try_mro(env, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
                 for duplicate in duplicates {
@@ -472,7 +472,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
                         class.name(db),
-                        bases_list.iter().map(|base| base.display(ctx)).join(", ")
+                        bases_list.iter().map(|base| base.display(env)).join(", ")
                     ));
                     let can_rewrite_bases = bases_list.len() == class_node.bases().len()
                         && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
@@ -519,7 +519,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         },
         Ok(_) => {
-            disjoint_bases.remove_redundant_entries(ctx);
+            disjoint_bases.remove_redundant_entries(env);
 
             if disjoint_bases.len() > 1 {
                 report_instance_layout_conflict(
@@ -530,7 +530,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
 
-            let explicit_bases = class.explicit_bases(context.semantic_context());
+            let explicit_bases = class.explicit_bases(context.semantic_environment());
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
@@ -544,7 +544,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that `@total_ordering` has a valid ordering method in the MRO
-    if class.total_ordering(db) && !class.has_ordering_method_in_mro(ctx, None) {
+    if class.total_ordering(db) && !class.has_ordering_method_in_mro(env, None) {
         // Find the `@total_ordering` decorator to report the diagnostic at its location
         if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
             file_expression_type(&decorator.expression)
@@ -556,7 +556,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that the class's metaclass can be determined without error.
-    if let Err(metaclass_error) = class.try_metaclass(ctx) {
+    if let Err(metaclass_error) = class.try_metaclass(env) {
         let invalid_metaclass_range = class_node
             .arguments
             .as_ref()
@@ -583,7 +583,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is not callable",
-                        ty.display(ctx)
+                        ty.display(env)
                     ));
                 }
             }
@@ -593,7 +593,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is partly not callable",
-                        ty.display(ctx)
+                        ty.display(env)
                     ));
                 }
             }
@@ -644,8 +644,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
-                || class.typed_dict_module(ctx) == Some(TypedDictModule::TypingExtensions)
-                || ctx.python_version() >= PythonVersion::PY315;
+                || class.typed_dict_module(env) == Some(TypedDictModule::TypingExtensions)
+                || env.python_version() >= PythonVersion::PY315;
 
             for keyword in &args.keywords {
                 if !supports_pep_728
@@ -670,7 +670,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             ));
                             diagnostic.set_primary_message(format_args!(
                                 "Expected either `True` or `False`, got object of type `{}`",
-                                passed_type.display(ctx)
+                                passed_type.display(env)
                             ));
                         }
                     }
@@ -726,17 +726,17 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             let init_subclass_type = class
                 .class_member_from_mro(
-                    ctx,
+                    env,
                     "__init_subclass__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     // skip(1) to skip the current class and only consider base classes.
-                    class.iter_mro(ctx, None).skip(1),
+                    class.iter_mro(env, None).skip(1),
                 )
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
                 let call_args = call_args.with_self(Some(Type::from(class)));
-                if let Err(call_error) = init_subclass.try_call(ctx, &call_args) {
+                if let Err(call_error) = init_subclass.try_call(env, &call_args) {
                     report_subclass_of_class_with_non_callable_init_subclass(
                         context, call_error, class, class_node,
                     );
@@ -747,8 +747,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
-    if class.has_pep_695_type_params(ctx)
-        && let Some(generic_context) = class.inherited_legacy_generic_context(ctx)
+    if class.has_pep_695_type_params(env)
+        && let Some(generic_context) = class.inherited_legacy_generic_context(env)
         && let Some(typevar) = generic_context
             .variables(db)
             .find(|typevar| !typevar.typevar(db).is_self(db))
@@ -761,8 +761,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if let (Some(legacy), Some(inherited)) = (
-        class.legacy_generic_context(ctx),
-        class.inherited_legacy_generic_context(ctx),
+        class.legacy_generic_context(env),
+        class.inherited_legacy_generic_context(env),
     ) {
         if !inherited.is_subset_of(db, legacy)
             && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
@@ -790,8 +790,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-        if !class.has_pep_695_type_params(ctx)
-            && let Some(generic_context) = class.legacy_generic_context(ctx)
+        if !class.has_pep_695_type_params(env)
+            && let Some(generic_context) = class.legacy_generic_context(env)
         {
             struct State<'db> {
                 typevar_with_default: TypeVarInstance<'db>,
@@ -802,7 +802,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             for bound_typevar in generic_context.variables(db) {
                 let typevar = bound_typevar.typevar(db);
-                let has_default = typevar.default_type(ctx).is_some();
+                let has_default = typevar.default_type(env).is_some();
 
                 if let Some(state) = state.as_mut() {
                     if !has_default {
@@ -832,19 +832,19 @@ pub(crate) fn check_static_class_definitions<'db>(
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
-            .pep695_generic_context(ctx)
-            .or_else(|| class.legacy_generic_context(ctx))
+            .pep695_generic_context(env)
+            .or_else(|| class.legacy_generic_context(env))
         {
             let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
 
             // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
             // a `std::slice::Iter` under the hood.
             for (i, typevar) in typevars.clone().enumerate() {
-                let Some(default_ty) = typevar.default_type(ctx) else {
+                let Some(default_ty) = typevar.default_type(env) else {
                     continue;
                 };
 
-                let first_bad_tvar = find_over_type(ctx, default_ty, false, |t| {
+                let first_bad_tvar = find_over_type(env, default_ty, false, |t| {
                     let tvar = match t {
                         Type::TypeVar(tvar) => tvar.typevar(db),
                         Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
@@ -873,10 +873,10 @@ pub(crate) fn check_static_class_definitions<'db>(
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
             // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(ctx) {
+            if let Some(generic_context) = class.generic_context(env) {
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(ctx, index, parent) {
+                    for enclosing in enclosing_generic_contexts(env, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                             report_shadowed_type_variable(
                                 context,
@@ -894,9 +894,9 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             // Check that the class's base classes don't reference type
             // variables from enclosing scopes (by identity).
-            for base_typevar in class.typevars_referenced_in_bases(ctx) {
+            for base_typevar in class.typevars_referenced_in_bases(env) {
                 let typevar = base_typevar.typevar(db);
-                for enclosing in enclosing_generic_contexts(ctx, index, parent) {
+                for enclosing in enclosing_generic_contexts(env, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
                         report_shadowed_type_variable(
                             context,
@@ -916,7 +916,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(ctx, class.into())
+        CodeGeneratorKind::from_class(env, class.into())
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
@@ -925,7 +925,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut required_after_default_field_names = vec![];
         let mut has_seen_default_field = false;
 
-        for (name, field) in class.own_fields(ctx, specialization, field_policy) {
+        for (name, field) in class.own_fields(env, specialization, field_policy) {
             if field.is_kw_only_sentinel(db) {
                 kw_only_sentinel_fields.push(name);
                 continue;
@@ -1019,11 +1019,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
-    if let Some(protocol) = class.into_protocol_class(ctx) {
+    if let Some(protocol) = class.into_protocol_class(env) {
         protocol.validate_members(context);
     }
 
-    if class.is_typed_dict(ctx) {
+    if class.is_typed_dict(env) {
         validate_typed_dict_class(context, class, class_node, &direct_typed_dict_bases);
     }
 
@@ -1044,13 +1044,13 @@ fn check_class_namespace_against_metaclass_members<'db>(
     index: &SemanticIndex<'db>,
 ) {
     let db = context.db();
-    let ctx = context.semantic_context();
-    let metaclass = class.metaclass(ctx);
-    if metaclass == KnownClass::Type.to_class_literal(ctx) {
+    let env = context.semantic_environment();
+    let metaclass = class.metaclass(env);
+    if metaclass == KnownClass::Type.to_class_literal(env) {
         return;
     }
 
-    let Some(metaclass_instance) = metaclass.to_instance_approximation(ctx) else {
+    let Some(metaclass_instance) = metaclass.to_instance_approximation(env) else {
         return;
     };
 
@@ -1058,7 +1058,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     let table = index.place_table(scope);
     let use_def = index.use_def_map(scope);
 
-    let Some(metaclass) = metaclass.to_class_type(ctx) else {
+    let Some(metaclass) = metaclass.to_class_type(env) else {
         return;
     };
 
@@ -1067,7 +1067,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     let mut metaclass_instance_members = FxHashSet::default();
     let mut metaclass_assigned_members = FxHashSet::default();
     for metaclass in metaclass
-        .iter_mro(ctx)
+        .iter_mro(env)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
     {
@@ -1115,7 +1115,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
             ty: metaclass_member_ty,
             origin,
             ..
-        }) = metaclass_instance.instance_member(ctx, name.as_str()).place
+        }) = metaclass_instance.instance_member(env, name.as_str()).place
         else {
             continue;
         };
@@ -1131,8 +1131,8 @@ fn check_class_namespace_against_metaclass_members<'db>(
                     continue;
                 }
 
-                let assigned_ty = binding_type(ctx, definition);
-                if !assigned_ty.is_assignable_to(ctx, metaclass_member_ty) {
+                let assigned_ty = binding_type(env, definition);
+                if !assigned_ty.is_assignable_to(env, metaclass_member_ty) {
                     reported_incompatible_binding = true;
                     report_invalid_attribute_assignment(
                         context,
@@ -1156,7 +1156,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         }
 
         let result =
-            place_from_declarations(ctx, use_def.end_of_scope_symbol_declarations(symbol_id));
+            place_from_declarations(env, use_def.end_of_scope_symbol_declarations(symbol_id));
         let Some(definition) = result.first_declaration else {
             continue;
         };
@@ -1173,7 +1173,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         if !matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
             continue;
         }
-        if !metaclass_member_ty.is_assignable_to(ctx, class_declared_ty) {
+        if !metaclass_member_ty.is_assignable_to(env, class_declared_ty) {
             report_invalid_attribute_assignment(
                 context,
                 definition_kind.target_range(context.module()),
@@ -1186,20 +1186,20 @@ fn check_class_namespace_against_metaclass_members<'db>(
 }
 
 fn ordered_dataclass_base_class<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     base_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
-    let db = ctx.db();
-    for ancestor in base_class.iter_mro(ctx).filter_map(ClassBase::into_class) {
+    let db = env.db();
+    for ancestor in base_class.iter_mro(env).filter_map(ClassBase::into_class) {
         let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
             continue;
         };
 
-        if ancestor_literal.is_ordered_dataclass(ctx) {
+        if ancestor_literal.is_ordered_dataclass(env) {
             return Some(ancestor);
         }
 
-        if ancestor_literal.has_own_comparison_methods(ctx) {
+        if ancestor_literal.has_own_comparison_methods(env) {
             return None;
         }
     }
@@ -1218,10 +1218,10 @@ fn check_final_class_abstract_methods<'db>(
     class_node: &ast::StmtClassDef,
 ) {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
     // Only check if the class is final.
-    if !class.is_final(ctx) {
+    if !class.is_final(env) {
         return;
     }
 
@@ -1229,14 +1229,14 @@ fn check_final_class_abstract_methods<'db>(
     // without subclassing it, so an `@final` `Protocol` class with unimplemented abstract
     // methods is not inherently broken in the same way as a non-`Protocol` final class
     // with unimplemented abstract methods.
-    if class.is_protocol(ctx) {
+    if class.is_protocol(env) {
         return;
     }
 
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
-    let class_type = class.identity_specialization(ctx);
-    let abstract_methods = class_type.abstract_methods(ctx);
+    let class_type = class.identity_specialization(env);
+    let abstract_methods = class_type.abstract_methods(env);
 
     // If there are no abstract methods, we're done.
     let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
@@ -1254,7 +1254,7 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
-    let definition_types = infer_definition_types(ctx, class.definition(db));
+    let definition_types = infer_definition_types(env, class.definition(db));
 
     if let Some(class_node) = class.body_scope(db).node(db).as_class()
         && let Some(decorator) = class_node
@@ -1317,13 +1317,13 @@ fn check_final_class_abstract_methods<'db>(
 
     let defining_class_name = defining_class.name(db);
 
-    if let Type::FunctionLiteral(function) = binding_type(ctx, *definition) {
+    if let Type::FunctionLiteral(function) = binding_type(env, *definition) {
         let policy = if kind.is_explicit() {
             AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         } else {
             AbstractMethodAnnotationPolicy::AlwaysIncludeBody
         };
-        let secondary_span = abstract_method_span(ctx, function, policy);
+        let secondary_span = abstract_method_span(env, function, policy);
         let mut secondary_annotation = Annotation::secondary(secondary_span);
         secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
             secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
@@ -1354,16 +1354,16 @@ fn check_final_class_abstract_methods<'db>(
         // and the return type is assignable to `None`, they may not have intended
         // for it to be implicitly abstract; add a clarificatory note:
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(ctx, *definition)
+            let function_type_as_callable = infer_definition_types(env, *definition)
                 .binding_type(*definition)
-                .try_upcast_to_callable(ctx);
+                .try_upcast_to_callable(env);
 
             if let Some(callables) = function_type_as_callable
                 && Type::function_like_callable(
                     db,
-                    Signature::new(Parameters::gradual_form(), Type::none(ctx)),
+                    Signature::new(Parameters::gradual_form(), Type::none(env)),
                 )
-                .is_assignable_to(ctx, callables.into_type(ctx))
+                .is_assignable_to(env, callables.into_type(env))
             {
                 diagnostic.help(format_args!(
                     "Change the body of `{first_method_name}` to `return` \
@@ -1387,7 +1387,7 @@ fn check_class_final_without_value<'db>(
     }
 
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     let body_scope = class.body_scope(db);
     let body_scope_id = body_scope.file_scope_id(db);
     let use_def = index.use_def_map(body_scope_id);
@@ -1397,12 +1397,12 @@ fn check_class_final_without_value<'db>(
     // defaults are initialized by the synthesized __init__. In protocols, the
     // declaration describes a required instance attribute rather than storage
     // that must be initialized by the protocol class itself.
-    if CodeGeneratorKind::from_class(ctx, class.into()).is_some() || class.is_protocol(ctx) {
+    if CodeGeneratorKind::from_class(env, class.into()).is_some() || class.is_protocol(env) {
         return;
     }
 
     for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-        let result = place_from_declarations(ctx, declarations);
+        let result = place_from_declarations(env, declarations);
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
@@ -1412,7 +1412,7 @@ fn check_class_final_without_value<'db>(
 
         // Check if the symbol has any bindings at class level.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(ctx, bindings);
+        let binding_place = place_from_bindings(env, bindings);
 
         if !binding_place.place.is_undefined() {
             continue;
