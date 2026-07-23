@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use strum::IntoEnumIterator;
 
@@ -7,8 +8,8 @@ use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
 use crate::docstring::document::syntax::{
-    InlineMarkupScanner, InlineMarkupToken, is_rest_role_name, is_wrapped_in_markdown_code_span,
-    starts_with_markdown_list_item,
+    BracketNesting, InlineMarkupScanner, InlineMarkupToken, consume_quoted_string,
+    is_rest_role_name, is_wrapped_in_markdown_code_span, starts_with_markdown_list_item,
 };
 
 mod google;
@@ -386,7 +387,98 @@ fn render_type_code_span_into(output: &mut String, ty: &str) {
     }
 
     let normalized = normalize_embedded_type_markup(&normalized);
-    render_code_span_into(output, normalized.as_ref());
+    render_type_alternatives_into(output, normalized.as_ref());
+}
+
+/// Renders top-level type alternatives as separate code spans.
+///
+/// For example, `"Unit, str, or None, optional"` becomes
+/// ``"`Unit`, `str`, or `None, optional`"``.
+fn render_type_alternatives_into(output: &mut String, ty: &str) {
+    let mut nesting = BracketNesting::default();
+    let mut cursor = Cursor::new(ty);
+    let mut start = 0usize;
+
+    while let Some(character) = cursor.bump() {
+        let separator_start = cursor.offset().to_usize() - character.len_utf8();
+        match character {
+            quote @ ('\'' | '"') => {
+                consume_quoted_string(&mut cursor, quote);
+                continue;
+            }
+            _ => nesting.update(character),
+        }
+        if !nesting.is_top_level() {
+            continue;
+        }
+
+        let remainder = &ty[separator_start..];
+        let separator_end = if let Some(remainder) = remainder
+            .strip_prefix(" or ")
+            .or_else(|| remainder.strip_prefix(" | "))
+        {
+            if remainder.trim().is_empty() {
+                continue;
+            }
+            ty.len() - remainder.len()
+        } else if let Some(remainder) = remainder.strip_prefix(',') {
+            let remainder = remainder.trim_start();
+            if remainder.is_empty()
+                || remainder.starts_with(['(', '['])
+                || starts_with_type_qualifier(remainder)
+            {
+                continue;
+            }
+            let remainder = remainder.strip_prefix("or ").unwrap_or(remainder);
+            if remainder.trim().is_empty() {
+                continue;
+            }
+            ty.len() - remainder.len()
+        } else {
+            continue;
+        };
+        if ty[start..separator_start].trim().is_empty() {
+            continue;
+        }
+
+        render_code_span_into(output, ty[start..separator_start].trim());
+        output.push_str(&ty[separator_start..separator_end]);
+        cursor.skip_bytes(separator_end - cursor.offset().to_usize());
+        start = separator_end;
+    }
+
+    render_code_span_into(output, ty[start..].trim());
+}
+
+/// Returns whether a comma introduces a type qualifier rather than another alternative.
+fn starts_with_type_qualifier(text: &str) -> bool {
+    let qualifier = text
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, ',' | '=' | ':' | '(')
+        })
+        .next()
+        .unwrap_or_default();
+
+    [
+        "optional",
+        "default",
+        "keyword-only",
+        "required",
+        "deprecated",
+        "shape",
+        "dtype",
+        "with",
+        "same",
+        "compatible",
+        "length",
+        "ndim",
+        "1d",
+        "2d",
+        "1-D",
+        "2-D",
+    ]
+    .iter()
+    .any(|candidate| qualifier.eq_ignore_ascii_case(candidate))
 }
 
 /// Removes markup before wrapping a type in a code span. For example:
@@ -561,7 +653,9 @@ mod tests {
     use insta::{Settings, assert_snapshot};
     use ruff_text_size::{TextRange, TextSize};
 
-    use super::{Section, SectionItem, SectionKind, render_sections_into};
+    use super::{
+        Section, SectionItem, SectionKind, render_sections_into, render_type_code_span_into,
+    };
 
     #[test]
     fn sections_render_in_canonical_order() {
@@ -764,7 +858,7 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @"
         ## Parameters
-        **colormap**: `str or Colormap or matplotlib.colors or Index`<HB>
+        **colormap**: `str` or `Colormap` or `matplotlib.colors` or `Index`<HB>
         Color mapping.
 
         **model**: `Model`<HB>
@@ -776,6 +870,42 @@ mod tests {
         **line**: `lines.Line2D`<HB>
         Line.
         ");
+    }
+
+    #[test]
+    fn renders_type_alternatives_separately() {
+        for (ty, expected) in [
+            (
+                ":class:`~astropy.units.UnitBase`, str, `~astropy.units.PhysicalType`, or tuple",
+                "`UnitBase`, `str`, `PhysicalType`, or `tuple`",
+            ),
+            (
+                "Sequence[int] | None, default=None",
+                "`Sequence[int]` | `None, default=None`",
+            ),
+            (
+                "str, Path, list[str, Path], optional",
+                "`str`, `Path`, `list[str, Path], optional`",
+            ),
+            (
+                "ndarray of dtype (int or float), optional",
+                "`ndarray of dtype (int or float), optional`",
+            ),
+            ("Literal['a or b'] or None", "`Literal['a or b']` or `None`"),
+            (
+                "array, shape(n, 2, 2), optional",
+                "`array, shape(n, 2, 2), optional`",
+            ),
+            (
+                "{0 or 'index', 1 or 'columns'}, default 0",
+                "`{0 or 'index', 1 or 'columns'}, default 0`",
+            ),
+            ("``str | None``", "``str | None``"),
+        ] {
+            let mut rendered = String::new();
+            render_type_code_span_into(&mut rendered, ty);
+            assert_eq!(rendered, expected, "{ty:?}");
+        }
     }
 
     #[test]
