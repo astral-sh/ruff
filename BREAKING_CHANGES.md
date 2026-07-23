@@ -1,5 +1,70 @@
 # Breaking Changes
 
+## 0.16.0
+
+### Breaking changes
+
+- **New default rules**
+
+    Ruff now enables a much larger set of rules by default (413, up from 59). See the blog post for
+    more details and the new [Default Rules](https://docs.astral.sh/ruff/default-rules/) page for a
+    full listing of the enabled rules.
+
+- **Python code block formatting in Markdown files**
+
+    Ruff can now format Python code blocks in Markdown files and will do this by default. See the
+    [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
+
+- **`ruff: ignore` suppression comments**
+
+    Ruff now supports `ruff: ignore` comments the ends of lines, like `noqa` comments`, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import`(`F401\`)\](<https://docs.astral.sh/ruff/rules/unused-import/>) diagnostic:
+
+    ```py
+    import math  # ruff: ignore[F401]
+
+    # ruff: ignore[F401]
+    import os
+    ```
+
+- **Fix diffs in linter and formatter output**
+
+    Fixes are now shown in `check` and `format --check` output:
+
+    ````console
+    ❯ ruff format --check .
+    unformatted: File would be reformatted
+     --> try.md:1:1
+      |
+    1 | ```python
+      - import   math
+    2 + import math
+    3 | ```
+      |
+
+    1 file would be reformatted
+    ````
+
+    This example also shows off the Markdown formatting.
+
+- **Output format support in `format --check`**
+
+    `format --check` now supports the same output formats as the linter, including the `github` and
+    `gitlab` outputs for rendering annotations in CI:
+
+    ```console
+    ❯ ruff format --check --output-format github .
+    ::error title=ruff (unformatted),file=try.md,line=2,col=8,endLine=2,endColumn=10::try.md:2:8: unformatted: File would be reformatted
+    ```
+
+    See the CLI help or [documentation](https://docs.astral.sh/ruff/settings/#output-format) for the
+    full list of supported formats.
+
+- **Some fields are now optional in the JSON output**
+
+    The `filename`, `location`, `end_location`, `fix.edits[].location`, and `fix.edits[].end_location`
+    fields in the JSON output format may now be `null` rather than defaulting to the empty string and
+    row 1, column 1, respectively.
+
 ## 0.15.0
 
 - **2026 formatter style guide**
