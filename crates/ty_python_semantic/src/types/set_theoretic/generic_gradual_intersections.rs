@@ -1,6 +1,9 @@
 use crate::Db;
 use crate::types::generics::specialization_variance;
-use crate::types::{IntersectionType, KnownClass, Type, TypeVarVariance, UnionType};
+use crate::types::{
+    ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
+    UnionType,
+};
 
 /// Simplify the intersection of two generic specializations when one is a gradual
 /// generalization of the other.
@@ -14,6 +17,113 @@ pub(super) fn generic_gradual_intersection<'db>(
 ) -> Option<Type<'db>> {
     dynamic_generalization_intersection(db, left, right)
         .or_else(|| dynamic_generalization_intersection(db, right, left))
+        .or_else(|| nominal_top_intersection(db, left, right))
+        .or_else(|| nominal_top_intersection(db, right, left))
+}
+
+/// Intersect a fully static nominal base with a top-materialized generic subclass.
+///
+/// The subclass's identity MRO determines which subclass type variables specialize the base.
+/// Restricting those variables by the base's variance preserves invariant subclass
+/// materializations instead of incorrectly collapsing, for example,
+/// `Sequence[int] & Top[list[Any]]` to `list[int]`.
+fn nominal_top_intersection<'db>(
+    db: &'db dyn Db,
+    base: Type<'db>,
+    subclass: Type<'db>,
+) -> Option<Type<'db>> {
+    if !base.is_nominal_instance() || !subclass.is_nominal_instance() || base.has_dynamic(db) {
+        return None;
+    }
+
+    let (base_class, base_specialization) = base.class_specialization(db)?;
+    let (subclass_class, subclass_specialization) = subclass.class_specialization(db)?;
+
+    if base_class == subclass_class
+        || base_specialization.materialization_kind(db).is_some()
+        || subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Bottom)
+    {
+        return None;
+    }
+
+    let inherited_specialization = subclass_class
+        .identity_specialization(db)
+        .iter_mro(db)
+        .find_map(|ancestor| match ancestor {
+            ClassBase::Class(ClassType::Generic(alias)) if alias.origin(db) == base_class => {
+                Some(alias.specialization(db))
+            }
+            _ => None,
+        })?;
+
+    let subclass_context = subclass_specialization.generic_context(db);
+    let mut types = subclass_specialization.types(db).to_vec();
+    let mut changed = false;
+
+    for ((base_typevar, base_type), inherited_type) in base_specialization
+        .generic_context(db)
+        .variables(db)
+        .zip(base_specialization.types(db))
+        .zip(inherited_specialization.types(db))
+    {
+        let Type::TypeVar(subclass_typevar) = *inherited_type else {
+            return None;
+        };
+        let subclass_index = subclass_context
+            .variables(db)
+            .position(|typevar| typevar.identity(db) == subclass_typevar.identity(db))?;
+        let subclass_type = types[subclass_index];
+
+        if subclass_type == *base_type {
+            continue;
+        }
+
+        let is_top_generalization = match specialization_variance(db, subclass_typevar) {
+            TypeVarVariance::Covariant => subclass_type == Type::object(),
+            TypeVarVariance::Contravariant => subclass_type.is_never(),
+            TypeVarVariance::Invariant => {
+                subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+                    && subclass_type.is_non_divergent_dynamic()
+            }
+            TypeVarVariance::Bivariant => false,
+        };
+
+        if !is_top_generalization {
+            return None;
+        }
+
+        types[subclass_index] = match specialization_variance(db, base_typevar) {
+            TypeVarVariance::Covariant => {
+                IntersectionType::from_two_elements(db, subclass_type, *base_type)
+            }
+            TypeVarVariance::Contravariant => {
+                UnionType::from_two_elements(db, subclass_type, *base_type)
+            }
+            TypeVarVariance::Invariant => *base_type,
+            TypeVarVariance::Bivariant => return None,
+        };
+        changed = true;
+    }
+
+    if !changed {
+        return None;
+    }
+
+    if subclass_class.known(db) == Some(KnownClass::Tuple) {
+        subclass_specialization
+            .tuple(db)?
+            .variable_element_type(db)?;
+        return Some(Type::homogeneous_tuple(db, types[0]));
+    }
+
+    let specialization = subclass_context.specialize(db, types);
+    Some(
+        Type::instance(
+            db,
+            subclass_class.apply_optional_specialization(db, Some(specialization)),
+        )
+        .top_materialization(db),
+    )
 }
 
 /// Intersect two specializations of the same generic class if `general` only differs from
