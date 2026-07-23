@@ -412,8 +412,7 @@ fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
 #[test]
 fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
     let case = workspace_case()?;
-    case.write_file(".python-version", "3.12")?;
-    case.write_file("packages/member/member.py", "PythonFinalizationError")?;
+    case.write_file("packages/member/member.py", "frozendict")?;
 
     for output_format in ["full", "concise"] {
         let Some(mut command) = command_with_uv(&case, None)? else {
