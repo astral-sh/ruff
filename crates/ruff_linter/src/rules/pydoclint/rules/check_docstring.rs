@@ -1276,7 +1276,25 @@ pub(crate) fn check_docstring(
             let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
+                    let has_non_none_return = body_entries
+                        .returns
+                        .iter()
+                        .any(|entry| !entry.is_none_return());
+                    let is_generator = !body_entries.yields.is_empty();
                     match function_def.returns.as_deref() {
+                        // For a generator function whose return annotation isn't a recognized
+                        // generator/iterator type (e.g. `-> object`), the annotation doesn't
+                        // describe the generator's *return* value, so defer to the body and only
+                        // flag a non-`None` return statement.
+                        Some(returns)
+                            if is_generator
+                                && generator_annotation_arguments(returns, semantic).is_none() =>
+                        {
+                            if has_non_none_return {
+                                checker
+                                    .report_diagnostic(DocstringMissingReturns, docstring.range());
+                            }
+                        }
                         Some(returns)
                             // Ignore it if it's annotated as returning `None`
                             // or it's a generator function annotated as returning `None`,
@@ -1291,11 +1309,7 @@ pub(crate) fn check_docstring(
                                 checker
                                     .report_diagnostic(DocstringMissingReturns, docstring.range());
                             }
-                        None if body_entries
-                            .returns
-                            .iter()
-                            .any(|entry| !entry.is_none_return()) =>
-                        {
+                        None if has_non_none_return => {
                             checker.report_diagnostic(DocstringMissingReturns, docstring.range());
                         }
                         _ => {}

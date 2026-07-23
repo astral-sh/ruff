@@ -234,3 +234,19 @@ def generator_function_4():
 def not_a_generator() -> Iterator[int]:
     """"No returns documented here, oh no"""
     return (x for x in range(42))
+
+
+# This is okay -- a bare `return` in a generator returns `None`, and the loose
+# `-> object` annotation doesn't describe the generator's return value
+def generator_function_5(val: object) -> object:
+    """Generate some values"""
+    if val is not None:
+        yield val
+    return
+
+
+# DOC201 -- a non-None return, despite the loose `-> object` annotation
+def generator_function_6(val: object) -> object:
+    """Generate some values"""
+    yield val
+    return 42
