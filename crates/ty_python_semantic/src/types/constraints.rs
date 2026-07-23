@@ -849,14 +849,15 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
-    /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
-    /// identity. Constraints are added to this arena as they are encountered when constructing
+    /// Constraints are one kind of the variable in our BDD.
+    /// They are interned in a dedicated arena to give them a space-efficient identity.
+    /// Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
     /// structures.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
 
-    /// Quantified relations have their own arena and ID space; ordinary range constraints never
-    /// pay for or share the representation of their payloads.
+    /// Existential quantifiers are one kind of variable in our BDD.
+    /// They are interned in a dedicated arena to give them a space-efficient identity.
     existentials: IndexVec<ExistentialId, Existential<'db>>,
 
     /// Typevars are interned so that they have a stable ordering within this builder, which does
@@ -1067,6 +1068,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         fn rebuild_node<'db>(
+            db: &'db dyn Db,
             builder: &ConstraintSetBuilder<'db>,
             inner: &OwnedConstraintSetInner<'db>,
             constraints: &[NodeId],
@@ -1082,15 +1084,24 @@ impl<'db> ConstraintSetBuilder<'db> {
 
             let old_node_index = inner.retained_node_index(old_node);
             let old_interior = inner.nodes[old_node_index];
-            let if_true = rebuild_node(builder, inner, constraints, cache, old_interior.if_true);
+            let if_true =
+                rebuild_node(db, builder, inner, constraints, cache, old_interior.if_true);
             let if_uncertain = rebuild_node(
+                db,
                 builder,
                 inner,
                 constraints,
                 cache,
                 old_interior.if_uncertain,
             );
-            let if_false = rebuild_node(builder, inner, constraints, cache, old_interior.if_false);
+            let if_false = rebuild_node(
+                db,
+                builder,
+                inner,
+                constraints,
+                cache,
+                old_interior.if_false,
+            );
             let condition = match old_interior.atom {
                 AtomId::Range(constraint) => {
                     let old_index = inner.retained_constraint_index(constraint);
@@ -1099,14 +1110,17 @@ impl<'db> ConstraintSetBuilder<'db> {
                 AtomId::Existential(existential) => {
                     let old_index = inner.retained_existential_index(existential);
                     let relation = inner.existentials[old_index];
-                    let domain = rebuild_node(builder, inner, constraints, cache, relation.domain);
-                    let body = rebuild_node(builder, inner, constraints, cache, relation.body);
-                    let existential =
-                        ExistentialId::new_with_domain(builder, relation.locals, domain, body);
-                    Node::new_atom(builder, AtomId::Existential(existential), 1)
+                    let domain =
+                        rebuild_node(db, builder, inner, constraints, cache, relation.domain);
+                    let body = rebuild_node(db, builder, inner, constraints, cache, relation.body);
+                    Existential::new_node_with_domain(db, builder, relation.locals, domain, body)
                 }
-            }
-            .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
+            };
+            // The atom node constructors create standalone nodes whose source order starts at 1.
+            // Shift the reloaded condition back to the source order recorded in the owned set;
+            // solution extraction uses this order for deterministic unions and intersections.
+            let condition = condition
+                .with_adjusted_source_order(builder, old_interior.source_order.saturating_sub(1));
             let remapped = condition.ite_uncertain(builder, if_true, if_uncertain, if_false);
 
             cache.insert(old_node, remapped);
@@ -1120,12 +1134,6 @@ impl<'db> ConstraintSetBuilder<'db> {
             .inner
             .as_ref()
             .expect("storage-free owned constraint sets must have terminal roots");
-
-        for existential in &inner.existentials {
-            for local in existential.locals.iter(db) {
-                self.intern_typevar(db, local);
-            }
-        }
 
         if inner.nodes.len() == 1
             && let old_interior = inner.nodes[inner.retained_node_index(other.node)]
@@ -1149,8 +1157,9 @@ impl<'db> ConstraintSetBuilder<'db> {
             return ConstraintSet::from_node(self, node);
         }
 
-        // Load all of the range constraints first so existing range-only diagrams retain their
-        // builder-local ordering and single-node fast path.
+        // Load all of the range constraints into the this builder first, to maximize the chance
+        // that they will appear in the same order. (We can't easily do the same thing for
+        // existential atoms, since they contain NodeIds, which we aren't ready to rebuild yet.)
         let constraints: Box<[_]> = inner
             .constraints
             .iter()
@@ -1166,7 +1175,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             .collect();
 
         let mut cache = FxHashMap::default();
-        let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
+        let node = rebuild_node(db, self, inner, &constraints, &mut cache, other.node);
         ConstraintSet::from_node(self, node)
     }
 
@@ -1253,7 +1262,15 @@ impl<'db> ConstraintSetBuilder<'db> {
         id
     }
 
-    fn intern_existential(&self, data: Existential<'db>) -> ExistentialId {
+    fn intern_typevar_set(&self, db: &'db dyn Db, typevars: TypeVarSet<'db>) {
+        for bound_typevar in typevars.iter(db) {
+            self.intern_typevar(db, bound_typevar);
+        }
+    }
+
+    fn intern_existential(&self, db: &'db dyn Db, data: Existential<'db>) -> ExistentialId {
+        self.intern_typevar_set(db, data.locals);
+
         let mut storage = self.storage.borrow_mut();
         storage.ensure_overlay_identity_caches();
         if let Some(id) = storage.existential_cache.get(&data) {
@@ -1491,16 +1508,6 @@ impl IntersectionResult<'_> {
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct TypeVarId;
 
-/// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
-#[newtype_index]
-#[derive(get_size2::GetSize)]
-pub struct ConstraintId;
-
-/// The index of a quantified relation within its separate builder-local arena.
-#[newtype_index]
-#[derive(get_size2::GetSize)]
-struct ExistentialId;
-
 /// An atom of a constraint-set TDD, discriminating the two independent payload ID spaces.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 enum AtomId {
@@ -1508,14 +1515,82 @@ enum AtomId {
     Existential(ExistentialId),
 }
 
-/// A scoped quantified relation. Its local identities must already be correctly scoped and fresh
-/// relative to enclosing binders; the constructor trusts its caller instead of inspecting graphs.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct Existential<'db> {
-    locals: TypeVarSet<'db>,
-    domain: NodeId,
-    body: NodeId,
+impl AtomId {
+    fn when_true(self) -> AtomAssignment {
+        AtomAssignment::Positive(self)
+    }
+
+    fn when_false(self) -> AtomAssignment {
+        AtomAssignment::Negative(self)
+    }
+
+    fn when_unconstrained(self) -> AtomAssignment {
+        AtomAssignment::Unconstrained(self)
+    }
+
+    /// Defines the ordering of the variables in a constraint set BDD.
+    ///
+    /// If we only care about _correctness_, we can choose any ordering that we want, as long as
+    /// it's consistent. However, different orderings can have very different _performance_
+    /// characteristics. Many BDD libraries attempt to reorder variables on the fly while building
+    /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
+    /// have clear wins.
+    ///
+    /// In particular, we use the order that is based on when atoms are added to this builder. This
+    /// gives us an ordering that is stable across runs, and which is not influenced by when and
+    /// how quickly we analyze the other files in the project.
+    ///
+    /// As an optimization, we also _reverse_ this ordering, so that atoms that appear
+    /// earlier in the arena appear "lower" (closer to the terminal nodes) in the BDD. Since we
+    /// build up BDDs by combining smaller BDDs (which will have been atoms from expressions
+    /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
+    /// to do when combining BDDs.
+    ///
+    /// Previously, we tried to be more clever — for instance, by comparing the typevars of each
+    /// atom first, in an attempt to keep all of the atoms for a single typevar
+    /// adjacent in the BDD structure. However, this proved to be counterproductive; we've found
+    /// empirically that we get smaller BDDs with an ordering that is more aligned with source
+    /// order.
+    fn ordering(self) -> impl Ord {
+        match self {
+            AtomId::Range(constraint) => (
+                wobble_index(0),
+                std::cmp::Reverse(wobble_index(constraint.index())),
+            ),
+            AtomId::Existential(existential) => (
+                wobble_index(1),
+                std::cmp::Reverse(wobble_index(existential.index())),
+            ),
+        }
+    }
+
+    #[track_caller]
+    fn expect_range(self) -> ConstraintId {
+        match self {
+            AtomId::Range(constraint) => constraint,
+            AtomId::Existential(_) => {
+                panic!("invariant violation: existential atom reached range-only operation")
+            }
+        }
+    }
 }
+
+impl From<ConstraintId> for AtomId {
+    fn from(id: ConstraintId) -> AtomId {
+        AtomId::Range(id)
+    }
+}
+
+impl From<ExistentialId> for AtomId {
+    fn from(id: ExistentialId) -> AtomId {
+        AtomId::Existential(id)
+    }
+}
+
+/// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+pub struct ConstraintId;
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
@@ -1930,7 +2005,7 @@ impl<'db> Constraint<'db> {
                     })
                 }) =>
             {
-                return Node::new_constraint(
+                return Node::new_atom(
                     builder,
                     ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
                     1,
@@ -1986,7 +2061,7 @@ impl<'db> Constraint<'db> {
                 } else {
                     (typevar, lower)
                 };
-                Node::new_constraint(
+                Node::new_atom(
                     builder,
                     ConstraintId::new(
                         db,
@@ -2004,7 +2079,7 @@ impl<'db> Constraint<'db> {
                 if typevar.can_be_bound_for(db, builder, lower)
                     && typevar.can_be_bound_for(db, builder, upper) =>
             {
-                let lower = Node::new_constraint(
+                let lower = Node::new_atom(
                     builder,
                     ConstraintId::new_with_bounds(
                         db,
@@ -2015,7 +2090,7 @@ impl<'db> Constraint<'db> {
                     ),
                     1,
                 );
-                let upper = Node::new_constraint(
+                let upper = Node::new_atom(
                     builder,
                     ConstraintId::new_with_bounds(
                         db,
@@ -2031,7 +2106,7 @@ impl<'db> Constraint<'db> {
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
-                let lower = Node::new_constraint(
+                let lower = Node::new_atom(
                     builder,
                     ConstraintId::new_with_bounds(
                         db,
@@ -2057,7 +2132,7 @@ impl<'db> Constraint<'db> {
                 } else {
                     Constraint::new_node_with_bounds(db, builder, typevar, lower, None)
                 };
-                let upper = Node::new_constraint(
+                let upper = Node::new_atom(
                     builder,
                     ConstraintId::new_with_bounds(
                         db,
@@ -2071,7 +2146,7 @@ impl<'db> Constraint<'db> {
                 lower.and(builder, upper)
             }
 
-            _ => Node::new_constraint(
+            _ => Node::new_atom(
                 builder,
                 ConstraintId::new_with_bounds(db, builder, typevar, lower, upper),
                 1,
@@ -2091,33 +2166,6 @@ impl ConstraintId {
 
     fn when_unconstrained(self) -> AtomAssignment {
         AtomId::Range(self).when_unconstrained()
-    }
-
-    /// Defines the ordering of the variables in a constraint set BDD.
-    ///
-    /// If we only care about _correctness_, we can choose any ordering that we want, as long as
-    /// it's consistent. However, different orderings can have very different _performance_
-    /// characteristics. Many BDD libraries attempt to reorder variables on the fly while building
-    /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
-    /// have clear wins.
-    ///
-    /// In particular, we use the order that constraints are added to this builder. This gives us
-    /// an ordering that is stable across runs, and which is not influenced by when and how quickly
-    /// we analyze the other files in the project.
-    ///
-    /// As an optimization, we also _reverse_ this ordering, so that constraints that appear
-    /// earlier in the arena appear "lower" (closer to the terminal nodes) in the BDD. Since we
-    /// build up BDDs by combining smaller BDDs (which will have been constructed from expressions
-    /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
-    /// to do when combining BDDs.
-    ///
-    /// Previously, we tried to be more clever — for instance, by comparing the typevars of each
-    /// constraint first, in an attempt to keep all of the constraints for a single typevar
-    /// adjacent in the BDD structure. However, this proved to be counterproductive; we've found
-    /// empirically that we get smaller BDDs with an ordering that is more aligned with source
-    /// order.
-    fn ordering(self) -> std::cmp::Reverse<usize> {
-        std::cmp::Reverse(wobble_index(self.index()))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -2214,37 +2262,36 @@ impl ConstraintId {
     }
 }
 
+/// The index of a quantified relation within its separate builder-local arena.
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+struct ExistentialId;
+
+/// A scoped quantified relation. Its local identities must already be correctly scoped and fresh
+/// relative to enclosing binders; the constructor trusts its caller instead of inspecting graphs.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct Existential<'db> {
+    locals: TypeVarSet<'db>,
+    domain: NodeId,
+    body: NodeId,
+}
+
 impl ExistentialId {
-    #[cfg_attr(not(test), expect(dead_code))]
     fn new<'db>(
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        locals: TypeVarSet<'db>,
-        additional_domain: NodeId,
-        body: NodeId,
-    ) -> Self {
-        for local in locals.iter(db) {
-            builder.intern_typevar(db, local);
-        }
-
-        let declared_domain = locals.iter(db).fold(ALWAYS_TRUE, |domain, local| {
-            domain.and_with_offset(builder, local.valid_specializations(db, builder))
-        });
-        let domain = declared_domain.and_with_offset(builder, additional_domain);
-        Self::new_with_domain(builder, locals, domain, body)
-    }
-
-    fn new_with_domain<'db>(
         builder: &ConstraintSetBuilder<'db>,
         locals: TypeVarSet<'db>,
         domain: NodeId,
         body: NodeId,
     ) -> Self {
-        builder.intern_existential(Existential {
-            locals,
-            domain,
-            body,
-        })
+        builder.intern_existential(
+            db,
+            Existential {
+                locals,
+                domain,
+                body,
+            },
+        )
     }
 }
 
@@ -2261,44 +2308,23 @@ impl Existential<'_> {
             return additional_domain.and_with_offset(builder, body);
         }
 
-        let existential = ExistentialId::new(db, builder, locals, additional_domain, body);
+        let declared_domain = locals.iter(db).fold(ALWAYS_TRUE, |domain, local| {
+            domain.and_with_offset(builder, local.valid_specializations(db, builder))
+        });
+        let domain = declared_domain.and_with_offset(builder, additional_domain);
+
+        Self::new_node_with_domain(db, builder, locals, domain, body)
+    }
+
+    fn new_node_with_domain<'db>(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        locals: TypeVarSet<'db>,
+        domain: NodeId,
+        body: NodeId,
+    ) -> NodeId {
+        let existential = ExistentialId::new(db, builder, locals, domain, body);
         Node::new_atom(builder, AtomId::Existential(existential), 1)
-    }
-}
-
-impl AtomId {
-    fn when_true(self) -> AtomAssignment {
-        AtomAssignment::Positive(self)
-    }
-
-    fn when_false(self) -> AtomAssignment {
-        AtomAssignment::Negative(self)
-    }
-
-    fn when_unconstrained(self) -> AtomAssignment {
-        AtomAssignment::Unconstrained(self)
-    }
-
-    /// Keeps ordinary ranges above quantified atoms normally, while exercising both cross-kind
-    /// orders when constraint-order wobbling is enabled.
-    fn ordering(self) -> (usize, std::cmp::Reverse<usize>) {
-        match self {
-            AtomId::Range(constraint) => (wobble_index(0), constraint.ordering()),
-            AtomId::Existential(existential) => (
-                wobble_index(1),
-                std::cmp::Reverse(wobble_index(existential.index())),
-            ),
-        }
-    }
-
-    #[track_caller]
-    fn expect_range(self) -> ConstraintId {
-        match self {
-            AtomId::Range(constraint) => constraint,
-            AtomId::Existential(_) => {
-                panic!("invariant violation: existential atom reached range-only operation")
-            }
-        }
     }
 }
 
@@ -2426,20 +2452,16 @@ impl NodeId {
 }
 
 impl Node {
-    /// Creates a new BDD node for an individual constraint. (The BDD will evaluate to `true` when
-    /// the constraint holds, and to `false` when it does not.)
-    fn new_constraint(
+    /// Creates a new BDD node for an individual atom. (The BDD will evaluate to `true` when
+    /// the atom holds, and to `false` when it does not.)
+    fn new_atom(
         builder: &ConstraintSetBuilder<'_>,
-        constraint: ConstraintId,
+        atom: impl Into<AtomId>,
         source_order: usize,
     ) -> NodeId {
-        Self::new_atom(builder, AtomId::Range(constraint), source_order)
-    }
-
-    fn new_atom(builder: &ConstraintSetBuilder<'_>, atom: AtomId, source_order: usize) -> NodeId {
         NodeId::with_uncertain(
             builder,
-            atom,
+            atom.into(),
             ALWAYS_TRUE,
             ALWAYS_FALSE,
             ALWAYS_FALSE,
@@ -3295,8 +3317,10 @@ impl NodeId {
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
-    /// caller only needs to discover the atoms in the current diagram; traversing every
-    /// root-to-leaf occurrence can be exponential in the presence of shared subgraphs.
+    /// caller only needs to discover the set of atoms mentioned in a BDD; traversing every
+    /// root-to-leaf occurrence can be exponential in the presence of shared subgraphs. (Note that
+    /// if the BDD contains any existential atoms, we do _not_ recurse into their domains or
+    /// bodies. You must do that yourself if needed.)
     fn for_each_unique_atom(
         self,
         builder: &ConstraintSetBuilder<'_>,
@@ -3484,30 +3508,26 @@ impl NodeId {
                             let relation = builder.existential_data(existential);
                             write!(
                                 f,
-                                "<{index}> ∃ [{}] {}/{}",
-                                relation
-                                    .locals
-                                    .iter(db)
-                                    .map(|local| local.identity(db).display(db))
-                                    .format(", "),
+                                "<{index}> ∃ {} {}/{}",
+                                relation.locals.display(db),
                                 interior.source_order,
                                 interior.max_source_order,
                             )?;
-                            write!(f, "\n{prefix}├─D ")?;
+                            write!(f, "\n{prefix}├─ domain ")?;
                             format_node(
                                 db,
                                 builder,
                                 relation.domain,
-                                &format_args!("{prefix}│   "),
+                                &format_args!("{prefix}│         "),
                                 seen,
                                 f,
                             )?;
-                            write!(f, "\n{prefix}├─B ")?;
+                            write!(f, "\n{prefix}├─ body   ")?;
                             format_node(
                                 db,
                                 builder,
                                 relation.body,
-                                &format_args!("{prefix}│   "),
+                                &format_args!("{prefix}│         "),
                                 seen,
                                 f,
                             )?;
@@ -3613,7 +3633,7 @@ struct InteriorNodeData {
 
     /// Represents the order in which this node's atom was added to the containing constraint set,
     /// relative to all of the other atoms in the set. This starts off at 1 for a simple
-    /// single-atom set (e.g. created with [`Node::new_constraint`] or
+    /// single-atom set (e.g. created with [`Node::new_atom`] or
     /// [`Node::new_satisfied_atom`]). It will get incremented, if needed, as that simple BDD is
     /// combined into larger BDDs.
     source_order: usize,
@@ -4576,7 +4596,7 @@ impl InteriorNode {
                                 .filter(|(assignment, _)| {
                                     // Don't add back any derived facts if they are ones that we would have
                                     // removed!
-                                    !(self.should_remove)(assignment.expect_range())
+                                    !(self.should_remove)(assignment.atom().expect_range())
                                 })
                                 .fold(subtree, |subtree, (assignment, (source_order, _))| {
                                     subtree.and(
@@ -4613,7 +4633,7 @@ impl InteriorNode {
                     // derived constraints into the result, and those constraints might appear before this
                     // one in the BDD ordering.
                     Disposition::Keep => {
-                        let guard = Node::new_constraint(builder, *constraint, *source_order);
+                        let guard = Node::new_atom(builder, *constraint, *source_order);
                         ControlFlow::Continue(guard.ite(
                             builder,
                             if_true.or(builder, if_uncertain),
@@ -4858,7 +4878,7 @@ impl InteriorNode {
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
-                let new_node = Node::new_constraint(builder, new_constraint, next_source_order);
+                let new_node = Node::new_atom(builder, new_constraint, next_source_order);
                 next_source_order += 1;
                 let positive_left_node = Node::new_satisfied_atom(
                     builder,
@@ -5213,15 +5233,10 @@ enum AtomAssignment {
 impl AtomAssignment {
     fn atom(self) -> AtomId {
         match self {
-            AtomAssignment::Positive(atom)
-            | AtomAssignment::Negative(atom)
-            | AtomAssignment::Unconstrained(atom) => atom,
+            AtomAssignment::Positive(atom) => atom,
+            AtomAssignment::Negative(atom) => atom,
+            AtomAssignment::Unconstrained(atom) => atom,
         }
-    }
-
-    #[track_caller]
-    fn expect_range(self) -> ConstraintId {
-        self.atom().expect_range()
     }
 
     fn negated(self) -> Self {
@@ -5289,17 +5304,23 @@ impl AtomAssignment {
             //
             //     |------other-------|
             //     |---|...self...|---|
-            (AtomAssignment::Negative(_), AtomAssignment::Positive(_)) => false,
+            (
+                AtomAssignment::Negative(AtomId::Range(_)),
+                AtomAssignment::Positive(AtomId::Range(_)),
+            ) => false,
 
             // An `Unconstrained` assignment means "this constraint can go either way." It does
             // not imply any positive or negative assignment, and no positive or negative
             // assignment implies it. The only trivially true case is Unconstrained => Unconstrained
             // for the same constraint.
             (
-                AtomAssignment::Unconstrained(self_constraint),
-                AtomAssignment::Unconstrained(other_constraint),
+                AtomAssignment::Unconstrained(AtomId::Range(self_constraint)),
+                AtomAssignment::Unconstrained(AtomId::Range(other_constraint)),
             ) => self_constraint == other_constraint,
-            (AtomAssignment::Unconstrained(_), _) | (_, AtomAssignment::Unconstrained(_)) => false,
+
+            (AtomAssignment::Unconstrained(AtomId::Range(_)), _)
+            | (_, AtomAssignment::Unconstrained(AtomId::Range(_))) => false,
+
             // Quantified relations are opaque Boolean atoms: no range-containment or
             // disjointness implication can be inferred from their payloads.
             _ => false,
@@ -5329,37 +5350,12 @@ impl AtomAssignment {
                     AtomAssignment::Unconstrained(_) => "?",
                 }
             }
-        }
 
-        impl Display for DisplayAtomAssignment<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let constraint = match self.assignment.atom() {
-                    AtomId::Range(constraint) => constraint,
-                    AtomId::Existential(existential) => {
-                        let relation = self.builder.existential_data(existential);
-                        let locals = relation
-                            .locals
-                            .iter(self.db)
-                            .map(|local| local.identity(self.db).display(self.db))
-                            .format(", ");
-                        let domain = relation
-                            .domain
-                            .simplify_for_display(self.db, self.builder)
-                            .display(self.db, self.builder);
-                        let body = relation
-                            .body
-                            .simplify_for_display(self.db, self.builder)
-                            .display(self.db, self.builder);
-                        return write!(
-                            f,
-                            "{}(∃ [{}] . {} ∧ {})",
-                            self.range_prefix(),
-                            locals,
-                            domain,
-                            body,
-                        );
-                    }
-                };
+            fn display_range(
+                &self,
+                f: &mut std::fmt::Formatter<'_>,
+                constraint: ConstraintId,
+            ) -> std::fmt::Result {
                 let constraint_data = self.builder.constraint_data(constraint);
                 let lower = constraint_data.bounds.materialized_lower();
                 let upper = constraint_data.bounds.materialized_upper();
@@ -5407,6 +5403,47 @@ impl AtomAssignment {
                     write!(f, " ≤ {}", upper.display(self.db))?;
                 }
                 f.write_str(")")
+            }
+
+            fn display_existential(
+                &self,
+                f: &mut std::fmt::Formatter<'_>,
+                existential: ExistentialId,
+            ) -> std::fmt::Result {
+                let relation = self.builder.existential_data(existential);
+                write!(
+                    f,
+                    "{}(∃ {}",
+                    self.range_prefix(),
+                    relation.locals.display(self.db),
+                )?;
+                if relation.domain != ALWAYS_TRUE {
+                    write!(
+                        f,
+                        " | {}",
+                        relation
+                            .domain
+                            .simplify_for_display(self.db, self.builder)
+                            .display(self.db, self.builder),
+                    )?;
+                }
+                write!(
+                    f,
+                    " ⋅ {})",
+                    relation
+                        .body
+                        .simplify_for_display(self.db, self.builder)
+                        .display(self.db, self.builder),
+                )
+            }
+        }
+
+        impl Display for DisplayAtomAssignment<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.assignment.atom() {
+                    AtomId::Range(constraint) => self.display_range(f, constraint),
+                    AtomId::Existential(existential) => self.display_existential(f, existential),
+                }
             }
         }
 
@@ -7279,7 +7316,7 @@ impl PathAssignments {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
             // already any assignment for this constraint (positive, negative, or unconstrained),
             // the existing assignment is at least as informative, and we skip.
-            if self.contains_constraint(assignment.expect_range()) {
+            if self.contains_constraint(assignment.atom().expect_range()) {
                 return Ok(());
             }
 
@@ -7373,7 +7410,7 @@ impl PathAssignments {
         // brute-force search.
 
         self.new_assignments.clear();
-        self.discover_constraint(db, builder, assignment.expect_range());
+        self.discover_constraint(db, builder, assignment.atom().expect_range());
 
         for i in 0..self.sequents.len() {
             let sequent = self.sequents[i];
@@ -7876,32 +7913,35 @@ mod tests {
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
         let bool = known_instance(&db, KnownClass::Bool);
-        let outer = create_typevar(&db, "Y")
+
+        // Y: str
+        let y = create_typevar(&db, "Y")
             .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
-        let local = create_typevar(&db, "X").map_bound_or_constraints(&db, |_| {
-            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(outer)))
+        // X: Y
+        let x = create_typevar(&db, "X").map_bound_or_constraints(&db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(y)))
         });
+
         let builder = ConstraintSetBuilder::new();
-        let additional = ConstraintSet::constrain_typevar(&db, &builder, outer, int, int);
-        let body = ConstraintSet::constrain_typevar(&db, &builder, local, bool, bool);
+        // Y = int
+        let additional = ConstraintSet::constrain_typevar(&db, &builder, y, int, int);
+        // X = bool
+        let body = ConstraintSet::constrain_typevar(&db, &builder, x, bool, bool);
         let node = Existential::new_node(
             &db,
             &builder,
-            TypeVarSet::from_typevars(&db, [local]),
+            TypeVarSet::from_typevars(&db, [x]),
             additional.node,
             body.node,
         );
         let set = ConstraintSet::from_node(&builder, node);
 
+        let displayed = set.display(&db).to_string();
         assert_eq!(
-            set.display(&db).to_string(),
-            "(∃ [X] . ((X ≤ Y) ∧ (X ≤ int) ∧ (Y = int)) ∧ (X = bool))"
+            displayed,
+            "(∃ [X] | ((X ≤ Y) ∧ (X ≤ int) ∧ (Y = int)) ⋅ (X = bool))"
         );
-        assert!(!set.display(&db).to_string().contains("Y ≤ str"));
-
-        let empty =
-            Existential::new_node(&db, &builder, TypeVarSet::None, additional.node, body.node);
-        assert_eq!(empty, additional.node.and_with_offset(&builder, body.node));
+        assert!(!displayed.contains("Y ≤ str"));
     }
 
     #[test]
@@ -7928,9 +7968,10 @@ mod tests {
         let union =
             ConstraintSet::from_node(&builder, x_relation.or_with_offset(&builder, y_relation));
 
+        let displayed = union.display(&db).to_string();
         assert_eq!(
-            union.display(&db).to_string(),
-            "((∃ [X] . always ∧ always) ∧ ?(∃ [Y] . (Y = int) ∧ (Y = int))) ∨ (∃ [Y] . (Y = int) ∧ (Y = int))"
+            displayed,
+            "((∃ [X] ⋅ always) ∧ ?(∃ [Y] | (Y = int) ⋅ (Y = int))) ∨ (∃ [Y] | (Y = int) ⋅ (Y = int))",
         );
         check_display_graph(
             &db,
@@ -7938,15 +7979,15 @@ mod tests {
             union,
             indoc! {r#"
                 <0> ∃ [Y] 2/2
-                ├─D <1> (Y = int) 1/1
-                │   ┡━₁ always
-                │   ├─? never
-                │   └─₀ never
-                ├─B <1> SHARED
+                ├─ domain <1> (Y = int) 1/1
+                │         ┡━₁ always
+                │         ├─? never
+                │         └─₀ never
+                ├─ body   <1> SHARED
                 ┡━₁ always
                 ├─? <2> ∃ [X] 1/1
-                │   ├─D always
-                │   ├─B always
+                │   ├─ domain always
+                │   ├─ body   always
                 │   ┡━₁ always
                 │   ├─? never
                 │   └─₀ never
@@ -7955,10 +7996,8 @@ mod tests {
         );
 
         let negated = ConstraintSet::from_node(&builder, y_relation.negate(&builder));
-        assert_eq!(
-            negated.display(&db).to_string(),
-            "¬(∃ [Y] . (Y = int) ∧ (Y = int))"
-        );
+        let displayed = negated.display(&db).to_string();
+        assert_eq!(displayed, "¬(∃ [Y] | (Y = int) ⋅ (Y = int))");
         let intersection =
             ConstraintSet::from_node(&builder, x_relation.and_with_offset(&builder, y_relation));
         assert!(intersection.display(&db).to_string().contains("∃ [X]"));
@@ -7966,13 +8005,24 @@ mod tests {
 
         let mixed =
             ConstraintSet::from_node(&builder, y_body.node.and_with_offset(&builder, x_relation));
-        assert!(mixed.display(&db).to_string().contains("(Y = int)"));
-        assert!(mixed.display(&db).to_string().contains("∃ [X]"));
-        assert!(
-            mixed
-                .display_graph(&db, &"")
-                .to_string()
-                .starts_with("<0> (Y = int)")
+        let displayed = mixed.display(&db).to_string();
+        assert!(displayed.contains("(Y = int)"));
+        assert!(displayed.contains("∃ [X]"));
+        check_display_graph(
+            &db,
+            &builder,
+            mixed,
+            indoc! {r#"
+                <0> (Y = int) 1/2
+                ┡━₁ <1> ∃ [X] 2/2
+                │   ├─ domain always
+                │   ├─ body   always
+                │   ┡━₁ always
+                │   ├─? never
+                │   └─₀ never
+                ├─? never
+                └─₀ never
+            "#},
         );
     }
 
@@ -8078,10 +8128,7 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let loaded = builder.load(&db, &owned);
 
-        assert_eq!(
-            loaded.display(&db).to_string(),
-            "(∃ [Unused] . always ∧ always)"
-        );
+        assert_eq!(loaded.display(&db).to_string(), "(∃ [Unused] ⋅ always)");
     }
 
     #[test]
