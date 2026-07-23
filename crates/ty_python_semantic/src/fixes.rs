@@ -1,4 +1,4 @@
-use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
+use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all, suppression::can_suppress};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -93,7 +93,7 @@ where
 
     let has_fixable = diagnostics
         .iter()
-        .any(|diagnostic| fix_mode.is_fixable(diagnostic));
+        .any(|diagnostic| fix_mode.is_fixable(db, diagnostic));
 
     // Early return if there are no diagnostics that can be suppressed to avoid all the heavy work below.
     if !has_fixable {
@@ -204,6 +204,7 @@ where
 
                     if is_last_iteration {
                         let diagnostic = create_too_many_iterations_diagnostics(
+                            &*db,
                             file.file,
                             fix_mode,
                             file.diagnostics(),
@@ -324,13 +325,14 @@ fn create_fix_introduced_syntax_error_diagnostic(
 }
 
 fn create_too_many_iterations_diagnostics(
+    db: &dyn Db,
     file: File,
     fix_mode: FixMode,
     diagnostics: &[Diagnostic],
 ) -> Diagnostic {
     let mut fixable_ids = diagnostics
         .iter()
-        .filter(|diagnostic| fix_mode.is_fixable(diagnostic))
+        .filter(|diagnostic| fix_mode.is_fixable(db, diagnostic))
         .map(|diagnostic| diagnostic.id().as_str())
         .collect::<Vec<_>>();
 
@@ -362,19 +364,18 @@ enum FixMode {
 }
 
 impl FixMode {
-    fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+    fn is_fixable(self, db: &dyn Db, diagnostic: &Diagnostic) -> bool {
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
 
         match self {
-            FixMode::Suppress => {
-                primary_span.range().is_some()
-                    && diagnostic
-                        .id()
-                        .as_lint()
-                        .is_some_and(|name| !is_unused_ignore_comment_lint(name))
-            }
+            FixMode::Suppress => primary_span.range().is_some_and(|range| {
+                diagnostic.id().as_lint().is_some_and(|name| {
+                    !is_unused_ignore_comment_lint(name)
+                        && can_suppress(db, primary_span.expect_ty_file(), name, range)
+                })
+            }),
             FixMode::ApplyFixes(applicability) => diagnostic.has_applicable_fix(applicability),
         }
     }
@@ -395,6 +396,10 @@ impl FixMode {
                         // We can't suppress diagnostics without a corresponding file or range.
                         let span = diagnostic.primary_span()?;
                         let range = span.range()?;
+
+                        if !can_suppress(db, file, lint_id, range) {
+                            return None;
+                        }
 
                         Some((lint_id, range))
                     })
@@ -1254,21 +1259,31 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
         value = 1 / 0
         ```
 
         ## Diagnostics after applying fixes
 
-        warning[unused-ignore-comment]: Unused `ty: ignore` directive
-         --> test.py:2:68
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:2:1
           |
         1 | seen_code = True
-        2 | # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-          |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        2 | # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
+          | ^^^^^^^^^^^^^^^
         3 | value = 1 / 0
           |
         help: Remove the unused suppression comment
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'division-by-zero'
+         --> test.py:2:54
+          |
+        1 | seen_code = True
+        2 | # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero, ignore-comment-unknown-rule]
+          |                                                      ^^^^^^^^^^^^^^^^
+        3 | value = 1 / 0
+          |
+        help: Remove the unused suppression code
         "
         );
     }
@@ -1354,6 +1369,302 @@ class B(A):
         )
         ```
         "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_own_line_unknown_rule_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]
+                value = 1
+                # ty: ignore[another-not-a-rule, third-not-a-rule]
+                value = 1
+                "#),
+            @"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        # ty: ignore[another-not-a-rule, third-not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_preserves_bracket_terminated_suppression_reason() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # ty: ignore[unresolved-reference, not-a-rule, another-not-a-rule] tracked by [123]  # ty:ignore[ignore-comment-unknown-rule]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_preserves_leading_type_directives() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                items = []  # type: list[int]  # ty: ignore[not-a-rule]
+                invalid = []  # type: list[str]  # ty: ignore[*-*]
+                value = "x"  # type: ignore[assignment]  # ty: ignore[another-not-a-rule]
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        items = []  # type: list[int]  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        invalid = []  # type: list[str]  # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
+        value = "x"  # type: ignore[assignment]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_handles_nested_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
+                value = missing
+                # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
+                value = missing
+                # ty: ignore[#]
+                value = 1
+                # ty: ignore[unresolved-reference#]
+                value = 1
+                "#),
+            @"
+        Added 4 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference, ignore-comment-unknown-rule]
+        value = missing
+        # ty: ignore[*-*]  # ty: ignore[unresolved-reference, invalid-ignore-comment]
+        value = missing
+        # ty: ignore[#]  # ty:ignore[invalid-ignore-comment]
+        value = 1
+        # ty: ignore[unresolved-reference#]  # ty:ignore[invalid-ignore-comment]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_handles_indented_mixed_type_ignore() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f():
+                    # type: ignore[ty:division-by-zero, ty:not-a-rule]
+                    value = 1
+                    # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]
+                    value = 1
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f():
+            # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+            value = 1
+            # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+            value = 1
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
+         --> test.py:2:20
+          |
+        1 | def f():
+        2 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+          |                    ^^^^^^^^^^^^^^^^^^^
+        3 |     value = 1
+        4 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+          |
+        help: Remove the unused suppression code
+
+        warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
+         --> test.py:4:31
+          |
+        2 |     # type: ignore[ty:division-by-zero, ty:not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+        3 |     value = 1
+        4 |     # fmt: off # type: ignore[ty:division-by-zero, ty:another-not-a-rule]  # ty:ignore[ignore-comment-unknown-rule]
+          |                               ^^^^^^^^^^^^^^^^^^^
+        5 |     value = 1
+          |
+        help: Remove the unused suppression code
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_deduplicates_nested_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule]
+                value = 1
+                # ty: ignore[*-*]  # ty: ignore[*-*]
+                value = 1
+                # ty: ignore[third-not-a-rule]  # ty: ignore[*-*]
+                value = 1
+                "#),
+            @"
+        Added 6 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[not-a-rule]  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        # ty: ignore[*-*]  # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
+        value = 1
+        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule, invalid-ignore-comment]  # ty: ignore[*-*]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_groups_suppression_comments_on_one_physical_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                value = 1  # ty: ignore[first-not-a-rule]  # ty: ignore[second-not-a-rule]
+                # ty: ignore[third-not-a-rule]  # type: ignore[ty:fourth-not-a-rule]
+                value = 1
+                #! notes # ty: ignore[fifth-not-a-rule]
+                value = 1
+                # ty: ignore[*-*]  # ty: ignore[sixth-not-a-rule] explanation
+                value = 1
+                "#),
+            @"
+        Added 7 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        value = 1  # ty: ignore[first-not-a-rule]  # ty: ignore[second-not-a-rule, ignore-comment-unknown-rule]
+        # ty: ignore[third-not-a-rule, ignore-comment-unknown-rule]  # type: ignore[ty:fourth-not-a-rule]
+        value = 1
+        #! notes # ty: ignore[fifth-not-a-rule, ignore-comment-unknown-rule]
+        value = 1
+        # ty: ignore[*-*]  # ty: ignore[sixth-not-a-rule] explanation  # ty:ignore[ignore-comment-unknown-rule, invalid-ignore-comment]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_suppress_following_logical_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[not-a-rule]
+                value = 1  # ty: ignore[another-not-a-rule]
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        value = 1  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_file_level_suppression_comments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                # ty: ignore[not-a-rule]
+                # ty: ignore[*-*]
+                value = 1
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+        # ty: ignore[*-*]  # ty:ignore[invalid-ignore-comment]
+        value = 1
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_preserves_shebang_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+                value = 1
+                "#),
+            @"
+        Added 0 suppressions
+
+        ## Fixed source
+
+        ```py
+        #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+        value = 1
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[ignore-comment-unknown-rule]: Unknown rule `not-a-rule`
+         --> test.py:1:43
+          |
+        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+          |                                           ^^^^^^^^^^
+        2 | value = 1
+          |
+
+        warning[invalid-ignore-comment]: Invalid `ty: ignore` comment: expected a alphanumeric character or `-` or `_` as code
+         --> test.py:1:69
+          |
+        1 | #!/usr/bin/env -S python3 -u # ty: ignore[not-a-rule]  # ty: ignore[*-*]
+          |                                                                     ^
+        2 | value = 1
+          |
+        "
         );
     }
 
@@ -1965,11 +2276,11 @@ class B(A):
         let total_diagnostics = diagnostics.len();
         let suppressible_diagnostics = diagnostics
             .iter()
-            .filter(|diagnostic| FixMode::Suppress.is_fixable(diagnostic))
+            .filter(|diagnostic| FixMode::Suppress.is_fixable(&db, diagnostic))
             .count();
         let unsuppressible_diagnostics: Vec<_> = diagnostics
             .iter()
-            .filter(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            .filter(|diagnostic| !FixMode::Suppress.is_fixable(&db, diagnostic))
             .cloned()
             .collect();
         let cancellation_token_source = CancellationTokenSource::new();
@@ -1986,7 +2297,7 @@ class B(A):
                 fixes
                     .diagnostics
                     .iter()
-                    .all(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+                    .all(|diagnostic| !FixMode::Suppress.is_fixable(&db, diagnostic))
             );
 
             let unexpected_diagnostics =

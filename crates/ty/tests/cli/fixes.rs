@@ -55,13 +55,14 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
                 return value
 
             seen_code = True
-            # ty: ignore[]
+            # ty: ignore[unresolved-reference]
             values = [
                 # ty: ignore[blanket-ignore-comment]
                 # ty: ignore
                 f("bad"),
                 # ty: ignore
                 missing,
+                absent,
             ]
             "#,
     )?;
@@ -88,13 +89,14 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
         return value
 
     seen_code = True
-    # ty: ignore[blanket-ignore-comment]
+    # ty: ignore[unresolved-reference]
     values = [
         # ty: ignore[blanket-ignore-comment]
         # ty: ignore
         f("bad"),
-        # ty: ignore
+        # ty: ignore  # ty:ignore[blanket-ignore-comment]
         missing,
+        absent,
     ]
     "#);
 
@@ -161,6 +163,45 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_with_type_ignore_comments_disabled() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "unknown_rule.py",
+        r#"
+            seen_code = True
+            # ty: ignore[not-a-rule]
+            value = 1
+            value = 1  # ty: ignore[another-not-a-rule]
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--add-ignore")
+            .arg("--config")
+            .arg("analysis.respect-type-ignore-comments=false"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 2 ignore comments
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("unknown_rule.py"))?, @"
+
+    seen_code = True
+    # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
+    value = 1
+    value = 1  # ty: ignore[another-not-a-rule, ignore-comment-unknown-rule]
     ");
 
     Ok(())

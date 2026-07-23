@@ -16,13 +16,15 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 
 use crate::Db;
 use crate::lint::LintId;
 use crate::suppression::{
-    SuppressionKind, Suppressions, select_preferred_suppression, suppressions,
+    SuppressionKind, Suppressions, is_suppression_comment_lint, select_preferred_suppression,
+    suppressions,
 };
 
 /// Creates fixes to suppress all violations in `ids_with_range`.
@@ -41,18 +43,19 @@ pub fn suppress_all(
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
-    // Compute the full suppression ranges for each diagnostic, while retaining the original
-    // diagnostic ranges for matching existing suppressions.
-    let mut ids_with_suppression_range: Vec<_> = ids_with_range
-        .iter()
-        .map(|&(id, diagnostic_range)| {
-            (
-                id,
-                diagnostic_range,
-                suppression_range(db, file, diagnostic_range),
-            )
-        })
-        .collect();
+    let mut ids_with_suppression_range = Vec::with_capacity(ids_with_range.len());
+
+    for &(id, diagnostic_range) in ids_with_range {
+        if is_suppression_comment_lint(id) && is_executable_shebang(&source, diagnostic_range) {
+            continue;
+        }
+
+        ids_with_suppression_range.push((
+            id,
+            diagnostic_range,
+            suppression_range(db, file, diagnostic_range),
+        ));
+    }
 
     // Sort the suppression ranges by their start position and length (end position).
     // This ensures that a diagnostic with a shorter range is processed before
@@ -79,7 +82,9 @@ pub fn suppress_all(
 
     // Choose the final existing suppression for every diagnostic before grouping any edits.
     for (id, diagnostic_range, suppression_range) in ids_with_suppression_range {
-        if let Some(existing) = find_existing_suppression(suppressions, &source, diagnostic_range) {
+        if let Some(existing) =
+            find_existing_suppression(suppressions, &source, diagnostic_range, id)
+        {
             with_existing.push((id, suppression_range, existing));
         } else {
             without_existing.push((id, suppression_range));
@@ -165,19 +170,36 @@ pub struct SuppressFix {
     pub suppressed_diagnostics: usize,
 }
 
-/// Creates a fix to suppress a single lint.
-pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
-    let suppression_range = suppression_range(db, file, range);
-
+/// Creates a fix to suppress a single lint, unless doing so would edit an executable shebang.
+pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Option<Fix> {
     let suppressions = suppressions(db, file);
     let source = source_text(db, file);
     let codes = &[id.name()];
 
-    if let Some(existing) = find_existing_suppression(suppressions, &source, range) {
-        return add_to_existing_suppression(existing, codes);
+    if is_suppression_comment_lint(id.name()) && is_executable_shebang(&source, range) {
+        return None;
     }
 
-    add_end_of_line_suppression(&source, codes, suppression_range.end())
+    if let Some(existing) = find_existing_suppression(suppressions, &source, range, id.name()) {
+        return Some(add_to_existing_suppression(existing, codes));
+    }
+
+    let suppression_range = suppression_range(db, file, range);
+
+    Some(add_end_of_line_suppression(
+        &source,
+        codes,
+        suppression_range.end(),
+    ))
+}
+
+/// Returns whether a diagnostic can be included in a bulk suppression fix.
+pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
+    !is_suppression_comment_lint(id) || !is_executable_shebang(&source_text(db, file), range)
+}
+
+fn is_executable_shebang(source: &str, range: TextRange) -> bool {
+    source.starts_with("#!") && source.line_start(range.start()) == TextSize::ZERO
 }
 
 /// Returns the suppression range for the given `range`.
@@ -214,7 +236,7 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> TextRange {
             )
         })
         .map(Ranged::start)
-        .unwrap_or(range.end());
+        .unwrap_or_else(|| source_text(db, file).line_end(range.end()));
 
     TextRange::new(line_start, line_end)
 }
@@ -258,7 +280,9 @@ fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextS
 /// Returns insertion metadata for the preferred editable suppression covering `range`.
 ///
 /// When multiple comments apply, a same-line or otherwise nested comment takes precedence over an
-/// outer own-line suppression.
+/// outer own-line suppression. Diagnostics about suppression comments only extend a `ty: ignore`
+/// on their own physical line. A syntactically valid `ty: ignore` containing only unknown codes
+/// remains editable even though it has no indexed suppression entries.
 ///
 /// ```python
 /// # ty: ignore[invalid-assignment]
@@ -268,16 +292,47 @@ fn find_existing_suppression(
     suppressions: &Suppressions,
     source: &str,
     range: TextRange,
+    id: LintName,
 ) -> Option<ExistingSuppression> {
-    let suppression = select_preferred_suppression(
+    let line_start = source.line_start(range.start());
+    let is_suppression_comment = is_suppression_comment_lint(id);
+
+    let indexed = select_preferred_suppression(
         suppressions
-            .editable_inline_suppressions_rev(range)
+            .file
+            .iter()
+            .rev()
+            .filter(|_| is_suppression_comment)
+            .chain(suppressions.editable_inline_suppressions_rev(range))
             .filter(|suppression| {
-                editable_suppression_prefix(&source[suppression.comment_range]).is_some()
+                (!is_suppression_comment
+                    || (!suppression.kind.is_type_ignore()
+                        && source.line_start(suppression.comment_range.start()) == line_start))
+                    && editable_suppression_prefix(&source[suppression.comment_range]).is_some()
             }),
         range,
-    )?;
-    let prefix = editable_suppression_prefix(&source[suppression.comment_range])?;
+    )
+    .map(|suppression| (suppression.comment_range, suppression.kind));
+
+    let line_end = source.line_end(range.start());
+    let first_unknown = suppressions
+        .unknown
+        .partition_point(|unknown| unknown.range.start() < line_start);
+    let unknown = suppressions.unknown[first_unknown..]
+        .iter()
+        .take_while(|unknown| unknown.range.start() < line_end)
+        .filter(|unknown| {
+            unknown.kind == SuppressionKind::Ty
+                && editable_suppression_prefix(&source[unknown.comment_range]).is_some()
+        })
+        .max_by_key(|unknown| unknown.comment_range.start())
+        .map(|unknown| (unknown.comment_range, unknown.kind));
+
+    let (comment_range, kind) = indexed
+        .into_iter()
+        .chain(unknown)
+        .max_by_key(|(comment_range, _)| comment_range.start())?;
+    let prefix = editable_suppression_prefix(&source[comment_range])?;
     let separator = if prefix.ends_with('[') {
         ""
     } else if prefix.ends_with(',') {
@@ -287,8 +342,8 @@ fn find_existing_suppression(
     };
 
     Some(ExistingSuppression {
-        insertion_offset: suppression.comment_range.start() + prefix.text_len(),
-        kind: suppression.kind,
+        insertion_offset: comment_range.start() + prefix.text_len(),
+        kind,
         separator,
     })
 }

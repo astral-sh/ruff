@@ -370,6 +370,77 @@ a = 10
 reveal_type(a)  # ty: ignore[revealed-type]
 ```
 
+## Suppressing suppression diagnostics on an own line
+
+An own-line suppression covers its entire physical comment line and the following statement,
+including diagnostics emitted for ignore comments.
+
+```py
+seen_code = True
+# ty: ignore[ignore-comment-unknown-rule]
+# ty: ignore[not-a-rule]
+value = 1
+# error: [ignore-comment-unknown-rule]
+value = 1  # ty: ignore[another-not-a-rule]
+
+# ty: ignore[invalid-ignore-comment]
+# ty: ignore[*-*]
+value = 1
+# error: [invalid-ignore-comment]
+value = 1  # ty: ignore[*-*]
+```
+
+An own-line suppression can also suppress an ignore-comment diagnostic on the following statement.
+
+```py
+seen_code = True
+# ty: ignore[ignore-comment-unknown-rule]
+value = 1  # ty: ignore[not-a-rule]
+
+# ty: ignore[invalid-ignore-comment]
+value = 1  # ty: ignore[*-*]
+```
+
+An `unused-ignore-comment` suppression can likewise suppress an unused directive on the following
+statement.
+
+```py
+seen_code = True
+# ty: ignore[unused-ignore-comment]
+value = 1  # type: ignore[ty:division-by-zero]
+```
+
+An indented own-line comment can mix a suppression-comment rule with an ordinary rule without
+changing the source order of its suppression ranges.
+
+```py
+def f():
+    # ty: ignore[unresolved-reference, ignore-comment-unknown-rule, not-a-rule]
+    value = missing
+```
+
+A rule-specific suppression covers every ignore comment on its physical line, regardless of
+sub-comment order.
+
+```py
+def f():
+    # ty: ignore[not-a-rule] # type: ignore[ty:ignore-comment-unknown-rule]
+    value = 1
+
+    # ty: ignore[first-not-a-rule] # ty: ignore[second-not-a-rule] # ty: ignore[ignore-comment-unknown-rule]
+    value = 1
+```
+
+A later blanket `ty: ignore` does not suppress a malformed earlier sub-comment.
+
+```py
+def f():
+    # error: [ignore-comment-unknown-rule]
+    # error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
+    # ty: ignore[not-a-rule] # ty: ignore
+    value = 1
+```
+
 ## Extra whitespace in type ignore comments is allowed
 
 ```py
