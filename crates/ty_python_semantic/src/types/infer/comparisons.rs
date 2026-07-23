@@ -90,15 +90,15 @@ enum IntersectionOn {
 }
 
 /// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
-pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
+type BinaryComparisonVisitor<'db> = CycleDetector<
     'db,
     ast::CmpOp,
-    (Type<'db>, ast::CmpOp, Type<'db>),
+    (Type<'db>, NonIdentityOperator, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
     1,
 >;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum RichCompareOperator {
     Eq,
     Ne,
@@ -147,17 +147,42 @@ impl RichCompareOperator {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MembershipTestCompareOperator {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum MembershipOperator {
     In,
     NotIn,
 }
 
-impl From<MembershipTestCompareOperator> for ast::CmpOp {
-    fn from(value: MembershipTestCompareOperator) -> Self {
+impl MembershipOperator {
+    const fn is_in(self) -> bool {
+        matches!(self, MembershipOperator::In)
+    }
+
+    const fn is_not_in(self) -> bool {
+        matches!(self, MembershipOperator::NotIn)
+    }
+}
+
+impl From<MembershipOperator> for ast::CmpOp {
+    fn from(value: MembershipOperator) -> Self {
         match value {
-            MembershipTestCompareOperator::In => ast::CmpOp::In,
-            MembershipTestCompareOperator::NotIn => ast::CmpOp::NotIn,
+            MembershipOperator::In => ast::CmpOp::In,
+            MembershipOperator::NotIn => ast::CmpOp::NotIn,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum NonIdentityOperator {
+    Rich(RichCompareOperator),
+    Membership(MembershipOperator),
+}
+
+impl From<NonIdentityOperator> for ast::CmpOp {
+    fn from(value: NonIdentityOperator) -> Self {
+        match value {
+            NonIdentityOperator::Rich(rich_op) => rich_op.into(),
+            NonIdentityOperator::Membership(membership_op) => membership_op.into(),
         }
     }
 }
@@ -192,14 +217,92 @@ pub(super) fn infer_binary_type_comparison<'db>(
     op: ast::CmpOp,
     right: Type<'db>,
     range: TextRange,
+) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
+    let db = context.db();
+
+    let op = match op {
+        ast::CmpOp::Is | ast::CmpOp::IsNot => {
+            let is_positive = op == ast::CmpOp::Is;
+
+            // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
+            // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
+            // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
+            if let Type::TypeVar(left) = left.resolve_type_alias(db)
+                && let Type::TypeVar(right) = right.resolve_type_alias(db)
+                && left.is_same_typevar_as(db, right)
+                && Type::TypeVar(left).is_singleton(db)
+            {
+                return Ok(Type::bool_literal(is_positive));
+            }
+
+            // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
+            // same object:
+            //
+            // UserId = NewType("UserId", int)
+            // OrderId = NewType("OrderId", int)
+            // UserId(1) is OrderId(1)  # true, even though the two NewTypes are disjoint types!
+            //
+            // Widen both operands to the types of their possible runtime objects before using the
+            // ordinary comparison logic.
+            let left_identity = left.identity_comparison_type(db);
+            let right_identity = right.identity_comparison_type(db);
+
+            // If the identity types are disjoint, the operands cannot refer to the same
+            // runtime object.
+            //
+            // Otherwise, knowing that both types are non-disjoint singletons is still not enough
+            // to establish that they refer to the *same* singleton: `is_disjoint_from` can return
+            // false when disjointness cannot be proven. For example, two enum-literal types will
+            // always both be singletons, but if their aliases are unknown, we cannot tell whether
+            // they denote the same member or distinct members (one might be an alias to the other).
+            //
+            // We therefore require one singleton type to be a subtype of the other before inferring
+            // definite identity. Either direction suffices, which also handles cases like
+            // `None` and `Unknown & None`.
+            let result = if left_identity.is_disjoint_from(db, right_identity) {
+                Type::bool_literal(!is_positive)
+            } else if left_identity.is_singleton(db)
+                && right_identity.is_singleton(db)
+                && (left_identity.is_subtype_of(db, right_identity)
+                    || right_identity.is_subtype_of(db, left_identity))
+            {
+                Type::bool_literal(is_positive)
+            } else {
+                KnownClass::Bool.to_instance(db)
+            };
+
+            return Ok(result);
+        }
+        ast::CmpOp::Eq => NonIdentityOperator::Rich(RichCompareOperator::Eq),
+        ast::CmpOp::NotEq => NonIdentityOperator::Rich(RichCompareOperator::Ne),
+        ast::CmpOp::Lt => NonIdentityOperator::Rich(RichCompareOperator::Lt),
+        ast::CmpOp::LtE => NonIdentityOperator::Rich(RichCompareOperator::Le),
+        ast::CmpOp::Gt => NonIdentityOperator::Rich(RichCompareOperator::Gt),
+        ast::CmpOp::GtE => NonIdentityOperator::Rich(RichCompareOperator::Ge),
+        ast::CmpOp::In => NonIdentityOperator::Membership(MembershipOperator::In),
+        ast::CmpOp::NotIn => NonIdentityOperator::Membership(MembershipOperator::NotIn),
+    };
+
+    infer_binary_type_comparison_inner(
+        context,
+        left,
+        op,
+        right,
+        range,
+        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
+    )
+}
+
+fn infer_binary_type_comparison_inner<'db>(
+    context: &InferContext<'db, '_>,
+    left: Type<'db>,
+    op: NonIdentityOperator,
+    right: Type<'db>,
+    range: TextRange,
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
-    // Identity comparisons between equal builtin types are unreliable and not guaranteed by the
-    // language specification:
-    // - `is` returns `false` if the types are disjoint and `bool` if they overlap.
-    // - `is not` returns `true` if the types are disjoint and `bool` if they overlap.
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(db, left, right, op, policy);
         let membership_test_comparison = |op, range: TextRange| {
@@ -207,80 +310,22 @@ pub(super) fn infer_binary_type_comparison<'db>(
         };
 
         match op {
-            ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-            ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-            ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-            ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-            ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-            ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-            ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In, range),
-            ast::CmpOp::NotIn => {
-                membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-            }
-            ast::CmpOp::Is => {
-                if left.is_disjoint_from(db, right) {
-                    Ok(Type::bool_literal(false))
-                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                    Ok(Type::bool_literal(true))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(db))
-                }
-            }
-            ast::CmpOp::IsNot => {
-                if left.is_disjoint_from(db, right) {
-                    Ok(Type::bool_literal(true))
-                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                    Ok(Type::bool_literal(false))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(db))
-                }
+            NonIdentityOperator::Rich(rich_op) => rich_comparison(rich_op),
+            NonIdentityOperator::Membership(membership_op) => {
+                membership_test_comparison(membership_op, range)
             }
         }
     };
 
-    // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
-    // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
-    // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
-    if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot)
-        && !matches!(
-            (
-                left.resolve_type_alias(db),
-                right.resolve_type_alias(db)
-            ),
-            (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
-        )
-    {
-        // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
-        // same object:
-        //
-        // UserId = NewType("UserId", int)
-        // OrderId = NewType("OrderId", int)
-        // user_id is order_id  # possibly true
-        //
-        // Widen both operands to the types of their possible runtime objects before using the
-        // ordinary comparison logic. Keeping the usual recursive dispatch preserves facts carried
-        // by unions and intersections after widening.
-        let left_identity = left.identity_comparison_type(db);
-        let right_identity = right.identity_comparison_type(db);
-        if left_identity != left || right_identity != right {
-            return visitor.visit(db, (left, op, right), || {
-                infer_binary_type_comparison(
-                    context,
-                    left_identity,
-                    op,
-                    right_identity,
-                    range,
-                    visitor,
-                )
-            });
-        }
-    }
-
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
     let comparison_truthiness = match op {
-        ast::CmpOp::Eq => equality_truthiness(db, left, right, soundness_policy),
-        ast::CmpOp::NotEq => inequality_truthiness(db, left, right, soundness_policy),
+        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
+            equality_truthiness(db, left, right, soundness_policy)
+        }
+        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
+            inequality_truthiness(db, left, right, soundness_policy)
+        }
         _ => Truthiness::Ambiguous,
     };
     if comparison_truthiness != Truthiness::Ambiguous {
@@ -288,7 +333,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
     }
 
     let comparison_result = match (left, right) {
-        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison_inner(
             context,
             complement.remaining_literal_union(db),
             op,
@@ -296,7 +341,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             range,
             visitor,
         )),
-        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison_inner(
             context,
             left,
             op,
@@ -308,7 +353,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
-                builder = builder.add(infer_binary_type_comparison(
+                builder = builder.add(infer_binary_type_comparison_inner(
                     context, *element, op, other, range, visitor,
                 )?);
             }
@@ -317,7 +362,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (other, Type::Union(union)) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
-                builder = builder.add(infer_binary_type_comparison(
+                builder = builder.add(infer_binary_type_comparison_inner(
                     context, other, op, *element, range, visitor,
                 )?);
             }
@@ -331,7 +376,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 .copied()
                 .any(Type::is_type_var) =>
         {
-            Some(infer_binary_type_comparison(
+            Some(infer_binary_type_comparison_inner(
                 context,
                 intersection.with_expanded_typevars_and_newtypes(db),
                 op,
@@ -347,7 +392,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 .copied()
                 .any(Type::is_type_var) =>
         {
-            Some(infer_binary_type_comparison(
+            Some(infer_binary_type_comparison_inner(
                 context,
                 left,
                 op,
@@ -368,7 +413,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 visitor,
             )
             .map_err(|err| UnsupportedComparisonError {
-                op,
+                op: op.into(),
                 left_ty: left,
                 right_ty: err.right_ty,
             }),
@@ -384,18 +429,32 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 visitor,
             )
             .map_err(|err| UnsupportedComparisonError {
-                op,
+                op: op.into(),
                 left_ty: err.left_ty,
                 right_ty: right,
             }),
         ),
 
         (Type::TypeAlias(alias), right) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison(context, alias.value_type(db), op, right, range, visitor)
+            infer_binary_type_comparison_inner(
+                context,
+                alias.value_type(db),
+                op,
+                right,
+                range,
+                visitor,
+            )
         })),
 
         (left, Type::TypeAlias(alias)) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
+            infer_binary_type_comparison_inner(
+                context,
+                left,
+                op,
+                alias.value_type(db),
+                range,
+                visitor,
+            )
         })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
@@ -407,7 +466,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::NewTypeInstance(newtype), right) => {
             Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                 visitor.visit(db, (left, op, right), || {
-                    infer_binary_type_comparison(
+                    infer_binary_type_comparison_inner(
                         context,
                         newtype.concrete_base_type(db),
                         op,
@@ -421,7 +480,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (left, Type::NewTypeInstance(newtype)) => {
             Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                 visitor.visit(db, (left, op, right), || {
-                    infer_binary_type_comparison(
+                    infer_binary_type_comparison_inner(
                         context,
                         left,
                         op,
@@ -445,7 +504,9 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit(db, (left, op, right), || {
-                            infer_binary_type_comparison(context, bound, op, bound, range, visitor)
+                            infer_binary_type_comparison_inner(
+                                context, bound, op, bound, range, visitor,
+                            )
                         })
                     }))
                 }
@@ -453,7 +514,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     // For constrained TypeVars, check each constraint paired with itself.
                     let mut builder = UnionBuilder::new(db);
                     for &constraint in constraints.elements(db) {
-                        builder = builder.add(infer_binary_type_comparison(
+                        builder = builder.add(infer_binary_type_comparison_inner(
                             context, constraint, op, constraint, range, visitor,
                         )?);
                     }
@@ -469,14 +530,16 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit(db, (left, op, right), || {
-                            infer_binary_type_comparison(context, bound, op, right, range, visitor)
+                            infer_binary_type_comparison_inner(
+                                context, bound, op, right, range, visitor,
+                            )
                         })
                     }))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     let mut builder = UnionBuilder::new(db);
                     for &constraint in constraints.elements(db) {
-                        builder = builder.add(infer_binary_type_comparison(
+                        builder = builder.add(infer_binary_type_comparison_inner(
                             context, constraint, op, right, range, visitor,
                         )?);
                     }
@@ -492,14 +555,16 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit(db, (left, op, right), || {
-                            infer_binary_type_comparison(context, left, op, bound, range, visitor)
+                            infer_binary_type_comparison_inner(
+                                context, left, op, bound, range, visitor,
+                            )
                         })
                     }))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     let mut builder = UnionBuilder::new(db);
                     for &constraint in constraints.elements(db) {
-                        builder = builder.add(infer_binary_type_comparison(
+                        builder = builder.add(infer_binary_type_comparison_inner(
                             context, left, op, constraint, range, visitor,
                         )?);
                     }
@@ -513,31 +578,27 @@ pub(super) fn infer_binary_type_comparison<'db>(
             match (left_literal.kind(), right_literal.kind()) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
                     Some(match op {
-                        ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
-                        ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
-                        ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
-                        ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
-                        ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
-                        ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
-                        // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
-                        // Even if they are the same value, they may not be the same object.
-                        ast::CmpOp::Is => {
-                            if n == m {
-                                Ok(KnownClass::Bool.to_instance(db))
-                            } else {
-                                Ok(Type::bool_literal(false))
-                            }
+                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
+                            Ok(Type::bool_literal(n == m))
                         }
-                        ast::CmpOp::IsNot => {
-                            if n == m {
-                                Ok(KnownClass::Bool.to_instance(db))
-                            } else {
-                                Ok(Type::bool_literal(true))
-                            }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
+                            Ok(Type::bool_literal(n != m))
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                            Ok(Type::bool_literal(n < m))
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                            Ok(Type::bool_literal(n <= m))
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                            Ok(Type::bool_literal(n > m))
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                            Ok(Type::bool_literal(n >= m))
                         }
                         // Undefined for (int, int)
-                        ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
-                            op,
+                        NonIdentityOperator::Membership(_) => Err(UnsupportedComparisonError {
+                            op: op.into(),
                             left_ty: left,
                             right_ty: right,
                         }),
@@ -545,7 +606,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 }
                 // Booleans are coded as integers (False = 0, True = 1)
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => Some(
-                    infer_binary_type_comparison(
+                    infer_binary_type_comparison_inner(
                         context,
                         Type::int_literal(n.as_i64()),
                         op,
@@ -554,13 +615,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         visitor,
                     )
                     .map_err(|_| UnsupportedComparisonError {
-                        op,
+                        op: op.into(),
                         left_ty: left,
                         right_ty: right,
                     }),
                 ),
                 (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => Some(
-                    infer_binary_type_comparison(
+                    infer_binary_type_comparison_inner(
                         context,
                         Type::int_literal(i64::from(b)),
                         op,
@@ -569,13 +630,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         visitor,
                     )
                     .map_err(|_| UnsupportedComparisonError {
-                        op,
+                        op: op.into(),
                         left_ty: left,
                         right_ty: right,
                     }),
                 ),
                 (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => Some(
-                    infer_binary_type_comparison(
+                    infer_binary_type_comparison_inner(
                         context,
                         Type::int_literal(i64::from(a)),
                         op,
@@ -584,7 +645,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         visitor,
                     )
                     .map_err(|_| UnsupportedComparisonError {
-                        op,
+                        op: op.into(),
                         left_ty: left,
                         right_ty: right,
                     }),
@@ -597,27 +658,29 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     let s1 = salsa_s1.value(db);
                     let s2 = salsa_s2.value(db);
                     let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
-                        ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
-                        ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
-                        ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
-                        ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
-                        ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
-                        ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
-                        ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
-                        ast::CmpOp::Is => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(db)
-                            } else {
-                                Type::bool_literal(false)
-                            }
+                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
+                            Type::bool_literal(s1 == s2)
                         }
-                        ast::CmpOp::IsNot => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(db)
-                            } else {
-                                Type::bool_literal(true)
-                            }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
+                            Type::bool_literal(s1 != s2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                            Type::bool_literal(s1 < s2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                            Type::bool_literal(s1 <= s2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                            Type::bool_literal(s1 > s2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                            Type::bool_literal(s1 >= s2)
+                        }
+                        NonIdentityOperator::Membership(MembershipOperator::In) => {
+                            Type::bool_literal(s2.contains(s1))
+                        }
+                        NonIdentityOperator::Membership(MembershipOperator::NotIn) => {
+                            Type::bool_literal(!s2.contains(s1))
                         }
                     };
                     Some(Ok(result))
@@ -627,31 +690,29 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     let b1 = salsa_b1.value(db);
                     let b2 = salsa_b2.value(db);
                     let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
-                        ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
-                        ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
-                        ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
-                        ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
-                        ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
-                        ast::CmpOp::In => {
+                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
+                            Type::bool_literal(b1 == b2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
+                            Type::bool_literal(b1 != b2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                            Type::bool_literal(b1 < b2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                            Type::bool_literal(b1 <= b2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                            Type::bool_literal(b1 > b2)
+                        }
+                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                            Type::bool_literal(b1 >= b2)
+                        }
+                        NonIdentityOperator::Membership(MembershipOperator::In) => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
                         }
-                        ast::CmpOp::NotIn => {
+                        NonIdentityOperator::Membership(MembershipOperator::NotIn) => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
-                        }
-                        ast::CmpOp::Is => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(db)
-                            } else {
-                                Type::bool_literal(false)
-                            }
-                        }
-                        ast::CmpOp::IsNot => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(db)
-                            } else {
-                                Type::bool_literal(true)
-                            }
                         }
                     };
                     Some(Ok(result))
@@ -682,8 +743,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     | LiteralValueTypeKind::Bool(_)
                     | LiteralValueTypeKind::Bytes(_),
                     LiteralValueTypeKind::LiteralString,
-                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
-                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
+                ) if let NonIdentityOperator::Rich(
+                    rich @ (RichCompareOperator::Eq | RichCompareOperator::Ne),
+                ) = op =>
+                {
+                    Some(Ok(Type::bool_literal(rich == RichCompareOperator::Ne)))
                 }
                 _ => None,
             }
@@ -699,8 +763,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
             let result = left.iff(db, &constraints, right);
             let equivalent = result.is_always_satisfied(db);
             match op {
-                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),
-                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(!equivalent))),
+                NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
+                    Some(Ok(Type::bool_literal(equivalent)))
+                }
+                NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
+                    Some(Ok(Type::bool_literal(!equivalent)))
+                }
                 _ => None,
             }
         }
@@ -718,28 +786,21 @@ pub(super) fn infer_binary_type_comparison<'db>(
             };
 
             let result = match op {
-                ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
-                ast::CmpOp::NotEq => tuple_rich_comparison(RichCompareOperator::Ne),
-                ast::CmpOp::Lt => tuple_rich_comparison(RichCompareOperator::Lt),
-                ast::CmpOp::LtE => tuple_rich_comparison(RichCompareOperator::Le),
-                ast::CmpOp::Gt => tuple_rich_comparison(RichCompareOperator::Gt),
-                ast::CmpOp::GtE => tuple_rich_comparison(RichCompareOperator::Ge),
-                ast::CmpOp::In | ast::CmpOp::NotIn => {
+                NonIdentityOperator::Rich(rich_op) => tuple_rich_comparison(rich_op),
+                NonIdentityOperator::Membership(membership_op) => {
                     let mut any_eq = false;
                     let mut any_ambiguous = false;
 
                     for ty in rhs_tuple.iter_element_types(db) {
-                        let eq_result = infer_binary_type_comparison(
+                        let eq_result = infer_binary_type_comparison_inner(
                             context,
                             left,
-                            ast::CmpOp::Eq,
+                            NonIdentityOperator::Rich(RichCompareOperator::Eq),
                             ty,
                             range,
                             visitor,
                         )
-                        .expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
+                        .expect("infer_binary_type_comparison should never return None for `==`");
 
                         match eq_result {
                             todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
@@ -755,30 +816,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     }
 
                     if any_eq {
-                        Ok(Type::bool_literal(op.is_in()))
+                        Ok(Type::bool_literal(membership_op.is_in()))
                     } else if !any_ambiguous {
-                        Ok(Type::bool_literal(op.is_not_in()))
+                        Ok(Type::bool_literal(membership_op.is_not_in()))
                     } else {
                         Ok(KnownClass::Bool.to_instance(db))
                     }
-                }
-                ast::CmpOp::Is | ast::CmpOp::IsNot => {
-                    // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
-                    // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                    let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
-                        "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                    );
-
-                    Ok(match eq_result {
-                        todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
-                        // It's okay to ignore errors here because Python doesn't call `__bool__`
-                        // for `is` and `is not` comparisons. This is an implementation detail
-                        // for how we determine the truthiness of a type.
-                        ty => match ty.bool(db) {
-                            Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
-                            _ => KnownClass::Bool.to_instance(db),
-                        },
-                    })
                 }
             };
 
@@ -799,7 +842,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
 fn infer_binary_intersection_type_comparison<'db>(
     context: &InferContext<'db, '_>,
     intersection: IntersectionType<'db>,
-    op: ast::CmpOp,
+    op: NonIdentityOperator,
     other: Type<'db>,
     intersection_on: IntersectionOn,
     range: TextRange,
@@ -820,10 +863,10 @@ fn infer_binary_intersection_type_comparison<'db>(
     if let Some(alternatives) = intersection.finite_alternative_union(db) {
         return match intersection_on {
             IntersectionOn::Left => {
-                infer_binary_type_comparison(context, alternatives, op, other, range, visitor)
+                infer_binary_type_comparison_inner(context, alternatives, op, other, range, visitor)
             }
             IntersectionOn::Right => {
-                infer_binary_type_comparison(context, other, op, alternatives, range, visitor)
+                infer_binary_type_comparison_inner(context, other, op, alternatives, range, visitor)
             }
         };
     }
@@ -834,10 +877,10 @@ fn infer_binary_intersection_type_comparison<'db>(
     for pos in intersection.positive(db) {
         let result = match intersection_on {
             IntersectionOn::Left => {
-                infer_binary_type_comparison(context, *pos, op, other, range, visitor)
+                infer_binary_type_comparison_inner(context, *pos, op, other, range, visitor)
             }
             IntersectionOn::Right => {
-                infer_binary_type_comparison(context, other, op, *pos, range, visitor)
+                infer_binary_type_comparison_inner(context, other, op, *pos, range, visitor)
             }
         };
 
@@ -847,30 +890,6 @@ fn infer_binary_intersection_type_comparison<'db>(
             .is_some_and(LiteralValueType::is_bool)
         {
             return result;
-        }
-    }
-
-    // For negative contributions to the intersection type, there are only a few
-    // special cases that allow us to narrow down the result type of the comparison.
-    for neg in intersection.negative(db) {
-        let result = match intersection_on {
-            IntersectionOn::Left => {
-                infer_binary_type_comparison(context, *neg, op, other, range, visitor).ok()
-            }
-            IntersectionOn::Right => {
-                infer_binary_type_comparison(context, other, op, *neg, range, visitor).ok()
-            }
-        }
-        .and_then(Type::as_literal_value_kind);
-
-        match (op, result) {
-            (ast::CmpOp::Is, Some(LiteralValueTypeKind::Bool(true))) => {
-                return Ok(Type::bool_literal(false));
-            }
-            (ast::CmpOp::IsNot, Some(LiteralValueTypeKind::Bool(false))) => {
-                return Ok(Type::bool_literal(true));
-            }
-            _ => {}
         }
     }
 
@@ -921,10 +940,10 @@ fn infer_binary_intersection_type_comparison<'db>(
     for pos in intersection.positive(db) {
         let result = match intersection_on {
             IntersectionOn::Left => {
-                infer_binary_type_comparison(context, *pos, op, other, range, visitor)
+                infer_binary_type_comparison_inner(context, *pos, op, other, range, visitor)
             }
             IntersectionOn::Right => {
-                infer_binary_type_comparison(context, other, op, *pos, range, visitor)
+                infer_binary_type_comparison_inner(context, other, op, *pos, range, visitor)
             }
         };
 
@@ -959,12 +978,22 @@ fn infer_binary_intersection_type_comparison<'db>(
         State::NoPositiveElements => {
             // We didn't see any positive elements, check if the operation is supported on `object`:
             match intersection_on {
-                IntersectionOn::Left => {
-                    infer_binary_type_comparison(context, Type::object(), op, other, range, visitor)
-                }
-                IntersectionOn::Right => {
-                    infer_binary_type_comparison(context, other, op, Type::object(), range, visitor)
-                }
+                IntersectionOn::Left => infer_binary_type_comparison_inner(
+                    context,
+                    Type::object(),
+                    op,
+                    other,
+                    range,
+                    visitor,
+                ),
+                IntersectionOn::Right => infer_binary_type_comparison_inner(
+                    context,
+                    other,
+                    op,
+                    Type::object(),
+                    range,
+                    visitor,
+                ),
             }
         }
         State::UnsupportedOnAllElements(error) => Err(error),
@@ -1031,7 +1060,7 @@ fn infer_membership_test_comparison<'db>(
     context: &InferContext<'db, '_>,
     left: Type<'db>,
     right: Type<'db>,
-    op: MembershipTestCompareOperator,
+    op: MembershipOperator,
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
@@ -1065,10 +1094,8 @@ fn infer_membership_test_comparison<'db>(
             });
 
             match op {
-                MembershipTestCompareOperator::In => Type::from_truthiness(db, truthiness),
-                MembershipTestCompareOperator::NotIn => {
-                    Type::from_truthiness(db, truthiness.negate())
-                }
+                MembershipOperator::In => Type::from_truthiness(db, truthiness),
+                MembershipOperator::NotIn => Type::from_truthiness(db, truthiness.negate()),
             }
         })
         .ok_or_else(|| UnsupportedComparisonError {
@@ -1101,15 +1128,15 @@ fn infer_tuple_rich_comparison<'db>(
             let mut builder = UnionBuilder::new(db);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
-                let pairwise_eq_result = infer_binary_type_comparison(
+                let pairwise_eq_result = infer_binary_type_comparison_inner(
                     context,
                     l_ty,
-                    ast::CmpOp::Eq,
+                    NonIdentityOperator::Rich(RichCompareOperator::Eq),
                     r_ty,
                     range,
                     visitor,
                 )
-                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+                .expect("infer_binary_type_comparison should never return None for `==`");
 
                 match pairwise_eq_result.try_bool(db).unwrap_or_else(|err| {
                     // TODO: We should, whenever possible, pass the range of the left and right elements
@@ -1131,10 +1158,10 @@ fn infer_tuple_rich_comparison<'db>(
                             RichCompareOperator::Lt
                             | RichCompareOperator::Le
                             | RichCompareOperator::Gt
-                            | RichCompareOperator::Ge => infer_binary_type_comparison(
+                            | RichCompareOperator::Ge => infer_binary_type_comparison_inner(
                                 context,
                                 l_ty,
-                                op.into(),
+                                NonIdentityOperator::Rich(op),
                                 r_ty,
                                 range,
                                 visitor,
@@ -1190,10 +1217,10 @@ fn infer_tuple_rich_comparison<'db>(
         (left @ TupleSpec::Variable(_), right) | (left, right @ TupleSpec::Variable(_)) => {
             let mut results = SmallVec::<[Type<'db>; 8]>::new();
             left.try_for_each_element_pair(db, right, |l_ty, r_ty| {
-                results.push(infer_binary_type_comparison(
+                results.push(infer_binary_type_comparison_inner(
                     context,
                     l_ty,
-                    op.into(),
+                    NonIdentityOperator::Rich(op),
                     r_ty,
                     range,
                     visitor,
