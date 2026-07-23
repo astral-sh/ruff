@@ -8,10 +8,9 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
-    DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
-    MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType,
-    todo_type,
+    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use ty_python_core::definition::Definition;
 
@@ -99,9 +98,8 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        // Handle unions and intersections by distributing `type[]` over each element:
+        // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
-        // `type[A & B]` -> `type[A] & type[B]`
         match ty {
             Type::Union(union) => UnionType::try_from_elements(
                 db,
@@ -111,14 +109,6 @@ impl<'db> SubclassOfType<'db> {
                     .iter()
                     .map(|element| Self::try_from_instance(db, env, *element)),
             ),
-            Type::Intersection(intersection) if intersection.iter_negative(db).next().is_none() => {
-                intersection
-                    .iter_positive(db)
-                    .try_fold(IntersectionBuilder::new(db, env), |builder, element| {
-                        Some(builder.add_positive(Self::try_from_instance(db, env, element)?))
-                    })
-                    .map(IntersectionBuilder::build)
-            }
             Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db, env)),
             _ => SubclassOfInner::try_from_instance(db, env, ty)
                 .map(|subclass_of| Self::from(db, env, subclass_of)),
