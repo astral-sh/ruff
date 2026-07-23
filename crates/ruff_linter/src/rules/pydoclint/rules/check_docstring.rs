@@ -5,7 +5,7 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
-use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_python_semantic::{BindingKind, Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -871,13 +871,33 @@ impl Ranged for ReturnEntry {
 /// An individual exception raised in a function body.
 #[derive(Debug)]
 struct ExceptionEntry<'a> {
+    /// Qualified name used for the diagnostic display.
     qualified_name: QualifiedName<'a>,
+    /// Additional qualified name accepted when matching against the docstring's
+    /// `Raises` section. Populated for ambiguous `X.method(...)` forms — without
+    /// type information, the AST cannot distinguish a classmethod constructor
+    /// (`ValueError.from_exception_data(...)`, exception is `ValueError`) from
+    /// a module attribute call (`urllib.error.URLError(...)`, exception is the
+    /// full path). Accepting either form sidesteps the ambiguity.
+    extra_candidate: Option<QualifiedName<'a>>,
     range: TextRange,
 }
 
 impl Ranged for ExceptionEntry<'_> {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl ExceptionEntry<'_> {
+    fn matches_docstring_exception(&self, exception: &QualifiedName) -> bool {
+        self.qualified_name
+            .segments()
+            .ends_with(exception.segments())
+            || self
+                .extra_candidate
+                .as_ref()
+                .is_some_and(|candidate| candidate.segments().ends_with(exception.segments()))
     }
 }
 
@@ -951,9 +971,40 @@ impl<'a> BodyVisitor<'a> {
         }
         self.raised_exceptions.push(ExceptionEntry {
             qualified_name,
+            extra_candidate: None,
             range,
         });
     }
+}
+
+/// Walk down an `Attribute` chain to the leftmost `Name`, if any.
+fn head_name(expr: &Expr) -> Option<&ast::ExprName> {
+    let mut current = expr;
+    loop {
+        match current {
+            Expr::Name(name) => return Some(name),
+            Expr::Attribute(ast::ExprAttribute { value, .. }) => current = value.as_ref(),
+            _ => return None,
+        }
+    }
+}
+
+/// For chained method calls like `f(...).g(...).h(...)`, walk down to the
+/// inner-most `Call`. This lets the standard `map_callable` + `resolve_qualified_name`
+/// pipeline handle expressions like `Error.create(...).with_traceback(tb)` by
+/// reducing them to a resolvable form before resolution.
+fn peel_chained_method_calls(expr: &Expr) -> &Expr {
+    let mut current = expr;
+    while let Expr::Call(ast::ExprCall { func, .. }) = current {
+        if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+            if matches!(value.as_ref(), Expr::Call(_)) {
+                current = value.as_ref();
+                continue;
+            }
+        }
+        break;
+    }
+    current
 }
 
 impl<'a> Visitor<'a> for BodyVisitor<'a> {
@@ -980,12 +1031,58 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
-                    // First try to resolve the exception directly
-                    if let Some(qualified_name) =
-                        self.semantic.resolve_qualified_name(map_callable(exc))
-                    {
+                    // Reduce chained method calls to their inner-most call so
+                    // `map_callable` + `resolve_qualified_name` can handle them
+                    // (e.g. `Error.create(...).with_traceback(tb)` → `Error.create(...)`).
+                    let inner = peel_chained_method_calls(exc.as_ref());
+                    let callable = map_callable(inner);
+                    let qualified_name = self.semantic.resolve_qualified_name(callable);
+
+                    if let Some(qualified_name) = qualified_name {
+                        // For `X.method(...)` (after peeling chains), the AST cannot
+                        // tell us whether `X` is a class (classmethod constructor) or
+                        // a module (attribute call). Compute the trimmed alternative
+                        // and decide which form to display by inspecting what the
+                        // head name binds to: if it's a class/builtin, prefer the
+                        // trimmed form (the class is the exception). Otherwise the
+                        // head is a module and the full name is the exception.
+                        let trimmed = if matches!(callable, Expr::Attribute(_)) {
+                            let segments = qualified_name.segments();
+                            if segments.len() > 1 {
+                                Some(
+                                    segments[..segments.len() - 1]
+                                        .iter()
+                                        .copied()
+                                        .collect::<QualifiedName>(),
+                                )
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        let head_is_class = trimmed
+                            .as_ref()
+                            .and_then(|_| head_name(callable))
+                            .and_then(|name| self.semantic.resolve_name(name))
+                            .map(|id| self.semantic.binding(id))
+                            .is_some_and(|binding| {
+                                matches!(
+                                    binding.kind,
+                                    BindingKind::ClassDefinition(_) | BindingKind::Builtin
+                                )
+                            });
+
+                        let (display, extra_candidate) = match (trimmed, head_is_class) {
+                            (Some(trimmed), true) => (trimmed, Some(qualified_name)),
+                            (Some(trimmed), false) => (qualified_name, Some(trimmed)),
+                            (None, _) => (qualified_name, None),
+                        };
+
                         self.raised_exceptions.push(ExceptionEntry {
-                            qualified_name,
+                            qualified_name: display,
+                            extra_candidate,
                             range: exc.range(),
                         });
                     } else if let ast::Expr::Name(name) = exc.as_ref() {
@@ -1338,12 +1435,10 @@ pub(crate) fn check_docstring(
             }
 
             if !docstring_sections.raises.as_ref().is_some_and(|section| {
-                section.raised_exceptions.iter().any(|exception| {
-                    body_raise
-                        .qualified_name
-                        .segments()
-                        .ends_with(exception.segments())
-                })
+                section
+                    .raised_exceptions
+                    .iter()
+                    .any(|exception| body_raise.matches_docstring_exception(exception))
             }) {
                 checker.report_diagnostic(
                     DocstringMissingException {
@@ -1402,12 +1497,11 @@ pub(crate) fn check_docstring(
             if let Some(docstring_raises) = docstring_sections.raises {
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {
-                    if !body_entries.raised_exceptions.iter().any(|exception| {
-                        exception
-                            .qualified_name
-                            .segments()
-                            .ends_with(docstring_raise.segments())
-                    }) {
+                    if !body_entries
+                        .raised_exceptions
+                        .iter()
+                        .any(|exception| exception.matches_docstring_exception(docstring_raise))
+                    {
                         extraneous_exceptions.push(docstring_raise.to_string());
                     }
                 }

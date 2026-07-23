@@ -226,3 +226,80 @@ DOC501 Raised exception `ValueError` missing from docstring
 244 |           raise TypeError  # DOC501
     |
 help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+   --> DOC501_google.py:273:5
+    |
+271 |   # DOC501 - exception raised via classmethod, NOT documented
+272 |   def validate_classmethod_missing(value):
+273 | /     """Validate a value.
+274 | |
+275 | |     Args:
+276 | |         value: the value to validate.
+277 | |     """
+    | |_______^
+278 |       raise ValueError.from_exception_data(
+279 |           title="Validation",
+    |
+help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+   --> DOC501_google.py:315:5
+    |
+313 |   # DOC501 - chained method call, NOT documented
+314 |   def chained_missing(value):
+315 | /     """Validate a value.
+316 | |
+317 | |     Args:
+318 | |         value: the value to validate.
+319 | |     """
+    | |_______^
+320 |       raise ValueError.from_exception_data(
+321 |           title="Validation",
+    |
+help: Add `ValueError` to the docstring
+
+DOC501 Raised exception `SomeError` missing from docstring
+   --> DOC501_google.py:341:5
+    |
+339 |   # DOC501 - exception raised via module attribute call, NOT documented
+340 |   def module_exception_missing(value):
+341 | /     """Process a value.
+342 | |
+343 | |     Args:
+344 | |         value: the value to process.
+345 | |     """
+    | |_______^
+346 |       raise something.SomeError(value)
+    |
+help: Add `SomeError` to the docstring
+
+DOC501 Raised exception `URLError` missing from docstring
+   --> DOC501_google.py:364:5
+    |
+362 |   # DOC501 - exception raised via nested module attribute call, NOT documented
+363 |   def nested_module_exception_missing(value):
+364 | /     """Process a value.
+365 | |
+366 | |     Args:
+367 | |         value: the value to process.
+368 | |     """
+    | |_______^
+369 |       raise urllib.error.URLError(value)
+    |
+help: Add `URLError` to the docstring
+
+DOC501 Raised exception `URLError` missing from docstring
+   --> DOC501_google.py:387:5
+    |
+385 |   # DOC501 - exception raised via from-imported module, NOT documented
+386 |   def from_import_module_missing(value):
+387 | /     """Process a value.
+388 | |
+389 | |     Args:
+390 | |         value: the value to process.
+391 | |     """
+    | |_______^
+392 |       raise url_error.URLError(value)
+    |
+help: Add `URLError` to the docstring

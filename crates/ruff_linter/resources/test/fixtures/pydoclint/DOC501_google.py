@@ -246,3 +246,147 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+import urllib.error
+from urllib import error as url_error
+
+
+# OK - exception raised via classmethod, documented in Raises section
+def validate_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        ValueError: if the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    )
+
+
+# DOC501 - exception raised via classmethod, NOT documented
+def validate_classmethod_missing(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    )
+
+
+# OK - exception raised via classmethod using imported exception
+def validate_imported_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        AnotherError: if the value is invalid.
+    """
+    raise AnotherError.create(value)
+
+
+# OK - chained method call with .with_traceback(), documented
+def chained_with_traceback(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+
+    Raises:
+        ValueError: if the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    ).with_traceback(None)
+
+
+# DOC501 - chained method call, NOT documented
+def chained_missing(value):
+    """Validate a value.
+
+    Args:
+        value: the value to validate.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    ).with_traceback(None)
+
+
+# OK - exception raised via module attribute call, documented
+def module_exception_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        something.SomeError: if the value is bad.
+    """
+    raise something.SomeError(value)
+
+
+# DOC501 - exception raised via module attribute call, NOT documented
+def module_exception_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise something.SomeError(value)
+
+
+# OK - exception raised via nested module attribute call, documented
+def nested_module_exception_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        URLError: if the connection fails.
+    """
+    raise urllib.error.URLError(value)
+
+
+# DOC501 - exception raised via nested module attribute call, NOT documented
+def nested_module_exception_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise urllib.error.URLError(value)
+
+
+# OK - exception raised via from-imported module, documented
+def from_import_module_documented(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+
+    Raises:
+        URLError: if the connection fails.
+    """
+    raise url_error.URLError(value)
+
+
+# DOC501 - exception raised via from-imported module, NOT documented
+def from_import_module_missing(value):
+    """Process a value.
+
+    Args:
+        value: the value to process.
+    """
+    raise url_error.URLError(value)
