@@ -60,6 +60,28 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 static HASH_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#\d").unwrap());
 
+static VERSION_REQUIREMENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+        ^
+        [A-Za-z0-9][A-Za-z0-9._-]*
+        \s*
+        (?:===|==|!=|~=|<=|>=|<|>)
+        \s*
+        [vV]?\d[0-9A-Za-z.*+!_-]*
+        (?:
+            \s*,\s*
+            (?:===|==|!=|~=|<=|>=|<|>)
+            \s*
+            [vV]?\d[0-9A-Za-z.*+!_-]*
+        )*
+        (?:\s*#.*)?
+        $
+        ",
+    )
+    .unwrap()
+});
+
 static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         // Keywords
@@ -109,6 +131,11 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
 
     // Ignore non-comment related hashes (e.g., "# Issue #999").
     if HASH_NUMBER.is_match(line) {
+        return false;
+    }
+
+    // Ignore package version requirements (e.g., "# django >= 4.2").
+    if VERSION_REQUIREMENT.is_match(line) {
         return false;
     }
 
@@ -171,6 +198,21 @@ mod tests {
             "# SPDX-License-Identifier: MIT",
             &[]
         ));
+        assert!(!comment_contains_code("# django >= 4.2", &[]));
+        assert!(!comment_contains_code("# django>=4.2,<5", &[]));
+        assert!(!comment_contains_code("# django == 4.2.1", &[]));
+        assert!(!comment_contains_code("# django != 4.2.1", &[]));
+        assert!(!comment_contains_code("# django ~= 4.2", &[]));
+        assert!(!comment_contains_code(
+            "# django >= 4.2  # pin for CVE",
+            &[]
+        ));
+        assert!(!comment_contains_code(
+            "# django>=4.2,<5 # pin for CVE",
+            &[]
+        ));
+        assert!(comment_contains_code("# django >= minimum_version", &[]));
+        assert!(comment_contains_code("# django >= 4.2 and enabled", &[]));
         assert!(comment_contains_code("\t# x = 1", &[]));
 
         // TODO(charlie): This should be `true` under aggressive mode.
