@@ -227,3 +227,12 @@ async def func():
     async for x in async_gen():
         g(x, idx)
         idx += 1
+
+
+def func():
+    # OK (`2 ** -1` is a `float`, not a valid `enumerate` start value)
+    idx = 2**-1
+    for x in range(5):
+        g(x, idx)
+        idx += 1
+        h(x)
