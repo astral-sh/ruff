@@ -2,8 +2,6 @@
 
 ## 0.16.0
 
-### Breaking changes
-
 - **New default rules**
 
     Ruff now enables a much larger set of rules by default (413, up from 59). See the blog post for
