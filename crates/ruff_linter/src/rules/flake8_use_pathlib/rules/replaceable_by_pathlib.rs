@@ -7,7 +7,7 @@ use crate::rules::flake8_use_pathlib::helpers::{
 };
 use crate::rules::flake8_use_pathlib::{
     rules::Glob,
-    violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, OsStat, PyPath},
+    violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, PyPath},
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -17,24 +17,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
     let range = call.func.range();
     match qualified_name.segments() {
-        // PTH116
-        ["os", "stat"] => {
-            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.stat)
-            // ```text
-            //           0         1           2
-            // os.stat(path, *, dir_fd=None, follow_symlinks=True)
-            // ```
-            if call
-                .arguments
-                .find_argument_value("path", 0)
-                .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsStat, range)
-        }
         // PTH118
         ["os", "path", "join"] => checker.report_diagnostic_if_enabled(
             OsPathJoin {

@@ -223,3 +223,18 @@ pub(crate) fn is_top_level_expression_in_statement(checker: &Checker) -> bool {
     checker.semantic().current_expression_parent().is_none()
         && checker.semantic().current_statement().is_expr_stmt()
 }
+
+/// Returns the value of the given boolean keyword argument.
+///
+/// If the keyword is omitted, returns `Some(true)` (its default value).
+/// Returns `None` if the keyword argument is present but not a boolean literal.
+pub(crate) fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<bool> {
+    let Some(kw) = argument.find_keyword(name) else {
+        return Some(true);
+    };
+
+    match &kw.value {
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+        _ => None,
+    }
+}
