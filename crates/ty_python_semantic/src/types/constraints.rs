@@ -7908,6 +7908,29 @@ mod tests {
     }
 
     #[test]
+    fn empty_existential_binder_does_not_create_existential_atom() {
+        let db = setup_db();
+        let x = create_typevar(&db, "X");
+        let y = create_typevar(&db, "Y");
+        let builder = ConstraintSetBuilder::new();
+        let additional_domain = create_constraint(&db, &builder, x, KnownClass::Int);
+        let body = create_constraint(&db, &builder, y, KnownClass::Str);
+
+        let node = Existential::new_node(
+            &db,
+            &builder,
+            TypeVarSet::None,
+            additional_domain.node,
+            body.node,
+        );
+
+        assert!(!matches!(
+            node.root_atom(&builder),
+            Some(AtomId::Existential(_))
+        ));
+    }
+
+    #[test]
     fn existential_construction_preserves_declared_and_additional_domains() {
         let db = setup_db();
         let int = known_instance(&db, KnownClass::Int);
