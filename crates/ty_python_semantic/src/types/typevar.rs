@@ -1603,8 +1603,6 @@ impl<'db> TypeVarSet<'db> {
         }
     }
 
-    // Keep this around for debugging purposes
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn display(self, db: &'db dyn Db) -> String {
         format!(
             "[{}]",
