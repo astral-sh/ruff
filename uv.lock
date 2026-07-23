@@ -30,8 +30,8 @@ name = "anyio"
 version = "4.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "idna", marker = "python_full_version >= '3.12'" },
+    { name = "typing-extensions", marker = "python_full_version == '3.12.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3b/72/5562aabb8dd7181e8e860622a38bea08d17842b99ecd4c91f84ac95251b0/anyio-4.14.1.tar.gz", hash = "sha256:8d648a3544c1a700e3ff78615cd679e4c5c3f149904287e73687b2596963629e", size = 254831, upload-time = "2026-06-24T20:56:06.017Z" }
 wheels = [
@@ -43,7 +43,7 @@ name = "anysqlite"
 version = "0.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio" },
+    { name = "anyio", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0f/4b/cd5d66b9f87e773bc71344a368b9472987e33514e6627e28342b9c3e7c43/anysqlite-0.0.5.tar.gz", hash = "sha256:9dfcf87baf6b93426ad1d9118088c41dbf24ef01b445eea4a5d486bac2755cce", size = 3432, upload-time = "2023-10-02T13:49:25.135Z" }
 wheels = [
@@ -64,7 +64,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser", marker = "python_full_version >= '3.12' and implementation_name != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -176,11 +176,11 @@ name = "hishel"
 version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio" },
-    { name = "anysqlite" },
-    { name = "httpx" },
-    { name = "msgpack" },
-    { name = "typing-extensions" },
+    { name = "anyio", marker = "python_full_version >= '3.12'" },
+    { name = "anysqlite", marker = "python_full_version >= '3.12'" },
+    { name = "httpx", marker = "python_full_version >= '3.12'" },
+    { name = "msgpack", marker = "python_full_version >= '3.12'" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e5/64/a104ccac48f123f853254483617b16e0efc1649bd7e35bcdc5a5a5ef0ae2/hishel-0.1.5.tar.gz", hash = "sha256:9d40c682cd94fd6e1394fb05713ae20a75ed8aeba6f5272380444039ce6257f2", size = 75468, upload-time = "2025-10-18T13:32:41.854Z" }
 wheels = [
@@ -192,8 +192,8 @@ name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi" },
-    { name = "h11" },
+    { name = "certifi", marker = "python_full_version >= '3.12'" },
+    { name = "h11", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
@@ -205,10 +205,10 @@ name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio" },
-    { name = "certifi" },
-    { name = "httpcore" },
-    { name = "idna" },
+    { name = "anyio", marker = "python_full_version >= '3.12'" },
+    { name = "certifi", marker = "python_full_version >= '3.12'" },
+    { name = "httpcore", marker = "python_full_version >= '3.12'" },
+    { name = "idna", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
 wheels = [
@@ -229,7 +229,7 @@ name = "markdown-it-py"
 version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mdurl" },
+    { name = "mdurl", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz", hash = "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49", size = 82454, upload-time = "2026-05-07T12:08:28.36Z" }
 wheels = [
@@ -374,10 +374,10 @@ name = "pydantic"
 version = "2.13.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "annotated-types" },
-    { name = "pydantic-core" },
-    { name = "typing-extensions" },
-    { name = "typing-inspection" },
+    { name = "annotated-types", marker = "python_full_version >= '3.12'" },
+    { name = "pydantic-core", marker = "python_full_version >= '3.12'" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'" },
+    { name = "typing-inspection", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/18/a5/b60d21ac674192f8ab0ba4e9fd860690f9b4a6e51ca5df118733b487d8d6/pydantic-2.13.4.tar.gz", hash = "sha256:c40756b57adaa8b1efeeced5c196f3f3b7c435f90e84ea7f443901bec8099ef6", size = 844775, upload-time = "2026-05-06T13:43:05.343Z" }
 wheels = [
@@ -389,7 +389,7 @@ name = "pydantic-core"
 version = "2.46.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9d/56/921726b776ace8d8f5db44c4ef961006580d91dc52b803c489fafd1aa249/pydantic_core-2.46.4.tar.gz", hash = "sha256:62f875393d7f270851f20523dd2e29f082bcc82292d66db2b64ea71f64b6e1c1", size = 471464, upload-time = "2026-05-06T13:37:06.98Z" }
 wheels = [
@@ -519,7 +519,7 @@ name = "pygit2"
 version = "1.19.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi" },
+    { name = "cffi", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a6/44/415aa93422b4bfc21a6448acb7e16280d5f33a9a3fae38a384e37b046ae4/pygit2-1.19.3.tar.gz", hash = "sha256:a543e6d4ebb43825564935758dc234e770016fed673b84370d46ae9580558831", size = 810489, upload-time = "2026-06-13T08:06:04.982Z" }
 wheels = [
@@ -594,8 +594,8 @@ name = "rich"
 version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markdown-it-py" },
-    { name = "pygments" },
+    { name = "markdown-it-py", marker = "python_full_version >= '3.12'" },
+    { name = "pygments", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
@@ -607,14 +607,14 @@ name = "rooster"
 version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "hishel" },
-    { name = "httpx" },
-    { name = "marko" },
-    { name = "packaging" },
-    { name = "pydantic" },
-    { name = "pygit2" },
-    { name = "tqdm" },
-    { name = "typer" },
+    { name = "hishel", marker = "python_full_version >= '3.12'" },
+    { name = "httpx", marker = "python_full_version >= '3.12'" },
+    { name = "marko", marker = "python_full_version >= '3.12'" },
+    { name = "packaging", marker = "python_full_version >= '3.12'" },
+    { name = "pydantic", marker = "python_full_version >= '3.12'" },
+    { name = "pygit2", marker = "python_full_version >= '3.12'" },
+    { name = "tqdm", marker = "python_full_version >= '3.12'" },
+    { name = "typer", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/02/8ce565271dc52bd0d0d812043b12ec60111d947f81dc30301d19d7bfd453/rooster-0.1.1.tar.gz", hash = "sha256:c9823122f0c2b035985e70384323cdd353477af988e0f065bc302646a49da482", size = 18608, upload-time = "2025-10-29T15:18:49.478Z" }
 wheels = [
@@ -623,7 +623,7 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.15.22"
+version = "0.16.0"
 source = { editable = "." }
 
 [package.dev-dependencies]
@@ -654,7 +654,7 @@ name = "tqdm"
 version = "4.68.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "python_full_version >= '3.12' and sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/87/d7/0535a28b1f5f24f6612fb3ff1e89fb1a8d160fee0f976e0aa6803862134b/tqdm-4.68.3.tar.gz", hash = "sha256:00dfa48452b6b6cfae3dd9885636c23d3422d1ec97c66d96818cbd5e0821d482", size = 170596, upload-time = "2026-06-17T07:36:52.105Z" }
 wheels = [
@@ -666,10 +666,10 @@ name = "typer"
 version = "0.26.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "annotated-doc" },
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "rich" },
-    { name = "shellingham" },
+    { name = "annotated-doc", marker = "python_full_version >= '3.12'" },
+    { name = "colorama", marker = "python_full_version >= '3.12' and sys_platform == 'win32'" },
+    { name = "rich", marker = "python_full_version >= '3.12'" },
+    { name = "shellingham", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7c/f7/68adc395201b20b872d68e975386832e8005ffeacedd43a1d837a32815be/typer-0.26.8.tar.gz", hash = "sha256:c244a6bd558886fe3f8780efb6bdd28bb9aff005a94eedebaa5cb32926fe2f7e", size = 202097, upload-time = "2026-06-26T09:22:45.705Z" }
 wheels = [
@@ -690,7 +690,7 @@ name = "typing-inspection"
 version = "0.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
 wheels = [
