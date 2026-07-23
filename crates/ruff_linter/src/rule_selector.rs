@@ -352,9 +352,10 @@ mod schema {
             let enum_values: Vec<String> = [
                 // Include the non-standard "ALL" selectors.
                 "ALL".to_string(),
-                // Include the legacy "C" and "T" selectors.
+                // Include the legacy "C", "T", and "R" selectors.
                 "C".to_string(),
                 "T".to_string(),
+                "R".to_string(),
                 // Include some common redirect targets for those legacy selectors.
                 "C9".to_string(),
                 "T1".to_string(),
