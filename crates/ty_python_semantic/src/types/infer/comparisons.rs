@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use smallvec::SmallVec;
 
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
@@ -30,11 +30,11 @@ impl<'db> Type<'db> {
     /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
     /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
     /// preserved.
-    pub(crate) fn identity_comparison_type(self, env: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn identity_comparison_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         struct IdentityComparisonUpcasting;
 
         fn upcast<'db>(
-            env: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             visitor: &TypeTransformer<'db, IdentityComparisonUpcasting>,
         ) -> Type<'db> {
@@ -79,7 +79,7 @@ impl<'db> Type<'db> {
     /// Return whether values of these types always, never, or possibly identify the same object.
     pub(crate) fn identity_comparison_truthiness(
         self,
-        env: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         other: Type<'db>,
     ) -> Truthiness {
         let db = env.db();
@@ -266,7 +266,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
     right: Type<'db>,
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
 
     let op = match op {
         ast::CmpOp::Is | ast::CmpOp::IsNot => {
@@ -304,7 +304,7 @@ fn infer_binary_type_comparison_inner<'db>(
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
 
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(context, left, right, op, policy);
@@ -826,7 +826,7 @@ fn infer_binary_intersection_type_comparison<'db>(
     }
 
     let db = context.db();
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
 
     if let Some(alternatives) = intersection.finite_alternative_union(env) {
         return match intersection_on {
@@ -979,7 +979,7 @@ fn infer_rich_comparison<'db>(
     op: RichCompareOperator,
     policy: MemberLookupPolicy,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
     Type::try_call_rich_comparison_dunder(
         env,
         left,
@@ -1020,7 +1020,7 @@ fn infer_membership_test_comparison<'db>(
     op: MembershipOperator,
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
     let compare_result_opt = match right.try_call_dunder(
         env,
         "__contains__",
@@ -1076,7 +1076,7 @@ fn infer_tuple_rich_comparison<'db>(
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let env = &context.semantic_context();
+    let env = &context.semantic_environment();
     match (left, right) {
         // Both fixed-length: perform full lexicographic comparison.
         (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) => {

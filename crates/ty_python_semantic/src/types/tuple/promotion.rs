@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{self as ast};
@@ -23,13 +23,13 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// Records whether an inferred collection element blocks tuple size promotion for the typevar.
     pub(crate) fn record_inferred_expression_type(
         &mut self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::is_promotable_tuple_literal(ctx, expression, ty) {
-            self.record_unpromotable_type(ctx, typevar_identity, ty);
+        if !Self::is_promotable_tuple_literal(env, expression, ty) {
+            self.record_unpromotable_type(env, typevar_identity, ty);
         }
     }
 
@@ -37,11 +37,11 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// a tuple type.
     pub(crate) fn record_unpromotable_type(
         &mut self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(ctx, ty, true, |ty| ty.tuple_instance_spec(ctx).is_some()) {
+        if any_over_type(env, ty, true, |ty| ty.tuple_instance_spec(env).is_some()) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -55,12 +55,12 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the
     /// empty tuple (and hence is eligible for tuple size promotion).
     fn is_promotable_tuple_literal(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
     ) -> bool {
         matches!(expression, ast::Expr::Tuple(tuple) if !tuple.iter().any(ast::Expr::is_starred_expr))
-            && TupleSizePromotionCandidate::from_type(ctx, ty).is_some()
+            && TupleSizePromotionCandidate::from_type(env, ty).is_some()
     }
 }
 
@@ -76,8 +76,8 @@ enum TupleSizePromotionCandidate<'db> {
 impl<'db> TupleSizePromotionCandidate<'db> {
     /// Returns an eligible candidate if the given type represents one (i.e., it is a
     /// fixed-length homogeneous tuple or the empty tuple).
-    fn from_type(ctx: &SemanticContext<'db>, ty: Type<'db>) -> Option<Self> {
-        let tuple_spec = ty.exact_tuple_instance_spec(ctx.db())?;
+    fn from_type(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+        let tuple_spec = ty.exact_tuple_instance_spec(env.db())?;
         let TupleSpec::Fixed(tuple) = tuple_spec.as_ref() else {
             return None;
         };
@@ -88,7 +88,7 @@ impl<'db> TupleSizePromotionCandidate<'db> {
         };
 
         elements
-            .all(|element| element.is_equivalent_to(ctx, element_type))
+            .all(|element| element.is_equivalent_to(env, element_type))
             .then_some(Self::Homogeneous {
                 element_type,
                 length: tuple.len(),
@@ -125,21 +125,21 @@ impl<'db> HomogeneousTupleUnionGroup<'db> {
 /// Partitions a union into two sets prior to rebuilding it: one for elements that are not
 /// candidates for tuple size promotion, and another for groups of homogeneous tuple elements that are.
 fn partition_tuple_union_elements<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     elements: impl IntoIterator<Item = Type<'db>>,
 ) -> (Vec<Type<'db>>, Vec<HomogeneousTupleUnionGroup<'db>>) {
     let mut other_union_elements = Vec::new();
     let mut tuple_groups: Vec<HomogeneousTupleUnionGroup<'db>> = Vec::new();
 
     for element in elements {
-        match TupleSizePromotionCandidate::from_type(ctx, element) {
+        match TupleSizePromotionCandidate::from_type(env, element) {
             Some(TupleSizePromotionCandidate::Homogeneous {
                 element_type,
                 length,
             }) => {
                 if let Some(group) = tuple_groups
                     .iter_mut()
-                    .find(|group| group.element_type.is_equivalent_to(ctx, element_type))
+                    .find(|group| group.element_type.is_equivalent_to(env, element_type))
                 {
                     group.add(element, length);
                 } else {
@@ -179,21 +179,21 @@ impl<'db> Type<'db> {
     /// reveal_type(languages)  # revealed: dict[str, tuple[str, ...]]
     /// ```
     ///
-    pub(crate) fn promote_tuple_size_in_union(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn promote_tuple_size_in_union(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         let Type::Union(union) = self else {
             return self;
         };
 
         let (other_union_elements, tuple_groups) =
-            partition_tuple_union_elements(ctx, union.elements(ctx.db()).iter().copied());
+            partition_tuple_union_elements(env, union.elements(env.db()).iter().copied());
 
         if !tuple_groups.iter().any(|group| group.has_multiple_lengths) {
             return self;
         }
 
-        let mut builder = UnionBuilder::new(ctx)
+        let mut builder = UnionBuilder::new(env)
             .unpack_aliases(false)
-            .recursively_defined(union.recursively_defined(ctx.db()));
+            .recursively_defined(union.recursively_defined(env.db()));
 
         for element in other_union_elements {
             builder = builder.add(element);
@@ -201,7 +201,7 @@ impl<'db> Type<'db> {
 
         for group in tuple_groups {
             if group.has_multiple_lengths {
-                builder = builder.add(Type::homogeneous_tuple(ctx.db(), group.element_type));
+                builder = builder.add(Type::homogeneous_tuple(env.db(), group.element_type));
             } else {
                 for element in group.original_tuple_types {
                     builder = builder.add(element);

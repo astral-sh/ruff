@@ -1,4 +1,4 @@
-use crate::{SemanticContext, types::BoundTypeVarIdentity};
+use crate::{SemanticEnvironment, types::BoundTypeVarIdentity};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
@@ -135,7 +135,7 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     /// specify a non-covariant polarity. See `with_polarity` for more details.
     fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance;
 
@@ -171,7 +171,7 @@ where
 {
     fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let WithPolarity {
@@ -179,6 +179,6 @@ where
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(ctx, typevar))
+        polarity.compose_thunk(|| variance_inferable.variance_of(env, typevar))
     }
 }

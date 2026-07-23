@@ -117,7 +117,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
     TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, SemanticContext};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, SemanticEnvironment};
 
 mod support;
 
@@ -3730,7 +3730,7 @@ impl<'db> Type<'db> {
     /// constraint-set assignable to `target`.
     pub(crate) fn assignable_solutions_with_inferable(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> &'db PathBounds<'db> {
@@ -3746,16 +3746,16 @@ impl<'db> Type<'db> {
             target: Type<'db>,
             inferable: TypeVarSet<'db>,
         ) -> PathBounds<'db> {
-            let ctx = &SemanticContext::from_program(db, program);
-            let when = source.when_constraint_set_assignable_to_owned(ctx, target);
+            let env = &SemanticEnvironment::from_program(db, program);
+            let when = source.when_constraint_set_assignable_to_owned(env, target);
             when.query(|builder, when| {
                 let mut storage = builder.storage.borrow_mut();
                 PathBounds::compute(db, &mut storage, when.node, inferable, when.source_order)
             })
         }
 
-        let db = ctx.db();
-        let program = ctx.program();
+        let db = env.db();
+        let program = env.program();
         assignable_solutions_impl(db, program, self, target, inferable)
     }
 }
@@ -3767,10 +3767,10 @@ impl<'db> Type<'db> {
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
     let program = types.program(db);
-    let ctx = &SemanticContext::from_program(db, program);
+    let env = &SemanticEnvironment::from_program(db, program);
     types
         .first(db)
-        .when_constraint_set_assignable_to_owned(ctx, types.second(db))
+        .when_constraint_set_assignable_to_owned(env, types.second(db))
         .query(|_storage, when| !when.is_never_satisfied(db))
 }
 
@@ -4096,7 +4096,7 @@ impl<'db> PathBounds<'db> {
 
                     if !is_possibly_constraint_set_assignable(
                         db,
-                        TypePair::new(db, ctx.program(), lower, declared_upper),
+                        TypePair::new(db, env.program(), lower, declared_upper),
                     ) {
                         // This path does not satisfy the typevar's declared upper bound, and is
                         // therefore not a valid specialization.

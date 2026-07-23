@@ -4,7 +4,7 @@ use super::{
     visitor,
 };
 use crate::Db;
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
@@ -13,12 +13,12 @@ pub struct TypeFormType<'db> {
 }
 
 pub(super) fn walk_typeform_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     typeform_type: TypeFormType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
-    visitor.visit_type(ctx, typeform_type.type_argument(db));
+    let db = env.db();
+    visitor.visit_type(env, typeform_type.type_argument(db));
 }
 
 // The Salsa heap is tracked separately.
@@ -38,59 +38,59 @@ impl<'db> Type<'db> {
     /// bounds or constraints, using cycle detection for recursive types. Union and intersection
     /// elements that do not represent type forms are ignored, as are negative intersection
     /// elements. If no type-form component can be projected, this returns the original type.
-    pub(crate) fn project_type_form(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn project_type_form(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         struct TypeFormArgument;
         type TypeFormArgumentVisitor<'db> =
             CycleDetector<'db, TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
 
         fn project<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             visitor: &TypeFormArgumentVisitor<'db>,
         ) -> Option<Type<'db>> {
-            let db = ctx.db();
+            let db = env.db();
             match ty {
                 Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ctx, ty, || project(ctx, alias.value_type(ctx), visitor))
+                    visitor.visit(env, ty, || project(env, alias.value_type(env), visitor))
                 }
                 Type::Union(union) => {
                     let mut elements = union
                         .elements(db)
                         .iter()
-                        .filter_map(|element| project(ctx, *element, visitor))
+                        .filter_map(|element| project(env, *element, visitor))
                         .peekable();
                     elements.peek()?;
-                    Some(UnionType::from_elements(ctx, elements))
+                    Some(UnionType::from_elements(env, elements))
                 }
                 Type::Intersection(intersection) => {
                     let mut elements = intersection
                         .iter_positive(db)
-                        .filter_map(|element| project(ctx, element, visitor))
+                        .filter_map(|element| project(env, element, visitor))
                         .peekable();
                     elements.peek()?;
-                    Some(IntersectionType::from_elements(ctx, elements))
+                    Some(IntersectionType::from_elements(env, elements))
                 }
-                Type::TypeVar(typevar) => visitor.visit(ctx, ty, || {
+                Type::TypeVar(typevar) => visitor.visit(env, ty, || {
                     typevar
                         .typevar(db)
-                        .bound_or_constraints(ctx)
+                        .bound_or_constraints(env)
                         .and_then(|bound_or_constraints| {
-                            project(ctx, bound_or_constraints.as_type(ctx), visitor)
+                            project(env, bound_or_constraints.as_type(env), visitor)
                         })
                 }),
-                Type::SpecialForm(special_form) => special_form.type_form_argument(ctx),
+                Type::SpecialForm(special_form) => special_form.type_form_argument(env),
                 Type::KnownInstance(instance) if instance.is_type_form_value() => {
-                    instance.type_form_argument(ctx)
+                    instance.type_form_argument(env)
                 }
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    ty.to_instance_approximation(ctx)
+                    ty.to_instance_approximation(env)
                 }
                 _ => None,
             }
         }
 
-        project(ctx, self, &TypeFormArgumentVisitor::default()).unwrap_or(self)
+        project(env, self, &TypeFormArgumentVisitor::default()).unwrap_or(self)
     }
 }
 
@@ -98,10 +98,10 @@ impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     // `TypeForm` is covariant in its type argument.
     fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let db = ctx.db();
-        self.type_argument(db).variance_of(ctx, typevar)
+        let db = env.db();
+        self.type_argument(db).variance_of(env, typevar)
     }
 }

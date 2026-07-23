@@ -18,16 +18,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         target: Type<'db>,
     ) -> Option<Type<'db>> {
-        let ctx = self.semantic_context();
-        let non_type_form_fallback = match target.resolve_type_alias(ctx) {
+        let env = self.semantic_environment();
+        let non_type_form_fallback = match target.resolve_type_alias(env) {
             Type::TypeForm(_) => None,
             Type::Union(union)
                 if union.elements(self.db()).iter().any(|element| {
-                    matches!(element.resolve_type_alias(ctx), Type::TypeForm(_))
+                    matches!(element.resolve_type_alias(env), Type::TypeForm(_))
                 }) =>
             {
-                Some(target.filter_union(ctx, |element| {
-                    !matches!(element.resolve_type_alias(ctx), Type::TypeForm(_))
+                Some(target.filter_union(env, |element| {
+                    !matches!(element.resolve_type_alias(env), Type::TypeForm(_))
                 }))
             }
             _ => return None,
@@ -38,10 +38,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let value_ty = self
             .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
-        if matches!(value_ty.resolve_type_alias(ctx), Type::Never)
+        if matches!(value_ty.resolve_type_alias(env), Type::Never)
             || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
-                .is_some_and(|alternative| value_ty.is_assignable_to(ctx, alternative))
+                .is_some_and(|alternative| value_ty.is_assignable_to(env, alternative))
         {
             return None;
         }
@@ -57,7 +57,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let contextual_ty = self
                 .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
-            if contextual_ty.is_assignable_to(ctx, target) {
+            if contextual_ty.is_assignable_to(env, target) {
                 return None;
             }
         }
@@ -79,7 +79,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ty: Type<'db>,
             visitor: &ContainsTypeFormValueVisitor<'db>,
         ) -> bool {
-            let ctx = builder.semantic_context();
+            let env = builder.semantic_environment();
             match ty {
                 Type::TypeForm(_) | Type::SubclassOf(_) => true,
                 // A bare class object is valid type-expression syntax and should still be
@@ -101,18 +101,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(ctx, ty, || {
-                    imp(builder, expression, alias.value_type(ctx), visitor)
+                Type::TypeAlias(alias) => visitor.visit(env, ty, || {
+                    imp(builder, expression, alias.value_type(env), visitor)
                 }),
-                Type::TypeVar(typevar) => visitor.visit(ctx, ty, || {
+                Type::TypeVar(typevar) => visitor.visit(env, ty, || {
                     typevar
                         .typevar(builder.db())
-                        .bound_or_constraints(ctx)
+                        .bound_or_constraints(env)
                         .is_some_and(|bound_or_constraints| {
                             imp(
                                 builder,
                                 expression,
-                                bound_or_constraints.as_type(ctx),
+                                bound_or_constraints.as_type(env),
                                 visitor,
                             )
                         })

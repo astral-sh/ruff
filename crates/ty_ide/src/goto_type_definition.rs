@@ -16,11 +16,11 @@ pub fn goto_type_definition(
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;
-    let ctx = model.semantic_context();
+    let env = model.semantic_environment();
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(&ctx));
+    tracing::debug!("Inferred type of covering node is {}", ty.display(&env));
 
-    let navigation_targets = ty.navigation_targets(&ctx);
+    let navigation_targets = ty.navigation_targets(&env);
 
     Some(RangedValue {
         range: FileRange::new(file.file(db), goto_target.range()),

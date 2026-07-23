@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
-use crate::{Db, SemanticContext};
+use crate::{Db, SemanticEnvironment};
 use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
@@ -26,7 +26,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHa
 
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
-    ctx: SemanticContext<'db>,
+    env: SemanticEnvironment<'db>,
     file: PythonFile<'db>,
 
     /// The semantic index for the module.
@@ -46,7 +46,7 @@ struct DunderAllNamesCollector<'db> {
 impl<'db> DunderAllNamesCollector<'db> {
     fn new(db: &'db dyn Db, file: PythonFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
-            ctx: SemanticContext::from_file(db, file),
+            env: SemanticEnvironment::from_file(db, file),
             file,
             index,
             origin: None,
@@ -84,7 +84,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let db = self.ctx.db();
+                let db = self.env.db();
                 let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
                 else {
                     return false;
@@ -158,7 +158,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
-        let db = self.ctx.db();
+        let db = self.env.db();
         let module_name = ModuleName::from_import_statement(db, self.file, import_from).ok()?;
         let module = resolve_module(db, self.file, &module_name)?;
         dunder_all_names(db, module.python_file(db)?)
@@ -171,7 +171,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         infer_expression_types(
-            &self.ctx,
+            &self.env,
             self.index.expression(expr),
             TypeContext::default(),
         )
@@ -183,7 +183,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
         self.standalone_expression_type(expr)
-            .try_bool(&self.ctx)
+            .try_bool(&self.env)
             .ok()
     }
 
@@ -208,7 +208,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
-            let db = self.ctx.db();
+            let db = self.env.db();
             tracing::debug!("Invalid `__all__` in `{}`", self.file.file(db).path(db));
             None
         } else {

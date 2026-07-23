@@ -64,7 +64,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
 use ty_python_semantic::{
-    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticContext,
+    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticEnvironment,
     SemanticModel,
 };
 
@@ -97,8 +97,8 @@ pub fn goto_implementation(
         .into_par_iter()
         .map_with_db(db, |db, file| {
             let file = PythonFile::new(db, file, python_version);
-            let ctx = SemanticContext::from_file(db, file);
-            let definitions = finder.implementations_for_file(&ctx, file);
+            let env = SemanticEnvironment::from_file(db, file);
+            let definitions = finder.implementations_for_file(&env, file);
             definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();
@@ -124,7 +124,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
     model: &SemanticModel<'db>,
     goto_target: &GotoTarget<'_>,
 ) -> Option<ImplementationsFinder<'db>> {
-    let ctx = model.semantic_context();
+    let env = model.semantic_environment();
     match goto_target {
         GotoTarget::Expression(expression)
         | GotoTarget::Call {
@@ -138,7 +138,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
             goto_target
                 .expression_definitions(model, ImportAliasResolution::ResolveAliases)
                 .and_then(|definitions| {
-                    ImplementationsFinder::for_class_reference(&ctx, definitions.iter().as_slice())
+                    ImplementationsFinder::for_class_reference(&env, definitions.iter().as_slice())
                 })
                 .or_else(|| match expression {
                     ruff_python_ast::ExprRef::Attribute(attribute) => {
@@ -150,7 +150,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
         GotoTarget::StringAnnotationSubexpr { .. } => goto_target
             .definitions(model, ImportAliasResolution::ResolveAliases)
             .and_then(|definitions| {
-                ImplementationsFinder::for_class_reference(&ctx, definitions.iter().as_slice())
+                ImplementationsFinder::for_class_reference(&env, definitions.iter().as_slice())
             }),
         GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, function),
         GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, class),

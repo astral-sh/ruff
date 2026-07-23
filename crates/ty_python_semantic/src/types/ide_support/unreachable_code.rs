@@ -1,5 +1,5 @@
 use crate::reachability::is_reachable;
-use crate::{Db, SemanticContext};
+use crate::{Db, SemanticEnvironment};
 use get_size2::GetSize;
 use itertools::Itertools;
 use ruff_db::PythonFile;
@@ -48,7 +48,7 @@ pub enum UnreachableKind {
 pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
-    let ctx = SemanticContext::from_file(db, file);
+    let env = SemanticEnvironment::from_file(db, file);
 
     for scope_id in index.scope_ids() {
         let use_def = index.use_def_map(scope_id.file_scope_id(db));
@@ -56,7 +56,7 @@ pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[Unreachable
             use_def
                 .range_reachability()
                 .filter_map(|(range, constraint)| {
-                    (!is_reachable(&ctx, use_def, constraint)).then_some(UnreachableRange {
+                    (!is_reachable(&env, use_def, constraint)).then_some(UnreachableRange {
                         range,
                         kind: if constraint == ScopedReachabilityConstraintId::ALWAYS_FALSE {
                             UnreachableKind::Unconditional

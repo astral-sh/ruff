@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
@@ -55,8 +55,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 is_typed_dict |= match ty {
                     ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
-                    Type::ClassLiteral(class) => class.is_typed_dict(self.semantic_context()),
-                    Type::GenericAlias(alias) => alias.is_typed_dict(self.semantic_context()),
+                    Type::ClassLiteral(class) => class.is_typed_dict(self.semantic_environment()),
+                    Type::GenericAlias(alias) => alias.is_typed_dict(self.semantic_environment()),
                     _ => false,
                 };
             }
@@ -84,7 +84,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         class_node: &ast::StmtClassDef,
         definition: Definition<'db>,
     ) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let ast::StmtClassDef {
             range: _,
             node_index: _,
@@ -184,7 +184,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default_params(ctx));
+                dataclass_params = Some(DataclassParams::default_params(env));
                 continue;
             }
 
@@ -252,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
                 let transformer_params = f
-                    .iter_overloads_and_implementation(ctx)
+                    .iter_overloads_and_implementation(env)
                     .rev()
                     .find_map(|overload| overload.dataclass_transformer_params(db));
                 if let Some(transformer_params) = transformer_params {
@@ -276,21 +276,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 dataclass_transformer_params,
                 total_ordering,
             );
-            let decorator_result = apply_class_decorator(ctx, decorator_ty, original_class_ty);
+            let decorator_result = apply_class_decorator(env, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(ctx),
+                Err(error) => error.return_type(env),
             };
-            if is_unknown_decorator_result(ctx, decorated_ty) {
+            if is_unknown_decorator_result(env, decorated_ty) {
                 if !preserve_binding_for_unknown_result(
-                    ctx,
+                    env,
                     decorator_ty,
                     decorator_call_ty(decorator),
                     decorated_ty,
                 ) {
                     metadata_applies_to_original_class = false;
                 }
-            } else if !type_retains_original_class(ctx, original_class_ty, decorated_ty) {
+            } else if !type_retains_original_class(env, original_class_ty, decorated_ty) {
                 metadata_applies_to_original_class = false;
             }
 
@@ -324,13 +324,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     decorator_result
                 }
-                _ => apply_class_decorator(ctx, decorator_ty, inferred_ty),
+                _ => apply_class_decorator(env, decorator_ty, inferred_ty),
             };
             let decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
-                    bindings.return_type(ctx)
+                    bindings.return_type(env)
                 }
             };
             let decorated_ty = match decorated_ty {
@@ -339,19 +339,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding for decorators known to preserve unknown results.
-            let should_preserve_binding = is_unknown_decorator_result(ctx, decorated_ty)
+            let should_preserve_binding = is_unknown_decorator_result(env, decorated_ty)
                 && preserve_binding_for_unknown_result(
-                    ctx,
+                    env,
                     decorator_ty,
                     decorator_call_ty(decorator_node),
                     decorated_ty,
                 );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
-            } else if class_decorator_preserves_class_binding(ctx, original_class_ty, decorated_ty)
+            } else if class_decorator_preserves_class_binding(env, original_class_ty, decorated_ty)
             {
                 merge_class_preserving_decorator_result(
-                    ctx,
+                    env,
                     original_class_ty,
                     inferred_ty,
                     decorated_ty,
@@ -432,9 +432,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(arguments) = class.arguments.as_deref()
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
-            if original_class_type(self.db(), definition)
-                .is_some_and(|class_literal| class_literal.is_typed_dict(self.semantic_context()))
-            {
+            if original_class_type(self.db(), definition).is_some_and(|class_literal| {
+                class_literal.is_typed_dict(self.semantic_environment())
+            }) {
                 self.infer_extra_items_kwarg(&extra_items_keyword.value);
             } else if self.in_stub() {
                 self.infer_expression_with_state(
@@ -452,14 +452,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 }
 
 fn apply_class_decorator<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
 ) -> Result<Type<'db>, CallError<'db>> {
     let call_arguments = CallArguments::positional([decorated_ty]);
     decorator_ty
-        .try_call(ctx, &call_arguments)
-        .map(|bindings| bindings.return_type(ctx))
+        .try_call(env, &call_arguments)
+        .map(|bindings| bindings.return_type(env))
 }
 
 /// Return true if a decorator result still binds the name to the original class.
@@ -476,11 +476,11 @@ fn apply_class_decorator<'db>(
 /// This also accepts metaclass-shaped results such as `type[C]`, because those still describe the
 /// original class object even if the decorator call produced a `SubclassOf` type internally.
 fn class_decorator_preserves_class_binding<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    let db = ctx.db();
+    let db = env.db();
     let Type::ClassLiteral(original_literal) = original_class else {
         return false;
     };
@@ -494,18 +494,18 @@ fn class_decorator_preserves_class_binding<'db>(
         }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
-            .into_class(ctx)
-            .is_some_and(|class| class == original_literal.default_specialization(ctx)),
+            .into_class(env)
+            .is_some_and(|class| class == original_literal.default_specialization(env)),
         Type::Divergent(_) => true,
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| class_decorator_preserves_class_binding(ctx, original_class, *element)),
+            .all(|element| class_decorator_preserves_class_binding(env, original_class, *element)),
         Type::TypeAlias(alias) => {
-            class_decorator_preserves_class_binding(ctx, original_class, alias.value_type(ctx))
+            class_decorator_preserves_class_binding(env, original_class, alias.value_type(env))
         }
-        _ => SubclassOfType::try_from_type(ctx, original_class).is_some_and(|original_meta_type| {
-            decorated_class.is_equivalent_to(ctx, original_meta_type)
+        _ => SubclassOfType::try_from_type(env, original_class).is_some_and(|original_meta_type| {
+            decorated_class.is_equivalent_to(env, original_meta_type)
         }),
     }
 }
@@ -513,24 +513,24 @@ fn class_decorator_preserves_class_binding<'db>(
 /// Return true if a type still contains the original class object, even if it also carries extra
 /// intersection members.
 fn type_retains_original_class<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    let db = ctx.db();
+    let db = env.db();
     match decorated_class {
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| type_retains_original_class(ctx, original_class, *element)),
+            .any(|element| type_retains_original_class(env, original_class, *element)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| type_retains_original_class(ctx, original_class, *element)),
+            .all(|element| type_retains_original_class(env, original_class, *element)),
         Type::TypeAlias(alias) => {
-            type_retains_original_class(ctx, original_class, alias.value_type(ctx))
+            type_retains_original_class(env, original_class, alias.value_type(env))
         }
-        _ => class_decorator_preserves_class_binding(ctx, original_class, decorated_class),
+        _ => class_decorator_preserves_class_binding(env, original_class, decorated_class),
     }
 }
 
@@ -553,22 +553,22 @@ fn type_retains_original_class<'db>(
 /// `decorator_factory` carries the static information that tells us whether an unknown result can
 /// be preserved.
 fn preserve_binding_for_unknown_result<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     decorator_ty: Type<'db>,
     decorator_call_ty: Option<Type<'db>>,
     decorator_result_ty: Type<'db>,
 ) -> bool {
-    ClassDecoratorUnknownResultPolicy::from_decorator(ctx, decorator_ty, decorator_result_ty)
+    ClassDecoratorUnknownResultPolicy::from_decorator(env, decorator_ty, decorator_result_ty)
         == ClassDecoratorUnknownResultPolicy::PreserveBinding
         || decorator_call_ty.is_some_and(|ty| {
-            ClassDecoratorUnknownResultPolicy::from_decorator(ctx, ty, decorator_result_ty)
+            ClassDecoratorUnknownResultPolicy::from_decorator(env, ty, decorator_result_ty)
                 == ClassDecoratorUnknownResultPolicy::PreserveBinding
         })
 }
 
 /// Return true if applying a class decorator produced no useful replacement type.
-fn is_unknown_decorator_result<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> bool {
-    ty.is_unknown() || is_unknown_class_object_decorator_result(ctx, ty)
+fn is_unknown_decorator_result<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> bool {
+    ty.is_unknown() || is_unknown_class_object_decorator_result(env, ty)
 }
 
 /// Return true if applying a class decorator produced an unknown class-object type.
@@ -585,10 +585,10 @@ fn is_unknown_decorator_result<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -
 /// class C: ...
 /// ```
 fn is_unknown_class_object_decorator_result<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
 ) -> bool {
-    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(ctx) else {
+    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(env) else {
         return false;
     };
 
@@ -619,7 +619,7 @@ impl ClassDecoratorUnknownResultPolicy {
     /// application result is unknown. Explicit return annotations are trusted as replacement
     /// intent.
     fn from_decorator<'db>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         decorator_ty: Type<'db>,
         decorator_result_ty: Type<'db>,
     ) -> Self {
@@ -627,7 +627,7 @@ impl ClassDecoratorUnknownResultPolicy {
             return Self::ReplaceBinding;
         }
 
-        Self::known_from_decorator(ctx, decorator_ty, decorator_result_ty)
+        Self::known_from_decorator(env, decorator_ty, decorator_result_ty)
             .unwrap_or(Self::ReplaceBinding)
     }
 
@@ -649,21 +649,21 @@ impl ClassDecoratorUnknownResultPolicy {
     /// Callable instances and protocols delegate the decision to their `__call__` member, because
     /// the decorator value itself is not the function that receives the class.
     fn known_from_decorator<'db>(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         decorator_ty: Type<'db>,
         decorator_result_ty: Type<'db>,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         match decorator_ty {
             Type::FunctionLiteral(function) => {
-                Some(if function.has_explicit_return_annotation(ctx) {
+                Some(if function.has_explicit_return_annotation(env) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
                 })
             }
             Type::BoundMethod(method) => {
-                Some(if method.function(db).has_explicit_return_annotation(ctx) {
+                Some(if method.function(db).has_explicit_return_annotation(env) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
@@ -672,7 +672,7 @@ impl ClassDecoratorUnknownResultPolicy {
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = decorator_ty
                     .member_lookup_with_policy(
-                        ctx,
+                        env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
@@ -682,7 +682,7 @@ impl ClassDecoratorUnknownResultPolicy {
                     && place.is_definitely_defined()
                 {
                     Some(
-                        Self::known_from_decorator(ctx, place.ty, decorator_result_ty)
+                        Self::known_from_decorator(env, place.ty, decorator_result_ty)
                             .unwrap_or(Self::ReplaceBinding),
                     )
                 } else {
@@ -691,7 +691,7 @@ impl ClassDecoratorUnknownResultPolicy {
             }
             Type::Union(union) => Some(
                 if union.elements(db).iter().all(|element| {
-                    Self::known_from_decorator(ctx, *element, decorator_result_ty)
+                    Self::known_from_decorator(env, *element, decorator_result_ty)
                         == Some(Self::PreserveBinding)
                 }) {
                     Self::PreserveBinding
@@ -700,7 +700,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 },
             ),
             Type::TypeAlias(alias) => Some(
-                Self::known_from_decorator(ctx, alias.value_type(ctx), decorator_result_ty)
+                Self::known_from_decorator(env, alias.value_type(env), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
             Type::Callable(callable) => Some(match callable.provenance(db) {
@@ -730,7 +730,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 // class C: ...
                 // ```
                 CallableFunctionProvenance::None
-                    if is_unknown_class_object_decorator_result(ctx, decorator_result_ty) =>
+                    if is_unknown_class_object_decorator_result(env, decorator_result_ty) =>
                 {
                     Self::PreserveBinding
                 }
@@ -755,13 +755,13 @@ impl ClassDecoratorUnknownResultPolicy {
 /// members instead of collapsing back to the undecorated class when a later decorator simply
 /// returns the original class object again.
 fn merge_class_preserving_decorator_result<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     original_class: Type<'db>,
     current_binding: Type<'db>,
     decorated_binding: Type<'db>,
 ) -> Type<'db> {
     if current_binding == original_class
-        || type_retains_original_class(ctx, original_class, current_binding)
+        || type_retains_original_class(env, original_class, current_binding)
     {
         current_binding
     } else {

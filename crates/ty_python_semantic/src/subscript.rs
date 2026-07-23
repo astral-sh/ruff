@@ -4,7 +4,7 @@
 
 use std::num::NonZeroI32;
 
-use crate::{Db, SemanticContext};
+use crate::{Db, SemanticEnvironment};
 use itertools::Either;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,7 +15,7 @@ pub(crate) trait PyIndex<'db> {
 
     fn py_index(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         index: i32,
     ) -> Result<Self::Item, OutOfBoundsError>;
 }
@@ -85,7 +85,11 @@ impl Nth {
 impl<'db, T> PyIndex<'db> for &'db [T] {
     type Item = &'db T;
 
-    fn py_index(self, _ctx: &SemanticContext<'db>, index: i32) -> Result<&'db T, OutOfBoundsError> {
+    fn py_index(
+        self,
+        _ctx: &SemanticEnvironment<'db>,
+        index: i32,
+    ) -> Result<&'db T, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
@@ -101,7 +105,7 @@ where
 {
     type Item = I;
 
-    fn py_index(self, _ctx: &SemanticContext<'db>, index: i32) -> Result<I, OutOfBoundsError> {
+    fn py_index(self, _ctx: &SemanticEnvironment<'db>, index: i32) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),
@@ -235,59 +239,59 @@ mod tests {
     #[test]
     fn py_index_empty() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let iter = std::iter::empty::<char>();
 
-        assert_eq!(iter.clone().py_index(&ctx, 0), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&ctx, 1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&ctx, -1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&ctx, i32::MIN), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&ctx, i32::MAX), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, 0), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, -1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, i32::MIN), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, i32::MAX), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_single_element() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let iter = ['a'].into_iter();
 
-        assert_eq!(iter.clone().py_index(&ctx, 0), Ok('a'));
-        assert_eq!(iter.clone().py_index(&ctx, 1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&ctx, -1), Ok('a'));
-        assert_eq!(iter.clone().py_index(&ctx, -2), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(&env, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, -1), Ok('a'));
+        assert_eq!(iter.clone().py_index(&env, -2), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_more_elements() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let iter = ['a', 'b', 'c', 'd', 'e'].into_iter();
 
-        assert_eq!(iter.clone().py_index(&ctx, 0), Ok('a'));
-        assert_eq!(iter.clone().py_index(&ctx, 1), Ok('b'));
-        assert_eq!(iter.clone().py_index(&ctx, 4), Ok('e'));
-        assert_eq!(iter.clone().py_index(&ctx, 5), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(&env, 1), Ok('b'));
+        assert_eq!(iter.clone().py_index(&env, 4), Ok('e'));
+        assert_eq!(iter.clone().py_index(&env, 5), Err(OutOfBoundsError));
 
-        assert_eq!(iter.clone().py_index(&ctx, -1), Ok('e'));
-        assert_eq!(iter.clone().py_index(&ctx, -2), Ok('d'));
-        assert_eq!(iter.clone().py_index(&ctx, -5), Ok('a'));
-        assert_eq!(iter.clone().py_index(&ctx, -6), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(&env, -1), Ok('e'));
+        assert_eq!(iter.clone().py_index(&env, -2), Ok('d'));
+        assert_eq!(iter.clone().py_index(&env, -5), Ok('a'));
+        assert_eq!(iter.clone().py_index(&env, -6), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_uses_full_index_range() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         let iter = 0..=u32::MAX;
 
         // u32::MAX - |i32::MIN| + 1 = 2^32 - 1 - 2^31 + 1 = 2^31
-        assert_eq!(iter.clone().py_index(&ctx, i32::MIN), Ok(2u32.pow(31)));
-        assert_eq!(iter.clone().py_index(&ctx, -2), Ok(u32::MAX - 2 + 1));
-        assert_eq!(iter.clone().py_index(&ctx, -1), Ok(u32::MAX - 1 + 1));
+        assert_eq!(iter.clone().py_index(&env, i32::MIN), Ok(2u32.pow(31)));
+        assert_eq!(iter.clone().py_index(&env, -2), Ok(u32::MAX - 2 + 1));
+        assert_eq!(iter.clone().py_index(&env, -1), Ok(u32::MAX - 1 + 1));
 
-        assert_eq!(iter.clone().py_index(&ctx, 0), Ok(0));
-        assert_eq!(iter.clone().py_index(&ctx, 1), Ok(1));
-        assert_eq!(iter.clone().py_index(&ctx, i32::MAX), Ok(i32::MAX as u32));
+        assert_eq!(iter.clone().py_index(&env, 0), Ok(0));
+        assert_eq!(iter.clone().py_index(&env, 1), Ok(1));
+        assert_eq!(iter.clone().py_index(&env, i32::MAX), Ok(i32::MAX as u32));
     }
 
     #[track_caller]

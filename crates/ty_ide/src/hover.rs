@@ -8,7 +8,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::SemanticContext;
+use ty_python_semantic::SemanticEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
@@ -84,12 +84,12 @@ pub fn hover<'db>(
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        let ctx = model.semantic_context();
-        tracing::debug!("Inferred type of covering node is {}", ty.display(&ctx));
+        let env = model.semantic_environment();
+        tracing::debug!("Inferred type of covering node is {}", ty.display(&env));
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                typevar.bind_pep695(&ctx).map_or(
+                typevar.bind_pep695(&env).map_or(
                     HoverContent::Type {
                         ty,
                         variance: None,
@@ -97,26 +97,26 @@ pub fn hover<'db>(
                     },
                     |typevar| HoverContent::Type {
                         ty: Type::TypeVar(typevar),
-                        variance: Some(typevar.variance(&ctx)),
+                        variance: Some(typevar.variance(&env)),
                         qualifiers,
                     },
                 )
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(&ctx);
+                let value_ty = alias.value_type(&env);
 
-                alias_docstring = Definitions::from_ty(db, &ctx, ty)
+                alias_docstring = Definitions::from_ty(db, &env, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| {
-                        Definitions::from_ty(db, &ctx, value_ty).and_then(|def| def.docstring(db))
+                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
                     });
 
                 HoverContent::TypeAlias { alias, qualifiers }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
                 ty,
-                variance: Some(typevar.variance(&ctx)),
+                variance: Some(typevar.variance(&env)),
                 qualifiers,
             },
             _ => HoverContent::Type {
@@ -270,13 +270,13 @@ pub struct DisplayHover<'db, 'a> {
 impl fmt::Display for DisplayHover<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut first = true;
-        let ctx = SemanticContext::from_file(self.db, self.hover.python_file);
+        let env = SemanticEnvironment::from_file(self.db, self.hover.python_file);
         for content in &self.hover.contents {
             if !first {
                 self.kind.horizontal_line().fmt(f)?;
             }
 
-            content.display(&ctx, self.kind).fmt(f)?;
+            content.display(&env, self.kind).fmt(f)?;
             first = false;
         }
 
@@ -314,11 +314,11 @@ pub enum HoverContent<'db> {
 impl<'db> HoverContent<'db> {
     fn display<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         kind: MarkupKind,
     ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
-            ctx,
+            env,
             content: self,
             kind,
         }
@@ -326,7 +326,7 @@ impl<'db> HoverContent<'db> {
 }
 
 pub(crate) struct DisplayHoverContent<'a, 'db> {
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
 }
@@ -336,7 +336,7 @@ impl<'db> DisplayHoverContent<'_, 'db> {
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
         let ty_string = ty
-            .display_with(self.ctx, DisplaySettings::default().multiline())
+            .display_with(self.env, DisplaySettings::default().multiline())
             .to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
@@ -391,7 +391,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             }
             HoverContent::TypeAlias { alias, qualifiers } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(self.ctx);
+                let declaration = alias.display_declaration(self.env);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")

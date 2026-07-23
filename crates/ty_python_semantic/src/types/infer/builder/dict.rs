@@ -26,7 +26,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // is `TypedDict`-shaped.
         if let Some(tcx) = call_expression_tcx.annotation
             && let Some(typed_dict) = tcx
-                .filter_union(self.semantic_context(), Type::is_typed_dict)
+                .filter_union(self.semantic_environment(), Type::is_typed_dict)
                 .as_typed_dict()
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
@@ -41,15 +41,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // back.
             let supports_typed_dict_context = {
                 let mut speculative_builder = self.speculate_without_diagnostics();
-                let ctx = speculative_builder.semantic_context();
+                let env = speculative_builder.semantic_environment();
                 infer_unpacked_keyword_types(arguments, |expr, tcx| {
                     speculative_builder.infer_expression(expr, tcx)
                 })
                 .into_iter()
                 .flatten()
                 .all(|keyword_ty| {
-                    keyword_ty.is_assignable_to(ctx, Type::TypedDict(typed_dict))
-                        || extract_unpacked_typed_dict_keys_from_value_type(ctx, keyword_ty)
+                    keyword_ty.is_assignable_to(env, Type::TypedDict(typed_dict))
+                        || extract_unpacked_typed_dict_keys_from_value_type(env, keyword_ty)
                             .is_some()
                 })
             };

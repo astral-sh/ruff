@@ -980,7 +980,7 @@ def ab(a: int, *, c: int):
         // the parameter type should be `str` (not `_KT`).
         let key_param = &signature.parameters[0];
         assert_eq!(key_param.name, "key");
-        let type_display = format!("{}", key_param.ty.display(&test.db.semantic_context()));
+        let type_display = format!("{}", key_param.ty.display(&test.db.semantic_environment()));
         assert_eq!(type_display, "str");
     }
 
@@ -1001,7 +1001,10 @@ def ab(a: int, *, c: int):
         // list.append's parameter is typed as `_T`, which should resolve
         // to `int` for a `list[int]`.
         let object_param = &signature.parameters[0];
-        let type_display = format!("{}", object_param.ty.display(&test.db.semantic_context()));
+        let type_display = format!(
+            "{}",
+            object_param.ty.display(&test.db.semantic_environment())
+        );
         assert_eq!(type_display, "int");
     }
 
@@ -1028,12 +1031,12 @@ def ab(a: int, *, c: int):
         // `T` should be resolved to `str` from the first argument.
         let a_param = &signature.parameters[0];
         assert_eq!(a_param.name, "a");
-        let a_type = format!("{}", a_param.ty.display(&test.db.semantic_context()));
+        let a_type = format!("{}", a_param.ty.display(&test.db.semantic_environment()));
         assert_eq!(a_type, "str");
 
         let b_param = &signature.parameters[1];
         assert_eq!(b_param.name, "b");
-        let b_type = format!("{}", b_param.ty.display(&test.db.semantic_context()));
+        let b_type = format!("{}", b_param.ty.display(&test.db.semantic_environment()));
         assert_eq!(b_type, "str");
     }
 

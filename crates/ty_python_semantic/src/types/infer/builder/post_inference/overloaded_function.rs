@@ -46,7 +46,7 @@ pub(crate) fn check_overloaded_function<'db>(
     };
 
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
     if function.file(db) != context.file() {
         // If the function is not in this file, we don't need to check it.
@@ -54,7 +54,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !function.has_known_decorator(ctx, FunctionDecorators::OVERLOAD) {
+    if !function.has_known_decorator(env, FunctionDecorators::OVERLOAD) {
         return;
     }
 
@@ -67,7 +67,7 @@ pub(crate) fn check_overloaded_function<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = place_from_bindings(
-        ctx,
+        env,
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
     )
     .place
@@ -75,7 +75,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     };
 
-    if !function.contains_definition(ctx, definition) {
+    if !function.contains_definition(env, definition) {
         // The public end-of-scope binding for this place can be a different overloaded function
         // value assigned to the same name. In that case, the current local overload definition is
         // shadowed, and checking the public function here would report against the wrong function.
@@ -92,7 +92,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    let (overloads, implementation) = function.overloads_and_implementation(ctx);
+    let (overloads, implementation) = function.overloads_and_implementation(env);
     if overloads.is_empty() {
         return;
     }
@@ -104,7 +104,7 @@ pub(crate) fn check_overloaded_function<'db>(
         && binding_decorator_inconsistencies.is_empty()
         && context.is_lint_enabled(&INVALID_OVERLOAD)
     {
-        let implementation_callables = function.implementation_callables(ctx);
+        let implementation_callables = function.implementation_callables(env);
         check_non_generic_overload_implementation_consistency(
             context,
             overloads,
@@ -123,7 +123,7 @@ pub(crate) fn check_overloaded_function<'db>(
             ));
             diagnostic.set_primary_annotation_message("Only one overload defined here");
             if let Some(decorator) = single_overload
-                .find_known_decorator_span(context.semantic_context(), KnownFunction::Overload)
+                .find_known_decorator_span(context.semantic_environment(), KnownFunction::Overload)
             {
                 diagnostic.annotate(Annotation::secondary(decorator));
             }
@@ -136,7 +136,7 @@ pub(crate) fn check_overloaded_function<'db>(
     if implementation.is_none() && !context.in_stub() {
         let mut implementation_required = true;
 
-        if function.iter_overloads_and_implementation(ctx).all(|f| {
+        if function.iter_overloads_and_implementation(env).all(|f| {
             index.is_in_type_checking_block(
                 f.body_scope(db).file_scope_id(db),
                 f.node(db, context.file(), context.module()).range(),
@@ -149,10 +149,10 @@ pub(crate) fn check_overloaded_function<'db>(
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
         {
-            if class.is_protocol(ctx)
+            if class.is_protocol(env)
                 || ({
                     Type::ClassLiteral(class)
-                        .is_subtype_of(ctx, KnownClass::ABCMeta.to_instance(ctx))
+                        .is_subtype_of(env, KnownClass::ABCMeta.to_instance(env))
                 } && overloads.iter().all(|overload| {
                     overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
                 }))
@@ -200,9 +200,10 @@ pub(crate) fn check_overloaded_function<'db>(
                         .secondary(function.focus_range(db, context.module()))
                         .message(format_args!("Missing here")),
                 );
-                if let Some(decorator) = function
-                    .find_known_decorator_span(context.semantic_context(), KnownFunction::Overload)
-                {
+                if let Some(decorator) = function.find_known_decorator_span(
+                    context.semantic_environment(),
+                    KnownFunction::Overload,
+                ) {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
             }
@@ -230,7 +231,7 @@ pub(crate) fn check_overloaded_function<'db>(
                 ));
                 for known_function in [known_function, KnownFunction::Overload] {
                     if let Some(decorator) = overload
-                        .find_known_decorator_span(context.semantic_context(), known_function)
+                        .find_known_decorator_span(context.semantic_environment(), known_function)
                     {
                         diagnostic.annotate(Annotation::secondary(decorator));
                     }
@@ -260,8 +261,8 @@ pub(crate) fn check_overloaded_function<'db>(
                         first overload",
                     name = known_function.name()
                 ));
-                if let Some(decorator) =
-                    overload.find_known_decorator_span(context.semantic_context(), known_function)
+                if let Some(decorator) = overload
+                    .find_known_decorator_span(context.semantic_environment(), known_function)
                 {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
@@ -295,7 +296,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     implementation_callables: &[CallableType<'db>],
 ) {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     if implementation_callables.is_empty()
         || implementation_callables
             .iter()
@@ -322,7 +323,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads.iter().flat_map(|overload| {
         overload
-            .decorated_signatures(ctx)
+            .decorated_signatures(env)
             .map(move |signature| (overload, signature))
     });
 
@@ -341,12 +342,12 @@ fn check_non_generic_overload_implementation_consistency<'db>(
                 for implementation_signature in &callable.signatures(db).overloads {
                     let parameter_consistency = implementation_signature
                         .non_generic_implementation_parameters_consistency_with(
-                            ctx,
+                            env,
                             &overload_signature,
                         );
                     let return_type_consistency = implementation_signature
                         .non_generic_implementation_return_type_consistency_with(
-                            ctx,
+                            env,
                             &overload_signature,
                         );
                     if matches!(
@@ -406,18 +407,18 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(ctx),
-                overload_signature.display(ctx),
+                implementation_signature.display(env),
+                overload_signature.display(env),
             ));
-            error_context.attach_to(ctx, &mut diagnostic);
+            error_context.attach_to(env, &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(ctx),
-                implementation_signature.return_ty.display(ctx),
+                overload_signature.return_ty.display(env),
+                implementation_signature.return_ty.display(env),
             ));
-            error_context.attach_to(ctx, &mut diagnostic);
+            error_context.attach_to(env, &mut diagnostic);
         }
         diagnostic.annotate(
             context
