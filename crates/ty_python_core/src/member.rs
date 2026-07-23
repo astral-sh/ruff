@@ -109,6 +109,20 @@ impl Member {
         self.as_instance_attribute() == Some(name)
     }
 
+    /// Returns the symbol the member access is performed on, e.g. `x` in `x.y.z`.
+    pub(crate) fn symbol_name(&self) -> &str {
+        self.expression().symbol_name()
+    }
+
+    /// Returns the leading attribute segments, e.g. `y`, `z` for `x.y.z` and `y` for
+    /// `x.y[0].z`.
+    pub fn leading_attribute_segments(&self) -> impl Iterator<Item = &str> {
+        self.expression()
+            .segments()
+            .take_while(|segment| segment.kind == SegmentKind::Attribute)
+            .map(|segment| segment.text)
+    }
+
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
     pub fn as_instance_attribute(&self) -> Option<&str> {
         if self.is_instance_attribute() {

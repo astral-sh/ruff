@@ -331,6 +331,17 @@ impl<'db> DefinitionState<'db> {
     }
 }
 
+/// Returns `true` if the dotted path given by `path_segments` starts with `prefix` at a
+/// segment boundary: `os.path.join` starts with `os.path` and `os`, but not with `os.pa`.
+pub fn dotted_starts_with<'a>(
+    mut path_segments: impl Iterator<Item = &'a str>,
+    prefix: &str,
+) -> bool {
+    prefix
+        .split('.')
+        .all(|part| path_segments.next() == Some(part))
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Import(ImportDefinitionNodeRef<'ast>),
@@ -973,6 +984,28 @@ impl<'db> DefinitionKind<'db> {
                 | DefinitionKind::StarImport(_)
                 | DefinitionKind::ImportFromSubmodule(_)
         )
+    }
+
+    pub fn is_future_import(&self, parsed: &ParsedModuleRef) -> bool {
+        matches!(
+            self,
+            DefinitionKind::ImportFrom(import_from)
+                if import_from.import(parsed).module.as_deref() == Some("__future__")
+        )
+    }
+
+    pub fn unaliased_multipart_import_name<'a>(
+        &'a self,
+        parsed: &'a ParsedModuleRef,
+    ) -> Option<&'a str> {
+        let DefinitionKind::Import(import) = self else {
+            return None;
+        };
+
+        let alias = import.alias(parsed);
+        let name = alias.name.id.as_str();
+
+        (alias.asname.is_none() && name.contains('.')).then_some(name)
     }
 
     pub const fn is_unannotated_assignment(&self) -> bool {

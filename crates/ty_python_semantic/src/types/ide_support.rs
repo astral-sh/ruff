@@ -27,11 +27,14 @@ use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
+#[path = "ide_support/unused_imports.rs"]
+mod unused_import_support;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
+pub use unused_import_support::{UnusedImport, unused_imports};
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -53,21 +56,20 @@ pub fn definition_for_name<'db>(
     None
 }
 
-/// Returns all definitions for a name. If any definitions are imports, they
-/// are resolved (recursively) to the original definitions or module files.
-pub fn definitions_for_name<'db>(
+/// Returns reachable local definitions for a name without resolving imports or falling back to
+/// builtins.
+pub(super) fn visible_reachable_definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
     node: AnyNodeRef<'_>,
-    alias_resolution: ImportAliasResolution,
-) -> Vec<ResolvedDefinition<'db>> {
+) -> FxIndexSet<Definition<'db>> {
     let db = model.db();
     let file = model.file();
     let index = semantic_index(db, file);
 
     // Get the scope for this name expression
     let Some(file_scope) = model.scope(node) else {
-        return vec![];
+        return FxIndexSet::default();
     };
 
     let mut all_definitions = FxIndexSet::default();
@@ -140,6 +142,20 @@ pub fn definitions_for_name<'db>(
             break;
         }
     }
+
+    all_definitions
+}
+
+/// Returns all definitions for a name. If any definitions are imports, they
+/// are resolved (recursively) to the original definitions or module files.
+pub fn definitions_for_name<'db>(
+    model: &SemanticModel<'db>,
+    name_str: &str,
+    node: AnyNodeRef<'_>,
+    alias_resolution: ImportAliasResolution,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let all_definitions = visible_reachable_definitions_for_name(model, name_str, node);
 
     // Resolve import definitions to their targets
     let mut resolved_definitions = Vec::new();
