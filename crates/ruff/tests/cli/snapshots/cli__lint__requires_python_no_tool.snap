@@ -84,6 +84,7 @@ linter.safety_table.forced_unsafe = []
 linter.unresolved_target_version = 3.11
 linter.per_file_target_version = {}
 linter.preview = disabled
+linter.prefer_rule_codes_in_output = false
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []

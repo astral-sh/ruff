@@ -1445,6 +1445,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
+    - `lint.prefer-rule-codes-in-output`
     - `lint.typing-extensions`
     - `lint.future-annotations`
 
@@ -4267,6 +4268,31 @@ class Foo:
     exit_code: 0
     ----- stdout -----
     All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn prefer_rule_codes_in_output() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args([
+                "--preview",
+                "--config",
+                "lint.prefer-rule-codes-in-output = true",
+                "--select=A001",
+                "-",
+            ])
+            .pass_stdin("print = 1\n"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: A001 Variable `print` is shadowing a Python builtin
+    Found 1 error.
 
     ----- stderr -----
     "

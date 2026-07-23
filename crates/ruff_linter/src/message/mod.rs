@@ -213,6 +213,7 @@ pub fn render_diagnostics(
                 .with_show_fix_status(config.show_fix_status())
                 .with_applicability(config.fix_applicability())
                 .with_preview(config.preview_enabled())
+                .with_prefer_rule_codes(config.prefer_rule_codes_enabled())
                 .emit(writer, diagnostics, context)
                 .map_err(std::io::Error::other)?;
         }

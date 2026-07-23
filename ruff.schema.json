@@ -2517,6 +2517,13 @@
             }
           }
         },
+        "prefer-rule-codes-in-output": {
+          "description": "Whether to prefer rule codes over human-readable rule names in diagnostic output, even\nwhen preview mode is enabled.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "preview": {
           "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will\nuse unstable rules and fixes.",
           "type": [

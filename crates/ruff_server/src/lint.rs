@@ -157,7 +157,9 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
-        if is_human_readable_names_enabled(settings.linter.preview) {
+        if is_human_readable_names_enabled(settings.linter.preview)
+            && !settings.linter.prefer_rule_codes_in_output
+        {
             SuppressionKind::Ignore
         } else {
             SuppressionKind::Noqa
@@ -276,7 +278,9 @@ fn to_lsp_diagnostic(
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
-        let code = if is_human_readable_names_enabled(context.settings.preview) {
+        let code = if is_human_readable_names_enabled(context.settings.preview)
+            && !context.settings.prefer_rule_codes_in_output
+        {
             name.to_string()
         } else {
             code.to_string()

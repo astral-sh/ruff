@@ -375,6 +375,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview;
+    let prefer_rule_codes = pyproject_config.settings.linter.prefer_rule_codes_in_output;
 
     if cli.watch {
         // Configure the file watcher.
@@ -400,7 +401,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &diagnostics, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -427,7 +428,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 fix_mode,
                 unsafe_fixes,
             )?;
-            printer.write_continuously(&mut writer, &diagnostics, preview)?;
+            printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
         }
     } else {
         // Generate lint violations.
@@ -462,7 +463,12 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
+            printer.write_once(
+                &diagnostics,
+                &mut summary_writer,
+                preview,
+                prefer_rule_codes,
+            )?;
         }
 
         if !cli.exit_zero {

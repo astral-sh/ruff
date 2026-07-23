@@ -194,7 +194,9 @@ impl Serialize for RuleCode<'_> {
 impl<'a> RuleCode<'a> {
     fn from_diagnostic(code: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
         match code.secondary_code() {
-            Some(diagnostic) if !config.preview_enabled() => Self::SecondaryCode(diagnostic),
+            Some(diagnostic) if !config.preview_enabled() || config.prefer_rule_codes_enabled() => {
+                Self::SecondaryCode(diagnostic)
+            }
             _ => Self::LintId(code.id().as_str()),
         }
     }

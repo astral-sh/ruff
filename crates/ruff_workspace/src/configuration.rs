@@ -357,6 +357,7 @@ impl Configuration {
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
+                prefer_rule_codes_in_output: lint.prefer_rule_codes_in_output.unwrap_or_default(),
                 unresolved_target_version: linter_target_version,
                 per_file_target_version,
                 project_root: project_root.to_path_buf(),
@@ -720,6 +721,7 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+    pub prefer_rule_codes_in_output: Option<bool>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -812,6 +814,7 @@ impl LintConfiguration {
                     .collect()
             }),
             preview: options.preview.map(PreviewMode::from),
+            prefer_rule_codes_in_output: options.prefer_rule_codes_in_output,
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
@@ -1242,6 +1245,9 @@ impl LintConfiguration {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
+            prefer_rule_codes_in_output: self
+                .prefer_rule_codes_in_output
+                .or(config.prefer_rule_codes_in_output),
             rule_selections,
             extend_safe_fixes,
             extend_unsafe_fixes,
