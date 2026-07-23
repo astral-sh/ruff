@@ -364,6 +364,36 @@ info: Function defined here
   |
 ```
 
+### Nested argument type
+
+```py
+class Descriptor:
+    def __set__(self, instance, value: tuple[int, str]) -> None: ...
+
+class C:
+    x = Descriptor()
+
+c = C()
+c.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
+ --> src/mdtest_snippet.py:8:7
+  |
+8 | c.x = (1, b"")  # snapshot: invalid-assignment
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...
+  |         ^^^^^^^                 ---------------------- Parameter declared here
+  |
+```
+
 ## Setting attributes on union types
 
 ```py

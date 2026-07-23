@@ -2980,6 +2980,75 @@ instance.callback = lambda number: (
 instance.payload = {"value": 1}
 ```
 
+### Nested argument type
+
+```py
+class C:
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+
+c = C()
+c.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`
+ --> src/mdtest_snippet.py:5:7
+  |
+5 | c.x = (1, b"")  # snapshot: invalid-assignment
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Method defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+  |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
+  |
+```
+
+### Overloaded `__setattr__`
+
+```py
+from typing import overload
+
+class D:
+    @overload
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+    @overload
+    def __setattr__(self, name: str, value: int): ...
+    def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+
+d = D()
+d.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | d.x = (1, b"")  # snapshot: invalid-assignment
+   | ^^^ No overload of bound method `D.__setattr__` matches arguments
+   |
+info: This assignment implicitly calls a custom `__setattr__` method
+info: First overload defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | /     @overload
+5 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+  | |_________________________________________________________________^ First overload defined here
+  |
+info: Possible overloads for bound method `__setattr__`:
+info:   (self, name: str, value: tuple[int, str]) -> Unknown
+info:   (self, name: str, value: int) -> Unknown
+info: Overload implementation defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__setattr__` method is annotated with a (union of) literal type(s),
