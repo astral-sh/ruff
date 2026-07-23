@@ -471,7 +471,7 @@ b"123a𝐁<CURSOR>c"
         fn selection_range(&self) -> String {
             let ranges = selection_range(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file).python_file(&self.db),
                 self.cursor.offset,
             );
 

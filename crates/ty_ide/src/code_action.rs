@@ -2,11 +2,11 @@ use crate::completion;
 
 use ruff_db::parsed::parsed_module;
 
-use ruff_db::PythonFile;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
@@ -21,7 +21,7 @@ pub struct QuickFix {
 
 pub fn code_actions(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
@@ -44,7 +44,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, file.python_file(db), lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 
@@ -53,10 +53,10 @@ pub fn code_actions(
 
 fn unresolved_fixes(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     diagnostic_range: TextRange,
 ) -> Option<impl Iterator<Item = QuickFix>> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
     Some(
@@ -77,7 +77,6 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
-        PythonFile,
         diagnostic::{
             Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
             LintName, Span, SubDiagnostic,
@@ -89,6 +88,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
+    use ty_python_core::ProgramFile;
     use ty_python_semantic::{
         default_lint_registry,
         lint::LintMetadata,
@@ -973,7 +973,11 @@ mod tests {
 
             for mut action in code_actions(
                 &self.db,
-                PythonFile::new(&self.db, self.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.semantic_environment().program(),
+                ),
                 self.diagnostic_range,
                 &lint.name,
             ) {

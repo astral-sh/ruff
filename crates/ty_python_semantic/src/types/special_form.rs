@@ -11,9 +11,9 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use ruff_db::PythonFile;
 use strum_macros::EnumString;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
+use ty_python_core::ProgramFile;
 use ty_python_core::{
     FileScopeId,
     definition::{Definition, DefinitionKind},
@@ -272,16 +272,19 @@ impl SpecialFormType {
 
     pub(super) fn try_from_file_and_name(
         db: &dyn Db,
-        file: PythonFile<'_>,
+        file: ImportingFile<'_>,
         symbol_name: &str,
     ) -> Option<Self> {
-        Self::candidates_from_name(symbol_name)
+        let candidates = Self::candidates_from_name(symbol_name);
+        if candidates.is_empty() {
+            return None;
+        }
+
+        let known_module =
+            file_to_module(db, file.resolver_file(db)).and_then(|module| module.known(db))?;
+        candidates
             .iter()
-            .find(|candidate| {
-                file_to_module(db, file)
-                    .and_then(|module| module.known(db))
-                    .is_some_and(|known_module| candidate.check_module(known_module))
-            })
+            .find(|candidate| candidate.check_module(known_module))
             .copied()
     }
 
@@ -803,8 +806,9 @@ impl SpecialFormType {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module_confident(db, env.python_version(), &module.name())?
-                    .python_file(db)?;
+                let module =
+                    resolve_module_confident(db, env.resolver_environment(), &module.name())?;
+                let file = ProgramFile::new(db, module.file(db)?, env.program());
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
@@ -858,8 +862,8 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
-                let python_file = scope_id.python_file(db);
-                let index = semantic_index(db, python_file);
+                let program_file = scope_id.program_file(db);
+                let index = semantic_index(db, program_file);
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),

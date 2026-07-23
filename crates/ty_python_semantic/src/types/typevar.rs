@@ -498,7 +498,7 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_bound_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
@@ -549,7 +549,7 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_constraints_unchecked_inner(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let constraints = match definition.kind(db) {
             // PEP 695 typevar
@@ -657,7 +657,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
@@ -731,7 +731,7 @@ impl<'db> TypeVarInstance<'db> {
             return None;
         }
         let typevar_definition = self.definition(db)?;
-        let index = semantic_index(db, typevar_definition.python_file(db));
+        let index = semantic_index(db, typevar_definition.program_file(db));
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
@@ -1293,9 +1293,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         debug_assert_eq!(
             self.typevar(db)
                 .definition(db)
-                .map_or(program, |definition| { definition.program(db) }),
+                .map_or(program, |definition| definition.program(db)),
             program,
-            "a bound TypeVar's Python version must match the active Python version"
+            "a bound TypeVar's resolver environment must match the active environment"
         );
         bound_typevar_default_type(db, self)
     }
@@ -1451,11 +1451,11 @@ fn lazy_bound_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     let current = current?;
-    let python_file = typevar
+    let program_file = typevar
         .definition(db)
         .expect("a lazy TypeVar bound must have a source definition")
-        .python_file(db);
-    let env = SemanticEnvironment::from_file(db, python_file);
+        .program_file(db);
+    let env = SemanticEnvironment::from_file(db, program_file);
     Some(match previous {
         Some(prev) => current.cycle_normalized(&env, *prev, cycle),
         None => current.recursive_type_normalized(&env, cycle),
@@ -1473,11 +1473,11 @@ fn lazy_constraints_cycle_recover<'db>(
 ) -> Option<TypeVarConstraints<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     let current = current?;
-    let python_file = typevar
+    let program_file = typevar
         .definition(db)
         .expect("lazy TypeVar constraints must have a source definition")
-        .python_file(db);
-    let env = SemanticEnvironment::from_file(db, python_file);
+        .program_file(db);
+    let env = SemanticEnvironment::from_file(db, program_file);
     Some(match previous {
         Some(prev) => current.cycle_normalized(&env, *prev, cycle),
         None => current.recursive_type_normalized(&env, cycle),
@@ -1494,11 +1494,11 @@ fn lazy_default_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the default to ensure cycle convergence.
     let current = current?;
-    let python_file = typevar
+    let program_file = typevar
         .definition(db)
         .expect("a lazy TypeVar default must have a source definition")
-        .python_file(db);
-    let env = SemanticEnvironment::from_file(db, python_file);
+        .program_file(db);
+    let env = SemanticEnvironment::from_file(db, program_file);
     Some(match previous_default {
         Some(prev) => current.cycle_normalized(&env, *prev, cycle),
         None => current.recursive_type_normalized(&env, cycle),
@@ -1603,7 +1603,7 @@ fn bound_typevar_default_type<'db>(
     let definition = typevar
         .definition(db)
         .expect("a bound TypeVar with a default must have a source definition");
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+    let env = SemanticEnvironment::from_file(db, definition.program_file(db));
     let default = typevar.default_type(&env)?;
     let binding_context = bound_typevar.binding_context(db);
 
@@ -1623,12 +1623,12 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     let default = default?;
-    let python_file = bound_typevar
+    let program_file = bound_typevar
         .typevar(db)
         .definition(db)
         .expect("a bound TypeVar with a default must have a source definition")
-        .python_file(db);
-    let env = SemanticEnvironment::from_file(db, python_file);
+        .program_file(db);
+    let env = SemanticEnvironment::from_file(db, program_file);
     Some(match previous_default {
         Some(previous) => default.cycle_normalized(&env, *previous, cycle),
         None => default.recursive_type_normalized(&env, cycle),

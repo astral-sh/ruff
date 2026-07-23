@@ -2,10 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::DocumentHighlightRequest;
 use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri};
-use ruff_db::PythonFile;
 use ty_ide::{ReferenceKind, document_highlights};
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -52,7 +51,7 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
         };
 
         let Some(highlights_result) =
-            document_highlights(db, PythonFile::new(db, file, db.python_version()), offset)
+            document_highlights(db, Program::get(db).program_file(db, file), offset)
         else {
             return Ok(None);
         };

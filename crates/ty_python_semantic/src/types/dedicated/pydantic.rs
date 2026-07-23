@@ -168,7 +168,7 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.python_file(db));
+        let model = SemanticModel::new(db, definition.program_file(db));
         let Some(alias_definition) = definitions_for_name(
             &model,
             name.id.as_str(),
@@ -533,7 +533,7 @@ fn is_root_model<'db>(env: &SemanticEnvironment<'db>, class: StaticClassLiteral<
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_file(db, class.program_file(db));
     class
         .iter_mro(&env, None)
         .filter_map(ClassBase::into_class)
@@ -614,7 +614,7 @@ fn model_config<'db>(
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn model_config_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_file(db, class.program_file(db));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
@@ -895,7 +895,7 @@ fn has_before_or_plain_field_validator_inner<'db>(
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_file(db, class.program_file(db));
     let field_name = CharStr::from(field_name);
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
@@ -1209,7 +1209,8 @@ fn instance_symbol<'db>(
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
     let db = env.db();
     let class = ty.nominal_class(env)?.class_literal(db).as_static()?;
-    let module = file_to_module(db, class.python_file(db))?.known(db)?;
+    let file = class.program_file(db);
+    let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 

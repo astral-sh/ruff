@@ -1,11 +1,10 @@
 use lsp_types::SemanticToken;
-use ruff_db::PythonFile;
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::document::{PositionEncoding, ToRangeExt};
 
@@ -20,8 +19,7 @@ pub(crate) fn generate_semantic_tokens(
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
     let line_index = line_index(db, file);
-    let semantic_token_data =
-        semantic_tokens(db, PythonFile::new(db, file, db.python_version()), range);
+    let semantic_token_data = semantic_tokens(db, Program::get(db).program_file(db, file), range);
 
     let mut encoder = Encoder {
         tokens: Vec::with_capacity(semantic_token_data.len()),

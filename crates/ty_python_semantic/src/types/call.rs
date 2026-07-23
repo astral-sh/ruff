@@ -1,11 +1,10 @@
 use super::context::InferContext;
 use super::{ClassType, Signature, Type, TypeContext, UnionType};
-use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use crate::{Program, SemanticEnvironment};
-use ruff_python_ast as ast;
+use crate::{Db, Program, SemanticEnvironment};
+use ruff_python_ast::{self as ast};
 
 mod arguments;
 pub(crate) mod bind;
@@ -105,7 +104,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_return_type_impl<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,

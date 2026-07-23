@@ -215,12 +215,12 @@ impl<'db> DynamicEnumLiteral<'db> {
         cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
-                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).python_file(db))),
+                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).program_file(db))),
             ]))
         }
     )]
     fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.scope(db).program_file(db));
         Mro::of_dynamic_enum(&env, self)
     }
 

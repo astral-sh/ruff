@@ -8,15 +8,15 @@ use regex::Regex;
 
 use ruff_db::parsed::parsed_module;
 
-use ruff_db::PythonFile;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, ResolverFile, resolve_module};
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 
 use crate::completion::CompletionKind;
 
@@ -389,11 +389,11 @@ impl SymbolKind {
 /// The flattened list includes parent/child information and can be
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
-    let parsed = parsed_module(db, file);
+pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::tree(db, file);
+    let mut visitor = SymbolVisitor::tree(db, file.resolver_file(db));
     visitor.visit_body(&module.syntax().body);
     visitor.into_flat_symbols()
 }
@@ -408,12 +408,12 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols
     cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
+pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
     let source_file = file.file(db);
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, file);
+    let mut visitor = SymbolVisitor::globals(db, file.resolver_file(db));
     visitor.visit_body(&module.syntax().body);
 
     if source_file
@@ -452,11 +452,13 @@ impl ImportedFrom {
 
     fn import_from(
         db: &dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         ast: &ast::StmtImportFrom,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
-        let module_name = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
+        let module_name =
+            ModuleName::from_import_statement(db, ImportingFile::ResolverFile(importing_file), ast)
+                .ok()?;
         Some(ImportedFrom { module_name, kind })
     }
 
@@ -593,16 +595,24 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: PythonFile<'db>,
+        importing_file: ResolverFile<'db>,
         name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
-        let module_name = match self.module_names.get(name.as_str())? {
+        let module_kind = self.module_names.get(name.as_str())?;
+        let module_name = match module_kind {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
                 name.to_module_name(db, importing_file)?
             }
         };
-        let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.python_file(db)?))
+        let module = resolve_module(
+            db,
+            ImportingFile::ResolverFile(importing_file),
+            &module_name,
+        )?;
+        Some(symbols_for_file_global_only(
+            db,
+            ProgramFile::new(db, module.file(db)?, importing_file.environment(db)),
+        ))
     }
 }
 
@@ -654,13 +664,17 @@ impl<'db> ImportModuleName<'db> {
     fn to_module_name(
         self,
         db: &'db dyn Db,
-        importing_file: PythonFile<'db>,
+        importing_file: ResolverFile<'db>,
     ) -> Option<ModuleName> {
         match self {
             ImportModuleName::Import(name) => ModuleName::new(name),
             ImportModuleName::ImportFrom { parent, child } => {
-                let mut module_name =
-                    ModuleName::from_import_statement(db, importing_file, parent).ok()?;
+                let mut module_name = ModuleName::from_import_statement(
+                    db,
+                    ImportingFile::ResolverFile(importing_file),
+                    parent,
+                )
+                .ok()?;
                 let child_module_name = ModuleName::new(child)?;
                 module_name.extend(&child_module_name);
                 Some(module_name)
@@ -691,7 +705,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ResolverFile<'db>,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function at any point.
@@ -725,7 +739,7 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn tree(db: &'db dyn Db, file: ResolverFile<'db>) -> Self {
         Self {
             db,
             file,
@@ -741,7 +755,7 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    fn globals(db: &'db dyn Db, file: ResolverFile<'db>) -> Self {
         Self {
             exports_only: true,
             ..Self::tree(db, file)
@@ -1118,12 +1132,25 @@ impl<'db> SymbolVisitor<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FlatSymbols> {
-        let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, self.file, &module_name)?;
+        let resolver_file = self.file;
+        let module_name = ModuleName::from_import_statement(
+            self.db,
+            ImportingFile::ResolverFile(resolver_file),
+            import_from,
+        )
+        .ok()?;
+        let module = resolve_module(
+            self.db,
+            ImportingFile::ResolverFile(resolver_file),
+            &module_name,
+        )?;
         Some(symbols_for_file_global_only(
             self.db,
-            module.python_file(self.db)?,
+            ProgramFile::new(
+                self.db,
+                module.file(self.db)?,
+                self.file.environment(self.db),
+            ),
         ))
     }
 
@@ -1501,12 +1528,12 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::PythonFile;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
+    use ty_python_core::ProgramFile;
 
     use super::symbols_for_file_global_only;
 
@@ -2952,7 +2979,7 @@ class C: ...
             let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
             symbols_for_file_global_only(
                 &self.db,
-                PythonFile::new(&self.db, file, self.db.python_version()),
+                ProgramFile::new(&self.db, file, self.db.semantic_environment().program()),
             )
         }
 

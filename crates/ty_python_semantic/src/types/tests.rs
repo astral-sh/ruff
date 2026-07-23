@@ -3,11 +3,12 @@ use crate::SemanticEnvironment;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
-use ruff_db::PythonFile;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
+use ty_python_core::ProgramFile;
+use ty_python_core::program::Program as ProjectProgram;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
@@ -69,10 +70,8 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
 ) -> Type<'db> {
-    let env = SemanticEnvironment::from_program(
-        db,
-        ty_python_core::program::Program::get(db).python_version(db),
-    );
+    let env =
+        SemanticEnvironment::from_program(db, ProjectProgram::get(db).resolver_environment(db));
     current.cycle_normalized(&env, *previous, cycle)
 }
 
@@ -82,10 +81,8 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
-    let env = SemanticEnvironment::from_program(
-        db,
-        ty_python_core::program::Program::get(db).python_version(db),
-    );
+    let env =
+        SemanticEnvironment::from_program(db, ProjectProgram::get(db).resolver_environment(db));
     let previous = oscillating_generic_alias(db);
     let argument = if let Type::GenericAlias(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]
@@ -420,7 +417,7 @@ fn type_alias_variance() {
 
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let module = PythonFile::new(db, module, db.python_version());
+        let module = ProgramFile::new(db, module, db.semantic_environment().program());
         let ty = global_symbol(&db.semantic_environment(), module, name)
             .place
             .expect_type();
@@ -582,7 +579,7 @@ fn eager_expansion() {
 
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let module = PythonFile::new(db, module, db.python_version());
+        let module = ProgramFile::new(db, module, db.semantic_environment().program());
         let ty = global_symbol(&db.semantic_environment(), module, name)
             .place
             .expect_type();

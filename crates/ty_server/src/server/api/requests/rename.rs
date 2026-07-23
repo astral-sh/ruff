@@ -3,10 +3,9 @@ use std::collections::HashMap;
 
 use lsp_types::RenameRequest;
 use lsp_types::{RenameParams, TextEdit, Uri, WorkspaceEdit};
-use ruff_db::PythonFile;
 use ty_ide::rename;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -54,7 +53,7 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
 
         let Some(rename_results) = rename(
             db,
-            PythonFile::new(db, file, db.python_version()),
+            Program::get(db).program_file(db, file),
             offset,
             &params.new_name,
         ) else {

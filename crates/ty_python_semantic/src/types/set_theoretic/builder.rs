@@ -1951,9 +1951,9 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
-    use ruff_db::PythonFile;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
+    use ty_python_core::ProgramFile;
 
     #[test]
     fn build_union_no_elements() {
@@ -2132,7 +2132,7 @@ mod tests {
         let env = db.semantic_environment();
 
         let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
-        let module = PythonFile::new(&db, module, db.python_version());
+        let module = ProgramFile::new(&db, module, env.program());
         let alias_ty = global_symbol(&db.semantic_environment(), module, "Alias")
             .place
             .expect_type();

@@ -957,7 +957,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     fn mro_inner(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.scope(db).program_file(db));
         let object_class = ClassType::object(&env);
         Mro::from([
             self_base,

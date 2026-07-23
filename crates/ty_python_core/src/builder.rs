@@ -8,7 +8,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use ruff_db::PythonFile;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
@@ -20,9 +19,10 @@ use ruff_python_parser::semantic_errors::{
 };
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, ResolverEnvironment, resolve_module};
 
 use crate::HasTrackedScope;
+use crate::ProgramFile;
 use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
@@ -239,7 +239,7 @@ impl ConditionFlowSnapshot {
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo<'ast>>,
@@ -263,7 +263,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
-    python_version: PythonVersion,
+    resolver_environment: ResolverEnvironment<'db>,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
@@ -312,7 +312,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     pub(super) fn new(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        file: ProgramFile<'db>,
         module_ref: &'ast ParsedModuleRef,
     ) -> Self {
         let mut builder = Self {
@@ -354,7 +354,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             enclosing_snapshots: FxHashMap::default(),
 
-            python_version: file.python_version(db),
+            resolver_environment: file.resolver_environment(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
@@ -987,7 +987,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                     symbol.name().to_string(),
                                 ),
                                 range: declaration.range,
-                                python_version: self.python_version,
+                                python_version: self.python_version(),
                             });
                         }
                         // This `nonlocal` is resolved.
@@ -1050,7 +1050,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
                             range: declaration.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                 }
@@ -2937,14 +2937,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // in one function is visible in another function.
                 let mut is_self_import = false;
                 let source_file = self.file.file(self.db);
+                let resolver_environment = self.resolver_environment;
                 if source_file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
-                        self.file,
+                        ImportingFile::File(source_file, resolver_environment),
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                    && let Ok(thispackage) = ModuleName::package_for_file(
+                        self.db,
+                        ImportingFile::File(source_file, resolver_environment),
+                    )
                 {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
@@ -3017,19 +3021,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, self.file, node)
-                        else {
+                        let Ok(module_name) = ModuleName::from_import_statement(
+                            self.db,
+                            ImportingFile::File(source_file, resolver_environment),
+                            node,
+                        ) else {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
+                        let Some(module) = resolve_module(
+                            self.db,
+                            ImportingFile::File(source_file, resolver_environment),
+                            &module_name,
+                        ) else {
                             continue;
                         };
 
-                        let Some(referenced_parse_file) = module.python_file(self.db) else {
+                        let Some(referenced_file) = module.file(self.db) else {
                             continue;
                         };
+                        let referenced_program_file =
+                            ProgramFile::new(self.db, referenced_file, resolver_environment);
                         // In order to understand the reachability of definitions created by a `*` import,
                         // we need to know the reachability of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`
@@ -3044,14 +3056,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // ```
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
-                        for export in exported_names(self.db, referenced_parse_file) {
+                        for export in exported_names(self.db, referenced_program_file) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
                                 self.file,
                                 symbol_id,
-                                referenced_parse_file,
+                                referenced_program_file,
                             );
 
                             let star_import_predicate = self.add_predicate(star_import.into());
@@ -3232,7 +3244,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has been declared nonlocal.
@@ -3242,7 +3254,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 name.id.as_str().into(),
                             ),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                 }
@@ -4007,7 +4019,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 start: name.range.start(),
                             },
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has also been declared nonlocal.
@@ -4015,7 +4027,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
                         continue;
@@ -4060,7 +4072,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 start: name.range.start(),
                             },
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has also been declared global.
@@ -4068,7 +4080,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
                         continue;
@@ -4781,7 +4793,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn python_version(&self) -> PythonVersion {
-        self.python_version
+        self.resolver_environment.python_version(self.db)
     }
 
     fn source(&self) -> &str {

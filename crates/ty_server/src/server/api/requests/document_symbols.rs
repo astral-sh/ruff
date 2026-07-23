@@ -2,11 +2,10 @@ use std::borrow::Cow;
 
 use lsp_types::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, Uri};
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
@@ -50,7 +49,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             .resolved_client_capabilities()
             .supports_hierarchical_document_symbols();
 
-        let symbols = document_symbols(db, PythonFile::new(db, file, db.python_version()));
+        let symbols = document_symbols(db, Program::get(db).program_file(db, file));
         if symbols.is_empty() {
             return Ok(None);
         }

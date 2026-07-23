@@ -3,7 +3,6 @@ use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use rayon::prelude::*;
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::is_dunder;
@@ -13,7 +12,9 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_module_resolver::ResolverFile;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_python_core::ProgramFile;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
@@ -27,8 +28,8 @@ const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
-pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<IncomingCall> {
-    let module = parsed_module(db, file).load(db);
+pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> Vec<IncomingCall> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
@@ -75,8 +76,8 @@ pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Ve
     let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
+        let resolver_environment = model.semantic_environment().resolver_environment();
         let files = db.project().files(db);
-        let python_version = file.python_version(db);
         let files: Vec<_> = files
             .iter()
             .copied()
@@ -103,7 +104,7 @@ pub fn incoming_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Ve
 
                 call_sites_for_file(
                     db,
-                    PythonFile::new(db, other_file, python_version),
+                    ProgramFile::new(db, other_file, resolver_environment),
                     &target_definitions,
                     target_role,
                     needle,
@@ -170,12 +171,12 @@ struct EnclosingKey {
 /// `target_definitions`.
 fn call_sites_for_file(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_role: Option<PropertyAccessorRole>,
     needle: Option<&str>,
 ) -> Vec<RawCallSite> {
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut sites = Vec::new();
@@ -390,8 +391,9 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// method's AST node. Comprehension and annotation scopes have no callable
     /// hierarchy item of their own, so walk outward until reaching one that does.
     fn enclosing_scope_item(&self, scope_node: AnyNodeRef<'_>) -> CallHierarchyItem {
-        let python_file = self.model.python_file();
-        let file = python_file.file(self.db);
+        let program_file = self.model.program_file();
+        let resolver_file = program_file.resolver_file(self.db);
+        let file = program_file.file(self.db);
         let mut ancestors = self.model.ancestor_scopes(scope_node);
         let Some((_, enclosing)) = ancestors.find(|(_, ancestor)| {
             matches!(
@@ -399,11 +401,11 @@ impl<'a> CallSitesFinder<'a, '_> {
                 ScopeKind::Module | ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda
             )
         }) else {
-            return module_item(self.db, python_file);
+            return module_item(self.db, resolver_file);
         };
 
         match enclosing.node() {
-            NodeWithScopeKind::Module => module_item(self.db, python_file),
+            NodeWithScopeKind::Module => module_item(self.db, resolver_file),
             NodeWithScopeKind::Function(func) => {
                 let func = func.node(self.module);
                 let is_method = ancestors
@@ -422,7 +424,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     } else {
                         SymbolKind::Function
                     },
-                    detail: module_detail(self.db, python_file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: func.range(),
                     selection_range: func.name.range(),
@@ -433,7 +435,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: class.name.id.clone(),
                     kind: SymbolKind::Class,
-                    detail: module_detail(self.db, python_file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: class.range(),
                     selection_range: class.name.range(),
@@ -450,13 +452,13 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new_static("(lambda)"),
                     kind: SymbolKind::Function,
-                    detail: module_detail(self.db, python_file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: lambda.range(),
                     selection_range: TextRange::new(lambda.start(), end),
                 }
             }
-            _ => module_item(self.db, python_file),
+            _ => module_item(self.db, resolver_file),
         }
     }
 }
@@ -467,7 +469,7 @@ struct RawCallSite {
 }
 
 /// Build an item for the module-level enclosing scope (no enclosing function).
-fn module_item(db: &dyn Db, file: PythonFile<'_>) -> CallHierarchyItem {
+fn module_item(db: &dyn Db, file: ResolverFile<'_>) -> CallHierarchyItem {
     let name = ty_module_resolver::file_to_module(db, file)
         .map(|module| Name::new(module.name(db).last_component()))
         .unwrap_or_else(|| Name::new_static("<module>"));
@@ -527,7 +529,7 @@ mod tests {
             };
             let calls = incoming_calls(
                 &self.db,
-                self.python_file(target.file),
+                self.program_file(target.file),
                 target.selection_range.start(),
             );
             if calls.is_empty() {
@@ -1179,7 +1181,7 @@ def make() -> C:
         };
         let incoming = incoming_calls(
             &test.db,
-            test.python_file(target.file),
+            test.program_file(target.file),
             target.selection_range.start(),
         );
         // The selection identifies the anonymous callable header.
@@ -1320,7 +1322,7 @@ def make() -> C:
         };
         let incoming = incoming_calls(
             &test.db,
-            test.python_file(target.file),
+            test.program_file(target.file),
             target.selection_range.start(),
         );
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
@@ -1329,7 +1331,7 @@ def make() -> C:
 
         let follow_up_incoming = incoming_calls(
             &test.db,
-            test.python_file(lambda_item.file),
+            test.program_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(
@@ -1339,7 +1341,7 @@ def make() -> C:
 
         let follow_up_outgoing = outgoing_calls(
             &test.db,
-            test.python_file(lambda_item.file),
+            test.program_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(

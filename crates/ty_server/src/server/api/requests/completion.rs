@@ -6,12 +6,11 @@ use lsp_types::{
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
-use ruff_db::PythonFile;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 use ty_python_semantic::SemanticEnvironment;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -60,7 +59,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
         let client_capabilities = snapshot.resolved_client_capabilities();
-        let python_file = PythonFile::new(db, file, db.python_version());
+        let python_file = Program::get(db).program_file(db, file);
         let env = SemanticEnvironment::from_file(db, python_file);
         let completions = completion(
             db,

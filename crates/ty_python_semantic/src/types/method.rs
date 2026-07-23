@@ -83,7 +83,7 @@ impl<'db> BoundMethodType<'db> {
     )]
     fn into_callable_type_inner(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
-        let env = SemanticEnvironment::from_file(db, function.python_file(db));
+        let env = SemanticEnvironment::from_file(db, function.program_file(db));
 
         CallableType::new(
             db,
@@ -127,7 +127,7 @@ impl<'db> BoundMethodType<'db> {
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     fn bound_signatures_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function = self.function(db);
-        let env = SemanticEnvironment::from_file(db, function.python_file(db));
+        let env = SemanticEnvironment::from_file(db, function.program_file(db));
         let typing_self_type = self.typing_self_type(&env);
         let receiver_type = self.self_instance(db);
 

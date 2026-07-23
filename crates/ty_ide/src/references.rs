@@ -13,7 +13,6 @@
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
@@ -23,6 +22,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::Ranged;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
@@ -85,7 +85,7 @@ impl ReferencesMode {
 /// Search for references across all files in the project.
 pub(crate) fn references(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
@@ -116,8 +116,8 @@ pub(crate) fn references(
     let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
+        let resolver_environment = model.semantic_environment().resolver_environment();
         let files = db.project().files(db);
-        let python_version = file.python_version(db);
         let files: Vec<_> = files
             .iter()
             .copied()
@@ -133,7 +133,7 @@ pub(crate) fn references(
                     return Vec::new();
                 }
 
-                let other_file = PythonFile::new(db, other_file, python_version);
+                let other_file = ProgramFile::new(db, other_file, resolver_environment);
 
                 if is_externally_visible_symbol {
                     references_for_file(db, other_file, &target_definitions, &target_text, mode)
@@ -162,7 +162,7 @@ pub(crate) fn references(
 
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
@@ -174,7 +174,7 @@ fn references_for_keyword_arguments_in_file(
         "keyword-label cross-file scan should not run in DocumentHighlights mode"
     );
 
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -253,12 +253,12 @@ fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
 /// The behavior depends on the provided mode.
 fn references_for_file(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -729,7 +729,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let file = self.model.file();
         let class_range = class.range();
         let module = ruff_db::parsed::parsed_module(db, self.model.python_file()).load(db);
-        let index = ty_python_core::semantic_index(db, self.model.python_file());
+        let index = ty_python_core::semantic_index(db, self.model.program_file());
 
         // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
         // class scopes for name resolution, so we walk the lexical parents directly to stop at the
@@ -830,7 +830,7 @@ mod tests {
     use crate::tests::{CursorTest, cursor_test};
 
     fn cursor_target_is_externally_visible(test: &CursorTest) -> bool {
-        let model = SemanticModel::new(&test.db, test.python_file(test.cursor.file));
+        let model = SemanticModel::new(&test.db, test.program_file(test.cursor.file));
         let goto_target =
             find_goto_target(&model, &test.cursor.parsed, test.cursor.offset).unwrap();
         let definitions = goto_target

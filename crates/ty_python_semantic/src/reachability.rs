@@ -251,7 +251,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, predicate.subject(db).program_file(db));
         result.cycle_normalized(&env, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
@@ -265,7 +265,7 @@ fn type_narrowed_by_previous_patterns_inner<'db>(
         return subject_ty;
     };
     let previous = *previous;
-    let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, predicate.subject(db).program_file(db));
     let narrowed_by_previous_patterns =
         type_narrowed_by_previous_patterns(&env, previous, subject_ty);
 
@@ -293,7 +293,7 @@ fn type_narrowed_by_pattern<'db>(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, predicate.subject(db).program_file(db));
         result.cycle_normalized(&env, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
@@ -303,7 +303,7 @@ fn type_narrowed_by_pattern_inner<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let env = SemanticEnvironment::from_file(db, predicate.python_file(db));
+    let env = SemanticEnvironment::from_file(db, predicate.program_file(db));
     pattern_binding_fallthrough_type(&env, predicate.kind(db), subject_ty)
 }
 
@@ -509,7 +509,7 @@ fn analyze_pattern_predicate_inner<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
 ) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, predicate.subject(db).program_file(db));
     let subject_ty =
         infer_same_file_expression_type(&env, predicate.subject(db), TypeContext::default());
 
@@ -724,7 +724,7 @@ fn analyze_non_terminal_call_range_inner<'db>(
     index: usize,
 ) {
     if level == 0 {
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.program_file(db));
         let use_def = use_def_map(db, scope);
         let call_predicates = non_terminal_call_predicates(&env, scope);
         let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
@@ -734,7 +734,7 @@ fn analyze_non_terminal_call_range_inner<'db>(
     }
 
     let child_index = index * 2;
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+    let env = SemanticEnvironment::from_file(db, scope.program_file(db));
     analyze_non_terminal_call_range(&env, scope, level - 1, child_index);
     analyze_non_terminal_call_range(&env, scope, level - 1, child_index + 1);
 }
@@ -850,7 +850,7 @@ fn evaluate_reachability_checkpoint_inner<'db>(
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+    let env = SemanticEnvironment::from_file(db, scope.program_file(db));
     let use_def = use_def_map(db, scope);
     evaluate_reachability_path(
         &env,
@@ -1527,7 +1527,7 @@ fn analyze_non_terminal_call_inner<'db>(
     call_expr: Expression<'db>,
     is_await: bool,
 ) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, callable.python_file(db));
+    let env = SemanticEnvironment::from_file(db, callable.program_file(db));
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
     // the more expensive work of inferring the entire call expression (which could involve
@@ -1614,8 +1614,8 @@ fn analyze_single(env: &SemanticEnvironment<'_>, predicate: &Predicate) -> Truth
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
-            let python_file = star_import.referenced_parse_file(db);
-            let requires_explicit_reexport = match dunder_all_names(db, python_file) {
+            let program_file = star_import.referenced_file(db);
+            let requires_explicit_reexport = match dunder_all_names(db, program_file) {
                 Some(all_names) => {
                     if all_names.contains(symbol.name()) {
                         Some(RequiresExplicitReExport::No)
@@ -1623,7 +1623,7 @@ fn analyze_single(env: &SemanticEnvironment<'_>, predicate: &Predicate) -> Truth
                         tracing::trace!(
                             "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                             symbol.name(),
-                            python_file.file(db).path(db)
+                            program_file.file(db).path(db)
                         );
                         return Truthiness::AlwaysFalse;
                     }
@@ -1633,7 +1633,7 @@ fn analyze_single(env: &SemanticEnvironment<'_>, predicate: &Predicate) -> Truth
 
             match imported_symbol(
                 env,
-                Some(python_file),
+                Some(program_file),
                 symbol.name(),
                 requires_explicit_reexport,
             )
@@ -1866,9 +1866,9 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
@@ -1892,7 +1892,10 @@ mod tests {
                 )?;
 
                 let file = system_path_to_file(&db, "/src/test.py").unwrap();
-                let index = semantic_index(&db, PythonFile::new(&db, file, db.python_version()));
+                let index = semantic_index(
+                    &db,
+                    ProgramFile::new(&db, file, db.semantic_environment().program()),
+                );
                 let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
                 let use_def = index.use_def_map(function_scope);
                 let predicate = use_def
