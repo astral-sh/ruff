@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 3
+Added: 5
 
 --- Added ---
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
@@ -56,11 +56,50 @@ UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `t
 133 | T_default = TypeVar("T_default", default=int)
 134 | DefaultList: TypeAlias = list[T_default]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+135 |
+136 | # https://github.com/astral-sh/ruff/issues/27021
     |
 help: Use the `type` keyword
     |
 133 | T_default = TypeVar("T_default", default=int)
     - DefaultList: TypeAlias = list[T_default]
 134 + type DefaultList[T_default = int] = list[T_default]
+135 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP040 [*] Type alias `GoodPair` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:150:1
+    |
+149 | # OK (in preview): the non-defaulted TypeVar comes first
+150 | GoodPair: TypeAlias = tuple[S_no_default, T_with_default]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+151 |
+152 | # OK (in preview): all TypeVars have defaults
+    |
+help: Use the `type` keyword
+    |
+149 | # OK (in preview): the non-defaulted TypeVar comes first
+    - GoodPair: TypeAlias = tuple[S_no_default, T_with_default]
+150 + type GoodPair[S_no_default, T_with_default = int] = tuple[S_no_default, T_with_default]
+151 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP040 [*] Type alias `AllDefaults` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:154:1
+    |
+152 | # OK (in preview): all TypeVars have defaults
+153 | S_with_default = TypeVar("S_with_default", default=str)
+154 | AllDefaults: TypeAlias = tuple[T_with_default, S_with_default]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use the `type` keyword
+    |
+153 | S_with_default = TypeVar("S_with_default", default=str)
+    - AllDefaults: TypeAlias = tuple[T_with_default, S_with_default]
+154 + type AllDefaults[T_with_default = int, S_with_default = str] = tuple[T_with_default, S_with_default]
     |
 note: This is an unsafe fix and may change runtime behavior

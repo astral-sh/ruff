@@ -58,6 +58,23 @@ def multi_param(t: list[T], c: Callable[[T], None]) -> T:
     return t[1]
 
 
+# https://github.com/astral-sh/ruff/issues/27021
+# No diagnostic if a defaulted TypeVar precedes a non-defaulted TypeVar: a
+# non-default type parameter can't follow a default type parameter in a PEP 695
+# type parameter list, and reordering would change the meaning of subscriptions.
+X = TypeVar("X", default=int)
+Y = TypeVar("Y")
+
+
+def default_before_non_default(x: X, y: Y) -> tuple[X, Y]:
+    return (x, y)
+
+
+# OK (in preview): the non-defaulted TypeVar comes first
+def non_default_before_default(y: Y, x: X) -> tuple[Y, X]:
+    return (y, x)
+
+
 # these cases are not handled
 
 def outer():
