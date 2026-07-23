@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -163,21 +163,21 @@ pub enum KnownInstanceType<'db> {
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     known_instance: KnownInstanceType<'db>,
     visitor: &V,
 ) {
-    let db = ctx.db();
+    let db = env.db();
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(ctx, context, visitor);
+            walk_generic_context(env, context, visitor);
         }
         KnownInstanceType::TypeVar(typevar) => {
-            visitor.visit_type_var_type(ctx, typevar);
+            visitor.visit_type_var_type(env, typevar);
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
-            visitor.visit_type_alias_type(ctx, type_alias);
+            visitor.visit_type_alias_type(env, type_alias);
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }
@@ -188,46 +188,46 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::ConstraintSetSolution(solution) => {
             for binding in solution.bindings(db) {
-                visitor.visit_type(ctx, binding.solution);
+                visitor.visit_type(env, binding.solution);
             }
         }
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
-                visitor.visit_type(ctx, default_ty);
+                visitor.visit_type(env, default_ty);
             }
             if let Some((input_ty, output_ty)) = field.converter(db) {
-                visitor.visit_type(ctx, input_ty);
-                visitor.visit_type(ctx, output_ty);
+                visitor.visit_type(env, input_ty);
+                visitor.visit_type(env, output_ty);
             }
         }
         KnownInstanceType::UnionType(instance) => {
             if let Ok(union_type) = instance.union_type(db) {
-                visitor.visit_type(ctx, *union_type);
+                visitor.visit_type(env, *union_type);
             }
         }
         KnownInstanceType::Literal(ty)
         | KnownInstanceType::Annotated(ty)
         | KnownInstanceType::TypeGenericAlias(ty)
         | KnownInstanceType::LiteralStringAlias(ty) => {
-            visitor.visit_type(ctx, ty.inner(db));
+            visitor.visit_type(env, ty.inner(db));
         }
         KnownInstanceType::Callable(callable) => {
-            visitor.visit_callable_type(ctx, callable);
+            visitor.visit_callable_type(env, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            visitor.visit_newtype_instance_type(ctx, newtype);
+            visitor.visit_newtype_instance_type(env, newtype);
         }
         KnownInstanceType::Sentinel(_) => {
             // Nothing to visit
         }
         KnownInstanceType::NamedTupleSpec(spec) => {
             for field in spec.fields(db) {
-                visitor.visit_type(ctx, field.ty);
+                visitor.visit_type(env, field.ty);
             }
         }
         KnownInstanceType::FunctoolsPartial(partial)
         | KnownInstanceType::FunctoolsPartialCall(partial) => {
-            visitor.visit_callable_type(ctx, partial.partial(db));
+            visitor.visit_callable_type(env, partial.partial(db));
         }
     }
 }
@@ -235,12 +235,12 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
     fn variance_of(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(ctx).variance_of(ctx, typevar)
+                type_alias.raw_value_type(env).variance_of(env, typevar)
             }
             _ => TypeVarVariance::Bivariant,
         }
@@ -250,7 +250,7 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
 impl<'db> KnownInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -265,42 +265,42 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .map(Self::Field),
             Self::UnionType(union_type) => union_type
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .map(Self::UnionType),
             Self::Literal(ty) => ty
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::Literal),
             Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::Annotated),
             Self::TypeGenericAlias(ty) => ty
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::TypeGenericAlias),
             Self::LiteralStringAlias(ty) => ty
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::LiteralStringAlias),
             Self::Callable(callable) => callable
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::Specialization),
             Self::NamedTupleSpec(spec) => spec
-                .recursive_type_normalized_impl(ctx, div, true)
+                .recursive_type_normalized_impl(env, div, true)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .map(Self::FunctoolsPartial),
             Self::FunctoolsPartialCall(partial) => partial
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .map(Self::FunctoolsPartialCall),
         }
     }
@@ -340,9 +340,9 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
-    pub(super) fn to_meta_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        self.class(db).to_class_literal(ctx)
+    pub(super) fn to_meta_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
+        self.class(db).to_class_literal(env)
     }
 
     /// Return the instance type which this type is a subtype of.
@@ -350,24 +350,24 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db, python_version)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        let db = ctx.db();
-        self.class(db).to_instance(ctx)
+    pub(super) fn instance_fallback(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
+        self.class(db).to_instance(env)
     }
 
     /// Return the type denoted by this retained runtime type-expression object.
     ///
     /// This is the scope-independent subset of `Type::in_type_expression` used when a value
     /// reaches a `TypeForm` position after it has already been inferred in value context.
-    pub(crate) fn type_form_argument(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        let db = ctx.db();
+    pub(crate) fn type_form_argument(self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
+        let db = env.db();
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
             Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
             }
-            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(ctx)),
+            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(env)),
             Self::Callable(callable) => Some(Type::Callable(callable)),
             Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
             Self::Sentinel(sentinel) => {
@@ -394,27 +394,27 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, ctx: &SemanticContext<'db>, class: ClassType) -> bool {
-        let db = ctx.db();
-        self.class(db).is_subclass_of(ctx, class)
+    pub(super) fn is_instance_of(self, env: &SemanticEnvironment<'db>, class: ClassType) -> bool {
+        let db = env.db();
+        self.class(db).is_subclass_of(env, class)
     }
 
     /// Return the repr of the symbol at runtime
-    pub(super) fn repr<'ctx>(
+    pub(super) fn repr<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
-    ) -> impl std::fmt::Display + 'ctx {
-        self.display_with(ctx, DisplaySettings::default())
+        env: &'env SemanticEnvironment<'db>,
+    ) -> impl std::fmt::Display + 'env {
+        self.display_with(env, DisplaySettings::default())
     }
 
     pub(super) fn apply_type_mapping_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        let db = ctx.db();
+        let db = env.db();
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
                 TypeMapping::BindLegacyTypevars(binding_context) => {
@@ -439,49 +439,49 @@ impl<'db> KnownInstanceType<'db> {
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
-                    instance.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    instance.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::Annotated(ty) => {
                 Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
                     db,
                     ty.inner(db)
-                        .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 )))
             }
             KnownInstanceType::Callable(callable_type) => {
                 Type::KnownInstance(KnownInstanceType::Callable(
-                    callable_type.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    callable_type.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::FunctoolsPartial(partial) => {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-                    partial.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    partial.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::Range { .. } => match type_mapping {
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                    self.instance_fallback(ctx)
+                    self.instance_fallback(env)
                 }
                 _ => Type::KnownInstance(self),
             },
             KnownInstanceType::FunctoolsPartialCall(partial) => {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
-                    partial.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    partial.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
                     ty.inner(db)
-                        .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 )))
             }
             KnownInstanceType::LiteralStringAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
                     db,
                     ty.inner(db)
-                        .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
                 )))
             }
 
@@ -572,33 +572,33 @@ impl get_size2::GetSize for FieldInstance<'_> {}
 impl<'db> FieldInstance<'db> {
     fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         let default_type = match self.default_type(db) {
             Some(default) if nested => {
-                Some(default.recursive_type_normalized_impl(ctx, div, true)?)
+                Some(default.recursive_type_normalized_impl(env, div, true)?)
             }
             Some(default) => Some(
                 default
-                    .recursive_type_normalized_impl(ctx, div, true)
+                    .recursive_type_normalized_impl(env, div, true)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
-                input_ty.recursive_type_normalized_impl(ctx, div, true)?,
-                output_ty.recursive_type_normalized_impl(ctx, div, true)?,
+                input_ty.recursive_type_normalized_impl(env, div, true)?,
+                output_ty.recursive_type_normalized_impl(env, div, true)?,
             )),
             Some((input_ty, output_ty)) => Some((
                 input_ty
-                    .recursive_type_normalized_impl(ctx, div, true)
+                    .recursive_type_normalized_impl(env, div, true)
                     .unwrap_or(div),
                 output_ty
-                    .recursive_type_normalized_impl(ctx, div, true)
+                    .recursive_type_normalized_impl(env, div, true)
                     .unwrap_or(div),
             )),
             None => None,
@@ -644,16 +644,16 @@ impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
 impl<'db> UnionTypeInstance<'db> {
     pub(crate) fn from_value_expression_types(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
-        let db = ctx.db();
-        let mut builder = UnionBuilder::new(ctx);
+        let db = env.db();
+        let mut builder = UnionBuilder::new(env);
         for ty in &value_expr_types {
-            match ty.in_type_expression(ctx, scope_id, typevar_binding_context, inference_flags) {
+            match ty.in_type_expression(env, scope_id, typevar_binding_context, inference_flags) {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
@@ -686,17 +686,17 @@ impl<'db> UnionTypeInstance<'db> {
 
     pub(super) fn apply_type_mapping_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         if let Ok(union_type) = self.union_type(db) {
             UnionTypeInstance::new(
                 db,
                 self._value_expr_types(db),
-                Ok(union_type.apply_type_mapping_impl(ctx, type_mapping, tcx, visitor)),
+                Ok(union_type.apply_type_mapping_impl(env, type_mapping, tcx, visitor)),
             )
         } else {
             self
@@ -711,15 +711,15 @@ impl<'db> UnionTypeInstance<'db> {
     /// into class literals like `<class 'int'>`. This operation is potentially lossy.
     pub(crate) fn value_expression_types(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
-        let db = ctx.db();
-        let ctx = ctx.clone();
+        let db = env.db();
+        let env = env.clone();
         let to_class_literal = move |ty: Type<'db>| {
             ty.as_nominal_instance()
                 .and_then(|instance| {
                     instance
-                        .class(&ctx)
+                        .class(&env)
                         .static_class_literal(db)
                         .map(|(lit, _)| Type::ClassLiteral(lit.into()))
                 })
@@ -742,32 +742,32 @@ impl<'db> UnionTypeInstance<'db> {
 
     fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         // The `Divergent` elimination rules are different within union types.
         // See `UnionType::recursive_type_normalized_impl` for details.
         let value_expr_types = match self._value_expr_types(db).as_ref() {
             Some([first, second]) if nested => Some([
-                first.recursive_type_normalized_impl(ctx, div, nested)?,
-                second.recursive_type_normalized_impl(ctx, div, nested)?,
+                first.recursive_type_normalized_impl(env, div, nested)?,
+                second.recursive_type_normalized_impl(env, div, nested)?,
             ]),
             Some([first, second]) => Some([
                 first
-                    .recursive_type_normalized_impl(ctx, div, nested)
+                    .recursive_type_normalized_impl(env, div, nested)
                     .unwrap_or(div),
                 second
-                    .recursive_type_normalized_impl(ctx, div, nested)
+                    .recursive_type_normalized_impl(env, div, nested)
                     .unwrap_or(div),
             ]),
             None => None,
         };
         let union_type = match self.union_type(db).clone() {
-            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(ctx, div, nested)?),
+            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(env, div, nested)?),
             Ok(ty) => Ok(ty
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .unwrap_or(div)),
             Err(err) => Err(err),
         };
@@ -780,43 +780,43 @@ impl<'db> FunctoolsPartialInstance<'db> {
     /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
     fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         Some(Self::new(
             db,
             InternedType::new(
                 db,
                 self.wrapped(db)
                     .inner(db)
-                    .recursive_type_normalized_impl(ctx, div, nested)?,
+                    .recursive_type_normalized_impl(env, div, nested)?,
             ),
             self.partial(db)
-                .recursive_type_normalized_impl(ctx, div, nested)?,
+                .recursive_type_normalized_impl(env, div, nested)?,
         ))
     }
 
     /// Applies a type mapping to both the wrapped callable and the exposed reduced callable.
     fn apply_type_mapping_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         Self::new(
             db,
             InternedType::new(
                 db,
                 self.wrapped(db)
                     .inner(db)
-                    .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                    .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
             ),
             self.partial(db)
-                .apply_type_mapping_impl(ctx, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
         )
     }
 }
@@ -833,17 +833,17 @@ impl get_size2::GetSize for InternedType<'_> {}
 impl<'db> InternedType<'db> {
     fn recursive_type_normalized_impl(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = ctx.db();
+        let db = env.db();
         let inner = if nested {
             self.inner(db)
-                .recursive_type_normalized_impl(ctx, div, nested)?
+                .recursive_type_normalized_impl(env, div, nested)?
         } else {
             self.inner(db)
-                .recursive_type_normalized_impl(ctx, div, nested)
+                .recursive_type_normalized_impl(env, div, nested)
                 .unwrap_or(div)
         };
         Some(InternedType::new(db, inner))

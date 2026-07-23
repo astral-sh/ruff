@@ -1,5 +1,5 @@
 use crate::{
-    Db, Program, SemanticContext,
+    Db, Program, SemanticEnvironment,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
@@ -1033,7 +1033,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     #[track_caller]
-    pub fn to_instance<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub fn to_instance<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,
@@ -1045,30 +1045,30 @@ impl KnownClass {
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
         ) -> Type<'db> {
-            let ctx = &SemanticContext::from_program(db, argument.program(db));
+            let env = &SemanticEnvironment::from_program(db, argument.program(db));
             argument
                 .class(db)
-                .to_class_literal(ctx)
-                .to_class_type(ctx)
-                .map(|class| Type::instance(ctx, class))
+                .to_class_literal(env)
+                .to_class_type(env)
+                .map(|class| Type::instance(env, class))
                 .unwrap_or_else(Type::unknown)
         }
 
-        let db = ctx.db();
-        known_class_to_instance(db, KnownClassArgument::new(db, self, ctx.program()))
+        let db = env.db();
+        known_class_to_instance(db, KnownClassArgument::new(db, self, env.program()))
     }
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
     /// parameter is specialized to `Unknown`.
     #[track_caller]
-    pub(crate) fn to_instance_unknown<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn to_instance_unknown<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
-        self.try_to_class_literal(ctx)
-            .map(|literal| Type::instance(ctx, literal.unknown_specialization(ctx)))
+        self.try_to_class_literal(env)
+            .map(|literal| Type::instance(env, literal.unknown_specialization(env)))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1079,7 +1079,7 @@ impl KnownClass {
     /// types, a debug-level log message will be emitted stating this.
     pub(crate) fn to_specialized_class_type<'t, 'db, T>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         specialization: T,
     ) -> Option<ClassType<'db>>
     where
@@ -1087,13 +1087,13 @@ impl KnownClass {
         'db: 't,
     {
         fn to_specialized_class_type_impl<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             class: KnownClass,
             class_literal: StaticClassLiteral<'db>,
             specialization: Cow<[Type<'db>]>,
             generic_context: GenericContext<'db>,
         ) -> ClassType<'db> {
-            let db = ctx.db();
+            let db = env.db();
             if specialization.len() != generic_context.len(db) {
                 // a cache of the `KnownClass`es that we have already seen mismatched-arity
                 // specializations for (and therefore that we've already logged a warning for)
@@ -1103,22 +1103,22 @@ impl KnownClass {
                     tracing::info!(
                         "Wrong number of types when specializing {}. \
                  Falling back to default specialization for the symbol instead.",
-                        class.display(ctx.python_version())
+                        class.display(env.python_version())
                     );
                 }
-                return class_literal.default_specialization(ctx);
+                return class_literal.default_specialization(env);
             }
 
             class_literal
-                .apply_specialization(ctx, |_| generic_context.specialize(db, specialization))
+                .apply_specialization(env, |_| generic_context.specialize(db, specialization))
         }
 
-        let class_literal = self.to_class_literal(ctx).as_class_literal()?.as_static()?;
-        let generic_context = class_literal.generic_context(ctx)?;
+        let class_literal = self.to_class_literal(env).as_class_literal()?.as_static()?;
+        let generic_context = class_literal.generic_context(env)?;
         let specialization = specialization.into();
 
         Some(to_specialized_class_type_impl(
-            ctx,
+            env,
             self,
             class_literal,
             specialization,
@@ -1134,7 +1134,7 @@ impl KnownClass {
     #[track_caller]
     pub(crate) fn to_specialized_instance<'t, 'db, T>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         specialization: T,
     ) -> Type<'db>
     where
@@ -1146,8 +1146,8 @@ impl KnownClass {
             KnownClass::Tuple,
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
-        self.to_specialized_class_type(ctx, specialization)
-            .and_then(|class_type| Type::from(class_type).to_instance_approximation(ctx))
+        self.to_specialized_class_type(env, specialization)
+            .and_then(|class_type| Type::from(class_type).to_instance_approximation(env))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1156,7 +1156,7 @@ impl KnownClass {
     /// Lookup errors are logged when the cached query executes.
     fn lookup_class_literal<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
@@ -1164,12 +1164,12 @@ impl KnownClass {
             argument: KnownClassArgument<'db>,
         ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
             let program = argument.program(db);
-            let ctx = &SemanticContext::from_program(db, program);
-            let python_version = ctx.python_version();
+            let env = &SemanticEnvironment::from_program(db, program);
+            let python_version = env.python_version();
             let class = argument.class(db);
             let module = class.canonical_module(python_version);
             let third_party = module.is_third_party();
-            let symbol = known_module_symbol(ctx, module, class.name(python_version)).place;
+            let symbol = known_module_symbol(env, module, class.name(python_version)).place;
             let result = match symbol {
                 Place::Defined(DefinedPlace {
                     ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
@@ -1198,11 +1198,11 @@ impl KnownClass {
                     lookup_error,
                     KnownClassLookupError::ClassPossiblyUnbound { .. }
                 ) {
-                    tracing::info!("{}", lookup_error.display(ctx, class));
+                    tracing::info!("{}", lookup_error.display(env, class));
                 } else {
                     tracing::info!(
                         "{}. Falling back to `Unknown` for the symbol instead.",
-                        lookup_error.display(ctx, class)
+                        lookup_error.display(env, class)
                     );
                 }
             }
@@ -1210,8 +1210,8 @@ impl KnownClass {
             result
         }
 
-        let db = ctx.db();
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self, ctx.program()))
+        let db = env.db();
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self, env.program()))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -1220,9 +1220,9 @@ impl KnownClass {
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
-        match self.lookup_class_literal(ctx) {
+        match self.lookup_class_literal(env) {
             Ok(class_literal) => class_literal,
             Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. }) => {
                 Some(class_literal)
@@ -1238,8 +1238,8 @@ impl KnownClass {
     /// class literal.
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.try_to_class_literal(ctx)
+    pub(crate) fn to_class_literal<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.try_to_class_literal(env)
             .map(|class| Type::ClassLiteral(ClassLiteral::Static(class)))
             .unwrap_or_else(Type::unknown)
     }
@@ -1248,20 +1248,20 @@ impl KnownClass {
     /// and all possible subclasses of the class.
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
-    pub fn to_subclass_of<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.to_class_literal(ctx)
-            .to_class_type(ctx)
-            .map(|class| SubclassOfType::from(ctx, class))
+    pub fn to_subclass_of<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.to_class_literal(env)
+            .to_class_type(env)
+            .map(|class| SubclassOfType::from(env, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
     pub(crate) fn to_specialized_subclass_of<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         specialization: &[Type<'db>],
     ) -> Type<'db> {
-        self.to_specialized_class_type(ctx, specialization)
-            .map(|class_type| SubclassOfType::from(ctx, class_type))
+        self.to_specialized_class_type(env, specialization)
+            .map(|class_type| SubclassOfType::from(env, class_type))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
@@ -1269,20 +1269,20 @@ impl KnownClass {
     /// module, *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         other: ClassType<'db>,
     ) -> bool {
-        self.lookup_class_literal(ctx)
-            .is_ok_and(|class| class.is_some_and(|class| class.is_subclass_of(ctx, None, other)))
+        self.lookup_class_literal(env)
+            .is_ok_and(|class| class.is_some_and(|class| class.is_subclass_of(env, None, other)))
     }
 
     pub(crate) fn when_subclass_of<'db, 'c>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         other: ClassType<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        ConstraintSet::from_bool(constraints, self.is_subclass_of(ctx, other))
+        ConstraintSet::from_bool(constraints, self.is_subclass_of(env, other))
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -1912,7 +1912,7 @@ impl KnownClass {
 
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if CodeGeneratorKind::NamedTuple
-                            .matches(context.semantic_context(), enclosing_class.into())
+                            .matches(context.semantic_environment(), enclosing_class.into())
                         {
                             if let Some(builder) = context
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
@@ -1950,10 +1950,10 @@ impl KnownClass {
                         };
 
                         let definition = index.expect_single_definition(first_param);
-                        let first_param = binding_type(context.semantic_context(), definition);
+                        let first_param = binding_type(context.semantic_environment(), definition);
 
                         let bound_super = BoundSuperType::build(
-                            context.semantic_context(),
+                            context.semantic_environment(),
                             Type::ClassLiteral(ClassLiteral::Static(enclosing_class)),
                             first_param,
                         )
@@ -1968,7 +1968,7 @@ impl KnownClass {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
                             if CodeGeneratorKind::NamedTuple
-                                .matches(context.semantic_context(), enclosing_class.into())
+                                .matches(context.semantic_environment(), enclosing_class.into())
                             {
                                 if let Some(builder) = context
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
@@ -1984,7 +1984,7 @@ impl KnownClass {
                         }
 
                         let bound_super = BoundSuperType::build(
-                            context.semantic_context(),
+                            context.semantic_environment(),
                             *pivot_class_type,
                             *owner_type,
                         )
@@ -2068,22 +2068,22 @@ impl<'db> KnownClassLookupError<'db> {
         }
     }
 
-    fn display<'ctx>(
+    fn display<'env>(
         &self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         class: KnownClass,
-    ) -> impl std::fmt::Display + 'ctx {
-        struct ErrorDisplay<'ctx, 'db> {
-            ctx: &'ctx SemanticContext<'db>,
+    ) -> impl std::fmt::Display + 'env {
+        struct ErrorDisplay<'env, 'db> {
+            env: &'env SemanticEnvironment<'db>,
             class: KnownClass,
             error: KnownClassLookupError<'db>,
         }
 
         impl std::fmt::Display for ErrorDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let ErrorDisplay { ctx, class, error } = self;
+                let ErrorDisplay { env, class, error } = self;
 
-                let python_version = ctx.python_version();
+                let python_version = env.python_version();
                 let class = class.display(python_version);
                 let location = if error.is_third_party() {
                     ""
@@ -2100,7 +2100,7 @@ impl<'db> KnownClassLookupError<'db> {
                         f,
                         "Error looking up `{class}`{location}: expected to find a class definition \
                         on Python {python_version}, but found a symbol of type `{found_type}` instead",
-                        found_type = found_type.display(ctx),
+                        found_type = found_type.display(env),
                     ),
                     KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
                         f,
@@ -2112,7 +2112,7 @@ impl<'db> KnownClassLookupError<'db> {
         }
 
         ErrorDisplay {
-            ctx,
+            env,
             class,
             error: *self,
         }
@@ -2174,20 +2174,20 @@ mod tests {
             });
 
         let python_version = db.python_version();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
         for class in KnownClass::iter() {
             if class.canonical_module(python_version).is_third_party() {
                 continue;
             }
             // Check the class can be looked up successfully
-            class.try_to_class_literal(&ctx).unwrap();
+            class.try_to_class_literal(&env).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;
             // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
             // or `Type::heterogeneous_tuple()` instead.`
             if class != KnownClass::Tuple {
                 assert_ne!(
-                    class.to_instance(&ctx),
+                    class.to_instance(&env),
                     Type::unknown(),
                     "Unexpectedly fell back to `Unknown` for `{class:?}`"
                 );
@@ -2242,15 +2242,15 @@ mod tests {
             }
 
             // Check the class can be looked up successfully
-            let ctx = db.semantic_context();
-            class.try_to_class_literal(&ctx).unwrap();
+            let env = db.semantic_environment();
+            class.try_to_class_literal(&env).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;
             // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
             // or `Type::heterogeneous_tuple()` instead.`
             if class != KnownClass::Tuple {
                 assert_ne!(
-                    class.to_instance(&ctx),
+                    class.to_instance(&env),
                     Type::unknown(),
                     "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
                 );

@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
@@ -248,15 +248,15 @@ impl<'db> LiteralValueType<'db> {
         matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
-    pub(crate) fn fallback_instance(self, ctx: &SemanticContext<'db>) -> Type<'db> {
+    pub(crate) fn fallback_instance(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                KnownClass::Str.to_instance(ctx)
+                KnownClass::Str.to_instance(env)
             }
-            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(ctx),
-            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(ctx),
-            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(ctx),
-            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(ctx),
+            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(env),
+            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(env),
+            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(env),
+            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(env),
         }
     }
 }
@@ -403,8 +403,8 @@ impl<'db> EnumLiteralType<'db> {
         self.enum_class_literal(db).class_literal(db)
     }
 
-    pub(crate) fn enum_class_instance(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.enum_class(ctx.db()).to_non_generic_instance(ctx)
+    pub(crate) fn enum_class_instance(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.enum_class(env.db()).to_non_generic_instance(env)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {

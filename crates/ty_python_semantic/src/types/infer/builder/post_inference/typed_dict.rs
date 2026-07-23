@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -103,19 +103,19 @@ fn validate_typed_dict_field_overrides<'db>(
     direct_bases: &[ClassType<'db>],
 ) {
     let db = context.db();
-    let ctx = context.semantic_context();
-    let child_fields = TypedDictType::new(class.identity_specialization(ctx)).items(ctx);
-    let own_fields = class.own_fields(ctx, None, CodeGeneratorKind::TypedDict);
+    let env = context.semantic_environment();
+    let child_fields = TypedDictType::new(class.identity_specialization(env)).items(env);
+    let own_fields = class.own_fields(env, None, CodeGeneratorKind::TypedDict);
     let mut reported_fields = FxHashSet::default();
 
     for base in direct_bases {
-        for (field_name, base_field) in TypedDictType::new(*base).items(ctx) {
+        for (field_name, base_field) in TypedDictType::new(*base).items(env) {
             let Some(child_field) = child_fields.get(field_name.as_str()) else {
                 continue;
             };
 
             let Some(reason) =
-                TypedDictFieldOverrideReason::from_fields(ctx, child_field, base_field)
+                TypedDictFieldOverrideReason::from_fields(env, child_field, base_field)
             else {
                 continue;
             };
@@ -153,10 +153,10 @@ fn validate_typed_dict_openness<'db>(
     direct_bases: &[ClassType<'db>],
 ) {
     let db = context.db();
-    let ctx = context.semantic_context();
-    let child = TypedDictType::new(class.identity_specialization(ctx));
-    let child_openness = child.openness(ctx);
-    let child_items = child.items(ctx);
+    let env = context.semantic_environment();
+    let child = TypedDictType::new(class.identity_specialization(env));
+    let child_openness = child.openness(env);
+    let child_items = child.items(env);
 
     if let Some(arguments) = class_node.arguments.as_deref()
         && arguments.find_keyword("closed").is_some()
@@ -171,8 +171,8 @@ fn validate_typed_dict_openness<'db>(
 
     for base in direct_bases {
         let base_typed_dict = TypedDictType::new(*base);
-        let base_openness = base_typed_dict.openness(ctx);
-        let base_items = base_typed_dict.items(ctx);
+        let base_openness = base_typed_dict.openness(env);
+        let base_items = base_typed_dict.items(env);
 
         match base_openness {
             TypedDictOpenness::ImplicitlyOpen => {}
@@ -222,15 +222,15 @@ fn validate_typed_dict_openness<'db>(
                     TypedDictOpenness::Extra(child_extra_items) => {
                         if !child_extra_items
                             .declared_ty
-                            .is_assignable_to(ctx, base_extra_items.declared_ty)
+                            .is_assignable_to(env, base_extra_items.declared_ty)
                         {
                             report_invalid_typed_dict_openness(
                                 context,
                                 class,
                                 format_args!(
                                     "Extra items type `{}` is not assignable to `{}` from base `{}`",
-                                    child_extra_items.declared_ty.display(ctx),
-                                    base_extra_items.declared_ty.display(ctx),
+                                    child_extra_items.declared_ty.display(env),
+                                    base_extra_items.declared_ty.display(env),
                                     base.name(db),
                                 ),
                             );
@@ -243,15 +243,15 @@ fn validate_typed_dict_openness<'db>(
                     !base_items.contains_key(*field_name)
                         && !field
                             .declared_ty
-                            .is_assignable_to(ctx, base_extra_items.declared_ty)
+                            .is_assignable_to(env, base_extra_items.declared_ty)
                 }) {
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` of type `{}` is not assignable to extra items type `{}` from base `{}`",
-                            field.declared_ty.display(ctx),
-                            base_extra_items.declared_ty.display(ctx),
+                            field.declared_ty.display(env),
+                            base_extra_items.declared_ty.display(env),
                             base.name(db),
                         ),
                     );
@@ -274,10 +274,10 @@ fn validate_typed_dict_openness<'db>(
                 if child_extra_items.is_read_only()
                     || !child_extra_items
                         .declared_ty
-                        .is_assignable_to(ctx, base_extra_items.declared_ty)
+                        .is_assignable_to(env, base_extra_items.declared_ty)
                     || !base_extra_items
                         .declared_ty
-                        .is_assignable_to(ctx, child_extra_items.declared_ty)
+                        .is_assignable_to(env, child_extra_items.declared_ty)
                 {
                     report_invalid_typed_dict_openness(
                         context,
@@ -285,7 +285,7 @@ fn validate_typed_dict_openness<'db>(
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items type `{}` from base `{}`",
                             class.name(db),
-                            base_extra_items.declared_ty.display(ctx),
+                            base_extra_items.declared_ty.display(env),
                             base.name(db),
                         ),
                     );
@@ -298,17 +298,17 @@ fn validate_typed_dict_openness<'db>(
                             || field.is_read_only()
                             || !field
                                 .declared_ty
-                                .is_assignable_to(ctx, base_extra_items.declared_ty)
+                                .is_assignable_to(env, base_extra_items.declared_ty)
                             || !base_extra_items
                                 .declared_ty
-                                .is_assignable_to(ctx, field.declared_ty))
+                                .is_assignable_to(env, field.declared_ty))
                 }) {
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` must be mutable, not required, and consistent with extra items type `{}` from base `{}`",
-                            base_extra_items.declared_ty.display(ctx),
+                            base_extra_items.declared_ty.display(env),
                             base.name(db),
                         ),
                     );
@@ -340,13 +340,13 @@ enum TypedDictFieldOverrideReason<'db> {
     MutableNotRequiredFieldMadeRequired,
     /// A read-only inherited field's new type is not assignable to the base type.
     ReadOnlyTypeNotAssignable {
-        ctx: SemanticContext<'db>,
+        env: SemanticEnvironment<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
     /// A mutable inherited field's new type is not mutually assignable with the base type.
     MutableTypeIncompatible {
-        ctx: SemanticContext<'db>,
+        env: SemanticEnvironment<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
@@ -374,24 +374,24 @@ impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
                 )
             }
             Self::ReadOnlyTypeNotAssignable {
-                ctx,
+                env,
                 child_ty,
                 base_ty,
             } => write!(
                 f,
                 "Inherited read-only field type `{}` is not assignable from `{}`",
-                base_ty.display(ctx),
-                child_ty.display(ctx),
+                base_ty.display(env),
+                child_ty.display(env),
             ),
             Self::MutableTypeIncompatible {
-                ctx,
+                env,
                 child_ty,
                 base_ty,
             } => write!(
                 f,
                 "Inherited mutable field type `{}` is incompatible with `{}`",
-                base_ty.display(ctx),
-                child_ty.display(ctx),
+                base_ty.display(env),
+                child_ty.display(env),
             ),
         }
     }
@@ -399,7 +399,7 @@ impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
 
 impl<'db> TypedDictFieldOverrideReason<'db> {
     fn from_fields(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         child_field: &TypedDictField<'db>,
         base_field: &TypedDictField<'db>,
     ) -> Option<Self> {
@@ -420,14 +420,14 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
         let types_are_compatible = if base_field.is_read_only() {
             child_field
                 .declared_ty
-                .is_assignable_to(ctx, base_field.declared_ty)
+                .is_assignable_to(env, base_field.declared_ty)
         } else {
             child_field
                 .declared_ty
-                .is_assignable_to(ctx, base_field.declared_ty)
+                .is_assignable_to(env, base_field.declared_ty)
                 && base_field
                     .declared_ty
-                    .is_assignable_to(ctx, child_field.declared_ty)
+                    .is_assignable_to(env, child_field.declared_ty)
         };
 
         if types_are_compatible {
@@ -436,13 +436,13 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
 
         Some(if base_field.is_read_only() {
             Self::ReadOnlyTypeNotAssignable {
-                ctx: ctx.clone(),
+                env: env.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }
         } else {
             Self::MutableTypeIncompatible {
-                ctx: ctx.clone(),
+                env: env.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }

@@ -72,7 +72,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
-use ty_python_semantic::SemanticContext;
+use ty_python_semantic::SemanticEnvironment;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
@@ -279,24 +279,24 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
 }
 
 pub trait HasNavigationTargets {
-    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets;
+    fn navigation_targets(&self, env: &SemanticEnvironment<'_>) -> NavigationTargets;
 }
 
 impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets {
-        let db = ctx.db();
+    fn navigation_targets(&self, env: &SemanticEnvironment<'_>) -> NavigationTargets {
+        let db = env.db();
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .flat_map(|target| target.navigation_targets(ctx))
+                .flat_map(|target| target.navigation_targets(env))
                 .collect(),
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternatives(ctx) {
+                if let Some(alternatives) = intersection.finite_alternatives(env) {
                     return alternatives
                         .iter()
-                        .flat_map(|alternative| alternative.navigation_targets(ctx))
+                        .flat_map(|alternative| alternative.navigation_targets(env))
                         .collect();
                 }
 
@@ -313,27 +313,27 @@ impl HasNavigationTargets for Type<'_> {
                         // because the type is the intersection of all those types.
                         NavigationTargets::empty()
                     }
-                    None => first.navigation_targets(ctx),
+                    None => first.navigation_targets(env),
                 }
             }
 
             Type::EnumComplement(complement) => complement
-                .remaining_literal_types(ctx)
+                .remaining_literal_types(env)
                 .iter()
-                .flat_map(|alternative| alternative.navigation_targets(ctx))
+                .flat_map(|alternative| alternative.navigation_targets(env))
                 .collect(),
 
             ty => ty
-                .definition(ctx)
-                .map(|definition| definition.navigation_targets(ctx))
+                .definition(env)
+                .map(|definition| definition.navigation_targets(env))
                 .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
 impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, ctx: &SemanticContext<'_>) -> NavigationTargets {
-        let db = ctx.db();
+    fn navigation_targets(&self, env: &SemanticEnvironment<'_>) -> NavigationTargets {
+        let db = env.db();
         let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };

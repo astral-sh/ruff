@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use std::borrow::Cow;
 
 use ruff_db::parsed::ParsedModuleRef;
@@ -40,15 +40,15 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
 
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
-        ctx: &'ast SemanticContext<'db>,
+        env: &'ast SemanticEnvironment<'db>,
         target_scope: ScopeId<'db>,
         python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         Self {
             context: InferContext::new(
-                ctx,
+                env,
                 target_scope,
                 python_file.file(db),
                 python_file,
@@ -74,7 +74,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
 
         let value_inference = infer_expression_types(
-            self.context.semantic_context(),
+            self.context.semantic_environment(),
             value.expression(),
             TypeContext::default(),
         );
@@ -97,30 +97,30 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
             UnpackKind::Iterable { mode } => {
-                let ctx = self.context.semantic_context();
+                let env = self.context.semantic_environment();
                 value_type
-                    .try_iterate_with_mode(ctx, mode)
-                    .map(|tuple| tuple.homogeneous_element_type(ctx))
+                    .try_iterate_with_mode(env, mode)
+                    .map(|tuple| tuple.homogeneous_element_type(env))
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(
                             &self.context,
                             value_type,
                             value.as_any_node_ref(self.db(), self.module()),
                         );
-                        err.fallback_element_type(ctx)
+                        err.fallback_element_type(env)
                     })
             }
             UnpackKind::ContextManager { mode } => {
-                let ctx = self.context.semantic_context();
+                let env = self.context.semantic_environment();
                 value_type
-                    .try_enter_with_mode(ctx, mode)
+                    .try_enter_with_mode(env, mode)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(
                             &self.context,
                             value_type,
                             value.as_any_node_ref(self.db(), self.module()),
                         );
-                        err.fallback_enter_type(ctx)
+                        err.fallback_enter_type(env)
                     })
             }
         };
@@ -222,8 +222,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     }
                     None => TupleLength::Fixed(elts.len()),
                 };
-                let ctx = self.context.semantic_context();
-                let mut unpacker = TupleUnpacker::new(ctx, target_len);
+                let env = self.context.semantic_environment();
+                let mut unpacker = TupleUnpacker::new(env, target_len);
 
                 // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
                 // For our purposes here, we get better error messages and more precise inference
@@ -236,9 +236,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(ctx).unwrap_or_else(|err| {
+                    let tuple = ty.try_iterate(env).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(ctx)))
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(env)))
                     });
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
@@ -351,13 +351,13 @@ impl<'db> UnpackResult<'db> {
 
     pub(crate) fn cycle_normalized(
         mut self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(ctx, previous_ty, cycle);
+            *ty = ty.cycle_normalized(env, previous_ty, cycle);
         }
 
         self

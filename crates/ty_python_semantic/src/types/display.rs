@@ -1,6 +1,6 @@
 //! Display implementations for types.
 
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
@@ -209,7 +209,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types<I, T>(ctx: &SemanticContext<'db>, types: I) -> Self
+    pub fn from_possibly_ambiguous_types<I, T>(env: &SemanticEnvironment<'db>, types: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -230,7 +230,7 @@ impl<'db> DisplaySettings<'db> {
         let collector = AmbiguousNameCollector::default();
 
         for ty in types {
-            collector.visit_type(ctx, ty.into());
+            collector.visit_type(env, ty.into());
         }
 
         build_display_settings(&collector)
@@ -569,8 +569,8 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
         false
     }
 
-    fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
-        let db = ctx.db();
+    fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
+        let db = env.db();
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::LiteralValue(literal) => {
@@ -588,7 +588,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::FromClass(class),
                 ..
-            }) => return self.visit_type(ctx, Type::from(class)),
+            }) => return self.visit_type(env, Type::from(class)),
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -599,48 +599,48 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
                 // If we have already seen this type, we can skip it.
                 return;
             }
-            visitor::walk_non_atomic_type(ctx, t, self);
+            visitor::walk_non_atomic_type(env, t, self);
         }
     }
 }
 
 impl<'db> Type<'db> {
-    pub fn display<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> DisplayType<'ctx, 'db> {
+    pub fn display<'env>(self, env: &'env SemanticEnvironment<'db>) -> DisplayType<'env, 'db> {
         DisplayType {
             ty: self,
-            settings: DisplaySettings::from_possibly_ambiguous_types(ctx, [self]),
-            ctx,
+            settings: DisplaySettings::from_possibly_ambiguous_types(env, [self]),
+            env,
         }
     }
 
-    pub fn display_with<'ctx>(
+    pub fn display_with<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayType<'ctx, 'db> {
+    ) -> DisplayType<'env, 'db> {
         DisplayType {
             ty: self,
-            ctx,
+            env,
             settings,
         }
     }
 
-    fn representation<'ctx>(
+    fn representation<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayRepresentation<'ctx, 'db> {
+    ) -> DisplayRepresentation<'env, 'db> {
         DisplayRepresentation {
-            ctx,
+            env,
             ty: self,
             settings,
         }
     }
 }
 
-pub struct DisplayType<'ctx, 'db> {
+pub struct DisplayType<'env, 'db> {
     ty: Type<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -658,7 +658,7 @@ impl<'db> DisplayType<'_, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let representation = self.ty.representation(self.ctx, self.settings.clone());
+        let representation = self.ty.representation(self.env, self.settings.clone());
         match self.ty.as_literal_value_kind() {
             Some(
                 LiteralValueTypeKind::Int(_)
@@ -818,14 +818,17 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration<'ctx>(self, ctx: &'ctx SemanticContext<'db>) -> impl Display + 'ctx {
-        let value_ty = self.raw_value_type(ctx);
+    pub fn display_declaration<'env>(
+        self,
+        env: &'env SemanticEnvironment<'db>,
+    ) -> impl Display + 'env {
+        let value_ty = self.raw_value_type(env);
         DisplayTypeAliasDeclaration {
-            ctx,
+            env,
             type_alias: self,
             value_ty,
             settings: DisplaySettings::from_possibly_ambiguous_types(
-                ctx,
+                env,
                 [Type::TypeAlias(self), value_ty],
             ),
         }
@@ -876,8 +879,8 @@ impl Display for TypeAliasDisplay<'_> {
 }
 
 /// A source-style display of a type alias declaration.
-struct DisplayTypeAliasDeclaration<'ctx, 'db> {
-    ctx: &'ctx SemanticContext<'db>,
+struct DisplayTypeAliasDeclaration<'env, 'db> {
+    env: &'env SemanticEnvironment<'db>,
     type_alias: TypeAliasType<'db>,
     value_ty: Type<'db>,
     settings: DisplaySettings<'db>,
@@ -885,23 +888,23 @@ struct DisplayTypeAliasDeclaration<'ctx, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let generic_context = self.type_alias.generic_context(self.ctx);
+        let generic_context = self.type_alias.generic_context(self.env);
         let settings = self
             .settings
-            .with_generic_context(self.ctx.db(), generic_context.as_ref());
+            .with_generic_context(self.env.db(), generic_context.as_ref());
 
         f.write_str("type ")?;
         self.type_alias
-            .display_with(self.ctx.db(), settings.clone())
+            .display_with(self.env.db(), settings.clone())
             .fmt_detailed(f)?;
         if let Some(generic_context) = generic_context {
             generic_context
-                .display_with(self.ctx.db(), settings.clone())
+                .display_with(self.env.db(), settings.clone())
                 .fmt_detailed(f)?;
         }
         f.write_str(" = ")?;
         self.value_ty
-            .display_with(self.ctx, settings)
+            .display_with(self.env, settings)
             .fmt_detailed(f)
     }
 }
@@ -914,18 +917,18 @@ impl Display for DisplayTypeAliasDeclaration<'_, '_> {
 
 /// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
 fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     guard: T,
     settings: &DisplaySettings<'db>,
     f: &mut TypeWriter<'_, '_, 'db>,
 ) -> fmt::Result {
-    let db = ctx.db();
+    let db = env.db();
     f.with_type(Type::SpecialForm(T::special_form()))
         .write_str(T::FORM_NAME)?;
     f.write_char('[')?;
     guard
         .type_argument(db)
-        .display_with(ctx, settings.singleline())
+        .display_with(env, settings.singleline())
         .fmt_detailed(f)?;
     if let Some(name) = guard.place_name(db) {
         f.set_invalid_type_annotation();
@@ -938,9 +941,9 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
-struct DisplayRepresentation<'ctx, 'db> {
+struct DisplayRepresentation<'env, 'db> {
     ty: Type<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -970,30 +973,30 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
-                let class = instance.class(self.ctx);
+                let class = instance.class(self.env);
 
-                match (class, class.known(self.ctx.db())) {
+                match (class, class.known(self.env.db())) {
                     (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.with_type(self.ty).write_str("NoDefault"),
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
-                        .specialization(self.ctx.db())
-                        .tuple(self.ctx.db())
+                        .specialization(self.env.db())
+                        .tuple(self.env.db())
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f),
                     (ClassType::NonGeneric(class), _) => {
-                        class.display_with(self.ctx.db(), self.settings.clone()).fmt_detailed(f)
+                        class.display_with(self.env.db(), self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.ctx, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias.display_with(self.env, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => match *class {
                     ClassType::NonGeneric(class) => class
-                        .display_with(self.ctx.db(), self.settings.clone())
+                        .display_with(self.env.db(), self.settings.clone())
                         .fmt_detailed(f),
                     ClassType::Generic(alias) => alias
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
@@ -1003,7 +1006,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         .write_str("Protocol")?;
                     f.write_str(" with members ")?;
                     let interface = synthetic.interface();
-                    let member_list = interface.members(self.ctx.db());
+                    let member_list = interface.members(self.env.db());
                     let num_members = member_list.len();
                     for (i, member) in member_list.enumerate() {
                         let is_last = i == num_members - 1;
@@ -1017,15 +1020,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             },
             Type::PropertyInstance(property) => f
                 .with_type(self.ty)
-                .write_str(property_display_name(self.ctx.db(), property)),
+                .write_str(property_display_name(self.env.db(), property)),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::ModuleType.to_class_literal(self.ctx))
+                f.with_type(KnownClass::ModuleType.to_class_literal(self.env))
                     .write_str("module")?;
                 f.write_str(" '")?;
                 f.with_type(self.ty)
-                    .write_str(module.module(self.ctx.db()).name(self.ctx.db()))?;
+                    .write_str(module.module(self.env.db()).name(self.env.db()))?;
                 f.write_str("'>")
             }
             Type::ClassLiteral(class) => {
@@ -1033,7 +1036,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 class
-                    .display_with(self.ctx.db(), self.settings.clone())
+                    .display_with(self.env.db(), self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
@@ -1042,56 +1045,56 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
-                    .display_with(self.ctx, self.settings.clone())
+                    .display_with(self.env, self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.env))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
-                        .display_with(self.ctx.db(), self.settings.clone())
+                        .display_with(self.env.db(), self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.env))
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.env))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Protocol(protocol) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.env))
                         .write_str("type")?;
                     f.write_char('[')?;
                     Type::ProtocolInstance(protocol)
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                    f.with_type(KnownClass::Type.to_class_literal(self.env))
                         .write_str("type")?;
                     f.write_char('[')?;
                     write!(
                         f.with_type(Type::TypeVar(bound_typevar)),
                         "{}",
                         bound_typevar
-                            .identity(self.ctx.db())
-                            .display_with(self.ctx.db(), self.settings.clone())
+                            .identity(self.env.db())
+                            .display_with(self.env.db(), self.settings.clone())
                     )?;
                     f.write_char(']')
                 }
@@ -1101,25 +1104,25 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 write!(f.with_type(self.ty), "<special-form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::FunctionLiteral(function) => function
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::Callable(callable) => callable
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
-                let function = bound_method.function(self.ctx.db());
-                let self_ty = bound_method.self_instance(self.ctx.db());
-                let bound_signatures = bound_method.bound_signatures(self.ctx);
+                let function = bound_method.function(self.env.db());
+                let self_ty = bound_method.self_instance(self.env.db());
+                let bound_signatures = bound_method.bound_signatures(self.env);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
+                        let hide_unused_self = signature.should_hide_self_from_display(self.env);
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: signature.generic_context.as_ref(),
-                            db: self.ctx.db(),
+                            db: self.env.db(),
                             settings: self.settings.clone(),
                             hide_unused_self,
                         };
@@ -1127,16 +1130,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         f.write_str("bound method ")?;
                         DisplayMaybeParenthesizedType {
                             ty: self_ty,
-                            ctx: self.ctx,
+                            env: self.env,
                             settings: self.settings.singleline(),
                         }
                         .fmt_detailed(f)?;
                         f.write_char('.')?;
                         f.with_type(self.ty)
-                            .write_str(function.name(self.ctx.db()))?;
+                            .write_str(function.name(self.env.db()))?;
                         type_parameters.fmt_detailed(f)?;
                         signature
-                            .display_with(self.ctx, self.settings.disallow_signature_name())
+                            .display_with(self.env, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
                     signatures => {
@@ -1150,7 +1153,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(&signature.display_with(self.ctx, self.settings.clone()));
+                            join.entry(&signature.display_with(self.env, self.settings.clone()));
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1168,44 +1171,44 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         "__get__",
                         "function",
                         Type::FunctionLiteral(function),
-                        Some(&**function.name(self.ctx.db())),
+                        Some(&**function.name(self.env.db())),
                     ),
                     KnownBoundMethodType::FunctionTypeDunderCall(function) => (
                         KnownClass::FunctionType,
                         "__call__",
                         "function",
                         Type::FunctionLiteral(function),
-                        Some(&**function.name(self.ctx.db())),
+                        Some(&**function.name(self.env.db())),
                     ),
                     KnownBoundMethodType::PropertyDunderGet(property) => (
-                        property.instance_class(self.ctx.db()),
+                        property.instance_class(self.env.db()),
                         "__get__",
-                        property_display_name(self.ctx.db(), property),
+                        property_display_name(self.env.db(), property),
                         Type::PropertyInstance(property),
                         property
-                            .getter(self.ctx.db())
+                            .getter(self.env.db())
                             .and_then(Type::as_function_literal)
-                            .map(|getter| &**getter.name(self.ctx.db())),
+                            .map(|getter| &**getter.name(self.env.db())),
                     ),
                     KnownBoundMethodType::PropertyDunderSet(property) => (
-                        property.instance_class(self.ctx.db()),
+                        property.instance_class(self.env.db()),
                         "__set__",
-                        property_display_name(self.ctx.db(), property),
+                        property_display_name(self.env.db(), property),
                         Type::PropertyInstance(property),
                         property
-                            .setter(self.ctx.db())
+                            .setter(self.env.db())
                             .and_then(Type::as_function_literal)
-                            .map(|setter| &**setter.name(self.ctx.db())),
+                            .map(|setter| &**setter.name(self.env.db())),
                     ),
                     KnownBoundMethodType::PropertyDunderDelete(property) => (
-                        property.instance_class(self.ctx.db()),
+                        property.instance_class(self.env.db()),
                         "__delete__",
-                        property_display_name(self.ctx.db(), property),
+                        property_display_name(self.env.db(), property),
                         Type::PropertyInstance(property),
                         property
-                            .deleter(self.ctx.db())
+                            .deleter(self.env.db())
                             .and_then(Type::as_function_literal)
-                            .map(|deleter| &**deleter.name(self.ctx.db())),
+                            .map(|deleter| &**deleter.name(self.env.db())),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
                         KnownClass::Property,
@@ -1214,7 +1217,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         Type::LiteralValue(LiteralValueType::promotable(
                             LiteralValueTypeKind::String(literal),
                         )),
-                        Some(literal.value(self.ctx.db())),
+                        Some(literal.value(self.env.db())),
                     ),
                     KnownBoundMethodType::ConstraintSetRange => {
                         return f.write_str("bound method `ConstraintSet.range`");
@@ -1252,13 +1255,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     }
                 };
 
-                let class_ty = cls.to_class_literal(self.ctx);
+                let class_ty = cls.to_class_literal(self.env);
                 f.write_char('<')?;
-                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.ctx))
+                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.env))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
                 if let Place::Defined(DefinedPlace { ty: member_ty, .. }) =
-                    class_ty.member(self.ctx, member_name).place
+                    class_ty.member(self.env, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
                 } else {
@@ -1291,12 +1294,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     }
                 };
                 f.write_char('<')?;
-                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.ctx))
+                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.env))
                     .write_str("wrapper-descriptor")?;
                 f.write_str(" '")?;
                 f.write_str(method)?;
                 f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(self.ctx))
+                f.with_type(cls.to_class_literal(self.env))
                     .write_str(object)?;
                 f.write_str("' objects>")
             }
@@ -1309,25 +1312,25 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::Intersection(intersection) => intersection
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::EnumComplement(complement) => {
                 if let Some(literals) =
-                    complement.remaining_literal_types_for_display(self.ctx, LITERAL_POLICY.max)
+                    complement.remaining_literal_types_for_display(self.env, LITERAL_POLICY.max)
                 {
                     DisplayLiteralGroup {
                         literals,
-                        ctx: self.ctx,
+                        env: self.env,
                         settings: self.settings.clone(),
                     }
                     .fmt_detailed(f)
                 } else {
                     complement
-                        .to_intersection(self.ctx)
-                        .display_with(self.ctx, self.settings.clone())
+                        .to_intersection(self.env)
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)
                 }
             }
@@ -1341,7 +1344,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     write!(
                         f.with_type(self.ty),
                         "{}",
-                        string.display_with(self.ctx.db(), self.settings.clone()),
+                        string.display_with(self.env.db(), self.settings.clone()),
                     )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
@@ -1353,7 +1356,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .write_str("LiteralString"),
                 LiteralValueTypeKind::Bytes(bytes) => {
                     let escape = AsciiEscape::with_preferred_quote(
-                        bytes.value(self.ctx.db()),
+                        bytes.value(self.env.db()),
                         Quote::Double,
                     );
 
@@ -1365,14 +1368,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 }
                 LiteralValueTypeKind::Enum(enum_literal) => {
                     enum_literal
-                        .enum_class(self.ctx.db())
-                        .display_with(self.ctx.db(), self.settings.clone())
+                        .enum_class(self.env.db())
+                        .display_with(self.env.db(), self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char('.')?;
                     write!(
                         f.with_type(Type::enum_literal(enum_literal)),
                         "{}",
-                        enum_literal.name(self.ctx.db())
+                        enum_literal.name(self.env.db())
                     )
                 }
             },
@@ -1382,8 +1385,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f,
                     "{}",
                     bound_typevar
-                        .identity(self.ctx.db())
-                        .display_with(self.ctx.db(), self.settings.clone())
+                        .identity(self.env.db())
+                        .display_with(self.env.db(), self.settings.clone())
                 )
             }
             Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
@@ -1391,37 +1394,37 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
-                Type::from(bound_super.pivot_class(self.ctx.db()))
-                    .display_with(self.ctx, self.settings.singleline())
+                Type::from(bound_super.pivot_class(self.env.db()))
+                    .display_with(self.env, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
                 bound_super
-                    .owner(self.ctx.db())
+                    .owner(self.env.db())
                     .owner_type()
-                    .display_with(self.ctx, self.settings.singleline())
+                    .display_with(self.env, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(self.ctx, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => fmt_type_guard_like(self.env, type_is, &self.settings, f),
             Type::TypeGuard(type_guard) => {
-                fmt_type_guard_like(self.ctx, type_guard, &self.settings, f)
+                fmt_type_guard_like(self.env, type_guard, &self.settings, f)
             }
             Type::TypeForm(typeform) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
                     .write_str("TypeForm")?;
                 f.write_char('[')?;
                 typeform
-                    .type_argument(self.ctx.db())
-                    .display_with(self.ctx, self.settings.clone())
+                    .type_argument(self.env.db())
+                    .display_with(self.env, self.settings.clone())
                     .fmt_detailed(f)?;
                 f.write_char(']')
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class
-                    .display_with(self.ctx.db(), self.settings.clone())
+                    .display_with(self.env.db(), self.settings.clone())
                     .fmt_detailed(f),
                 ClassType::Generic(alias) => alias
-                    .display_with(self.ctx, self.settings.clone())
+                    .display_with(self.env, self.settings.clone())
                     .fmt_detailed(f),
             },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
@@ -1432,7 +1435,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 )))
                 .write_str("TypedDict")?;
                 f.write_str(" with items ")?;
-                let items = synthesized.items(self.ctx.db());
+                let items = synthesized.items(self.env.db());
                 for (i, name) in items.keys().enumerate() {
                     let is_last = i == items.len() - 1;
                     write!(f, "'{name}'")?;
@@ -1444,17 +1447,17 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::TypeAlias(alias) => {
                 alias
-                    .display_with(self.ctx.db(), self.settings.clone())
+                    .display_with(self.env.db(), self.settings.clone())
                     .fmt_detailed(f)?;
-                match alias.specialization(self.ctx.db()) {
+                match alias.specialization(self.env.db()) {
                     None => Ok(()),
                     Some(specialization) => specialization
-                        .display_short(self.ctx, TupleSpecialization::No, self.settings.clone())
+                        .display_short(self.env, TupleSpecialization::No, self.settings.clone())
                         .fmt_detailed(f),
                 }
             }
             Type::NewTypeInstance(newtype) => {
-                f.with_type(self.ty).write_str(newtype.name(self.ctx.db()))
+                f.with_type(self.ty).write_str(newtype.name(self.env.db()))
             }
         }
     }
@@ -1504,12 +1507,12 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
 impl<'db> TupleSpec<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTuple<'a, 'db> {
         DisplayTuple {
             tuple: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -1517,13 +1520,13 @@ impl<'db> TupleSpec<'db> {
 
 struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        f.with_type(KnownClass::Tuple.to_class_literal(self.ctx))
+        f.with_type(KnownClass::Tuple.to_class_literal(self.env))
             .write_str("tuple")?;
         f.write_char('[')?;
         match self.tuple {
@@ -1533,7 +1536,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(self.ctx, self.settings.singleline())
+                        .display_with(self.env, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1556,7 +1559,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(self.ctx, self.settings.singleline())
+                        .display_with(self.env, self.settings.singleline())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
@@ -1564,7 +1567,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     VariableSegment::TypeVarTuple(typevar) => {
                         f.write_char('*')?;
                         Type::TypeVar(typevar)
-                            .display_with(self.ctx, self.settings.singleline())
+                            .display_with(self.env, self.settings.singleline())
                             .fmt_detailed(f)?;
                     }
                     VariableSegment::Homogeneous(variable) => {
@@ -1573,12 +1576,12 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         {
                             f.write_char('*')?;
                             // Might as well link the type again here too
-                            f.with_type(KnownClass::Tuple.to_class_literal(self.ctx))
+                            f.with_type(KnownClass::Tuple.to_class_literal(self.env))
                                 .write_str("tuple")?;
                             f.write_char('[')?;
                         }
                         variable
-                            .display_with(self.ctx, self.settings.singleline())
+                            .display_with(self.env, self.settings.singleline())
                             .fmt_detailed(f)?;
                         f.write_str(", ...")?;
                         if !tuple.prefix_elements().is_empty()
@@ -1592,7 +1595,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(self.ctx, self.settings.singleline())
+                        .display_with(self.env, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
             }
@@ -1610,49 +1613,49 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display<'ctx>(
+    pub(crate) fn display<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
-    ) -> DisplayOverloadLiteral<'ctx, 'db> {
-        Self::display_with(self, ctx, DisplaySettings::default())
+        env: &'env SemanticEnvironment<'db>,
+    ) -> DisplayOverloadLiteral<'env, 'db> {
+        Self::display_with(self, env, DisplaySettings::default())
     }
 
-    fn display_with<'ctx>(
+    fn display_with<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayOverloadLiteral<'ctx, 'db> {
+    ) -> DisplayOverloadLiteral<'env, 'db> {
         DisplayOverloadLiteral {
             literal: self,
-            ctx,
+            env,
             settings,
         }
     }
 }
 
-pub(crate) struct DisplayOverloadLiteral<'ctx, 'db> {
+pub(crate) struct DisplayOverloadLiteral<'env, 'db> {
     literal: OverloadLiteral<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let signature = self.literal.signature(self.ctx);
-        let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
+        let signature = self.literal.signature(self.env);
+        let hide_unused_self = signature.should_hide_self_from_display(self.env);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
-            db: self.ctx.db(),
+            db: self.env.db(),
             settings: self.settings.clone(),
             hide_unused_self,
         };
 
         f.set_invalid_type_annotation();
         f.write_str("def ")?;
-        write!(f, "{}", self.literal.name(self.ctx.db()))?;
+        write!(f, "{}", self.literal.name(self.env.db()))?;
         type_parameters.fmt_detailed(f)?;
         signature
-            .display_with(self.ctx, self.settings.disallow_signature_name())
+            .display_with(self.env, self.settings.disallow_signature_name())
             .fmt_detailed(f)
     }
 }
@@ -1664,22 +1667,22 @@ impl Display for DisplayOverloadLiteral<'_, '_> {
 }
 
 impl<'db> FunctionType<'db> {
-    fn display_with<'ctx>(
+    fn display_with<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayFunctionType<'ctx, 'db> {
+    ) -> DisplayFunctionType<'env, 'db> {
         DisplayFunctionType {
             ty: self,
-            ctx,
+            env,
             settings,
         }
     }
 }
 
-struct DisplayFunctionType<'ctx, 'db> {
+struct DisplayFunctionType<'env, 'db> {
     ty: FunctionType<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -1694,7 +1697,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
         {
             f.set_invalid_type_annotation();
             f.write_str("def ")?;
-            write!(f, "{}", self.ty.name(self.ctx.db()))?;
+            write!(f, "{}", self.ty.name(self.env.db()))?;
             return f.write_str("(...)");
         }
 
@@ -1703,24 +1706,24 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
         visited.insert(self.ty);
         settings.visited_function_types = Rc::new(visited);
 
-        let signature = self.ty.signature(self.ctx);
+        let signature = self.ty.signature(self.env);
 
         match signature.overloads.as_slice() {
             [signature] => {
-                let hide_unused_self = signature.should_hide_self_from_display(self.ctx);
+                let hide_unused_self = signature.should_hide_self_from_display(self.env);
 
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
-                    db: self.ctx.db(),
+                    db: self.env.db(),
                     settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
                 f.write_str("def ")?;
-                write!(f, "{}", self.ty.name(self.ctx.db()))?;
+                write!(f, "{}", self.ty.name(self.env.db()))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.ctx, settings.disallow_signature_name())
+                    .display_with(self.env, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
@@ -1734,7 +1737,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
                 let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.ctx, settings.clone()));
+                    join.entry(&signature.display_with(self.env, settings.clone()));
                 }
                 join.finish()?;
                 if !settings.multiline {
@@ -1753,48 +1756,48 @@ impl Display for DisplayFunctionType<'_, '_> {
 }
 
 impl<'db> GenericAlias<'db> {
-    pub(crate) fn display<'ctx>(
+    pub(crate) fn display<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
-    ) -> DisplayGenericAlias<'ctx, 'db> {
-        self.display_with(ctx, DisplaySettings::default())
+        env: &'env SemanticEnvironment<'db>,
+    ) -> DisplayGenericAlias<'env, 'db> {
+        self.display_with(env, DisplaySettings::default())
     }
 
-    pub(crate) fn display_with<'ctx>(
+    pub(crate) fn display_with<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayGenericAlias<'ctx, 'db> {
-        let db = ctx.db();
+    ) -> DisplayGenericAlias<'env, 'db> {
+        let db = env.db();
         DisplayGenericAlias {
             origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
-            ctx,
+            env,
             settings,
         }
     }
 }
 
-pub(crate) struct DisplayGenericAlias<'ctx, 'db> {
+pub(crate) struct DisplayGenericAlias<'env, 'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let Some(tuple) = self.specialization.tuple(self.ctx.db()) {
+        if let Some(tuple) = self.specialization.tuple(self.env.db()) {
             tuple
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix_details = match self.specialization.materialization_kind(self.ctx.db()) {
+            let prefix_details = match self.specialization.materialization_kind(self.env.db()) {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
             };
-            let suffix = match self.specialization.materialization_kind(self.ctx.db()) {
+            let suffix = match self.specialization.materialization_kind(self.env.db()) {
                 None => "",
                 Some(_) => "]",
             };
@@ -1803,12 +1806,12 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
                 f.write_char('[')?;
             }
             self.origin
-                .display_with(self.ctx.db(), self.settings.clone())
+                .display_with(self.env.db(), self.settings.clone())
                 .fmt_detailed(f)?;
             self.specialization
                 .display_short(
-                    self.ctx,
-                    TupleSpecialization::from_class(self.ctx.db(), self.origin),
+                    self.env,
+                    TupleSpecialization::from_class(self.env.db(), self.origin),
                     self.settings.clone(),
                 )
                 .fmt_detailed(f)?;
@@ -1968,13 +1971,13 @@ impl Display for DisplayGenericContext<'_, '_> {
 }
 
 impl<'db> Specialization<'db> {
-    fn display_full<'ctx>(
+    fn display_full<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
-    ) -> DisplaySpecialization<'ctx, 'db> {
+        env: &'env SemanticEnvironment<'db>,
+    ) -> DisplaySpecialization<'env, 'db> {
         DisplaySpecialization {
             specialization: self,
-            ctx,
+            env,
             tuple_specialization: TupleSpecialization::No,
             settings: DisplaySettings::default(),
             full: true,
@@ -1982,15 +1985,15 @@ impl<'db> Specialization<'db> {
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
-    fn display_short<'ctx>(
+    fn display_short<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
-    ) -> DisplaySpecialization<'ctx, 'db> {
+    ) -> DisplaySpecialization<'env, 'db> {
         DisplaySpecialization {
             specialization: self,
-            ctx,
+            env,
             tuple_specialization,
             settings,
             full: false,
@@ -1998,9 +2001,9 @@ impl<'db> Specialization<'db> {
     }
 }
 
-struct DisplaySpecialization<'ctx, 'db> {
+struct DisplaySpecialization<'env, 'db> {
     specialization: Specialization<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
     full: bool,
@@ -2011,18 +2014,18 @@ impl<'db> DisplaySpecialization<'_, 'db> {
         f.write_char('[')?;
         let variables = self
             .specialization
-            .generic_context(self.ctx.db())
-            .variables(self.ctx.db())
+            .generic_context(self.env.db())
+            .variables(self.env.db())
             .collect::<Vec<_>>();
-        let types = self.specialization.types(self.ctx.db());
+        let types = self.specialization.types(self.env.db());
         let mut wrote_any = false;
         for (typevar, ty) in variables.iter().zip(types) {
-            if typevar.is_typevartuple(self.ctx.db()) {
-                let Some(tuple) = ty.exact_tuple_instance_spec(self.ctx.db()) else {
+            if typevar.is_typevartuple(self.env.db()) {
+                let Some(tuple) = ty.exact_tuple_instance_spec(self.env.db()) else {
                     if wrote_any {
                         f.write_str(", ")?;
                     }
-                    ty.display_with(self.ctx, self.settings.clone())
+                    ty.display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                     wrote_any = true;
                     continue;
@@ -2043,7 +2046,7 @@ impl<'db> DisplaySpecialization<'_, 'db> {
                                 f.write_str(", ")?;
                             }
                             element
-                                .display_with(self.ctx, self.settings.clone())
+                                .display_with(self.env, self.settings.clone())
                                 .fmt_detailed(f)?;
                             wrote_any = true;
                         }
@@ -2053,7 +2056,7 @@ impl<'db> DisplaySpecialization<'_, 'db> {
                             f.write_str(", ")?;
                         }
                         f.write_char('*')?;
-                        ty.display_with(self.ctx, self.settings.clone())
+                        ty.display_with(self.env, self.settings.clone())
                             .fmt_detailed(f)?;
                         wrote_any = true;
                     }
@@ -2064,7 +2067,7 @@ impl<'db> DisplaySpecialization<'_, 'db> {
             if wrote_any {
                 f.write_str(", ")?;
             }
-            ty.display_with(self.ctx, self.settings.clone())
+            ty.display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)?;
             wrote_any = true;
         }
@@ -2078,9 +2081,9 @@ impl<'db> DisplaySpecialization<'_, 'db> {
         f.write_char('[')?;
         let variables = self
             .specialization
-            .generic_context(self.ctx.db())
-            .variables(self.ctx.db());
-        let types = self.specialization.types(self.ctx.db());
+            .generic_context(self.env.db())
+            .variables(self.env.db());
+        let types = self.specialization.types(self.env.db());
         for (idx, (bound_typevar, ty)) in variables.zip(types).enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
@@ -2089,10 +2092,10 @@ impl<'db> DisplaySpecialization<'_, 'db> {
             write!(
                 f,
                 "{}",
-                bound_typevar.identity(self.ctx.db()).display(self.ctx.db())
+                bound_typevar.identity(self.env.db()).display(self.env.db())
             )?;
             f.write_str(" = ")?;
-            ty.display_with(self.ctx, self.settings.clone())
+            ty.display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         f.write_char(']')
@@ -2138,21 +2141,21 @@ impl TupleSpecialization {
 impl<'db> CallableType<'db> {
     pub(crate) fn display<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
     ) -> DisplayCallableType<'a, 'db> {
-        Self::display_with(self, ctx, DisplaySettings::default())
+        Self::display_with(self, env, DisplaySettings::default())
     }
 
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'a, 'db> {
-        let db = ctx.db();
+        let db = env.db();
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            ctx,
+            env,
             settings,
         }
     }
@@ -2161,7 +2164,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2175,14 +2178,14 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     }
                     signature
                         .parameters()
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
                         f.write_str("]")?;
                     }
                 } else {
                     signature
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                 }
             }
@@ -2197,7 +2200,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.ctx, self.settings.clone()));
+                    join.entry(&signature.display_with(self.env, self.settings.clone()));
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -2219,14 +2222,14 @@ impl Display for DisplayCallableType<'_, '_> {
 impl<'db> Signature<'db> {
     pub(crate) fn display<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
     ) -> DisplaySignature<'a, 'db> {
-        Self::display_with(self, ctx, DisplaySettings::default())
+        Self::display_with(self, env, DisplaySettings::default())
     }
 
     pub(crate) fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
@@ -2234,7 +2237,7 @@ impl<'db> Signature<'db> {
             generic_context: self.generic_context.as_ref(),
             parameters: self.parameters(),
             return_ty: self.return_ty,
-            ctx,
+            env,
             settings,
         }
     }
@@ -2245,7 +2248,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     generic_context: Option<&'a GenericContext<'db>>,
     parameters: &'a Parameters<'db>,
     return_ty: Type<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2261,10 +2264,10 @@ impl<'db> DisplaySignature<'_, 'db> {
         }
     }
 
-    fn should_hide_self_from_display(&self, ctx: &SemanticContext<'db>) -> bool {
-        !self.return_ty.contains_self(ctx)
+    fn should_hide_self_from_display(&self, env: &SemanticEnvironment<'db>) -> bool {
+        !self.return_ty.contains_self(env)
             && !self.parameters.iter().any(|p| {
-                p.should_annotation_be_displayed() && p.annotated_type().contains_self(ctx)
+                p.should_annotation_be_displayed() && p.annotated_type().contains_self(env)
             })
     }
 }
@@ -2288,7 +2291,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .signature_name_display
             .should_display(self.settings.multiline)
             && let Some(definition) = self.definition
-            && let Some(name) = definition.name(self.ctx.db())
+            && let Some(name) = definition.name(self.env.db())
         {
             f.write_str("def ")?;
             f.write_str(&name)?;
@@ -2296,7 +2299,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         let settings = self
             .settings
-            .with_generic_context(self.ctx.db(), self.generic_context);
+            .with_generic_context(self.env.db(), self.generic_context);
 
         // Display type parameters if present, but only when the caller hasn't
         // already displayed them.
@@ -2305,11 +2308,11 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .signature_name_display
             .allows_type_parameters()
         {
-            let hide_unused_self = self.should_hide_self_from_display(self.ctx);
+            let hide_unused_self = self.should_hide_self_from_display(self.env);
 
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
-                db: self.ctx.db(),
+                db: self.env.db(),
                 settings: settings.clone(),
                 hide_unused_self,
             }
@@ -2322,7 +2325,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             ..settings.clone()
         };
         self.parameters
-            .display_with(self.ctx, param_settings)
+            .display_with(self.env, param_settings)
             .fmt_detailed(&mut f)?;
 
         // Return type
@@ -2330,12 +2333,12 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(" -> ")?;
 
             let should_parenthesize_return_type =
-                should_parenthesize_callable_type(self.return_ty, self.ctx.db());
+                should_parenthesize_callable_type(self.return_ty, self.env.db());
             if should_parenthesize_return_type {
                 f.write_char('(')?;
             }
             self.return_ty
-                .display_with(self.ctx, settings.singleline())
+                .display_with(self.env, settings.singleline())
                 .fmt_detailed(&mut f)?;
             if should_parenthesize_return_type {
                 f.write_char(')')?;
@@ -2370,12 +2373,12 @@ pub(crate) struct SignatureDisplayDetails {
 impl<'db> Parameters<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameters<'a, 'db> {
         DisplayParameters {
             parameters: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -2383,7 +2386,7 @@ impl<'db> Parameters<'db> {
 
 struct DisplayParameters<'a, 'db> {
     parameters: &'a Parameters<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2436,7 +2439,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .map(|name| name.to_string())
                     .unwrap_or_default();
                 parameter
-                    .display_with(display.ctx, display.settings.singleline())
+                    .display_with(display.env, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
                 after_synthetic_unpack |= is_synthetic_unpack;
@@ -2502,11 +2505,11 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 display_parameters(self, f, self.parameters.as_slice(), arg_separator)?;
             }
             ParametersKind::ParamSpec(typevar) => {
-                let parameter_name = format!("**{}", typevar.name(self.ctx.db()));
+                let parameter_name = format!("**{}", typevar.name(self.env.db()));
                 let mut parameter = f.with_detail(TypeDetail::Parameter(parameter_name.clone()));
                 write!(parameter, "{parameter_name}")?;
-                let binding_context = typevar.binding_context(self.ctx.db());
-                if let Some(binding_context_name) = binding_context.name(self.ctx.db())
+                let binding_context = typevar.binding_context(self.env.db());
+                if let Some(binding_context_name) = binding_context.name(self.env.db())
                     && let Some(definition) = binding_context.definition()
                     && !self.settings.active_scopes.contains(&definition)
                 {
@@ -2533,12 +2536,12 @@ impl Display for DisplayParameters<'_, '_> {
 impl<'db> Parameter<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameter<'a, 'db> {
         DisplayParameter {
             param: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -2546,7 +2549,7 @@ impl<'db> Parameter<'db> {
 
 struct DisplayParameter<'a, 'db> {
     param: &'a Parameter<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2559,7 +2562,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             f.write_str("*")?;
             self.param
                 .annotated_type()
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)?;
             return Ok(());
         }
@@ -2570,7 +2573,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
                 annotated_type
-                    .display_with(self.ctx, self.settings.clone())
+                    .display_with(self.env, self.settings.clone())
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
@@ -2593,14 +2596,14 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
-                            default_type.representation(self.ctx, self.settings.clone());
+                            default_type.representation(self.env, self.settings.clone());
                         representation.fmt_detailed(f)?;
                     }
                     Type::NominalInstance(instance) => {
                         // Some key default types like `None` are worth showing
-                        let class = instance.class(self.ctx);
+                        let class = instance.class(self.env);
 
-                        match (class, class.known(self.ctx.db())) {
+                        match (class, class.known(self.env.db())) {
                             (_, Some(KnownClass::NoneType)) => {
                                 f.with_type(default_type).write_str("None")?;
                             }
@@ -2619,7 +2622,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             // have something visible in the parameter slot.
             self.param
                 .annotated_type()
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())
@@ -2680,11 +2683,11 @@ impl Display for DisplayOmitted {
 impl<'db> UnionType<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayUnionType<'a, 'db> {
         DisplayUnionType {
-            ctx,
+            env,
             ty: self,
             settings,
         }
@@ -2693,7 +2696,7 @@ impl<'db> UnionType<'db> {
 
 struct DisplayUnionType<'a, 'db> {
     ty: &'a UnionType<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2721,7 +2724,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         /// # Color excluding RED displays through the literal-group path for BLUE.
         /// ```
         fn condensable_literals<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
         ) -> Option<Vec<Type<'db>>> {
             match ty {
@@ -2738,21 +2741,21 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                     Some(vec![ty])
                 }
                 Type::EnumComplement(complement) => {
-                    complement.remaining_literal_types_for_display(ctx, LITERAL_POLICY.max)
+                    complement.remaining_literal_types_for_display(env, LITERAL_POLICY.max)
                 }
                 Type::Intersection(intersection) => {
-                    intersection.finite_alternatives_for_display(ctx, LITERAL_POLICY.max)
+                    intersection.finite_alternatives_for_display(env, LITERAL_POLICY.max)
                 }
                 _ => None,
             }
         }
 
         fn singleline_union_element_label<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             element: Type<'db>,
             settings: &DisplaySettings<'db>,
         ) -> String {
-            element.display_with(ctx, settings.singleline()).to_string()
+            element.display_with(env, settings.singleline()).to_string()
         }
 
         fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
@@ -2768,7 +2771,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 .collect()
         }
 
-        let elements = self.ty.elements(self.ctx.db());
+        let elements = self.ty.elements(self.env.db());
         let mut condensed_types = vec![];
         let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
@@ -2776,14 +2779,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             .iter()
             .copied()
             .map(|element| {
-                (condensable_literals(self.ctx, element).is_none() && !element.is_subclass_of())
-                    .then(|| singleline_union_element_label(self.ctx, element, &self.settings))
+                (condensable_literals(self.env, element).is_none() && !element.is_subclass_of())
+                    .then(|| singleline_union_element_label(self.env, element, &self.settings))
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
 
         for element in elements.iter().copied() {
-            if let Some(literals) = condensable_literals(self.ctx, element) {
+            if let Some(literals) = condensable_literals(self.env, element) {
                 condensed_element_count += 1;
                 for literal in literals {
                     if !condensed_types.contains(&literal) {
@@ -2816,12 +2819,12 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 break;
             }
 
-            if condensable_literals(self.ctx, *element).is_some() {
+            if condensable_literals(self.env, *element).is_some() {
                 if let Some(condensed_types) = condensed_types.take() {
                     displayed_entries += 1;
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
-                        ctx: self.ctx,
+                        env: self.env,
                         settings: self.settings.singleline(),
                     });
                 }
@@ -2830,7 +2833,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                     displayed_entries += 1;
                     join.entry(&DisplaySubclassOfGroup {
                         types: subclass_of_types,
-                        ctx: self.ctx,
+                        env: self.env,
                         settings: self.settings.singleline(),
                     });
                 }
@@ -2846,7 +2849,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 };
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
-                    ctx: self.ctx,
+                    env: self.env,
                     settings,
                 });
             }
@@ -2878,9 +2881,9 @@ impl fmt::Debug for DisplayUnionType<'_, '_> {
     }
 }
 
-struct DisplaySubclassOfGroup<'ctx, 'db> {
+struct DisplaySubclassOfGroup<'env, 'db> {
     types: Vec<SubclassOfType<'db>>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2894,24 +2897,24 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'_, 'db> {
         for subclass_of in self.types.iter().take(display_limit) {
             match subclass_of.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    join.entry(&class.display_with(self.ctx.db(), self.settings.singleline()));
+                    join.entry(&class.display_with(self.env.db(), self.settings.singleline()));
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    join.entry(&alias.display_with(self.ctx, self.settings.singleline()));
+                    join.entry(&alias.display_with(self.env, self.settings.singleline()));
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
                     let rep =
-                        Type::Dynamic(dynamic).representation(self.ctx, self.settings.singleline());
+                        Type::Dynamic(dynamic).representation(self.env, self.settings.singleline());
                     join.entry(&rep);
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     let rep = Type::ProtocolInstance(protocol)
-                        .representation(self.ctx, self.settings.singleline());
+                        .representation(self.env, self.settings.singleline());
                     join.entry(&rep);
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let rep = Type::TypeVar(bound_typevar)
-                        .representation(self.ctx, self.settings.singleline());
+                        .representation(self.env, self.settings.singleline());
                     join.entry(&rep);
                 }
             }
@@ -2937,9 +2940,9 @@ impl Display for DisplaySubclassOfGroup<'_, '_> {
     }
 }
 
-struct DisplayLiteralGroup<'ctx, 'db> {
+struct DisplayLiteralGroup<'env, 'db> {
     literals: Vec<Type<'db>>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2962,7 +2965,7 @@ impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'_, 'db> {
         let mut join = f.join(", ");
 
         for lit in self.literals.iter().take(display_limit) {
-            let rep = lit.representation(self.ctx, self.settings.singleline());
+            let rep = lit.representation(self.env, self.settings.singleline());
             join.entry(&rep);
         }
 
@@ -2991,11 +2994,11 @@ impl Display for DisplayLiteralGroup<'_, '_> {
 impl<'db> IntersectionType<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayIntersectionType<'a, 'db> {
         DisplayIntersectionType {
-            ctx,
+            env,
             ty: self,
             settings,
         }
@@ -3004,7 +3007,7 @@ impl<'db> IntersectionType<'db> {
 
 struct DisplayIntersectionType<'a, 'db> {
     ty: &'a IntersectionType<'db>,
-    ctx: &'a SemanticContext<'db>,
+    env: &'a SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3012,21 +3015,21 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let tys = self
             .ty
-            .positive(self.ctx.db())
+            .positive(self.env.db())
             .iter()
             .map(|&ty| DisplayMaybeNegatedType {
                 ty,
-                ctx: self.ctx,
+                env: self.env,
                 settings: self.settings.singleline(),
                 negated: false,
             })
             .chain(
                 self.ty
-                    .negative(self.ctx.db())
+                    .negative(self.env.db())
                     .iter()
                     .map(|&ty| DisplayMaybeNegatedType {
                         ty,
-                        ctx: self.ctx,
+                        env: self.env,
                         settings: self.settings.singleline(),
                         negated: true,
                     }),
@@ -3049,9 +3052,9 @@ impl fmt::Debug for DisplayIntersectionType<'_, '_> {
     }
 }
 
-struct DisplayMaybeNegatedType<'ctx, 'db> {
+struct DisplayMaybeNegatedType<'env, 'db> {
     ty: Type<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     negated: bool,
     settings: DisplaySettings<'db>,
 }
@@ -3063,7 +3066,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'_, 'db> {
         }
         DisplayMaybeParenthesizedType {
             ty: self.ty,
-            ctx: self.ctx,
+            env: self.env,
             settings: self.settings.clone(),
         }
         .fmt_detailed(f)
@@ -3092,9 +3095,9 @@ fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
     }
 }
 
-struct DisplayMaybeParenthesizedType<'ctx, 'db> {
+struct DisplayMaybeParenthesizedType<'env, 'db> {
     ty: Type<'db>,
-    ctx: &'ctx SemanticContext<'db>,
+    env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3104,22 +3107,22 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
             f.set_invalid_type_annotation();
             f.write_char('(')?;
             self.ty
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f)?;
             f.write_char(')')
         };
         match self.ty {
-            ty if should_parenthesize_callable_type(ty, self.ctx.db()) => write_parentheses(f),
+            ty if should_parenthesize_callable_type(ty, self.env.db()) => write_parentheses(f),
             Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),
-            Type::Intersection(intersection) if !intersection.has_one_element(self.ctx.db()) => {
+            Type::Intersection(intersection) if !intersection.has_one_element(self.env.db()) => {
                 write_parentheses(f)
             }
             _ => self
                 .ty
-                .display_with(self.ctx, self.settings.clone())
+                .display_with(self.env, self.settings.clone())
                 .fmt_detailed(f),
         }
     }
@@ -3134,7 +3137,7 @@ impl Display for DisplayMaybeParenthesizedType<'_, '_> {
 trait TypeArrayDisplay<'db> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db>;
 }
@@ -3142,12 +3145,12 @@ trait TypeArrayDisplay<'db> {
 impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -3156,12 +3159,12 @@ impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
 impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -3170,12 +3173,12 @@ impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
 impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     fn display_with<'a>(
         &'a self,
-        ctx: &'a SemanticContext<'db>,
+        env: &'a SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
             types: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -3183,7 +3186,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
 
 struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
-    ctx: &'b SemanticContext<'db>,
+    env: &'b SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3193,7 +3196,7 @@ impl<'db> FmtDetailed<'db> for DisplayTypeArray<'_, 'db> {
             .entries(
                 self.types
                     .iter()
-                    .map(|ty| ty.display_with(self.ctx, self.settings.singleline())),
+                    .map(|ty| ty.display_with(self.env, self.settings.singleline())),
             )
             .finish()
     }
@@ -3239,21 +3242,21 @@ impl Display for DisplayStringLiteralType<'_> {
     }
 }
 
-pub(crate) struct DisplayKnownInstanceRepr<'ctx, 'db> {
+pub(crate) struct DisplayKnownInstanceRepr<'env, 'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
-    pub(crate) ctx: &'ctx SemanticContext<'db>,
+    pub(crate) env: &'env SemanticEnvironment<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
-    pub(crate) fn display_with<'ctx>(
+    pub(crate) fn display_with<'env>(
         self,
-        ctx: &'ctx SemanticContext<'db>,
+        env: &'env SemanticEnvironment<'db>,
         settings: DisplaySettings<'db>,
-    ) -> DisplayKnownInstanceRepr<'ctx, 'db> {
+    ) -> DisplayKnownInstanceRepr<'env, 'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
-            ctx,
+            env,
             settings,
         }
     }
@@ -3274,7 +3277,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                     .write_str("typing.Protocol")?;
-                generic_context.display(self.ctx.db()).fmt_detailed(f)?;
+                generic_context.display(self.env.db()).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
@@ -3282,17 +3285,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Generic))
                     .write_str("typing.Generic")?;
-                generic_context.display(self.ctx.db()).fmt_detailed(f)?;
+                generic_context.display(self.env.db()).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {
-                if let Some(specialization) = alias.specialization(self.ctx.db()) {
+                if let Some(specialization) = alias.specialization(self.env.db()) {
                     f.set_invalid_type_annotation();
                     f.write_str("<type alias '")?;
-                    f.with_type(ty).write_str(alias.name(self.ctx.db()))?;
+                    f.with_type(ty).write_str(alias.name(self.env.db()))?;
                     specialization
                         .display_short(
-                            self.ctx,
+                            self.env,
                             TupleSpecialization::No,
                             DisplaySettings::default(),
                         )
@@ -3306,9 +3309,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(typevar_instance) => {
-                if typevar_instance.kind(self.ctx.db()).is_paramspec() {
+                if typevar_instance.kind(self.env.db()).is_paramspec() {
                     f.with_type(ty).write_str("ParamSpec")
-                } else if typevar_instance.kind(self.ctx.db()).is_typevartuple() {
+                } else if typevar_instance.kind(self.env.db()).is_typevartuple() {
                     f.with_type(ty).write_str("TypeVarTuple")
                 } else {
                     f.with_type(ty).write_str("TypeVar")
@@ -3319,13 +3322,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(ty).write_str("dataclasses.Field")?;
 
                 let field_type = field
-                    .converter(self.ctx.db())
+                    .converter(self.env.db())
                     .map(|(_, converter_output)| converter_output)
-                    .or(field.default_type(self.ctx.db()));
+                    .or(field.default_type(self.env.db()));
 
                 if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(field_ty), "{}", field_ty.display(self.ctx))?;
+                    write!(f.with_type(field_ty), "{}", field_ty.display(self.env))?;
                     f.write_char(']')?;
                 }
                 Ok(())
@@ -3333,12 +3336,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::ConstraintSet(interned_set) => {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
-                let set = constraints.load(self.ctx, interned_set.constraints(self.ctx.db()));
-                if interned_set.detailed_display(self.ctx.db()) {
-                    write!(f, "[{}]", set.display(self.ctx))
-                } else if set.is_always_satisfied(self.ctx) {
+                let set = constraints.load(self.env, interned_set.constraints(self.env.db()));
+                if interned_set.detailed_display(self.env.db()) {
+                    write!(f, "[{}]", set.display(self.env))
+                } else if set.is_always_satisfied(self.env) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(self.ctx) {
+                } else if set.is_never_satisfied(self.env) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")
@@ -3347,14 +3350,14 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::ConstraintSetSolution(solution) => {
                 f.set_invalid_type_annotation();
                 f.with_type(ty).write_str("Solution[")?;
-                for (index, binding) in solution.bindings(self.ctx.db()).iter().enumerate() {
+                for (index, binding) in solution.bindings(self.env.db()).iter().enumerate() {
                     if index > 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{}=", binding.bound_typevar.name(self.ctx.db()))?;
+                    write!(f, "{}=", binding.bound_typevar.name(self.env.db()))?;
                     binding
                         .solution
-                        .display_with(self.ctx, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                 }
                 f.write_char(']')
@@ -3362,23 +3365,23 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty)
                     .write_str("ty_extensions._internal.GenericContext")?;
-                write!(f, "{}", generic_context.display_full(self.ctx.db()))
+                write!(f, "{}", generic_context.display_full(self.env.db()))
             }
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
                 f.with_type(ty)
                     .write_str("ty_extensions._internal.Specialization")?;
-                write!(f, "{}", specialization.display_full(self.ctx))
+                write!(f, "{}", specialization.display_full(self.env))
             }
             KnownInstanceType::UnionType(union) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::UnionType.to_class_literal(self.ctx))
+                f.with_type(KnownClass::UnionType.to_class_literal(self.env))
                     .write_str("types.UnionType")?;
                 f.write_str(" special-form")?;
-                if let Ok(ty) = union.union_type(self.ctx.db()) {
+                if let Ok(ty) = union.union_type(self.env.db()) {
                     f.write_str(" '")?;
-                    ty.display(self.ctx).fmt_detailed(f)?;
+                    ty.display(self.env).fmt_detailed(f)?;
                     f.write_char('\'')?;
                 }
                 f.write_char('>')
@@ -3387,8 +3390,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
                 inner
-                    .inner(self.ctx.db())
-                    .display(self.ctx)
+                    .inner(self.env.db())
+                    .display(self.env)
                     .fmt_detailed(f)?;
                 f.write_str("'>")
             }
@@ -3399,8 +3402,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                     .write_str("typing.Annotated")?;
                 f.write_char('[')?;
                 inner
-                    .inner(self.ctx.db())
-                    .display(self.ctx)
+                    .inner(self.env.db())
+                    .display(self.env)
                     .fmt_detailed(f)?;
                 f.write_str(", <metadata>]'>")
             }
@@ -3414,50 +3417,50 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("Callable")?;
                 f.write_str(" special-form '")?;
-                callable.display(self.ctx).fmt_detailed(f)?;
+                callable.display(self.env).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                f.with_type(KnownClass::Type.to_class_literal(self.ctx))
+                f.with_type(KnownClass::Type.to_class_literal(self.env))
                     .write_str("type")?;
                 f.write_char('[')?;
                 inner
-                    .inner(self.ctx.db())
-                    .display(self.ctx)
+                    .inner(self.env.db())
+                    .display(self.env)
                     .fmt_detailed(f)?;
                 f.write_str("]'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f
-                .with_type(KnownClass::Str.to_class_literal(self.ctx))
+                .with_type(KnownClass::Str.to_class_literal(self.env))
                 .write_str("str"),
             KnownInstanceType::NewType(declaration) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::NewType.to_class_literal(self.ctx))
+                f.with_type(KnownClass::NewType.to_class_literal(self.env))
                     .write_str("NewType")?;
                 f.write_str(" pseudo-class '")?;
-                f.with_type(ty).write_str(declaration.name(self.ctx.db()))?;
+                f.with_type(ty).write_str(declaration.name(self.env.db()))?;
                 f.write_str("'>")
             }
             KnownInstanceType::Sentinel(sentinel) => f
                 .with_type(ty)
-                .write_str(sentinel.name(self.ctx.db()).as_str()),
+                .write_str(sentinel.name(self.env.db()).as_str()),
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
             KnownInstanceType::FunctoolsPartial(partial) => {
                 f.write_str("partial[")?;
-                Type::Callable(partial.partial(self.ctx.db()))
-                    .display_with(self.ctx, DisplaySettings::default().singleline())
+                Type::Callable(partial.partial(self.env.db()))
+                    .display_with(self.env, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
             KnownInstanceType::Range { .. } => f
-                .with_type(KnownClass::Range.to_class_literal(self.ctx))
+                .with_type(KnownClass::Range.to_class_literal(self.env))
                 .write_str("range"),
             KnownInstanceType::FunctoolsPartialCall(partial) => {
-                Type::Callable(partial.partial(self.ctx.db()))
-                    .display_with(self.ctx, DisplaySettings::default().singleline())
+                Type::Callable(partial.partial(self.env.db()))
+                    .display_with(self.env, DisplaySettings::default().singleline())
                     .fmt_detailed(f)
             }
         }
@@ -3478,19 +3481,19 @@ mod tests {
 
         assert_eq!(
             Type::string_literal(&db, r"\n")
-                .display(&db.semantic_context())
+                .display(&db.semantic_environment())
                 .to_string(),
             r#"Literal["\\n"]"#
         );
         assert_eq!(
             Type::string_literal(&db, "'")
-                .display(&db.semantic_context())
+                .display(&db.semantic_environment())
                 .to_string(),
             r#"Literal["'"]"#
         );
         assert_eq!(
             Type::string_literal(&db, r#"""#)
-                .display(&db.semantic_context())
+                .display(&db.semantic_environment())
                 .to_string(),
             r#"Literal["\""]"#
         );
@@ -3502,10 +3505,10 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::from_annotation(&db.semantic_context(), parameters),
+            Parameters::from_annotation(&db.semantic_environment(), parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
-        .display(&db.semantic_context())
+        .display(&db.semantic_environment())
         .to_string()
     }
 
@@ -3515,11 +3518,11 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::from_annotation(&db.semantic_context(), parameters),
+            Parameters::from_annotation(&db.semantic_environment(), parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(
-            &db.semantic_context(),
+            &db.semantic_environment(),
             super::DisplaySettings::default().multiline(),
         )
         .to_string()
@@ -3528,14 +3531,14 @@ mod tests {
     #[test]
     fn signature_display() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
 
         // Empty parameters with no return type.
         assert_snapshot!(display_signature(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
         assert_snapshot!(
-            display_signature(&db, [], Some(Type::none(&ctx))),
+            display_signature(&db, [], Some(Type::none(&env))),
             @"() -> None"
         );
 
@@ -3543,8 +3546,8 @@ mod tests {
         assert_snapshot!(
             display_signature(
                 &db,
-                [Parameter::positional_only(None).with_annotated_type(Type::none(&ctx))],
-                Some(Type::none(&ctx))
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&env))],
+                Some(Type::none(&env))
             ),
             @"(None, /) -> None"
         );
@@ -3555,12 +3558,12 @@ mod tests {
                 &db,
                 [
                     Parameter::positional_or_keyword(Name::new_static("x"))
-                        .with_default_type(KnownClass::Int.to_instance(&ctx)),
+                        .with_default_type(KnownClass::Int.to_instance(&env)),
                     Parameter::positional_or_keyword(Name::new_static("y"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&ctx))
-                        .with_default_type(KnownClass::Str.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&env))
+                        .with_default_type(KnownClass::Str.to_instance(&env)),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(x=..., y: str = ...) -> None"
         );
@@ -3573,7 +3576,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(x, y, /) -> None"
         );
@@ -3586,7 +3589,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(x, /, y) -> None"
         );
@@ -3599,7 +3602,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(*, x, y) -> None"
         );
@@ -3612,7 +3615,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(x, *, y) -> None"
         );
@@ -3626,7 +3629,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"(a, /, *, x, y) -> None"
         );
@@ -3638,28 +3641,28 @@ mod tests {
                 [
                     Parameter::positional_only(Some(Name::new_static("a"))),
                     Parameter::positional_only(Some(Name::new_static("b")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Int.to_instance(&env)),
                     Parameter::positional_only(Some(Name::new_static("c")))
                         .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
                         .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&env)),
                 ],
-                Some(KnownClass::Bytes.to_instance(&ctx))
+                Some(KnownClass::Bytes.to_instance(&env))
             ),
             @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, *, g=5, h: int = 6, **kwargs: str) -> bytes"
         );
@@ -3668,14 +3671,14 @@ mod tests {
     #[test]
     fn signature_display_multiline() {
         let db = setup_db();
-        let ctx = db.semantic_context();
+        let env = db.semantic_environment();
 
         // Empty parameters with no return type.
         assert_snapshot!(display_signature_multiline(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
         assert_snapshot!(
-            display_signature_multiline(&db, [], Some(Type::none(&ctx))),
+            display_signature_multiline(&db, [], Some(Type::none(&env))),
             @"() -> None"
         );
 
@@ -3683,8 +3686,8 @@ mod tests {
         assert_snapshot!(
             display_signature_multiline(
                 &db,
-                [Parameter::positional_only(None).with_annotated_type(Type::none(&ctx))],
-                Some(Type::none(&ctx))
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&env))],
+                Some(Type::none(&env))
             ),
             @"(None, /) -> None"
         );
@@ -3695,12 +3698,12 @@ mod tests {
                 &db,
                 [
                     Parameter::positional_or_keyword(Name::new_static("x"))
-                        .with_default_type(KnownClass::Int.to_instance(&ctx)),
+                        .with_default_type(KnownClass::Int.to_instance(&env)),
                     Parameter::positional_or_keyword(Name::new_static("y"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&ctx))
-                        .with_default_type(KnownClass::Str.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&env))
+                        .with_default_type(KnownClass::Str.to_instance(&env)),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"
         (
@@ -3718,7 +3721,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"
         (
@@ -3737,7 +3740,7 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("x"))),
                     Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"
         (
@@ -3756,7 +3759,7 @@ mod tests {
                     Parameter::keyword_only(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"
         (
@@ -3775,7 +3778,7 @@ mod tests {
                     Parameter::positional_or_keyword(Name::new_static("x")),
                     Parameter::keyword_only(Name::new_static("y")),
                 ],
-                Some(Type::none(&ctx))
+                Some(Type::none(&env))
             ),
             @"
         (
@@ -3793,28 +3796,28 @@ mod tests {
                 [
                     Parameter::positional_only(Some(Name::new_static("a"))),
                     Parameter::positional_only(Some(Name::new_static("b")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Int.to_instance(&env)),
                     Parameter::positional_only(Some(Name::new_static("c")))
                         .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
                         .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
-                        .with_annotated_type(KnownClass::Int.to_instance(&ctx))
+                        .with_annotated_type(KnownClass::Int.to_instance(&env))
                         .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
-                        .with_annotated_type(KnownClass::Str.to_instance(&ctx)),
+                        .with_annotated_type(KnownClass::Str.to_instance(&env)),
                 ],
-                Some(KnownClass::Bytes.to_instance(&ctx))
+                Some(KnownClass::Bytes.to_instance(&env))
             ),
             @"
         (

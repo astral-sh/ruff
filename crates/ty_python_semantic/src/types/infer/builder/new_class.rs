@@ -27,7 +27,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let db = self.db();
 
         let ast::Arguments {
@@ -75,7 +75,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal.value(db)
         } else {
             if let Some(name_node) = name_node
-                && !name_type.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
+                && !name_type.is_assignable_to(env, KnownClass::Str.to_instance(env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
             {
                 let mut diagnostic = builder.into_diagnostic(
@@ -83,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
                 diagnostic.set_primary_message(format_args!(
                     "Expected `str`, found `{}`",
-                    name_type.display(ctx)
+                    name_type.display(env)
                 ));
             }
             "<unknown>"
@@ -166,7 +166,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
 
                 // MRO succeeded, check for instance-layout-conflict.
-                disjoint_bases.remove_redundant_entries(ctx);
+                disjoint_bases.remove_redundant_entries(env);
                 if disjoint_bases.len() > 1 {
                     report_instance_layout_conflict(
                         &self.context,
@@ -183,16 +183,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base1,
                 metaclass2,
                 base2,
-            }) = dynamic_class.try_metaclass(ctx)
+            }) = dynamic_class.try_metaclass(env)
             {
                 report_conflicting_metaclass_from_bases(
                     &self.context,
                     call_expr.into(),
                     dynamic_class.name(db),
                     metaclass1,
-                    base1.display(ctx),
+                    base1.display(env),
                     metaclass2,
-                    base2.display(ctx),
+                    base2.display(env),
                 );
             }
         }
@@ -217,7 +217,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Get the already-inferred class type from the initial pass.
         let inferred_type =
-            definition_expression_type(self.semantic_context(), definition, call_expr);
+            definition_expression_type(self.semantic_environment(), definition, call_expr);
         let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
             return;
         };
@@ -257,21 +257,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         bases_arg: Option<&ast::Expr>,
         definition: Option<Definition<'db>>,
     ) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let callable_type = self.expression_type(call_expr.func.as_ref());
-        let iterable_object = KnownClass::Iterable.to_specialized_instance(ctx, &[Type::object()]);
+        let iterable_object = KnownClass::Iterable.to_specialized_instance(env, &[Type::object()]);
         let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
 
         let mut bindings = callable_type
-            .bindings(ctx)
-            .match_parameters(ctx, &call_arguments);
+            .bindings(env)
+            .match_parameters(env, &call_arguments);
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(&call_expr.arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
                 if name_node.is_some_and(|name| std::ptr::eq(expr, name)) {
                     let _ = builder.infer_expression(expr, tcx);
-                    KnownClass::Str.to_instance(ctx)
+                    KnownClass::Str.to_instance(env)
                 } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {
                     if definition.is_none() {
                         let _ = builder.infer_expression(expr, tcx);

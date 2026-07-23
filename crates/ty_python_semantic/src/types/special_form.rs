@@ -2,7 +2,7 @@
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
 use super::{ClassType, Type, TypeFormType, class::KnownClass};
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
@@ -231,14 +231,17 @@ impl SpecialFormType {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `SpecialFormType::Literal.instance_fallback(db, python_version)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.class().to_instance(ctx)
+    pub(super) fn instance_fallback<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.class().to_instance(env)
     }
 
     /// Return the type denoted by this retained special-form value when it is valid without
     /// parameters or a surrounding inference scope.
-    pub(crate) fn type_form_argument<'db>(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
-        let db = ctx.db();
+    pub(crate) fn type_form_argument<'db>(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let db = env.db();
         match self {
             Self::Never | Self::NoReturn => Some(Type::Never),
             Self::LiteralString => Some(Type::literal_string()),
@@ -247,24 +250,24 @@ impl SpecialFormType {
             Self::AlwaysTruthy => Some(Type::AlwaysTruthy),
             Self::AlwaysFalsy => Some(Type::AlwaysFalsy),
             Self::NamedTuple => Some(IntersectionType::from_two_elements(
-                ctx,
+                env,
                 Type::homogeneous_tuple(db, Type::object()),
-                KnownClass::NamedTupleLike.to_instance(ctx),
+                KnownClass::NamedTupleLike.to_instance(env),
             )),
-            Self::Type => Some(KnownClass::Type.to_instance(ctx)),
+            Self::Type => Some(KnownClass::Type.to_instance(env)),
             Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
             Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
             Self::TypingCallable | Self::CollectionsAbcCallable => {
                 Some(Type::Callable(CallableType::unknown(db)))
             }
-            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(ctx)),
+            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(env)),
             _ => None,
         }
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, ctx: &SemanticContext<'_>, class: ClassType) -> bool {
-        self.class().is_subclass_of(ctx, class)
+    pub(super) fn is_instance_of(self, env: &SemanticEnvironment<'_>, class: ClassType) -> bool {
+        self.class().is_subclass_of(env, class)
     }
 
     pub(super) fn try_from_file_and_name(
@@ -572,8 +575,8 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn to_meta_type<'db>(self, ctx: &SemanticContext<'db>) -> Type<'db> {
-        self.class().to_class_literal(ctx)
+    pub(super) fn to_meta_type<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.class().to_class_literal(env)
     }
 
     /// Return true if this special form is callable at runtime.
@@ -792,12 +795,15 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn definition<'db>(self, ctx: &SemanticContext<'db>) -> Option<TypeDefinition<'db>> {
-        let db = ctx.db();
+    pub(super) fn definition<'db>(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<TypeDefinition<'db>> {
+        let db = env.db();
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module_confident(db, ctx.python_version(), &module.name())?
+                let file = resolve_module_confident(db, env.python_version(), &module.name())?
                     .python_file(db)?;
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
@@ -817,12 +823,12 @@ impl SpecialFormType {
     /// `Tuple`, `Type`, or `Callable` (those are handled by their respective call sites).
     pub(super) fn in_type_expression<'db>(
         self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
-        let db = ctx.db();
+        let db = env.db();
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),
@@ -842,9 +848,9 @@ impl SpecialFormType {
             // other type checkers such as mypy.
             // See conversation in https://github.com/astral-sh/ruff/pull/19915.
             Self::NamedTuple => Ok(IntersectionType::from_two_elements(
-                ctx,
+                env,
                 Type::homogeneous_tuple(db, Type::object()),
-                KnownClass::NamedTupleLike.to_instance(ctx),
+                KnownClass::NamedTupleLike.to_instance(env),
             )),
 
             Self::TypingSelf => {
@@ -861,7 +867,7 @@ impl SpecialFormType {
                     ));
                 };
 
-                let typing_self = typing_self(ctx, scope_id, typevar_binding_context, class.into());
+                let typing_self = typing_self(env, scope_id, typevar_binding_context, class.into());
 
                 let in_staticmethod = typing_self.is_some_and(|typing_self| {
                     let Some(binding_definition) = typing_self.binding_context(db).definition()
@@ -874,7 +880,7 @@ impl SpecialFormType {
                     }
 
                     binding_definition.name(db).as_deref() != Some("__new__")
-                        && function_known_decorator_flags(ctx, binding_definition)
+                        && function_known_decorator_flags(env, binding_definition)
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
@@ -882,12 +888,12 @@ impl SpecialFormType {
                 }
 
                 let is_in_metaclass = KnownClass::Type
-                    .to_class_literal(ctx)
-                    .to_class_type(ctx)
+                    .to_class_literal(env)
+                    .to_class_type(env)
                     .is_some_and(|type_class| {
                         class
-                            .default_specialization(ctx)
-                            .is_subclass_of(ctx, type_class)
+                            .default_specialization(env)
+                            .is_subclass_of(env, type_class)
                     });
                 if is_in_metaclass {
                     return Err(InvalidTypeExpression::TypingSelfInMetaclass);
@@ -933,13 +939,13 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
-            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(ctx)),
+            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(env)),
             SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
             SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
             SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                 Ok(Type::Callable(CallableType::unknown(db)))
             }
-            SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(ctx)),
+            SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(env)),
             SpecialFormType::TypeQualifier(qualifier) => {
                 Err(InvalidTypeExpression::TypeQualifier(qualifier))
             }

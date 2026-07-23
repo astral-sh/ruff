@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
@@ -67,28 +67,28 @@ struct ExpectedReturnType<'db> {
 impl<'db> ExpectedReturnType<'db> {
     /// Creates the expected return type policy for `function_node`.
     fn from_function(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         function: FunctionType<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
-        fn normalize<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> Type<'db> {
+        fn normalize<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Type<'db> {
             match ty {
-                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(ctx),
+                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(env),
                 ty => ty,
             }
         }
 
         let public = normalize(
-            ctx,
-            same_module_uncached_raw_signature(ctx, function, ReturnCallableTypeVarScope::Public)
+            env,
+            same_module_uncached_raw_signature(env, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
         let lexical = function_node.type_params.is_some().then(|| {
             normalize(
-                ctx,
+                env,
                 same_module_uncached_raw_signature(
-                    ctx,
+                    env,
                     function,
                     ReturnCallableTypeVarScope::Lexical,
                 )
@@ -106,31 +106,31 @@ impl<'db> ExpectedReturnType<'db> {
 
     /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
     /// type.
-    fn accepts(self, ctx: &SemanticContext<'db>, ty: Type<'db>) -> bool {
-        ty.is_assignable_to(ctx, self.public)
+    fn accepts(self, env: &SemanticEnvironment<'db>, ty: Type<'db>) -> bool {
+        ty.is_assignable_to(env, self.public)
             || self
                 .lexical
-                .is_some_and(|lexical| ty.is_assignable_to(ctx, lexical))
+                .is_some_and(|lexical| ty.is_assignable_to(env, lexical))
     }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             use_def: &UseDefMap<'db>,
         ) -> bool {
             !use_def
                 .reachability_constraints()
                 .evaluate(
-                    ctx,
+                    env,
                     use_def.predicates(),
                     use_def.end_of_scope_reachability(),
                 )
                 .is_always_false()
         }
 
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let db = self.db();
 
         // Parameters are odd: they are Definitions in the function body scope, but have no
@@ -149,7 +149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
-                && function_body_kind(ctx, function, |expr| self.expression_type(expr))
+                && function_body_kind(env, function, |expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
 
             let mut enclosing_class_context = None;
@@ -166,7 +166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 if let Some(class) = self.class_context_of_current_method() {
                     enclosing_class_context = Some(class);
-                    if class.is_protocol(ctx) {
+                    if class.is_protocol(env) {
                         return;
                     }
                 }
@@ -175,13 +175,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
             let declared_ty = same_module_uncached_raw_signature(
-                ctx,
+                env,
                 enclosing_function,
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
             let expected_return =
-                ExpectedReturnType::from_function(ctx, enclosing_function, function);
+                ExpectedReturnType::from_function(env, enclosing_function, function);
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
@@ -200,8 +200,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::GeneratorType
                 };
                 if !inferred_return
-                    .to_instance_unknown(ctx)
-                    .is_assignable_to(ctx, expected_ty)
+                    .to_instance_unknown(env)
+                    .is_assignable_to(env, expected_ty)
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
@@ -211,7 +211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                if let Some(expected_return_ty) = declared_ty.generator_return_type(ctx) {
+                if let Some(expected_return_ty) = declared_ty.generator_return_type(env) {
                     for invalid in
                         self.return_types_and_ranges
                             .iter()
@@ -219,7 +219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .filter(|actual_return_ty| {
                                 !actual_return_ty
                                     .ty
-                                    .is_assignable_to(ctx, expected_return_ty)
+                                    .is_assignable_to(env, expected_return_ty)
                             })
                     {
                         report_invalid_return_type(
@@ -233,8 +233,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let use_def = self.index.use_def_map(scope_id);
 
-                    if can_implicitly_return_none(ctx, use_def)
-                        && !Type::none(ctx).is_assignable_to(ctx, expected_return_ty)
+                    if can_implicitly_return_none(env, use_def)
+                        && !Type::none(env).is_assignable_to(env, expected_return_ty)
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
                         report_implicit_return_type(
@@ -265,7 +265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(db) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !expected_return.accepts(ctx, ty_range.ty))
+                .filter(|ty_range| !expected_return.accepts(env, ty_range.ty))
             {
                 report_invalid_return_type(
                     &self.context,
@@ -276,8 +276,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             let use_def = self.index.use_def_map(scope_id);
-            if can_implicitly_return_none(ctx, use_def)
-                && !Type::none(ctx).is_assignable_to(ctx, expected_ty)
+            if can_implicitly_return_none(env, use_def)
+                && !Type::none(env).is_assignable_to(env, expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
@@ -316,7 +316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let decorator_inference = (!decorator_list.is_empty())
-            .then(|| function_known_decorators(self.semantic_context(), definition));
+            .then(|| function_known_decorators(self.semantic_environment(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
             self.context.extend(decorator_inference.diagnostics());
             self.expressions
@@ -438,7 +438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral::new(self.semantic_context(), overload_literal);
+        let function_literal = FunctionLiteral::new(self.semantic_environment(), overload_literal);
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {
@@ -451,9 +451,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope = self.scope().file_scope_id(db);
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
-                for enclosing in
-                    enclosing_generic_contexts(self.semantic_context(), self.index, current_scope)
-                {
+                for enclosing in enclosing_generic_contexts(
+                    self.semantic_environment(),
+                    self.index,
+                    current_scope,
+                ) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
                         let kind = match type_param {
                             ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
@@ -575,7 +577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
                     .to_scope_id(db, self.python_file());
                 let type_params_inference = infer_scope_types(
-                    self.semantic_context(),
+                    self.semantic_environment(),
                     type_params_scope,
                     TypeContext::default(),
                 );
@@ -680,7 +682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let Some(kwargs) = parameters.kwarg.as_ref() else {
             return;
         };
@@ -694,7 +696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let annotated_type = self.file_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-            ctx,
+            env,
             annotated_type,
             annotation_flags,
         ) else {
@@ -703,7 +705,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let diag = builder.into_diagnostic(format_args!(
                     "Unpacked value for `**kwargs` must be a TypedDict, not `{}`",
-                    annotated_type.display(ctx)
+                    annotated_type.display(env)
                 ));
                 add_type_expression_reference_link(diag);
             }
@@ -816,7 +818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter_with_default: &'ast ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let ast::ParameterWithDefault {
             parameter,
             default,
@@ -857,15 +859,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
                 let suppress_invalid_default =
-                    is_invalid_typed_dict_literal(ctx, declared_ty, default_expr.into());
-                if !default_ty.is_assignable_to(ctx, declared_ty)
+                    is_invalid_typed_dict_literal(env, declared_ty, default_expr.into());
+                if !default_ty.is_assignable_to(env, declared_ty)
                     && !suppress_invalid_default
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
                         || self.is_in_type_checking_block(self.scope(), default_expr)
                         || self
                             .class_context_of_current_method()
-                            .is_some_and(|class| class.is_protocol(ctx)))
+                            .is_some_and(|class| class.is_protocol(env)))
                         && default
                             .as_ref()
                             .is_some_and(|d| d.is_ellipsis_literal_expr()))
@@ -877,8 +879,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         builder.into_diagnostic(format_args!(
                             "Default value of type `{}` is not assignable \
                              to annotated parameter type `{}`",
-                            default_ty.display(ctx),
-                            declared_ty.display(ctx)
+                            default_ty.display(env),
+                            declared_ty.display(env)
                         ));
                     }
                 }
@@ -892,7 +894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
-                UnionType::from_two_elements(ctx, Type::unknown(), default_ty)
+                UnionType::from_two_elements(env, Type::unknown(), default_ty)
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
             } else {
@@ -930,7 +932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::tuple(TupleType::new(
                         db,
                         &TupleSpecBuilder::with_capacity(0)
-                            .concat_variadic_typevar(self.semantic_context(), typevar)
+                            .concat_variadic_typevar(self.semantic_environment(), typevar)
                             .build(),
                     ))
                 }
@@ -986,7 +988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         parameter: &ast::Parameter,
     ) -> Option<Type<'db>> {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let db = self.db();
         let file = self.python_file();
 
@@ -1024,7 +1026,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_name = &function_node.name;
 
         let mut is_classmethod = is_implicit_classmethod(function_name);
-        let inference = infer_definition_types(self.semantic_context(), method_definition);
+        let inference = infer_definition_types(self.semantic_environment(), method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
             if let Some(known_class) = decorator_ty
@@ -1041,10 +1043,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
-        let typing_self = typing_self(ctx, self.scope(), Some(method_definition), class_literal);
+        let typing_self = typing_self(env, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {
             typing_self
-                .map(|typing_self| SubclassOfType::from(ctx, SubclassOfInner::TypeVar(typing_self)))
+                .map(|typing_self| SubclassOfType::from(env, SubclassOfInner::TypeVar(typing_self)))
         } else {
             typing_self.map(Type::TypeVar)
         }
@@ -1062,7 +1064,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter: &'ast ast::Parameter,
         definition: Definition<'db>,
     ) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
@@ -1085,8 +1087,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             add_type_expression_reference_link(diag);
                         }
                         KnownClass::Dict.to_specialized_instance(
-                            ctx,
-                            &[KnownClass::Str.to_instance(ctx), Type::unknown()],
+                            env,
+                            &[KnownClass::Str.to_instance(env), Type::unknown()],
                         )
                     }
 
@@ -1097,13 +1099,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     None => {
                         // The diagnostic for this case is handled in `in_type_expression`.
                         KnownClass::Dict.to_specialized_instance(
-                            ctx,
-                            &[KnownClass::Str.to_instance(ctx), Type::unknown()],
+                            env,
+                            &[KnownClass::Str.to_instance(env), Type::unknown()],
                         )
                     }
                 }
             } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                ctx,
+                env,
                 annotated_type,
                 self.file_type_expression_flags(annotation),
             )
@@ -1112,8 +1114,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 annotated_type
             } else {
                 KnownClass::Dict.to_specialized_instance(
-                    ctx,
-                    &[KnownClass::Str.to_instance(ctx), annotated_type],
+                    env,
+                    &[KnownClass::Str.to_instance(env), annotated_type],
                 )
             };
             self.add_declaration_with_binding(
@@ -1123,7 +1125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         } else {
             let inferred_ty = KnownClass::Dict
-                .to_specialized_instance(ctx, &[KnownClass::Str.to_instance(ctx), Type::unknown()]);
+                .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), Type::unknown()]);
 
             self.add_binding(parameter.into(), definition)
                 .insert(self, inferred_ty);
@@ -1151,7 +1153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parameter_type
         } else if let Some(default_expr) = default_expr {
             let default_ty = self.file_expression_type(default_expr);
-            UnionType::from_two_elements(self.semantic_context(), Type::unknown(), default_ty)
+            UnionType::from_two_elements(self.semantic_environment(), Type::unknown(), default_ty)
         } else {
             Type::unknown()
         };
@@ -1187,9 +1189,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter: &'ast ast::Parameter,
         definition: Definition<'db>,
     ) {
-        let ctx = self.semantic_context();
+        let env = self.semantic_environment();
         let inferred_ty = KnownClass::Dict
-            .to_specialized_instance(ctx, &[KnownClass::Str.to_instance(ctx), Type::unknown()]);
+            .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), Type::unknown()]);
 
         self.add_binding(parameter.into(), definition)
             .insert(self, inferred_ty);
@@ -1203,7 +1205,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
-            self.semantic_context(),
+            self.semantic_environment(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
@@ -1214,7 +1216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown()
-            || parameter_type.has_unspecialized_type_var(self.semantic_context())
+            || parameter_type.has_unspecialized_type_var(self.semantic_environment())
         {
             None
         } else {

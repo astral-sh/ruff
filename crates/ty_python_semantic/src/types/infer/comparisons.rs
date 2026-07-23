@@ -130,7 +130,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
     // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
     // language spec.
@@ -154,21 +154,21 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
             ast::CmpOp::Is => {
-                if left.is_disjoint_from(ctx, right) {
+                if left.is_disjoint_from(env, right) {
                     Ok(Type::bool_literal(false))
-                } else if left.is_singleton(ctx) && left.is_equivalent_to(ctx, right) {
+                } else if left.is_singleton(env) && left.is_equivalent_to(env, right) {
                     Ok(Type::bool_literal(true))
                 } else {
-                    Ok(KnownClass::Bool.to_instance(ctx))
+                    Ok(KnownClass::Bool.to_instance(env))
                 }
             }
             ast::CmpOp::IsNot => {
-                if left.is_disjoint_from(ctx, right) {
+                if left.is_disjoint_from(env, right) {
                     Ok(Type::bool_literal(true))
-                } else if left.is_singleton(ctx) && left.is_equivalent_to(ctx, right) {
+                } else if left.is_singleton(env) && left.is_equivalent_to(env, right) {
                     Ok(Type::bool_literal(false))
                 } else {
-                    Ok(KnownClass::Bool.to_instance(ctx))
+                    Ok(KnownClass::Bool.to_instance(env))
                 }
             }
         }
@@ -177,18 +177,18 @@ pub(super) fn infer_binary_type_comparison<'db>(
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
     let comparison_truthiness = match op {
-        ast::CmpOp::Eq => equality_truthiness(ctx, left, right, soundness_policy),
-        ast::CmpOp::NotEq => inequality_truthiness(ctx, left, right, soundness_policy),
+        ast::CmpOp::Eq => equality_truthiness(env, left, right, soundness_policy),
+        ast::CmpOp::NotEq => inequality_truthiness(env, left, right, soundness_policy),
         _ => Truthiness::Ambiguous,
     };
     if comparison_truthiness != Truthiness::Ambiguous {
-        return Ok(Type::from_truthiness(ctx, comparison_truthiness));
+        return Ok(Type::from_truthiness(env, comparison_truthiness));
     }
 
     let comparison_result = match (left, right) {
         (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
             context,
-            complement.remaining_literal_union(ctx),
+            complement.remaining_literal_union(env),
             op,
             right,
             range,
@@ -198,13 +198,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
             context,
             left,
             op,
-            complement.remaining_literal_union(ctx),
+            complement.remaining_literal_union(env),
             range,
             visitor,
         )),
 
         (Type::Union(union), other) => {
-            let mut builder = UnionBuilder::new(ctx);
+            let mut builder = UnionBuilder::new(env);
             for element in union.elements(db) {
                 builder = builder.add(infer_binary_type_comparison(
                     context, *element, op, other, range, visitor,
@@ -213,7 +213,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Some(Ok(builder.build()))
         }
         (other, Type::Union(union)) => {
-            let mut builder = UnionBuilder::new(ctx);
+            let mut builder = UnionBuilder::new(env);
             for element in union.elements(db) {
                 builder = builder.add(infer_binary_type_comparison(
                     context, other, op, *element, range, visitor,
@@ -231,7 +231,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         {
             Some(infer_binary_type_comparison(
                 context,
-                intersection.with_expanded_typevars_and_newtypes(ctx),
+                intersection.with_expanded_typevars_and_newtypes(env),
                 op,
                 right,
                 range,
@@ -249,7 +249,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 context,
                 left,
                 op,
-                intersection.with_expanded_typevars_and_newtypes(ctx),
+                intersection.with_expanded_typevars_and_newtypes(env),
                 range,
                 visitor,
             ))
@@ -288,10 +288,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }),
         ),
 
-        (Type::TypeAlias(alias), right) => Some(visitor.visit(ctx, (left, op, right), || {
+        (Type::TypeAlias(alias), right) => Some(visitor.visit(env, (left, op, right), || {
             infer_binary_type_comparison(
                 context,
-                alias.value_type(context.semantic_context()),
+                alias.value_type(context.semantic_environment()),
                 op,
                 right,
                 range,
@@ -299,12 +299,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
             )
         })),
 
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit(ctx, (left, op, right), || {
+        (left, Type::TypeAlias(alias)) => Some(visitor.visit(env, (left, op, right), || {
             infer_binary_type_comparison(
                 context,
                 left,
                 op,
-                alias.value_type(context.semantic_context()),
+                alias.value_type(context.semantic_environment()),
                 range,
                 visitor,
             )
@@ -318,10 +318,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // type, so that it hits the `Type::Union` branches above.
         (Type::NewTypeInstance(newtype), right) => {
             Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                visitor.visit(ctx, (left, op, right), || {
+                visitor.visit(env, (left, op, right), || {
                     infer_binary_type_comparison(
                         context,
-                        newtype.concrete_base_type(ctx),
+                        newtype.concrete_base_type(env),
                         op,
                         right,
                         range,
@@ -332,12 +332,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
         (left, Type::NewTypeInstance(newtype)) => {
             Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                visitor.visit(ctx, (left, op, right), || {
+                visitor.visit(env, (left, op, right), || {
                     infer_binary_type_comparison(
                         context,
                         left,
                         op,
-                        newtype.concrete_base_type(ctx),
+                        newtype.concrete_base_type(env),
                         range,
                         visitor,
                     )
@@ -353,17 +353,17 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
             if left_tvar.identity(db) == right_tvar.identity(db) =>
         {
-            match left_tvar.typevar(db).bound_or_constraints(ctx) {
+            match left_tvar.typevar(db).bound_or_constraints(env) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit(ctx, (left, op, right), || {
+                        visitor.visit(env, (left, op, right), || {
                             infer_binary_type_comparison(context, bound, op, bound, range, visitor)
                         })
                     }))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     // For constrained TypeVars, check each constraint paired with itself.
-                    let mut builder = UnionBuilder::new(ctx);
+                    let mut builder = UnionBuilder::new(env);
                     for &constraint in constraints.elements(db) {
                         builder = builder.add(infer_binary_type_comparison(
                             context, constraint, op, constraint, range, visitor,
@@ -377,16 +377,16 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // When the left operand is a bounded TypeVar and the right is not a TypeVar,
         // delegate to the bound type.
         (Type::TypeVar(left_tvar), right) if !right.is_type_var() => {
-            match left_tvar.typevar(db).bound_or_constraints(ctx) {
+            match left_tvar.typevar(db).bound_or_constraints(env) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit(ctx, (left, op, right), || {
+                        visitor.visit(env, (left, op, right), || {
                             infer_binary_type_comparison(context, bound, op, right, range, visitor)
                         })
                     }))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let mut builder = UnionBuilder::new(ctx);
+                    let mut builder = UnionBuilder::new(env);
                     for &constraint in constraints.elements(db) {
                         builder = builder.add(infer_binary_type_comparison(
                             context, constraint, op, right, range, visitor,
@@ -400,16 +400,16 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // When the right operand is a bounded TypeVar and the left is not a TypeVar,
         // delegate to the bound type.
         (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
-            match right_tvar.typevar(db).bound_or_constraints(ctx) {
+            match right_tvar.typevar(db).bound_or_constraints(env) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Some(try_dunder(MemberLookupPolicy::default()).or_else(|_| {
-                        visitor.visit(ctx, (left, op, right), || {
+                        visitor.visit(env, (left, op, right), || {
                             infer_binary_type_comparison(context, left, op, bound, range, visitor)
                         })
                     }))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let mut builder = UnionBuilder::new(ctx);
+                    let mut builder = UnionBuilder::new(env);
                     for &constraint in constraints.elements(db) {
                         builder = builder.add(infer_binary_type_comparison(
                             context, left, op, constraint, range, visitor,
@@ -435,14 +435,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         // Even if they are the same value, they may not be the same object.
                         ast::CmpOp::Is => {
                             if n == m {
-                                Ok(KnownClass::Bool.to_instance(ctx))
+                                Ok(KnownClass::Bool.to_instance(env))
                             } else {
                                 Ok(Type::bool_literal(false))
                             }
                         }
                         ast::CmpOp::IsNot => {
                             if n == m {
-                                Ok(KnownClass::Bool.to_instance(ctx))
+                                Ok(KnownClass::Bool.to_instance(env))
                             } else {
                                 Ok(Type::bool_literal(true))
                             }
@@ -519,14 +519,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
                         ast::CmpOp::Is => {
                             if s1 == s2 {
-                                KnownClass::Bool.to_instance(ctx)
+                                KnownClass::Bool.to_instance(env)
                             } else {
                                 Type::bool_literal(false)
                             }
                         }
                         ast::CmpOp::IsNot => {
                             if s1 == s2 {
-                                KnownClass::Bool.to_instance(ctx)
+                                KnownClass::Bool.to_instance(env)
                             } else {
                                 Type::bool_literal(true)
                             }
@@ -553,14 +553,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         }
                         ast::CmpOp::Is => {
                             if b1 == b2 {
-                                KnownClass::Bool.to_instance(ctx)
+                                KnownClass::Bool.to_instance(env)
                             } else {
                                 Type::bool_literal(false)
                             }
                         }
                         ast::CmpOp::IsNot => {
                             if b1 == b2 {
-                                KnownClass::Bool.to_instance(ctx)
+                                KnownClass::Bool.to_instance(env)
                             } else {
                                 Type::bool_literal(true)
                             }
@@ -606,10 +606,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
         ) => {
             let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(ctx, left.constraints(db));
-            let right = constraints.load(ctx, right.constraints(db));
+            let left = constraints.load(env, left.constraints(db));
+            let right = constraints.load(env, right.constraints(db));
             let result = left.iff(db, &constraints, right);
-            let equivalent = result.is_always_satisfied(ctx);
+            let equivalent = result.is_always_satisfied(env);
             match op {
                 ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),
                 ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(!equivalent))),
@@ -618,11 +618,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
 
         (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2))
-            if let Some(lhs_tuple) = nominal1.tuple_spec(ctx)
-                && let Some(rhs_tuple) = nominal2.tuple_spec(ctx) =>
+            if let Some(lhs_tuple) = nominal1.tuple_spec(env)
+                && let Some(rhs_tuple) = nominal2.tuple_spec(env) =>
         {
             let tuple_rich_comparison = |rich_op| {
-                visitor.visit(ctx, (left, op, right), || {
+                visitor.visit(env, (left, op, right), || {
                     infer_tuple_rich_comparison(
                         context, &lhs_tuple, rich_op, &rhs_tuple, range, visitor,
                     )
@@ -658,7 +658,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                             // It's okay to ignore errors here because Python doesn't call `__bool__`
                             // for different union variants. Instead, this is just for us to
                             // evaluate a possibly truthy value to `false` or `true`.
-                            ty => match ty.bool(ctx) {
+                            ty => match ty.bool(env) {
                                 Truthiness::AlwaysTrue => any_eq = true,
                                 Truthiness::AlwaysFalse => (),
                                 Truthiness::Ambiguous => any_ambiguous = true,
@@ -671,7 +671,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     } else if !any_ambiguous {
                         Ok(Type::bool_literal(op.is_not_in()))
                     } else {
-                        Ok(KnownClass::Bool.to_instance(ctx))
+                        Ok(KnownClass::Bool.to_instance(env))
                     }
                 }
                 ast::CmpOp::Is | ast::CmpOp::IsNot => {
@@ -686,9 +686,9 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         // It's okay to ignore errors here because Python doesn't call `__bool__`
                         // for `is` and `is not` comparisons. This is an implementation detail
                         // for how we determine the truthiness of a type.
-                        ty => match ty.bool(ctx) {
+                        ty => match ty.bool(env) {
                             Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
-                            _ => KnownClass::Bool.to_instance(ctx),
+                            _ => KnownClass::Bool.to_instance(env),
                         },
                     })
                 }
@@ -728,9 +728,9 @@ fn infer_binary_intersection_type_comparison<'db>(
     }
 
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
 
-    if let Some(alternatives) = intersection.finite_alternative_union(ctx) {
+    if let Some(alternatives) = intersection.finite_alternative_union(env) {
         return match intersection_on {
             IntersectionOn::Left => {
                 infer_binary_type_comparison(context, alternatives, op, other, range, visitor)
@@ -825,9 +825,9 @@ fn infer_binary_intersection_type_comparison<'db>(
     //
     // we would get a result type `Literal[True]` which is too narrow.
     //
-    let mut builder = IntersectionBuilder::new(ctx);
+    let mut builder = IntersectionBuilder::new(env);
 
-    builder.add_positive_in_place(KnownClass::Bool.to_instance(ctx));
+    builder.add_positive_in_place(KnownClass::Bool.to_instance(env));
 
     let mut state = State::NoPositiveElements;
 
@@ -897,21 +897,21 @@ fn infer_rich_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     // The following resource has details about the rich comparison algorithm:
     // https://snarky.ca/unravelling-rich-comparison-operators/
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
         left.try_call_dunder_with_policy(
-            ctx,
+            env,
             op.dunder(),
             &mut CallArguments::positional([right]),
             TypeContext::default(),
             policy,
         )
-        .map(|outcome| outcome.return_type(ctx))
+        .map(|outcome| outcome.return_type(env))
         .ok()
     };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left != right && right.is_subtype_of(ctx, left) {
+    if left != right && right.is_subtype_of(env, left) {
         call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
     } else {
         call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
@@ -925,7 +925,7 @@ fn infer_rich_comparison<'db>(
             // on `object`, so it does not apply if we skip looking up attributes on `object`.
             && !policy.mro_no_object_fallback()
         {
-            Some(KnownClass::Bool.to_instance(ctx))
+            Some(KnownClass::Bool.to_instance(env))
         } else {
             None
         }
@@ -948,20 +948,20 @@ fn infer_membership_test_comparison<'db>(
     op: MembershipTestCompareOperator,
     range: TextRange,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     let compare_result_opt = match right.try_call_dunder(
-        ctx,
+        env,
         "__contains__",
         CallArguments::positional([left]),
         TypeContext::default(),
     ) {
         // If `__contains__` is available, it is used directly for the membership test.
-        Ok(bindings) => Some(bindings.return_type(ctx)),
+        Ok(bindings) => Some(bindings.return_type(env)),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
         Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right
-            .try_iterate(ctx)
-            .map(|_| KnownClass::Bool.to_instance(ctx))
+            .try_iterate(env)
+            .map(|_| KnownClass::Bool.to_instance(env))
             .ok(),
         // `__contains__` exists but can't be called with the given arguments.
         Err(CallDunderError::CallError(..)) => None,
@@ -973,15 +973,15 @@ fn infer_membership_test_comparison<'db>(
                 return ty;
             }
 
-            let truthiness = ty.try_bool(ctx).unwrap_or_else(|err| {
+            let truthiness = ty.try_bool(env).unwrap_or_else(|err| {
                 err.report_diagnostic(context, range);
                 err.fallback_truthiness()
             });
 
             match op {
-                MembershipTestCompareOperator::In => Type::from_truthiness(ctx, truthiness),
+                MembershipTestCompareOperator::In => Type::from_truthiness(env, truthiness),
                 MembershipTestCompareOperator::NotIn => {
-                    Type::from_truthiness(ctx, truthiness.negate())
+                    Type::from_truthiness(env, truthiness.negate())
                 }
             }
         })
@@ -1006,14 +1006,14 @@ fn infer_tuple_rich_comparison<'db>(
     visitor: &BinaryComparisonVisitor<'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
-    let ctx = context.semantic_context();
+    let env = context.semantic_environment();
     match (left, right) {
         // Both fixed-length: perform full lexicographic comparison.
         (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) => {
             let left_iter = left.iter_all_elements();
             let right_iter = right.iter_all_elements();
 
-            let mut builder = UnionBuilder::new(ctx);
+            let mut builder = UnionBuilder::new(env);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
                 let pairwise_eq_result = infer_binary_type_comparison(
@@ -1026,7 +1026,7 @@ fn infer_tuple_rich_comparison<'db>(
                 )
                 .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-                match pairwise_eq_result.try_bool(ctx).unwrap_or_else(|err| {
+                match pairwise_eq_result.try_bool(env).unwrap_or_else(|err| {
                     // TODO: We should, whenever possible, pass the range of the left and right elements
                     //   instead of the range of the whole tuple.
                     err.report_diagnostic(context, range);
@@ -1097,7 +1097,7 @@ fn infer_tuple_rich_comparison<'db>(
         (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_))
             if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) =>
         {
-            Ok(KnownClass::Bool.to_instance(ctx))
+            Ok(KnownClass::Bool.to_instance(env))
         }
 
         // At least one variable-length: check all elements that could potentially be compared.
@@ -1116,12 +1116,12 @@ fn infer_tuple_rich_comparison<'db>(
                 Ok::<_, UnsupportedComparisonError<'db>>(())
             })?;
 
-            let mut builder = UnionBuilder::new(ctx);
+            let mut builder = UnionBuilder::new(env);
             for result in results {
                 builder = builder.add(result);
             }
             // Length comparison (when all elements are equal) returns bool.
-            builder = builder.add(KnownClass::Bool.to_instance(ctx));
+            builder = builder.add(KnownClass::Bool.to_instance(env));
 
             Ok(builder.build())
         }

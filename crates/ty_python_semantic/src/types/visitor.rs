@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::SemanticEnvironment;
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
@@ -38,129 +38,149 @@ pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
 
-    fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>);
+    fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>);
 
-    fn visit_union_type(&self, ctx: &SemanticContext<'db>, union: UnionType<'db>) {
-        walk_union(ctx, union, self);
+    fn visit_union_type(&self, env: &SemanticEnvironment<'db>, union: UnionType<'db>) {
+        walk_union(env, union, self);
     }
 
     fn visit_intersection_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         intersection: IntersectionType<'db>,
     ) {
-        walk_intersection_type(ctx, intersection, self);
+        walk_intersection_type(env, intersection, self);
     }
 
     fn visit_enum_complement_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         complement: EnumComplementType<'db>,
     ) {
-        let db = ctx.db();
+        let db = env.db();
         for rest in complement.rest(db) {
-            self.visit_type(ctx, *rest);
+            self.visit_type(env, *rest);
         }
     }
 
-    fn visit_callable_type(&self, ctx: &SemanticContext<'db>, callable: CallableType<'db>) {
-        walk_callable_type(ctx, callable, self);
+    fn visit_callable_type(&self, env: &SemanticEnvironment<'db>, callable: CallableType<'db>) {
+        walk_callable_type(env, callable, self);
     }
 
     fn visit_property_instance_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         property: PropertyInstanceType<'db>,
     ) {
-        walk_property_instance_type(ctx, property, self);
+        walk_property_instance_type(env, property, self);
     }
 
-    fn visit_typeis_type(&self, ctx: &SemanticContext<'db>, type_is: TypeIsType<'db>) {
-        walk_typeis_type(ctx, type_is, self);
+    fn visit_typeis_type(&self, env: &SemanticEnvironment<'db>, type_is: TypeIsType<'db>) {
+        walk_typeis_type(env, type_is, self);
     }
 
-    fn visit_typeguard_type(&self, ctx: &SemanticContext<'db>, type_is: TypeGuardType<'db>) {
-        walk_typeguard_type(ctx, type_is, self);
+    fn visit_typeguard_type(&self, env: &SemanticEnvironment<'db>, type_is: TypeGuardType<'db>) {
+        walk_typeguard_type(env, type_is, self);
     }
 
-    fn visit_typeform_type(&self, ctx: &SemanticContext<'db>, typeform: TypeFormType<'db>) {
-        walk_typeform_type(ctx, typeform, self);
+    fn visit_typeform_type(&self, env: &SemanticEnvironment<'db>, typeform: TypeFormType<'db>) {
+        walk_typeform_type(env, typeform, self);
     }
 
-    fn visit_subclass_of_type(&self, ctx: &SemanticContext<'db>, subclass_of: SubclassOfType<'db>) {
-        walk_subclass_of_type(ctx, subclass_of, self);
+    fn visit_subclass_of_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        subclass_of: SubclassOfType<'db>,
+    ) {
+        walk_subclass_of_type(env, subclass_of, self);
     }
 
-    fn visit_generic_alias_type(&self, ctx: &SemanticContext<'db>, alias: GenericAlias<'db>) {
-        walk_generic_alias(ctx, alias, self);
+    fn visit_generic_alias_type(&self, env: &SemanticEnvironment<'db>, alias: GenericAlias<'db>) {
+        walk_generic_alias(env, alias, self);
     }
 
-    fn visit_function_type(&self, ctx: &SemanticContext<'db>, function: FunctionType<'db>) {
-        walk_function_type(ctx, function, self);
+    fn visit_function_type(&self, env: &SemanticEnvironment<'db>, function: FunctionType<'db>) {
+        walk_function_type(env, function, self);
     }
 
-    fn visit_bound_method_type(&self, ctx: &SemanticContext<'db>, method: BoundMethodType<'db>) {
-        walk_bound_method_type(ctx, method, self);
+    fn visit_bound_method_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        method: BoundMethodType<'db>,
+    ) {
+        walk_bound_method_type(env, method, self);
     }
 
-    fn visit_bound_super_type(&self, ctx: &SemanticContext<'db>, bound_super: BoundSuperType<'db>) {
-        walk_bound_super_type(ctx, bound_super, self);
+    fn visit_bound_super_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        bound_super: BoundSuperType<'db>,
+    ) {
+        walk_bound_super_type(env, bound_super, self);
     }
 
     fn visit_nominal_instance_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         nominal: NominalInstanceType<'db>,
     ) {
-        walk_nominal_instance_type(ctx, nominal, self);
+        walk_nominal_instance_type(env, nominal, self);
     }
 
     fn visit_bound_type_var_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) {
-        walk_bound_type_var_type(ctx, bound_typevar, self);
+        walk_bound_type_var_type(env, bound_typevar, self);
     }
 
-    fn visit_type_var_type(&self, ctx: &SemanticContext<'db>, typevar: TypeVarInstance<'db>) {
-        walk_type_var_type(ctx, typevar, self);
+    fn visit_type_var_type(&self, env: &SemanticEnvironment<'db>, typevar: TypeVarInstance<'db>) {
+        walk_type_var_type(env, typevar, self);
     }
 
     fn visit_protocol_instance_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) {
-        walk_protocol_instance_type(ctx, protocol, self);
+        walk_protocol_instance_type(env, protocol, self);
     }
 
     fn visit_method_wrapper_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         method_wrapper: KnownBoundMethodType<'db>,
     ) {
-        walk_method_wrapper_type(ctx, method_wrapper, self);
+        walk_method_wrapper_type(env, method_wrapper, self);
     }
 
     fn visit_known_instance_type(
         &self,
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         known_instance: KnownInstanceType<'db>,
     ) {
-        walk_known_instance_type(ctx, known_instance, self);
+        walk_known_instance_type(env, known_instance, self);
     }
 
-    fn visit_type_alias_type(&self, ctx: &SemanticContext<'db>, type_alias: TypeAliasType<'db>) {
-        walk_type_alias_type(ctx, type_alias, self);
+    fn visit_type_alias_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        type_alias: TypeAliasType<'db>,
+    ) {
+        walk_type_alias_type(env, type_alias, self);
     }
 
-    fn visit_typed_dict_type(&self, ctx: &SemanticContext<'db>, typed_dict: TypedDictType<'db>) {
-        walk_typed_dict_type(ctx, typed_dict, self);
+    fn visit_typed_dict_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        typed_dict: TypedDictType<'db>,
+    ) {
+        walk_typed_dict_type(env, typed_dict, self);
     }
 
-    fn visit_newtype_instance_type(&self, ctx: &SemanticContext<'db>, newtype: NewType<'db>) {
-        walk_newtype_instance_type(ctx, newtype, self);
+    fn visit_newtype_instance_type(&self, env: &SemanticEnvironment<'db>, newtype: NewType<'db>) {
+        walk_newtype_instance_type(env, newtype, self);
     }
 }
 
@@ -266,75 +286,75 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
 }
 
 pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     non_atomic_type: NonAtomicType<'db>,
     visitor: &V,
 ) {
     match non_atomic_type {
         NonAtomicType::FunctionLiteral(function) => {
-            visitor.visit_function_type(ctx, function);
+            visitor.visit_function_type(env, function);
         }
         NonAtomicType::Intersection(intersection) => {
-            visitor.visit_intersection_type(ctx, intersection);
+            visitor.visit_intersection_type(env, intersection);
         }
         NonAtomicType::EnumComplement(complement) => {
-            visitor.visit_enum_complement_type(ctx, complement);
+            visitor.visit_enum_complement_type(env, complement);
         }
-        NonAtomicType::Union(union) => visitor.visit_union_type(ctx, union),
+        NonAtomicType::Union(union) => visitor.visit_union_type(env, union),
         NonAtomicType::BoundMethod(method) => {
-            visitor.visit_bound_method_type(ctx, method);
+            visitor.visit_bound_method_type(env, method);
         }
         NonAtomicType::BoundSuper(bound_super) => {
-            visitor.visit_bound_super_type(ctx, bound_super);
+            visitor.visit_bound_super_type(env, bound_super);
         }
         NonAtomicType::MethodWrapper(method_wrapper) => {
-            visitor.visit_method_wrapper_type(ctx, method_wrapper);
+            visitor.visit_method_wrapper_type(env, method_wrapper);
         }
         NonAtomicType::Callable(callable) => {
-            visitor.visit_callable_type(ctx, callable);
+            visitor.visit_callable_type(env, callable);
         }
         NonAtomicType::GenericAlias(alias) => {
-            visitor.visit_generic_alias_type(ctx, alias);
+            visitor.visit_generic_alias_type(env, alias);
         }
         NonAtomicType::KnownInstance(known_instance) => {
-            visitor.visit_known_instance_type(ctx, known_instance);
+            visitor.visit_known_instance_type(env, known_instance);
         }
         NonAtomicType::SubclassOf(subclass_of) => {
-            visitor.visit_subclass_of_type(ctx, subclass_of);
+            visitor.visit_subclass_of_type(env, subclass_of);
         }
         NonAtomicType::NominalInstance(nominal) => {
-            visitor.visit_nominal_instance_type(ctx, nominal);
+            visitor.visit_nominal_instance_type(env, nominal);
         }
         NonAtomicType::PropertyInstance(property) => {
-            visitor.visit_property_instance_type(ctx, property);
+            visitor.visit_property_instance_type(env, property);
         }
-        NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(ctx, type_is),
+        NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(env, type_is),
         NonAtomicType::TypeGuard(type_guard) => {
-            visitor.visit_typeguard_type(ctx, type_guard);
+            visitor.visit_typeguard_type(env, type_guard);
         }
         NonAtomicType::TypeForm(typeform) => {
-            visitor.visit_typeform_type(ctx, typeform);
+            visitor.visit_typeform_type(env, typeform);
         }
         NonAtomicType::TypeVar(bound_typevar) => {
-            visitor.visit_bound_type_var_type(ctx, bound_typevar);
+            visitor.visit_bound_type_var_type(env, bound_typevar);
         }
         NonAtomicType::ProtocolInstance(protocol) => {
-            visitor.visit_protocol_instance_type(ctx, protocol);
+            visitor.visit_protocol_instance_type(env, protocol);
         }
         NonAtomicType::TypedDict(typed_dict) => {
-            visitor.visit_typed_dict_type(ctx, typed_dict);
+            visitor.visit_typed_dict_type(env, typed_dict);
         }
         NonAtomicType::TypeAlias(alias) => {
-            visitor.visit_type_alias_type(ctx, alias);
+            visitor.visit_type_alias_type(env, alias);
         }
         NonAtomicType::NewTypeInstance(newtype) => {
-            visitor.visit_newtype_instance_type(ctx, newtype);
+            visitor.visit_newtype_instance_type(env, newtype);
         }
     }
 }
 
 pub(crate) fn walk_type_with_recursion_guard<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
@@ -346,7 +366,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
                 // If we have already seen this type, we can skip it.
                 return;
             }
-            walk_non_atomic_type(ctx, non_atomic_type, visitor);
+            walk_non_atomic_type(env, non_atomic_type, visitor);
         }
     }
 }
@@ -452,7 +472,7 @@ impl DynamicContent {
 /// Walking `Exact[int]` can skip its exact back-edge. Walking `Growing[int]` is indeterminate
 /// because each recursive edge creates a new specialization.
 pub(super) fn non_any_dynamic_content<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
     struct DynamicContentVisitor<'db> {
@@ -474,7 +494,7 @@ pub(super) fn non_any_dynamic_content<'db>(
             true
         }
 
-        fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
+        fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
             if !self.content.get().is_absent() {
                 return;
             }
@@ -484,22 +504,22 @@ pub(super) fn non_any_dynamic_content<'db>(
                 return;
             }
 
-            walk_type_with_recursion_guard(ctx, ty, self, &self.recursion_guard);
+            walk_type_with_recursion_guard(env, ty, self, &self.recursion_guard);
         }
 
         fn visit_protocol_instance_type(
             &self,
-            ctx: &SemanticContext<'db>,
+            env: &SemanticEnvironment<'db>,
             protocol: ProtocolInstanceType<'db>,
         ) {
-            let db = ctx.db();
+            let db = env.db();
             let protocol_ty = Type::ProtocolInstance(protocol);
             let Some(class) = protocol.as_class_based() else {
-                walk_protocol_instance_interface(ctx, protocol.interface(ctx), protocol_ty, self);
+                walk_protocol_instance_interface(env, protocol.interface(env), protocol_ty, self);
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
-                walk_protocol_instance_interface(ctx, protocol.interface(ctx), protocol_ty, self);
+                walk_protocol_instance_interface(env, protocol.interface(env), protocol_ty, self);
                 return;
             };
 
@@ -507,7 +527,7 @@ pub(super) fn non_any_dynamic_content<'db>(
                 // Bounds and defaults in the generic context do not describe the specialized
                 // instance; only inspect the types assigned to its parameters.
                 for ty in specialization.types(db) {
-                    self.visit_type(ctx, *ty);
+                    self.visit_type(env, *ty);
                     if !self.content.get().is_absent() {
                         return;
                     }
@@ -519,8 +539,8 @@ pub(super) fn non_any_dynamic_content<'db>(
                 || self.record(DynamicContent::Indeterminate),
                 || {
                     walk_protocol_instance_interface(
-                        ctx,
-                        protocol.interface(ctx),
+                        env,
+                        protocol.interface(env),
                         protocol_ty,
                         self,
                     );
@@ -534,13 +554,13 @@ pub(super) fn non_any_dynamic_content<'db>(
         active_class_protocols: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
     };
-    visitor.visit_type(ctx, ty);
+    visitor.visit_type(env, ty);
     visitor.content.get()
 }
 
 /// Implementation for `any_over_type` and `find_over_type`.
 fn any_over_type_impl<'db, F, T>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: F,
@@ -564,7 +584,7 @@ where
             self.should_visit_lazy_type_attributes
         }
 
-        fn visit_type(&self, ctx: &SemanticContext<'db>, ty: Type<'db>) {
+        fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
             let default_value = U::default();
             let pre_existing = self.found_matching_type.get();
             if pre_existing != default_value {
@@ -575,7 +595,7 @@ where
             if new_value != default_value {
                 return;
             }
-            walk_type_with_recursion_guard(ctx, ty, self, &self.recursion_guard);
+            walk_type_with_recursion_guard(env, ty, self, &self.recursion_guard);
         }
     }
 
@@ -585,7 +605,7 @@ where
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
     };
-    visitor.visit_type(ctx, ty);
+    visitor.visit_type(env, ty);
     visitor.found_matching_type.get()
 }
 
@@ -598,12 +618,12 @@ where
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
 /// are visited or not.
 pub(super) fn any_over_type<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(ctx, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(env, ty, should_visit_lazy_type_attributes, query)
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -620,7 +640,7 @@ pub(super) fn any_over_type<'db>(
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
 /// are visited or not.
 pub(super) fn find_over_type<'db, T>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> Option<T>,
@@ -628,7 +648,7 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(ctx, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(env, ty, should_visit_lazy_type_attributes, query)
 }
 
 #[cfg(test)]

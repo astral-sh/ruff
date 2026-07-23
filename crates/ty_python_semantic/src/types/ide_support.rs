@@ -12,7 +12,7 @@ use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
     KnownUnion, SubclassOfInner, Type, TypeContext,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticContext, SemanticModel};
+use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticEnvironment, SemanticModel};
 use itertools::Either;
 use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
@@ -151,9 +151,9 @@ pub fn definitions_for_name<'db>(
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    let ctx = model.semantic_context();
+    let env = model.semantic_environment();
     if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(&ctx)
+        && let Some(builtins_scope) = builtins_module_scope(&env)
     {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
@@ -178,7 +178,7 @@ pub fn definitions_for_name<'db>(
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
                 .filter_map(|instance| {
-                    let definition = instance.class_literal(&ctx).definition(db)?;
+                    let definition = instance.class_literal(&env).definition(db)?;
                     Some(ResolvedDefinition::Definition(definition))
                 })
                 .collect();
@@ -225,14 +225,14 @@ pub fn definitions_for_attribute<'db>(
         return resolved;
     };
 
-    let ctx = model.semantic_context();
+    let env = model.semantic_environment();
 
     // A structural protocol meta-type still uses its nominal protocol declaration as the source
     // location for go-to-definition, even though the origin is not a nominal upper bound.
     let subclass_origin = |subclass_of: SubclassOfInner<'db>| {
         let class = match subclass_of {
             SubclassOfInner::Protocol(protocol) => protocol.class_origin().map(|origin| *origin),
-            subclass_of => subclass_of.into_class(&ctx),
+            subclass_of => subclass_of.into_class(&env),
         }?;
         class
             .static_class_literal(db)
@@ -275,7 +275,7 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
-        let meta_type = ty.to_meta_type(&ctx);
+        let meta_type = ty.to_meta_type(&env);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
         let lookup_type = match ty {
@@ -336,7 +336,7 @@ pub fn static_member_type_for_attribute<'db>(
 ) -> Option<Type<'db>> {
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(&model.semantic_context(), attribute.attr.as_str())
+        .static_member(&model.semantic_environment(), attribute.attr.as_str())
         .ignore_possibly_undefined()
 }
 
@@ -346,10 +346,10 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     attribute_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
     let mut resolved = Vec::new();
     'scopes: for ancestor in class_literal
-        .iter_mro(ctx)
+        .iter_mro(env)
         .filter_map(ClassBase::into_class)
         .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
     {
@@ -451,7 +451,7 @@ pub fn typed_dict_key_definition<'db>(
 ) -> Option<ResolvedDefinition<'db>> {
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let field = typed_dict.items(&model.semantic_context()).get(key)?;
+    let field = typed_dict.items(&model.semantic_environment()).get(key)?;
     let definition = field.first_declaration()?;
     Some(ResolvedDefinition::Definition(definition))
 }
@@ -466,8 +466,8 @@ pub fn typed_dict_key_hover<'db>(
         .map(|literal| literal.value.to_str())?;
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let owner = value_ty.display(&model.semantic_context()).to_string();
-    let field = typed_dict.items(&model.semantic_context()).get(key)?;
+    let owner = value_ty.display(&model.semantic_environment()).to_string();
+    let field = typed_dict.items(&model.semantic_environment()).get(key)?;
     let docstring = field
         .first_declaration()
         .and_then(|declaration| declaration.docstring(model.db()));
@@ -498,10 +498,10 @@ pub fn definitions_for_keyword_argument<'db>(
     let keyword_name_str = keyword_name.as_str();
 
     let mut resolved_definitions = Vec::new();
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
 
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(ctx)
+        .try_upcast_to_callable(env)
         .and_then(CallableTypes::exactly_one)
     {
         let signatures = callable_type.signatures(db);
@@ -555,10 +555,10 @@ pub fn definitions_and_overloads_for_function<'db>(
         .inferred_type(model)
         .and_then(Type::as_function_literal)
     {
-        let ctx = &model.semantic_context();
+        let env = &model.semantic_environment();
         function_type
-            .iter_overloads_and_implementation(ctx)
-            .filter_map(|overload| overload.signature(ctx).definition())
+            .iter_overloads_and_implementation(env)
+            .filter_map(|overload| overload.signature(env).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
@@ -615,16 +615,16 @@ pub struct CallSignatureParameter<'db> {
 
 impl<'db> CallSignatureDetails<'db> {
     fn from_binding(
-        ctx: &SemanticContext<'db>,
+        env: &SemanticEnvironment<'db>,
         binding: &crate::types::call::Binding<'db>,
     ) -> Self {
-        let db = ctx.db();
+        let db = env.db();
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
         let specialization = binding.specialization(db);
         let signature = binding.signature.clone();
-        let display_details = signature.display(ctx).to_string_parts();
+        let display_details = signature.display(env).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
-            displayed_parameters_for_signature(ctx, &signature, &display_details, specialization);
+            displayed_parameters_for_signature(env, &signature, &display_details, specialization);
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
             .map(|mapping| {
@@ -656,17 +656,17 @@ impl<'db> CallSignatureDetails<'db> {
 /// `ParamSpec` signatures, and applies any inferred specialization to the
 /// displayed parameter types.
 fn displayed_parameters_for_signature<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     signature: &Signature<'db>,
     display_details: &crate::types::display::SignatureDisplayDetails,
     specialization: Option<crate::types::generics::Specialization<'db>>,
 ) -> (Vec<CallSignatureParameter<'db>>, Vec<Option<usize>>) {
-    let db = ctx.db();
+    let db = env.db();
     // Apply any inferred specialization to displayed parameter types so
     // call-site substitutions are reflected in the rendered signature. For
     // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
     let apply_specialization =
-        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(ctx, spec));
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(env, spec));
     let parameters = signature.parameters();
 
     match parameters.kind() {
@@ -761,10 +761,10 @@ pub fn call_signature_details<'db>(
     };
 
     // Use into_callable to handle all the complex type conversions
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(ctx)
-        .map(|callables| callables.into_type(ctx))
+        .try_upcast_to_callable(env)
+        .map(|callables| callables.into_type(env))
     {
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
@@ -775,8 +775,8 @@ pub fn call_signature_details<'db>(
                     .unwrap_or(Type::unknown())
             });
         let mut bindings = callable_type
-            .bindings(ctx)
-            .match_parameters(ctx, &call_arguments);
+            .bindings(env)
+            .match_parameters(env, &call_arguments);
 
         // Run type checking to resolve TypeVar bindings from argument types.
         // For example, calling `dict[str, int].get("a")` resolves the `_KT`
@@ -784,7 +784,7 @@ pub fn call_signature_details<'db>(
         // details even if the call has type errors.
         let constraints = ConstraintSetBuilder::new();
         let _ = bindings.check_types_impl(
-            ctx,
+            env,
             &constraints,
             &call_arguments,
             TypeContext::default(),
@@ -796,7 +796,7 @@ pub fn call_signature_details<'db>(
         bindings
             .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(ctx, binding))
+            .map(|binding| CallSignatureDetails::from_binding(env, binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -811,8 +811,8 @@ fn resolve_single_overload<'db>(
     callable_type: Type<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<Signature<'db>> {
-    let ctx = &model.semantic_context();
-    let bindings = callable_type.bindings(ctx);
+    let env = &model.semantic_environment();
+    let bindings = callable_type.bindings(env);
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -822,8 +822,8 @@ fn resolve_single_overload<'db>(
 
     let constraints = ConstraintSetBuilder::new();
     let mut resolved: Vec<_> = bindings
-        .match_parameters(ctx, &args)
-        .check_types(ctx, &constraints, &args, TypeContext::default(), &[])
+        .match_parameters(env, &args)
+        .check_types(env, &constraints, &args, TypeContext::default(), &[])
         .iter()
         .flat_map(super::call::bind::Bindings::iter_flat)
         .flat_map(|binding| {
@@ -858,7 +858,7 @@ fn full_type_bindings_for_call<'db>(
     func_type: Type<'db>,
     call_expr: &ast::ExprCall,
 ) -> crate::types::call::Bindings<'db> {
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
     let call_arguments =
         CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
             splatted_value
@@ -868,10 +868,10 @@ fn full_type_bindings_for_call<'db>(
     let constraints = ConstraintSetBuilder::new();
 
     func_type
-        .bindings(ctx)
-        .match_parameters(ctx, &call_arguments)
+        .bindings(env)
+        .match_parameters(env, &call_arguments)
         .check_types(
-            ctx,
+            env,
             &constraints,
             &call_arguments,
             TypeContext::default(),
@@ -937,7 +937,7 @@ pub fn call_argument_forms(
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
     if !func_type
-        .bindings(&model.semantic_context())
+        .bindings(&model.semantic_environment())
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
@@ -1008,11 +1008,11 @@ pub fn call_type_simplified_by_overloads(
 ) -> Option<String> {
     let func_type = call_expr.func.inferred_type(model)?;
 
-    let ctx = &model.semantic_context();
-    let callable_type = func_type.try_upcast_to_callable(ctx)?.into_type(ctx);
+    let env = &model.semantic_environment();
+    let callable_type = func_type.try_upcast_to_callable(env)?.into_type(env);
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = callable_type.bindings(ctx).single_element()
+    if let Some(binding) = callable_type.bindings(env).single_element()
         && binding.overloads().len() < 2
     {
         return None;
@@ -1021,7 +1021,7 @@ pub fn call_type_simplified_by_overloads(
     let signature = resolve_single_overload(model, callable_type, call_expr)?;
     Some(
         signature
-            .display_with(ctx, DisplaySettings::default().multiline())
+            .display_with(env, DisplaySettings::default().multiline())
             .to_string(),
     )
 }
@@ -1033,12 +1033,12 @@ pub fn definitions_for_bin_op<'db>(
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
     let left_ty = binary_op.left.inferred_type(model)?;
     let right_ty = binary_op.right.inferred_type(model)?;
-    let ctx = &model.semantic_context();
-    let Ok(bindings) = Type::try_call_bin_op(ctx, left_ty, binary_op.op, right_ty) else {
+    let env = &model.semantic_environment();
+    let Ok(bindings) = Type::try_call_bin_op(env, left_ty, binary_op.op, right_ty) else {
         return None;
     };
 
-    let callable_type = promote_for_self(ctx, bindings.callable_type());
+    let callable_type = promote_for_self(env, bindings.callable_type());
 
     let definitions: Vec<_> = bindings
         .iter_flat()
@@ -1067,9 +1067,9 @@ pub fn definitions_for_unary_op<'db>(
         ast::UnaryOp::Not => "__bool__",
     };
 
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
     let bindings = match operand_ty.try_call_dunder(
-        ctx,
+        env,
         unary_dunder_method,
         CallArguments::none(),
         TypeContext::default(),
@@ -1078,7 +1078,7 @@ pub fn definitions_for_unary_op<'db>(
         Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
-                ctx,
+                env,
                 "__len__",
                 CallArguments::none(),
                 TypeContext::default(),
@@ -1098,7 +1098,7 @@ pub fn definitions_for_unary_op<'db>(
         ) => *bindings,
     };
 
-    let callable_type = promote_for_self(ctx, bindings.callable_type());
+    let callable_type = promote_for_self(env, bindings.callable_type());
 
     let definitions = bindings
         .iter_flat()
@@ -1116,15 +1116,15 @@ pub fn definitions_for_unary_op<'db>(
 /// Promotes types in `self` positions.
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
-fn promote_for_self<'db>(ctx: &SemanticContext<'db>, ty: Type<'db>) -> Type<'db> {
-    let db = ctx.db();
+fn promote_for_self<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Type<'db> {
+    let db = env.db();
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-            self_ty.literal_fallback_instance(ctx).unwrap_or(self_ty)
+            self_ty.literal_fallback_instance(env).unwrap_or(self_ty)
         })),
-        Type::Union(elements) => elements.map(ctx, |ty| match ty {
+        Type::Union(elements) => elements.map(env, |ty| match ty {
             Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-                self_ty.literal_fallback_instance(ctx).unwrap_or(self_ty)
+                self_ty.literal_fallback_instance(env).unwrap_or(self_ty)
             })),
             _ => *ty,
         }),
@@ -1182,8 +1182,8 @@ pub fn resolved_call_signature<'db>(
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
     let func_type = call_expr.func.inferred_type(model)?;
-    let ctx = &model.semantic_context();
-    let callable_type = func_type.try_upcast_to_callable(ctx)?.into_type(ctx);
+    let env = &model.semantic_environment();
+    let callable_type = func_type.try_upcast_to_callable(env)?.into_type(env);
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -1194,16 +1194,16 @@ pub fn resolved_call_signature<'db>(
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
     let constraints = ConstraintSetBuilder::new();
     let bindings = callable_type
-        .bindings(ctx)
-        .match_parameters(ctx, &args)
-        .check_types(ctx, &constraints, &args, TypeContext::default(), &[])
+        .bindings(env)
+        .match_parameters(env, &args)
+        .check_types(env, &constraints, &args, TypeContext::default(), &[])
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
         .iter_flat()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
-        .map(|binding| CallSignatureDetails::from_binding(ctx, binding))
+        .map(|binding| CallSignatureDetails::from_binding(env, binding))
         .collect();
 
     if !type_checked_details.is_empty() {
@@ -1217,7 +1217,7 @@ pub fn resolved_call_signature<'db>(
     let all_details: Vec<_> = bindings
         .iter_flat()
         .flatten()
-        .map(|binding| CallSignatureDetails::from_binding(ctx, binding))
+        .map(|binding| CallSignatureDetails::from_binding(env, binding))
         .collect();
 
     if all_details.is_empty() {
@@ -1314,7 +1314,7 @@ mod resolve_definition {
 
     use crate::module_docstring;
     use crate::types::binding_type;
-    use crate::{Db, SemanticContext};
+    use crate::{Db, SemanticEnvironment};
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -1408,7 +1408,7 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
     ) -> Option<String> {
-        let ctx = SemanticContext::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };
@@ -1418,7 +1418,7 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
-        let current_overload = binding_type(&ctx, definition)
+        let current_overload = binding_type(&env, definition)
             .as_function_literal()?
             .literal(db)
             .last_definition;
@@ -1427,8 +1427,8 @@ mod resolve_definition {
         let implementation = use_def
             .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| {
-                let ty = binding_type(&ctx, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(&ctx)
+                let ty = binding_type(&env, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(&env)
                     .any(|overload| overload == current_overload)
                     .then_some(ty)
             })
@@ -1966,11 +1966,11 @@ pub struct TypeHierarchyClass<'db> {
 /// That is, this effectively validates whether the given type can be used in
 /// subsequent requests for supertypes or subtypes.
 pub fn type_hierarchy_prepare<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<TypeHierarchyClass<'db>> {
-    let db = ctx.db();
-    let class_literal = extract_class_literal(ctx, ty)?;
+    let db = env.db();
+    let class_literal = extract_class_literal(env, ty)?;
     Some(class_literal_to_hierarchy_info(db, class_literal))
 }
 
@@ -1981,11 +1981,11 @@ pub fn type_hierarchy_prepare<'db>(
 ///
 /// This includes `object` when the given class has no direct base classes.
 pub fn type_hierarchy_supertypes<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
 ) -> Vec<TypeHierarchyClass<'db>> {
-    let db = ctx.db();
-    let Some(class_literal) = extract_class_literal(ctx, ty) else {
+    let db = env.db();
+    let Some(class_literal) = extract_class_literal(env, ty) else {
         return vec![];
     };
     if class_literal.is_known(db, KnownClass::Object) {
@@ -1993,9 +1993,9 @@ pub fn type_hierarchy_supertypes<'db>(
     }
 
     let mut supertypes: Vec<TypeHierarchyClass<'db>> = class_literal
-        .explicit_bases(ctx)
+        .explicit_bases(env)
         .into_iter()
-        .filter_map(|base| extract_class_literal(ctx, base))
+        .filter_map(|base| extract_class_literal(env, base))
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
         .collect();
     // Every class implicitly inherits from `object` when no explicit
@@ -2003,7 +2003,7 @@ pub fn type_hierarchy_supertypes<'db>(
     if supertypes.is_empty() {
         supertypes.push(class_literal_to_hierarchy_info(
             db,
-            ClassLiteral::object(ctx),
+            ClassLiteral::object(env),
         ));
     }
     supertypes
@@ -2014,12 +2014,12 @@ pub fn type_hierarchy_supertypes<'db>(
 /// When the type given doesn't correspond to a class literal, then this always
 /// returns an empty sequence.
 pub fn type_hierarchy_subtypes<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     modules: &[Module<'db>],
 ) -> Vec<TypeHierarchyClass<'db>> {
-    let db = ctx.db();
-    let Some(target_class) = extract_class_literal(ctx, ty) else {
+    let db = env.db();
+    let Some(target_class) = extract_class_literal(env, ty) else {
         return vec![];
     };
     let target_name = target_class.name(db);
@@ -2053,7 +2053,7 @@ pub fn type_hierarchy_subtypes<'db>(
         }
 
         let index = semantic_index(db, python_file);
-        let file_ctx = SemanticContext::from_file(db, python_file);
+        let file_ctx = SemanticEnvironment::from_file(db, python_file);
         for scope_id in index.scope_ids() {
             let scope = scope_id.node(db);
             let Some(class_node) = scope.as_class() else {
@@ -2076,7 +2076,7 @@ pub fn type_hierarchy_subtypes<'db>(
                 continue;
             }
 
-            let ty = crate::types::binding_type(ctx, def);
+            let ty = crate::types::binding_type(env, def);
             let Some(class_ty) = extract_class_literal(&file_ctx, ty) else {
                 continue;
             };
@@ -2103,10 +2103,10 @@ pub fn type_hierarchy_subtypes<'db>(
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
 fn extract_class_literal<'db>(
-    ctx: &SemanticContext<'db>,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    let db = ctx.db();
+    let db = env.db();
     match ty {
         Type::ClassLiteral(class_literal) => Some(class_literal),
         Type::SubclassOf(subclass_of) => {
@@ -2121,11 +2121,11 @@ fn extract_class_literal<'db>(
             }
         }
         Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
-        Type::NominalInstance(instance) => Some(instance.class(ctx).class_literal(db)),
+        Type::NominalInstance(instance) => Some(instance.class(env).class_literal(db)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .find_map(|elem| extract_class_literal(ctx, *elem)),
+            .find_map(|elem| extract_class_literal(env, *elem)),
 
         _ => None,
     }
@@ -2220,11 +2220,11 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     let function_ty = call_expr.func.inferred_type(model)?;
     let db = model.db();
     let class_name = function_ty.as_class_literal()?.name(db);
-    let ctx = &model.semantic_context();
+    let env = &model.semantic_environment();
     let display_sig = |signature: &Signature| {
         let params = signature
             .display_with(
-                ctx,
+                env,
                 DisplaySettings::default()
                     .multiline()
                     .disallow_signature_name()
@@ -2234,8 +2234,8 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
         format!("class {class_name}{params}")
     };
-    let callable_type = function_ty.try_upcast_to_callable(ctx)?.into_type(ctx);
-    let bindings = callable_type.bindings(ctx);
+    let callable_type = function_ty.try_upcast_to_callable(env)?.into_type(env);
+    let bindings = callable_type.bindings(env);
 
     if let Some(binding) = bindings.single_element()
         && binding.overloads().len() == 1
