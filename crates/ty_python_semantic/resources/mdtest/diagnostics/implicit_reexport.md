@@ -185,7 +185,33 @@ from b import Answer
 Answer: int
 ```
 
-## Star imports
+## Star import with one implicit re-export
+
+```toml
+[rules]
+implicit-reexport = "error"
+```
+
+```py
+# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
+from a import *
+
+reveal_type(Answer)  # revealed: Literal[42]
+```
+
+`a.py`:
+
+```py
+from b import Answer
+```
+
+`b.py`:
+
+```py
+Answer = 42
+```
+
+## Star import with more than two implicit re-exports
 
 ```toml
 [rules]
@@ -323,6 +349,42 @@ Answer = 42
 `package/sub/nested.py`:
 
 ```py
+```
+
+## Imported submodule alias
+
+```toml
+[rules]
+implicit-reexport = "error"
+```
+
+```py
+# error: [implicit-reexport] "Module `q` does not explicitly export attribute `b`"
+from q import a, b
+
+reveal_type(b)  # revealed: <module 'a.b'>
+reveal_type(b.C)  # revealed: <class 'C'>
+
+reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(a.b.C)  # revealed: <class 'C'>
+```
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/b.py`:
+
+```py
+class C: ...
+```
+
+`q.py`:
+
+```py
+import a as a
+import a.b as b
 ```
 
 ## Star imports respect `__all__`

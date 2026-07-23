@@ -95,7 +95,7 @@ def coinflip() -> bool:
     return True
 
 if coinflip():
-    from c import f as f
+    from c import f
 else:
     def f(): ...
 ```
@@ -125,7 +125,7 @@ def coinflip() -> bool:
     return True
 
 if coinflip():
-    from c import x as x
+    from c import x
 else:
     x = 1
 ```

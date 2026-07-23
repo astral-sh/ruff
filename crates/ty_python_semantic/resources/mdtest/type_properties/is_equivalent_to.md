@@ -614,7 +614,7 @@ were originally imported in different first-party modules:
 `module.py`:
 
 ```py
-import typing as typing
+import typing
 ```
 
 `main.py`:
@@ -638,8 +638,8 @@ module:
 `module2.py`:
 
 ```py
+import imported
 import imported.abc
-import imported as imported
 ```
 
 `imported/__init__.pyi`:

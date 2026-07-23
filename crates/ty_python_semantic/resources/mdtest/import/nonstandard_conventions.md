@@ -259,7 +259,7 @@ reveal_type(mypackage.nested.X)  # revealed: Unknown
 `mypackage/__init__.py`:
 
 ```py
-from .submodule import nested as nested
+from .submodule import nested
 ```
 
 `mypackage/submodule/__init__.py`:
@@ -335,7 +335,7 @@ reveal_type(mypackage.nested.X)  # revealed: Unknown
 `mypackage/__init__.py`:
 
 ```py
-from mypackage.submodule import nested as nested
+from mypackage.submodule import nested
 ```
 
 `mypackage/submodule/__init__.py`:
@@ -472,8 +472,6 @@ reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 
 ```py
 from . import imported as imported_m
-
-__all__ = ["imported_m"]
 ```
 
 `mypackage/imported.py`:
@@ -755,7 +753,7 @@ reveal_type(mypackage.fails.Y)  # revealed: Unknown
 `mypackage/imported.py`:
 
 ```py
-from . import fails as fails
+from . import fails
 
 X: int = 42
 ```
@@ -1177,7 +1175,7 @@ x = funcmod(1)
 `mypackage/__init__.py`:
 
 ```py
-from .funcmod import funcmod as funcmod
+from .funcmod import funcmod
 from .funcmod import other
 ```
 

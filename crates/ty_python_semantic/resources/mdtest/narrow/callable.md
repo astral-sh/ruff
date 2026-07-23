@@ -172,13 +172,13 @@ reveal_type(_CollectionsAbcCallable)  # revealed: <special-form 'collections.abc
 `typing_compat.py`:
 
 ```py
-from typing import Callable as Callable
+from typing import Callable
 ```
 
 `collections_abc_compat.py`:
 
 ```py
-from collections.abc import Callable as Callable
+from collections.abc import Callable
 ```
 
 `main.py`:

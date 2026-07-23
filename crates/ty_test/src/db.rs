@@ -311,6 +311,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         .expect("missing-override-decorator is a known lint rule");
     selection.disable(missing_override_decorator);
 
+    // Test fixtures frequently use imports to assemble synthetic modules without intending to
+    // model their public APIs. Keep this opt-in outside its dedicated lint tests.
+    let implicit_reexport = registry
+        .get("implicit-reexport")
+        .expect("implicit-reexport is a known lint rule");
+    selection.disable(implicit_reexport);
+
     // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
     // negation types in our tests for better readability.
     let experimental_syntax = registry

@@ -342,12 +342,12 @@ If the items are instead star-imported, then the actual uses should warn.
 `module.py`:
 
 ```py
-from typing_extensions import deprecated as _deprecated
+from typing_extensions import deprecated
 
-@_deprecated("Use OtherType instead")
+@deprecated("Use OtherType instead")
 class DeprType: ...
 
-@_deprecated("Use other_func instead")
+@deprecated("Use other_func instead")
 def depr_func(): ...
 ```
 
