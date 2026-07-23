@@ -110,7 +110,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    3,
+    5,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
@@ -227,7 +227,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    1950,
+    2000,
 );
 
 #[track_caller]
