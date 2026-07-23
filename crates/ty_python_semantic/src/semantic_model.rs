@@ -63,6 +63,11 @@ impl<'db> SemanticModel<'db> {
         self.file
     }
 
+    /// Returns whether this model is analyzing a string annotation.
+    pub(crate) fn is_in_string_annotation(&self) -> bool {
+        self.in_string_annotation_expr.is_some()
+    }
+
     pub fn file_path(&self) -> &FilePath {
         self.file.path(self.db)
     }
