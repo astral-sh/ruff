@@ -25,8 +25,8 @@ use crate::rule_redirects::get_redirect_target;
 use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
 
-/// Generates an array of edits that matches the length of `diagnostics`.
-/// Each potential edit in the array is paired, in order, with the associated diagnostic.
+/// Generates arrays of `ruff:ignore` and `noqa` edits that match the length of `diagnostics`.
+/// Each potential edit is paired, in order, with the associated diagnostic.
 /// Each edit will add a suppression comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
@@ -40,23 +40,48 @@ pub fn generate_suppression_edits(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     suppressions: &Suppressions,
-    suppression_kind: SuppressionKind,
     preview: PreviewMode,
-) -> Vec<Option<Edit>> {
+) -> (Vec<Option<Edit>>, Vec<Option<Edit>>) {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
-    let comments = find_suppression_comments(
+    let ignore_comments = find_suppression_comments(
         diagnostics,
         locator,
         &exemption,
         &directives,
         noqa_line_for,
         suppressions,
-        suppression_kind,
+        SuppressionKind::Ignore,
         preview,
     );
-    build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
+    let noqa_comments = find_suppression_comments(
+        diagnostics,
+        locator,
+        &exemption,
+        &directives,
+        noqa_line_for,
+        suppressions,
+        SuppressionKind::Noqa,
+        preview,
+    );
+
+    (
+        build_suppression_edits_by_diagnostic(
+            ignore_comments,
+            locator,
+            line_ending,
+            None,
+            SuppressionKind::Ignore,
+        ),
+        build_suppression_edits_by_diagnostic(
+            noqa_comments,
+            locator,
+            line_ending,
+            None,
+            SuppressionKind::Noqa,
+        ),
+    )
 }
 
 /// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
@@ -3460,7 +3485,7 @@ print(
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_suppression_edits(
+        let (_, edits) = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),
@@ -3469,7 +3494,6 @@ print(
             &noqa_line_for,
             LineEnding::Lf,
             &suppressions,
-            SuppressionKind::Noqa,
             PreviewMode::Disabled,
         );
         assert_eq!(
@@ -3495,7 +3519,7 @@ bar =
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_suppression_edits(
+        let (_, edits) = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),
@@ -3504,7 +3528,6 @@ bar =
             &noqa_line_for,
             LineEnding::Lf,
             &suppressions,
-            SuppressionKind::Noqa,
             PreviewMode::Disabled,
         );
         assert_eq!(

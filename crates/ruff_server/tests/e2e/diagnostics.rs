@@ -57,8 +57,21 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
                 }
               }
             ],
-            "noqa_edit": {
+            "ignore_edit": {
               "newText": "  # ruff:ignore[unused-import]\n",
+              "range": {
+                "end": {
+                  "character": 0,
+                  "line": 1
+                },
+                "start": {
+                  "character": 9,
+                  "line": 0
+                }
+              }
+            },
+            "noqa_edit": {
+              "newText": "  # noqa: F401\n",
               "range": {
                 "end": {
                   "character": 0,
