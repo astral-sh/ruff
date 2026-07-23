@@ -358,6 +358,16 @@ def union_receiver(reader: Reader[int | str]):
     reveal_type(reader.get)  # revealed: Overload[]
 ```
 
+A concrete union that matches *neither* overload on any branch prunes to the same empty
+`Overload[]`: with no type variable in the receiver, pruning confidently rejects every overload, and
+calling the result reports `no-matching-overload`.
+
+```py
+def union_receiver_no_match(reader: Reader[bytes | float]):
+    reveal_type(reader.get)  # revealed: Overload[]
+    reader.get(0)  # error: [no-matching-overload]
+```
+
 ## Constrained `TypeVar` receivers
 
 A `TypeVar` constrained to several types stands for exactly one of those constraints, but never for
@@ -378,6 +388,33 @@ T = TypeVar("T", A, B)
 
 def get_x(value: T) -> int | str:
     return value["x"]
+```
+
+The same guard applies to an overloaded method reached directly through a constrained `TypeVar`
+receiver. When none of the constraints matches any overload's explicit `self` annotation, pruning
+would remove every overload; because the receiver still contains a type variable, the overloads are
+kept instead of collapsing to a non-callable `Overload[]`, and normal overload resolution runs.
+
+```py
+from typing import TypeVar, overload
+
+class Widget:
+    @overload
+    def render(self: "Sub1") -> int: ...
+    @overload
+    def render(self: "Sub2") -> str: ...
+    def render(self) -> int | str:
+        return 0
+
+class Sub1(Widget): ...
+class Sub2(Widget): ...
+class OtherA(Widget): ...
+class OtherB(Widget): ...
+
+U = TypeVar("U", OtherA, OtherB)
+
+def constrained_no_match(widget: U):
+    reveal_type(widget.render)  # revealed: Overload[() -> int, () -> str]
 ```
 
 ## Aliased overloads through a union receiver
