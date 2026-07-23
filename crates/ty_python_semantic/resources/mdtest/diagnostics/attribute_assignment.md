@@ -328,6 +328,42 @@ info: Parameter declared here
   |
 ```
 
+### Invalid property setter argument type
+
+```py
+class Document: ...
+
+class HasDocumentRef:
+    @property
+    def document(self) -> Document | None: ...
+    @document.setter
+    def document(self, document: Document) -> None: ...
+
+class Model(HasDocumentRef):
+    def detach(self) -> None:
+        self.document = None  # snapshot: invalid-assignment
+
+        # Check that the concise diagnostic identifies the actual setter argument mismatch.
+        # error: [invalid-assignment] "Expected `Document`, found `None`"
+        self.document = None
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `document` on type `Self@detach`
+  --> src/mdtest_snippet.py:11:25
+   |
+11 |         self.document = None  # snapshot: invalid-assignment
+   |                         ^^^^ Expected `Document`, found `None`
+   |
+info: This assignment implicitly calls `__set__` on a descriptor of type `property`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:9
+  |
+7 |     def document(self, document: Document) -> None: ...
+  |         ^^^^^^^^       ------------------ Parameter declared here
+  |
+```
+
 ## Setting attributes on union types
 
 ```py

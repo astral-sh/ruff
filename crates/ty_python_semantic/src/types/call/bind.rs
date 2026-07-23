@@ -94,6 +94,7 @@ pub(crate) struct CallDiagnosticOverride<'a> {
 struct CallDiagnosticContext<'context, 'overrides, 'db, 'ast> {
     context: &'context InferContext<'db, 'ast>,
     overrides: Option<&'context CallDiagnosticOverride<'overrides>>,
+    argument_index_offset: usize,
 }
 
 impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
@@ -118,7 +119,13 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
                 argument_index.and_then(|index| overrides.argument_ranges.get(index))
             })
             .copied()
-            .unwrap_or_else(|| BindingError::get_node(node, argument_index).range())
+            .unwrap_or_else(|| {
+                BindingError::get_node(
+                    node,
+                    argument_index.map(|index| index + self.argument_index_offset),
+                )
+                .range()
+            })
     }
 }
 
@@ -1317,6 +1324,7 @@ impl<'db> Bindings<'db> {
             &CallDiagnosticContext {
                 context,
                 overrides: None,
+                argument_index_offset: 0,
             },
             node,
         );
@@ -1332,6 +1340,7 @@ impl<'db> Bindings<'db> {
             &CallDiagnosticContext {
                 context,
                 overrides: Some(overrides),
+                argument_index_offset: 0,
             },
             node,
         );
@@ -1671,23 +1680,7 @@ impl<'db> Bindings<'db> {
                         ] = overload.parameter_types()
                         {
                             if let Some(setter) = property.setter(db) {
-                                if let Ok(return_ty) = setter
-                                    .try_call(db, &CallArguments::positional([*instance, *value]))
-                                    .map(|binding| binding.return_type(db))
-                                {
-                                    // `property.__set__` returns `None` for ordinary setters, but
-                                    // preserving `Never` keeps non-returning setters divergent.
-                                    overload.set_return_type(if return_ty.is_never() {
-                                        return_ty
-                                    } else {
-                                        Type::none(db)
-                                    });
-                                } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "calling the setter failed",
-                                    ));
-                                    overload.set_return_type(Type::unknown());
-                                }
+                                overload.check_property_setter(db, setter, *instance, *value, 1);
                             } else {
                                 overload
                                     .errors
@@ -1729,23 +1722,7 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
-                                if let Ok(return_ty) = setter
-                                    .try_call(db, &CallArguments::positional([*instance, *value]))
-                                    .map(|binding| binding.return_type(db))
-                                {
-                                    // `property.__set__` returns `None` for ordinary setters, but
-                                    // preserving `Never` keeps non-returning setters divergent.
-                                    overload.set_return_type(if return_ty.is_never() {
-                                        return_ty
-                                    } else {
-                                        Type::none(db)
-                                    });
-                                } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "calling the setter failed",
-                                    ));
-                                    overload.set_return_type(Type::unknown());
-                                }
+                                overload.check_property_setter(db, setter, *instance, *value, 0);
                             } else {
                                 overload
                                     .errors
@@ -6318,6 +6295,37 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    fn check_property_setter(
+        &mut self,
+        db: &'db dyn Db,
+        setter: Type<'db>,
+        instance: Type<'db>,
+        value: Type<'db>,
+        argument_index_offset: usize,
+    ) {
+        match setter.try_call(db, &CallArguments::positional([instance, value])) {
+            Ok(bindings) => {
+                let return_ty = bindings.return_type(db);
+                // `property.__set__` returns `None` for ordinary setters, but preserving `Never`
+                // keeps non-returning setters divergent.
+                self.set_return_type(if return_ty.is_never() {
+                    return_ty
+                } else {
+                    Type::none(db)
+                });
+            }
+            Err(CallError(_, bindings)) => {
+                self.errors.push(BindingError::PropertySetterCallError(
+                    PropertySetterCallError {
+                        bindings,
+                        argument_index_offset,
+                    },
+                ));
+                self.set_return_type(Type::unknown());
+            }
+        }
+    }
+
     pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Binding<'db> {
         let return_ty = signature.return_ty;
         Binding {
@@ -7430,9 +7438,10 @@ pub(crate) enum BindingError<'db> {
     },
     PropertyHasNoSetter(PropertyInstanceType<'db>),
     PropertyHasNoDeleter(PropertyInstanceType<'db>),
+    PropertySetterCallError(PropertySetterCallError<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
-    /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
-    /// can occur when the call to the underlying getter/setter fails.
+    /// We use this variant to report errors in `property.__get__` and `property.__delete__`,
+    /// which can occur when the call to the underlying getter/deleter fails.
     InternalCallError(&'static str),
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
@@ -7446,6 +7455,31 @@ pub(crate) enum BindingError<'db> {
     /// The stdlib `dataclass` decorator factory was called with incompatible arguments.
     InvalidDataclassArgument(InvalidDataclassArgument),
 }
+
+#[derive(Clone, Debug)]
+pub(crate) struct PropertySetterCallError<'db> {
+    bindings: Box<Bindings<'db>>,
+    argument_index_offset: usize,
+}
+
+impl PartialEq for PropertySetterCallError<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.argument_index_offset == other.argument_index_offset
+            && self.bindings.callable_type() == other.bindings.callable_type()
+            && self
+                .bindings
+                .iter_flat()
+                .flatten()
+                .flat_map(Binding::errors)
+                .eq(other
+                    .bindings
+                    .iter_flat()
+                    .flatten()
+                    .flat_map(Binding::errors))
+    }
+}
+
+impl Eq for PropertySetterCallError<'_> {}
 
 impl BindingError<'_> {
     /// Returns whether this error is relevant to `functools.partial(...)` construction.
@@ -7532,7 +7566,8 @@ impl BindingError<'_> {
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
-            | BindingError::PropertyHasNoDeleter(..) => {}
+            | BindingError::PropertyHasNoDeleter(..)
+            | BindingError::PropertySetterCallError(..) => {}
         }
     }
 
@@ -7592,6 +7627,7 @@ impl<'db> BindingError<'db> {
             | Self::InvalidDataclassArgument(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
+            | Self::PropertySetterCallError(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
 
@@ -8032,6 +8068,15 @@ impl<'db> BindingError<'db> {
                     matching_overload,
                     source_parameter_index_offset,
                 );
+            }
+
+            Self::PropertySetterCallError(error) => {
+                let context = CallDiagnosticContext {
+                    context: context.context,
+                    overrides: context.overrides,
+                    argument_index_offset: error.argument_index_offset,
+                };
+                error.bindings.report_diagnostics_impl(&context, node);
             }
 
             Self::InternalCallError(reason) => {
