@@ -1565,20 +1565,29 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> TypeVarSet<'db> {
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (TypeVarSet::None, other) | (other, TypeVarSet::None) => other,
-            (TypeVarSet::Some(self_inner), TypeVarSet::Some(other_inner)) => Self::from_typevars(
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn merge_inner<'db>(
+            db: &'db dyn Db,
+            self_inner: TypeVarSetInner<'db>,
+            other_inner: TypeVarSetInner<'db>,
+        ) -> TypeVarSet<'db> {
+            TypeVarSet::from_typevars(
                 db,
                 self_inner
                     .typevars(db)
                     .values()
                     .chain(other_inner.typevars(db).values())
                     .copied(),
-            ),
+            )
+        }
+
+        match (self, other) {
+            (TypeVarSet::None, other) | (other, TypeVarSet::None) => other,
+            (TypeVarSet::Some(self_inner), TypeVarSet::Some(other_inner)) => {
+                merge_inner(db, self_inner, other_inner)
+            }
         }
     }
 
