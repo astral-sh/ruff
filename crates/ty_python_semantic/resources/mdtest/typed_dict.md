@@ -2614,7 +2614,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping
 from typing import Any, Literal, TypedDict
 
-A = TypedDict("A", {"type": Literal["a"], "irrelevant": Any})
+A = TypedDict("A", {"type": Literal["a"]})
 B = TypedDict("B", {"type": Literal["b"]})
 C = TypedDict("C", {"type": Literal["c"]})
 D = TypedDict("D", {"type": Literal["d"]})
@@ -2652,8 +2652,7 @@ def _(item: Item | str) -> None:
         reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
-A union can also contain a regular dictionary. Copying the union remains fast even when a
-`TypedDict` has an unrelated `Any` field:
+Adding a regular dictionary to the union should not make copying it slow:
 
 ```py
 def _(item: Item | dict[str, Any]) -> None:
@@ -2662,7 +2661,18 @@ def _(item: Item | dict[str, Any]) -> None:
         dict(item)
 ```
 
-The same performance guarantee applies to `Mapping`, `MutableMapping`, and `OrderedDict`:
+An unrelated `Any` field on a `TypedDict` should not disable this optimization:
+
+```py
+class ItemWithAny(TypedDict):
+    type: Literal["any"]
+    other: Any
+
+def _(item: Item | ItemWithAny | dict[str, Any]) -> None:
+    dict(item)
+```
+
+`Mapping`, `MutableMapping`, and `OrderedDict` should also be copied efficiently:
 
 ```py
 def _(item: Item | Mapping[str, Any]) -> None:
