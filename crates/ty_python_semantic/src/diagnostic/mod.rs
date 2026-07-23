@@ -1,5 +1,5 @@
 use crate::{
-    Db, Program, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
+    Db, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
     types::TypeCheckDiagnostics,
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
@@ -48,7 +48,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
     diagnostic: &mut Diagnostic,
     action: &str,
 ) {
-    let program = Program::get(db);
+    let program = ty_python_core::program::Program::get(db);
     let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
 
     match source {

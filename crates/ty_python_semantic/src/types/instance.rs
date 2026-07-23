@@ -1,11 +1,11 @@
 //! Instance types: both nominal and structural.
 
-use crate::SemanticContext;
+use crate::{Program, SemanticContext};
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
@@ -243,9 +243,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn class(&self, ctx: &SemanticContext<'db>) -> ClassType<'db> {
         let db = ctx.db();
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                tuple.to_class_type(db, ctx.python_version())
-            }
+            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db, ctx.program()),
             NominalInstanceInner::NonTuple(class) => class.class(db),
             NominalInstanceInner::SysVersionInfo => {
                 sys_version_info_class(ctx).unwrap_or_else(|| ClassType::object(ctx))
@@ -750,13 +748,7 @@ fn non_recursive_protocol_interface<'db>(
     receiver_ty: Type<'db>,
 ) -> ProtocolInterface<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        protocol
-            .class_literal(db)
-            .python_file(db)
-            .python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), protocol.class_literal(db).program(db));
     non_recursive_protocol_interface_inner(db, interface, protocol, receiver_ty)
 }
 
@@ -1093,10 +1085,10 @@ impl<'db> ProtocolInstanceType<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
-            python_version: PythonVersion,
+            program: Program,
             protocol: ProtocolInstanceType<'db>,
         ) -> bool {
-            let ctx = SemanticContext::from_version(db, python_version);
+            let ctx = SemanticContext::from_program(db, program);
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
@@ -1115,7 +1107,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .is_always_satisfied(&ctx)
         }
 
-        is_equivalent_to_object_inner(ctx.db(), ctx.python_version(), self)
+        is_equivalent_to_object_inner(ctx.db(), ctx.program(), self)
     }
 
     pub(super) fn recursive_type_normalized_impl(

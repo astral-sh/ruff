@@ -121,10 +121,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     pattern: PatternPredicate<'db>,
 ) -> Option<&'db FrozenNarrowingConstraints<'db>> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        pattern.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), pattern.program(db));
     all_narrowing_constraints_for_pattern_inner(db, pattern)
 }
 
@@ -150,10 +147,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     expression: Expression<'db>,
 ) -> &'db ExpressionNarrowingConstraints<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        expression.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), expression.program(db));
     all_narrowing_constraints_for_expression_inner(db, expression)
 }
 
@@ -182,10 +176,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     pattern: PatternPredicate<'db>,
 ) -> Option<&'db FrozenNarrowingConstraints<'db>> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        pattern.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), pattern.program(db));
     all_negative_narrowing_constraints_for_pattern_inner(db, pattern)
 }
 
@@ -212,10 +203,7 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     target: ExpressionNodeKey,
 ) -> Option<&'db FrozenNarrowingConstraints<'db>> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        pattern.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), pattern.program(db));
     all_narrowing_constraints_for_subject_element_pattern_inner(db, pattern, target)
 }
 
@@ -462,10 +450,7 @@ pub(crate) fn pattern_success_types<'db>(
     pattern: PatternPredicate<'db>,
 ) -> &'db PatternSuccessTypes<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        pattern.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), pattern.program(db));
     pattern_success_types_inner(db, pattern)
 }
 

@@ -524,10 +524,7 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
 
 fn is_root_model<'db>(ctx: &SemanticContext<'db>, class: StaticClassLiteral<'db>) -> bool {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        class.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), class.program(db));
     is_root_model_inner(db, class)
 }
 
@@ -601,10 +598,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
 
 fn model_config<'db>(ctx: &SemanticContext<'db>, class: StaticClassLiteral<'db>) -> ModelConfig {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        class.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), class.program(db));
     model_config_inner(db, class)
 }
 
@@ -882,10 +876,7 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
-    debug_assert_eq!(
-        ctx.python_version(),
-        class.python_file(ctx.db()).python_version(ctx.db())
-    );
+    debug_assert_eq!(ctx.program(), class.program(ctx.db()));
     has_before_or_plain_field_validator_inner(ctx.db(), class, field_name)
 }
 

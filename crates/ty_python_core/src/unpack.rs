@@ -1,3 +1,4 @@
+use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -68,6 +69,10 @@ impl<'db> Unpack<'db> {
     pub fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.target_file_scope(db)
             .to_scope_id(db, self.python_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.target_scope(db).program(db)
     }
 
     /// Returns the range of the unpack target expression.

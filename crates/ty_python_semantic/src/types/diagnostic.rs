@@ -32,7 +32,7 @@ use crate::types::{
     binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
@@ -4637,7 +4637,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         return false;
     }
 
-    let program = Program::get(db);
+    let program = ty_python_core::program::Program::get(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {

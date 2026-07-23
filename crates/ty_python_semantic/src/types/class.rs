@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::{Program, SemanticContext};
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -186,10 +186,7 @@ impl<'db> CodeGeneratorKind<'db> {
             }
         }
 
-        debug_assert_eq!(
-            ctx.python_version(),
-            class.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), class.program(db));
         code_generator_of_static_class(db, class)
     }
 
@@ -240,10 +237,7 @@ impl<'db> CodeGeneratorKind<'db> {
         }
 
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            class.scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), class.scope(db).program(db));
         code_generator_of_dynamic_class(db, class)
     }
 
@@ -453,10 +447,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.origin(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.origin(db).program(db));
         self.variance_of_owner(db, typevar)
     }
 }
@@ -777,6 +768,16 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.scope(db).python_file(db),
             Self::DynamicTypedDict(class) => class.scope(db).python_file(db),
             Self::DynamicEnum(enum_lit) => enum_lit.scope(db).python_file(db),
+        }
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        match self {
+            Self::Static(class) => class.program(db),
+            Self::Dynamic(class) => class.scope(db).program(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).program(db),
+            Self::DynamicTypedDict(class) => class.scope(db).program(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).program(db),
         }
     }
 
@@ -1335,10 +1336,7 @@ impl<'db> ClassType<'db> {
         ctx: &SemanticContext<'db>,
     ) -> &'db FxIndexMap<Name, AbstractMethod<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.class_literal(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.class_literal(db).program(db));
         self.abstract_methods_inner(db)
     }
 
@@ -1495,10 +1493,7 @@ impl<'db> ClassType<'db> {
         ctx: &SemanticContext<'db>,
     ) -> Option<DisjointBase<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.class_literal(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.class_literal(db).program(db));
         self.nearest_disjoint_base_inner(db)
     }
 
@@ -2161,10 +2156,7 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     pub(super) fn into_callable(self, ctx: &SemanticContext<'db>) -> CallableTypes<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.class_literal(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.class_literal(db).program(db));
         self.into_callable_inner(db)
     }
 

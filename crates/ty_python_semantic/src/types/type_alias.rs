@@ -69,10 +69,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     pub(super) fn raw_value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.rhs_scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.rhs_scope(db).program(db));
         self.raw_value_type_inner(db)
     }
 
@@ -127,10 +124,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     pub(crate) fn generic_context(self, ctx: &SemanticContext<'db>) -> Option<GenericContext<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.rhs_scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.rhs_scope(db).program(db));
         self.generic_context_inner(db)
     }
 
@@ -200,10 +194,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     pub(crate) fn raw_value_type(self, ctx: &SemanticContext<'db>) -> Type<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.definition(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
         self.raw_value_type_inner(db)
     }
 
@@ -254,10 +245,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
 
     pub(crate) fn generic_context(self, ctx: &SemanticContext<'db>) -> Option<GenericContext<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.definition(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
         self.generic_context_inner(db)
     }
 
@@ -450,10 +438,7 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.definition(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
         self.variance_of_owner(db, typevar)
     }
 }

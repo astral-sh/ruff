@@ -800,13 +800,7 @@ fn enum_class_key_profile<'db>(
     operator: ComparisonOperator,
 ) -> &'db EnumClassKeyProfile<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        enum_class
-            .class_literal(db)
-            .python_file(db)
-            .python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), enum_class.class_literal(db).program(db));
     enum_class_key_profile_inner(db, enum_class, operator)
 }
 
@@ -865,13 +859,7 @@ fn same_enum_comparison_profile<'db>(
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        enum_class
-            .class_literal(db)
-            .python_file(db)
-            .python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), enum_class.class_literal(db).program(db));
     same_enum_comparison_profile_inner(db, enum_class, operator)
 }
 

@@ -1,4 +1,4 @@
-use crate::SemanticContext;
+use crate::{Program, SemanticContext};
 use itertools::{Either, Itertools};
 use ruff_db::{
     PythonFile,
@@ -194,10 +194,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// synthesis is valid.
     pub(crate) fn has_own_ordering_method(self, ctx: &SemanticContext<'db>) -> bool {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.has_own_ordering_method_inner(db)
     }
 
@@ -212,10 +209,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn has_own_comparison_methods(self, ctx: &SemanticContext<'db>) -> bool {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.has_own_comparison_methods_inner(db)
     }
 
@@ -294,10 +288,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn generic_context(self, ctx: &SemanticContext<'db>) -> Option<GenericContext<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.generic_context_inner(db)
     }
 
@@ -337,10 +328,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_type_params(db) {
             return None;
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.pep695_generic_context_inner(db)
     }
 
@@ -403,10 +391,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return None;
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         inherited_legacy_generic_context_inner(db, self)
     }
 
@@ -475,6 +460,10 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.body_scope(db).python_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        self.body_scope(db).program(db)
     }
 
     /// Return the original [`ast::StmtClassDef`] node associated with this class
@@ -606,10 +595,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return &[];
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         explicit_bases_inner(db, self)
     }
 
@@ -684,10 +670,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_decorators(db) {
             return &[];
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.decorators_inner(db)
     }
 
@@ -774,10 +757,7 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.try_mro_inner(db, specialization)
     }
 
@@ -867,20 +847,14 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return ClassInstanceFlags::empty();
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         instance_flags_inner(db, self)
     }
 
     /// Return the module defining the `TypedDict` base of this class.
     pub(crate) fn typed_dict_module(self, ctx: &SemanticContext<'db>) -> Option<TypedDictModule> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.typed_dict_module_inner(db)
     }
 
@@ -1242,10 +1216,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
             return Ok((KnownClass::Type.to_class_literal(ctx), None));
@@ -2133,10 +2104,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.fields_inner(db, specialization, field_policy)
     }
 
@@ -2307,10 +2275,7 @@ impl<'db> StaticClassLiteral<'db> {
         field_policy: CodeGeneratorKind<'db>,
     ) -> &'db FxIndexMap<Name, Field<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.own_fields_inner(db, specialization, field_policy)
     }
 
@@ -2557,10 +2522,7 @@ impl<'db> StaticClassLiteral<'db> {
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            class_body_scope.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), class_body_scope.program(db));
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
         let names = implicit_attribute_names(db, class_body_scope);
@@ -3169,10 +3131,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return None;
         }
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
 
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn inheritance_cycle_inner<'db>(
@@ -3383,10 +3342,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.variance_of_owner(db, typevar)
     }
 }

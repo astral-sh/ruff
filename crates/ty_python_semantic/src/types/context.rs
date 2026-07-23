@@ -21,7 +21,7 @@ use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
-    Db,
+    Db, Program,
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
@@ -44,11 +44,11 @@ impl<'db> SemanticContext<'db> {
         }
     }
 
-    /// Creates a context with an already-established Python version.
-    pub const fn from_version(db: &'db dyn Db, python_version: PythonVersion) -> Self {
+    /// Creates a context with an already-established program.
+    pub const fn from_program(db: &'db dyn Db, program: Program) -> Self {
         Self {
             db,
-            environment: Cell::new(PythonEnvironmentSource::Version(python_version)),
+            environment: Cell::new(PythonEnvironmentSource::Program(program)),
         }
     }
 
@@ -58,27 +58,33 @@ impl<'db> SemanticContext<'db> {
         self.db
     }
 
-    /// Returns the Python version used by this operation.
+    /// Returns the program used by this operation.
     #[inline]
-    pub fn python_version(&self) -> PythonVersion {
+    pub fn program(&self) -> Program {
         match self.environment.get() {
-            PythonEnvironmentSource::Version(python_version) => python_version,
+            PythonEnvironmentSource::Program(program) => program,
             PythonEnvironmentSource::File(file) => {
                 cold_path();
                 // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
                 // re-wrapping it for this ingredient read restores that database lifetime.
-                let python_version = PythonFile::from_id(file).python_version(self.db);
+                let program = PythonFile::from_id(file).python_version(self.db);
                 self.environment
-                    .set(PythonEnvironmentSource::Version(python_version));
-                python_version
+                    .set(PythonEnvironmentSource::Program(program));
+                program
             }
         }
+    }
+
+    /// Returns the Python version used by this operation.
+    #[inline]
+    pub fn python_version(&self) -> PythonVersion {
+        self.program()
     }
 }
 
 #[derive(Clone, Copy)]
 enum PythonEnvironmentSource {
-    Version(PythonVersion),
+    Program(Program),
     // Salsa interned handles are thin `Id` wrappers, so converting between `PythonFile` and `Id`
     // is an inlined representation change with no database lookup. Keeping the lifetime-bearing
     // `PythonFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
@@ -150,6 +156,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     #[inline]
     pub(crate) fn semantic_context(&self) -> &'ast SemanticContext<'db> {
         self.semantic_context
+    }
+
+    #[inline]
+    pub(crate) fn program(&self) -> Program {
+        self.semantic_context.program()
     }
 
     /// The module for which the types are inferred.

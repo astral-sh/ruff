@@ -90,7 +90,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn semantic_context(&self) -> SemanticContext<'_> {
-            SemanticContext::from_version(self, self.python_version())
+            SemanticContext::from_program(self, self.python_version())
         }
 
         /// Marks `file` as open in the editor.

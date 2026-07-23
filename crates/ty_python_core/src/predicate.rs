@@ -7,6 +7,7 @@
 //! - [_Reachability constraints_][crate::reachability_constraints] determine the
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
+use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
@@ -261,6 +262,10 @@ impl<'db> PatternPredicate<'db> {
 
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.python_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope(db).program(db)
     }
 }
 

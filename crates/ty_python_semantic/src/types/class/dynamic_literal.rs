@@ -200,10 +200,7 @@ impl<'db> DynamicClassLiteral<'db> {
             definition: Definition<'db>,
         ) -> &'db [Type<'db>] {
             let db = ctx.db();
-            debug_assert_eq!(
-                ctx.python_version(),
-                definition.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), definition.program(db));
             deferred_explicit_bases_inner(db, definition)
         }
 
@@ -484,10 +481,7 @@ impl<'db> DynamicClassLiteral<'db> {
         ctx: &SemanticContext<'db>,
     ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.scope(db).program(db));
         self.try_mro_inner(db)
     }
 

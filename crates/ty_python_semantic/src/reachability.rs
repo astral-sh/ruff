@@ -243,10 +243,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        predicate.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), predicate.program(db));
     type_narrowed_by_previous_patterns_inner(db, predicate, subject_ty)
 }
 
@@ -288,10 +285,7 @@ fn type_narrowed_by_pattern<'db>(
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        predicate.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), predicate.program(db));
     type_narrowed_by_pattern_inner(db, predicate, subject_ty)
 }
 
@@ -502,10 +496,7 @@ fn analyze_pattern_predicate<'db>(
     predicate: PatternPredicate<'db>,
 ) -> Truthiness {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        predicate.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), predicate.program(db));
     analyze_pattern_predicate_inner(db, predicate)
 }
 
@@ -680,10 +671,7 @@ fn non_terminal_call_predicates<'db>(
     scope: ScopeId<'db>,
 ) -> &'db [ScopedPredicateId] {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     non_terminal_call_predicates_inner(db, scope)
 }
 
@@ -724,10 +712,7 @@ fn analyze_non_terminal_call_range<'db>(
     index: usize,
 ) {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     analyze_non_terminal_call_range_inner(db, scope, level, index);
 }
 
@@ -851,10 +836,7 @@ fn evaluate_reachability_checkpoint<'db>(
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     evaluate_reachability_checkpoint_inner(db, scope, id)
 }
 
@@ -1529,14 +1511,8 @@ fn analyze_non_terminal_call<'db>(
     is_await: bool,
 ) -> Truthiness {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        callable.python_file(db).python_version(db)
-    );
-    debug_assert_eq!(
-        ctx.python_version(),
-        call_expr.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), callable.program(db));
+    debug_assert_eq!(ctx.program(), call_expr.program(db));
     analyze_non_terminal_call_inner(db, callable, call_expr, is_await)
 }
 

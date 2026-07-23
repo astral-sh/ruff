@@ -1,3 +1,4 @@
+use crate::Program;
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::definition::Definition;
@@ -62,6 +63,10 @@ impl<'db> StatementInner<'db> {
 
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.python_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope(db).program(db)
     }
 }
 

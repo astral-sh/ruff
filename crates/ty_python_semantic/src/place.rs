@@ -16,7 +16,7 @@ use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -1024,10 +1024,7 @@ pub(crate) fn place_by_id<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     place_by_id_inner(
         db,
         scope,
@@ -1359,7 +1356,7 @@ fn symbol_impl<'db>(
             "version_info" => {
                 return Place::bound(Type::sys_version_info()).into();
             }
-            "platform" => match Program::get(db).python_platform(db) {
+            "platform" => match ty_python_core::program::Program::get(db).python_platform(db) {
                 crate::PythonPlatform::Identifier(platform) => {
                     return Place::bound(Type::string_literal(db, platform.as_str())).into();
                 }
@@ -1372,7 +1369,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
-        match Program::get(db).python_platform(db) {
+        match ty_python_core::program::Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
                 let os_name = if platform == "win32" { "nt" } else { "posix" };
@@ -1404,10 +1401,7 @@ pub(crate) fn loop_header_reachability<'db>(
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     loop_header_reachability_inner(db, definition)
 }
 
@@ -2243,10 +2237,10 @@ pub(crate) mod implicit_globals {
         )]
         fn module_type_symbols_inner(
             db: &dyn Db,
-            python_version: PythonVersion,
+            program: ty_python_core::Program,
             _: (), // TODO: Remove once this is a query over `Program`.
         ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-            let ctx = SemanticContext::from_version(db, python_version);
+            let ctx = SemanticContext::from_program(db, program);
             let Some(module_type) = KnownClass::ModuleType
                 .to_class_literal(&ctx)
                 .as_class_literal()
@@ -2275,7 +2269,7 @@ pub(crate) mod implicit_globals {
                 .collect()
         }
 
-        module_type_symbols_inner(ctx.db(), ctx.python_version(), ())
+        module_type_symbols_inner(ctx.db(), ctx.program(), ())
     }
 
     /// Returns an iterator over all implicit module global symbols and their types.

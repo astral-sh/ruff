@@ -261,10 +261,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// 10. `<class 'object'>`
     pub(crate) fn mro(self, ctx: &SemanticContext<'db>) -> &'db Mro<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.scope(db).program(db));
         self.mro_inner(db)
     }
 
@@ -301,13 +298,12 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
         if !self.has_known_fields(ctx) {
-            return TupleType::homogeneous(db, Type::unknown())
-                .to_class_type(db, ctx.python_version());
+            return TupleType::homogeneous(db, Type::unknown()).to_class_type(db, ctx.program());
         }
 
         let field_types = self.fields(ctx).iter().map(|field| field.ty);
         TupleType::heterogeneous(db, field_types)
-            .map(|t| t.to_class_type(db, ctx.python_version()))
+            .map(|t| t.to_class_type(db, ctx.program()))
             .unwrap_or_else(|| {
                 KnownClass::Tuple
                     .to_class_literal(ctx)
@@ -468,10 +464,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             definition: Definition<'db>,
         ) -> NamedTupleSpec<'db> {
             let db = ctx.db();
-            debug_assert_eq!(
-                ctx.python_version(),
-                definition.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), definition.program(db));
             deferred_spec_inner(db, definition)
         }
 
