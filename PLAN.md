@@ -5,7 +5,7 @@
 - [x] PR 0's C0/E1–E6 behavior basis already exists on the parent stack.
 - [x] PR 1B's visitor-driven `PathAssignments` implementation is already merged into `main`.
 - [x] Phase 2 — Refactor `TypeVarSet` to retain identity-keyed bound instances.
-- [ ] Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end.
+- [ ] Phase 3 — Implement the minimal existential-atom representation, ownership, and display.
 
 The former Phase 1 `Atom::Range` refactor ([astral-sh/ruff#27111](https://github.com/astral-sh/ruff/pull/27111), `dcreager/refactor-atoms`) is **superseded and is not a prerequisite**. It has been moved out of this stack. `dcreager/inferable-instances` is based directly on `dcreager/quant-tests`; the implementation therefore still uses `ConstraintId`, `Constraint`, and the existing range-constraint arenas. Do not reintroduce the single shared `Atom` payload arena described by that earlier design.
 
@@ -40,7 +40,7 @@ struct Existential<'db> {
 }
 ```
 
-Construction takes an explicitly supplied `additional_domain` constraint set and combines it with the declared valid specializations of precisely the quantified variables:
+Construction takes an explicitly supplied `additional_domain` TDD root and combines it with the declared valid specializations of precisely the quantified variables:
 
 ```text
 DeclaredDomain(X) = ∧ { valid_specializations(x) | x ∈ X }
@@ -61,7 +61,7 @@ One existential atom kind is sufficient. A universal relation is represented lat
     ≡ ¬∃X. Domain(X, Additional) ∧ ¬Body(X, Y)
 ```
 
-PR 2A provides representation, persistence, and an explicit test-only eager-lowering operation. Positive/nested scoped discharge, negative discharge and explicit incompleteness, witness-preserving solution selection, optional exact-cover optimizations, and generic-signature integration remain subsequent PRs. Do not change production `reduce_inferable` or `for_all` to introduce existential atoms, and do not automatically lower constraint sets during production interrogation. Encountering an existential in a legacy semantic consumer is an invariant violation and may panic. A separately scoped follow-up PR can decide whether to start constructing existential atoms and explicitly opt into lowering before full scoped traversal lands.
+PR 2A is a representation prerequisite, not a production quantification feature. Its agreed minimum is the existential-atom representation together with ownership and display. Other capabilities are not requirements merely because they might be useful to a future consumer: include them only when a concrete representation, ownership, or display acceptance case actually requires them. Ownership must support both `OwnedConstraintSet::query` and `ConstraintSetBuilder::load`, including adding new existential atoms after existing ones have been loaded. Both `ConstraintSet::display` and `ConstraintSet::display_graph` must support existential atoms. Positive/nested scoped discharge, negative discharge and explicit incompleteness, witness-preserving solution selection, optional exact-cover optimizations, and generic-signature integration remain subsequent PRs. Do not change production `reduce_inferable` or `for_all` to introduce existential atoms, and do not automatically lower constraint sets during production interrogation.
 
 ## Current implementation and constraints
 
@@ -128,9 +128,9 @@ Keep **constraint** for the existing range representation and all genuinely rang
 - `ConstraintId`, `Constraint`, and `ConstraintBounds`;
 - `ConstraintSetStorage::constraints`, `OwnedConstraintSetInner::constraints`, `constraint_cache`, and `constraint_indices`;
 - `retained_constraint_index`, `adjusted_constraint_id`, `intern_constraint`, `constraint_data`, and other range lookup/interning helpers;
-- range implication/intersection, bound-depth caches, `ConstraintAssignment`, and range-only sequent handling.
+- range implication/intersection, bound-depth caches, and range-only sequent handling.
 
-Use **atom** only for data structures and operations shared by range and existential node atoms. The discriminator is the new `AtomId` enum, and the generic interior-node field becomes `atom: AtomId`. Rename traversal callbacks, root lookup, structural temporary maps, and similar generic node operations from `constraint` to `atom` only where they can now receive either kind. Do not rename the existing range arena or wrap `Constraint` in a single-variant payload enum.
+Use **atom** only for data structures and operations shared by range and existential node atoms. The discriminator is the new `AtomId` enum, the generic interior-node field becomes `atom: AtomId`, and the existing `ConstraintAssignment` becomes `AtomAssignment` over `AtomId`. Rename traversal callbacks, root lookup, structural temporary maps, and similar generic node operations from `constraint` to `atom` only where they can now receive either kind. Range-specific consumers of an `AtomAssignment` must explicitly require a range atom rather than inspecting an existential as a range constraint. Do not rename the existing range arena or wrap `Constraint` in a single-variant payload enum.
 
 The existential representation has its own typed arena, index space, cache, and compacted-index metadata. This keeps the common range representation and its hot paths intact while making it impossible to confuse range and existential payload IDs.
 
@@ -148,6 +148,12 @@ struct ExistentialId;
 enum AtomId {
     Range(ConstraintId),
     Existential(ExistentialId),
+}
+
+enum AtomAssignment {
+    Positive(AtomId),
+    Negative(AtomId),
+    Unconstrained(AtomId),
 }
 
 struct Constraint<'db> {
@@ -193,18 +199,19 @@ struct OwnedConstraintSetInner<'db> {
 
 The exact visibility and helper names can follow neighboring code. The essential properties are:
 
-1. Existing range constraints remain cheap, copyable, and fast. `ConstraintId` continues to index only `Constraint` payloads; range-specific APIs, caches, and assignments remain strongly typed.
+1. Existing range constraints remain cheap, copyable, and fast. `ConstraintId` continues to index only `Constraint` payloads; range-specific APIs, caches, and sequent reasoning remain strongly typed, while generic atom assignments explicitly distinguish their underlying atom kind.
 1. `ExistentialId` indexes only `Existential` payloads in a separate builder arena and separate compacted owned arena. Existentials have their own interning cache and overlay split/index metadata; there is no shared `Atom` payload arena or shared payload cache.
 1. `AtomId::{Range, Existential}` is the only ID stored in an interior node and is used by generic TDD structure, traversal, and Boolean operations. Exhaustive matching selects the correctly typed payload arena.
-1. `AtomId` must provide a deterministic total TDD-variable ordering across both ID spaces while preserving the existing range ordering/wobbling behavior. Raw per-arena indices cannot be treated as one shared encounter sequence. Explicitly define the cross-kind ordering (or retain separate builder-local encounter-order metadata if interleaving is required), and preserve source-order offsets independently of that ordering.
+1. `AtomId` must provide a deterministic total TDD-variable ordering across both ID spaces while preserving the existing range ordering/wobbling behavior. Order first by atom kind, with ordinary range constraints closer to the TDD root under the normal ordering, and then by the existing reversed/wobbled per-kind ID ordering. Apply `wobble_index` to the atom kind as well so wobble runs also exercise the opposite cross-kind ordering. Raw per-arena indices do not form a shared encounter sequence, and no global encounter-order metadata is needed. Preserve source-order offsets independently of TDD ordering.
 1. `TypeVarSet` is already a compact, copyable, Salsa-interned set, so each `Existential` can store its binder directly. No boxed local slice or additional canonical-instance storage is needed.
-1. Locals are exactly the supplied `TypeVarSet`, which retains bound instances while preserving identity-based membership, first-wins deduplication, freshness distinctions, Salsa sharing, and efficient set representation.
-1. The construction boundary accepts the authoritative `TypeVarSet`, an `additional_domain` constraint set, and a body. It stores that set unchanged and adds no variables discovered recursively in bounds.
+1. Proactively intern every variable in the supplied binder into the builder's existing typevar arena before constructing any declared-domain constraints, preserving binder/source order even for unused or unconstrained variables. Binder interning itself is just an ordered iteration of the explicit instances calling existing `intern_typevar`; do not recursively inspect bounds, constraints, or defaults. Leave existing range-constraint interning and its incidental traversal of referenced typevars completely unchanged.
+1. Locals are exactly the supplied `TypeVarSet`, which retains bound instances while preserving identity-based membership, first-wins deduplication, freshness distinctions, Salsa sharing, and efficient set representation. Constructors trust the caller to provide correctly scoped/fresh binder identities; document this invariant, but do not traverse nested graphs or enforce freshness/disjointness with debug assertions.
+1. The internal construction boundary accepts the authoritative `TypeVarSet` plus `NodeId` roots for `additional_domain` and the body. It stores the binder unchanged and adds no recursively discovered variables to that binder.
 1. The relation stores a domain root equal to the conjunction of the selected variables' valid specializations and `additional_domain`. `ConstraintSet` itself never stores a companion domain.
-1. The relation stores **no free-variable interface**; compute it from the stored domain and body when required. Ephemeral builder-local support caches are permitted if measurements justify them.
+1. The relation stores **no free-variable interface** and introduces no free-support traversal, helper, or cache.
 1. Nested quantified-relation domains and bodies remain separate TDDs. A relation's local variables do not become ordinary variables in its containing TDD merely because their graphs share the same builder arenas.
 
-A relation's free interface is the union of the free support of its stored domain and body, minus its own local set. This includes free variables introduced by both declared bounds and `additional_domain`. For nested quantified atoms, use the nested atom's free interface rather than exposing its locals. In particular:
+If a future operation ever needs to reason explicitly about free variables, the semantic free variables of a relation would come from its stored domain and body minus its own binder. This is explanatory semantics, not a planned data structure, traversal, helper, or cache; Phase 3 must not implement free-interface/support discovery, and no later need is assumed. In particular:
 
 ```text
 locals = {X}
@@ -242,65 +249,54 @@ The earlier phase replaced the existing constraint arena with a shared arena con
 
 **Exit criteria:** `TypeVarSet` retains actual bound instances while preserving its existing identity-based membership, ordering, first-wins deduplication, laziness, Salsa/cache behavior, and observable inference results; no new existential-specific methods or domain computations have been introduced; the revision is independently mergeable as a pure refactor.
 
-**Validation note:** the focused `TypeVarSet` and generic-context unit tests, quantification and constraint-ordering mdtests, and full `ty_python_semantic` suite pass (769 passed, 35 skipped). No snapshot expectations changed.
+**Validation note:** the focused `TypeVarSet` and generic-context unit tests, quantification and constraint-ordering mdtests, and full `ty_python_semantic` suite pass (most recently revalidated: 768 passed, 35 skipped). No snapshot expectations changed.
 
-## Phase 3 — Integrate existential atoms, ownership, mapping, and display end to end
+## Phase 3 — Implement the minimal existential-atom representation, ownership, and display
 
 **Status:** pending.
 
 **Dependency:** the independently reviewable Phase 2 `TypeVarSet` representation refactor, existing PR 0, and merged PR 1B. The superseded `Atom::Range` refactor is not a dependency.
 
-Adding `AtomId::{Range, Existential}`, changing `InteriorNodeData::constraint` to `atom: AtomId`, and adding the separate existential arenas immediately affects exhaustive matches, `ConstraintSet`, `OwnedConstraintSet`, type mapping, and display. Treat all of the workstreams below as one self-contained implementation phase and jj revision, not as independently passing revisions. If implementation reveals a genuinely self-contained intermediate boundary, update this plan before splitting the phase.
+**Agreed scope:** this phase is a representation prerequisite. It does not add a production existential producer, consumer, or user-visible quantification behavior. Ownership and display are considered necessary parts of implementing the new representation, rather than optional future integrations. Every additional capability must earn its place by supporting an actual representation, ownership, or display requirement; presumed utility to a later phase is insufficient.
 
-### Declared domains, existential atoms, and free interfaces
+### Required representation
 
-1. Add a `TypeVarSet`-level helper that computes the conjunction of `BoundTypeVarInstance::valid_specializations` for exactly its stored instances in the supplied builder. Reuse the existing single-typevar implementation for unbounded variables, upper bounds, finite constraints, gradual materialization, and `ParamSpec` components; do not recursively add domains for variables mentioned in those bounds.
-1. Support binders whose variables do not otherwise occur in the body, `additional_domain`, or builder. Their instances are available directly from `TypeVarSet`; do not introduce canonical-instance recovery in builder or owned storage.
-1. Preserve deterministic source ordering when constructing declared-domain roots. Never add a companion domain field to `ConstraintSet` or a separate top-level domain field to `OwnedConstraintSet`.
-1. Add a copyable `Existential<'db>` payload containing the supplied Salsa-interned `TypeVarSet<'db>`, a stored domain `NodeId`, and a separate body `NodeId`; add its typed `ExistentialId`, builder arena, and interning cache. Keep the existing `ConstraintId`, `Constraint`, constraint arena, and constraint cache unchanged.
-1. Introduce `AtomId::Range(ConstraintId)` and `AtomId::Existential(ExistentialId)`, and change the generic interior-node field to `atom: AtomId`. Update generic TDD construction, root lookup, traversal callbacks, temporary maps, ordering, and Boolean operations to use `AtomId`; retain `ConstraintAssignment` and sequent/bound caches as range-only types.
-1. Update existing range-specific consumers to match `AtomId::Range` before using `ConstraintId` or loading `Constraint` data. Handle existential atoms in structural operations, and panic with a clear invariant message if one unexpectedly reaches legacy satisfiability, validity, solution extraction, eager abstraction, or other unsupported semantic consumers.
-1. Add a private/internal constructor that takes an explicitly supplied `TypeVarSet`, an `additional_domain: ConstraintSet`, and a body; verifies all constraint-set inputs use the same builder; retains the supplied type-variable set unchanged; computes `valid_specializations(locals) ∧ additional_domain`; interns the `Existential` in its own arena; and creates an interior node using `AtomId::Existential`.
-1. Preserve the correct empty-binder fast path: with no locals, the quantified relation is `additional_domain ∧ body`, not merely `body`. Avoid unsupported simplifications that would accidentally assume a nonempty binder's domain is inhabited or flatten a nested scope.
-1. Enforce binder invariants with debug assertions: stored bound instances match their identity keys, nested binder identities are fresh/disjoint where required, and scope is interpreted according to lexical nesting rather than TDD variable ordering.
-1. Compute free support recursively from both the stored domain and body. Remove only the current binder's locals; preserve outer variables referenced through declared bounds or `additional_domain`, and preserve only the free interface of nested relation atoms.
-1. Ensure support discovery walks a TDD as a DAG and does not recurse into a variable's bound merely to decide which variables are quantified. Cache computed support only if necessary and only in transient builder storage.
-1. Give quantified atoms stable ordinary TDD ordering and Boolean composition. Define a deterministic total order across range and existential IDs, preserve existing range wobbling, and preserve source-order offsets when combining declared valid-specialization roots with `additional_domain`. Test positive, negative, and uncertain outer edges structurally, including nested relation domains and bodies.
-1. Keep existential constructors private/internal. Existing `ConstraintSet.exists`, `ConstraintSet.for_all`, `reduce_inferable`, and signature checking must continue to construct and use their current eager production representation; do not switch them to creating existential atoms in this PR.
-1. Add declared-domain and structural tests for empty binders, unconstrained variables, upper-bounded variables, finite constrained variables, gradual bounds, `ParamSpec` attributes, unused binders, interning/deduplication, distinct binders/domains/bodies, separate ID arenas, nested scopes, shared domain/body DAGs, receiver-style additional equality constraints, contradictory additional domains, additional domains mentioning only outer variables, dependent declared bounds, and TDD ordering wobble.
+1. Represent an existential relation with its explicitly supplied `TypeVarSet` binder, its separately stored domain, and its separately stored body. Preserve the existing single-root `ConstraintSet` and existing range-specific IDs, payloads, arenas, and caches.
+1. Mirror the existing range-constructor layering with private `NodeId`-level existential constructors. `ExistentialId::new(db, builder, locals, additional_domain, body)` first performs a shallow binder-order prepass calling `builder.intern_typevar` for each local, then computes `valid_specializations(locals) ∧ additional_domain` and delegates to a lower-level constructor such as `ExistentialId::new_with_domain(db, builder, locals, domain, body)`, which interns an already-complete domain and returns its `ExistentialId`. Cross-builder loading calls the complete-domain constructor directly, preserving the stored domain without recomputing or duplicating declared restrictions. Fold directly over the binder's instances in `ExistentialId::new`; do not add a single-use `TypeVarSet::valid_specializations` helper. Build declared domains in binder iteration order, place the additional domain after them using existing source-order-offset machinery, and preserve those offsets through ownership and loading. Binder interning does not walk declarations. Declared-domain construction evaluates the selected variables' own valid specializations but never recursively computes specializations for free variables mentioned in those declarations; any existing range-constraint interning triggered while constructing the domain remains unchanged.
+1. `Existential::new_node(db, builder, locals, additional_domain, body)` returns a `NodeId`. For an empty binder, return `additional_domain ∧ body`, never merely `body`; this remains correct under an enclosing negation and therefore preserves universal implication semantics. Otherwise, call `ExistentialId::new` and create the corresponding existential-atom node. Do not implement any other existential-specific simplifications. An implementation TODO may mention the potentially sound future cases `∃X. never ∧ body → never` and `∃X. domain ∧ never → never`. Additional domains may mention outer/free variables; do not impose a locals-only invariant or introduce support discovery to enforce one. Document that callers are responsible for correctly scoped/fresh nested binder identities; do not add nested-binder traversal or debug assertions.
+1. Do not add a higher-level constructor returning `ConstraintSet` until it has an actual caller. Its agreed future shape is a method on `ConstraintSet` whose `self` receiver is the body being quantified, and whose other inputs provide the quantified `TypeVarSet` and `additional_domain`; it returns the resulting `ConstraintSet`. The method name and exact argument/lifetime spelling can be decided when that caller exists.
+1. Rename and generalize `ConstraintAssignment` to `AtomAssignment`, retaining the existing `Positive`, `Negative`, and `Unconstrained` variants and replacing each `ConstraintId` payload with `AtomId`; do not flatten atom kind and polarity into six variants merely to preserve the previous eight-byte layout. Reuse this atom-generic assignment for display clauses; implication/simplification delegates to existing range logic only when both atoms are ranges and otherwise treats existential atoms opaquely. Keep sequents, bound reasoning, and other genuinely range-specific operations strongly range-oriented, failing explicitly if they encounter an existential assignment.
+1. Add only the generic atom discrimination, structural TDD handling, typed existential storage, and construction needed to represent and test that relation without changing existing production quantification behavior. Structural union, intersection, negation, and graph reconstruction may treat existential atoms opaquely. Generalize `for_each_unique_constraint` to `for_each_unique_atom`, but traverse only the current diagram's true/uncertain/false edges; ownership, loading, or display can explicitly recurse into existential domains/bodies when their contracts require it.
+1. Existing short-circuiting `ConstraintSet::and` and `ConstraintSet::or` need not accept existential-containing sets: their range-only satisfiability prechecks may fail under the normal invariant. Use direct/non-short-circuiting structural composition where existential support is required. Replacing those prechecks with terminal-only checks is a separate performance investigation, not part of this phase.
+1. Preserve existing ordinary-range behavior, deterministic ordering, source ordering, and performance-sensitive paths. Give atoms a total ordering by wobbled kind followed by reversed/wobbled per-kind ID; ordinary range constraints appear closer to the root under normal ordering, while wobble runs also exercise the opposite cross-kind order. Unsupported range-only semantic consumers must fail with an explicit invariant-violation panic when they encounter an existential atom, unless an operation is explicitly brought into scope by a concrete representation, ownership, or display requirement. Do not add proactive scans, automatic lowering, or speculative existential evaluation.
 
-### Explicit test-only lowering and production invariants
+### Required ownership
 
-1. Add an explicit lowering operation for existential atoms constructed by Rust unit tests. Recursively lower nested domains and bodies, then replace each existential with the existing eager abstraction of `domain ∧ body` over its `locals`. If practical, compile this helper only for tests until a later production user exists.
-1. Rebuild surrounding TDD structure while preserving positive/negative polarity, uncertain-branch semantics, source ordering, atom ordering, and shared subgraphs. Storage, Boolean structure, ownership, type mapping, and display must retain existential atoms unless a test explicitly requests lowering.
-1. Never call lowering automatically from production satisfiability/validity checks, `satisfied_by_all_typevars`, solution extraction, `reduce_inferable`, `for_all`, or other semantic interrogation. Production does not construct existential atoms, so existing hot paths must pay no no-op scan, cache lookup, or normalization cost.
-1. Panic with an explicit invariant-violation message if an existential nevertheless reaches a legacy semantic consumer. Add focused tests documenting the panic and tests that explicitly lower first before interrogating the equivalent ordinary constraint set.
-1. Treat explicit test lowering as the existing eager algorithm with its existing limitations, not as correct scoped quantifier discharge. Do not interpret existential atoms as independent freely assignable Booleans or silently claim exact invariant projection.
-1. Add unit tests comparing explicitly lowered positive, negative, nested, and uncertain existential formulas against manually constructing `domain ∧ body` and invoking the current eager abstraction. Include finite declared domains, receiver-style additional domains, free outer variables, and known incomplete invariant cases.
-1. Leave switching production `reduce_inferable` to construct existential atoms as an optional, separately reviewable follow-up. That future PR may explicitly invoke lowering where required and must independently evaluate declared-domain behavior changes and performance.
+1. `ConstraintSetBuilder::into_owned` must preserve each reachable existential relation, its binder, and its stored domain/body graphs in owned storage, including nested relations and shared subgraphs.
+1. `OwnedConstraintSet::query` must read existential relations through its compacted-storage overlay and permit adding new existential relations without confusing retained IDs with newly allocated IDs.
+1. `ConstraintSetBuilder::load` must rebuild existential relations and their domain/body graphs in another builder, preserve shared subgraphs, and permit adding additional existential relations afterward. Before rebuilding range constraints, iterate the owned existential arena and proactively intern each stored binder's explicit variables; the loop is naturally a no-op for ordinary range-only owned sets. Re-intern each relation through the complete-domain constructor rather than reapplying declared valid-specialization constraints to its already-combined stored domain.
+1. Preserve the existing single-node load fast path only when that node is a range atom. An existential with a nonempty binder and terminal domain/body can also occupy exactly one interior node, and must use the ordinary existential-capable reconstruction path.
+1. Remap builder-local node and payload IDs as required for ownership and loading. This is graph/arena remapping, not `ConstraintSet::apply_type_mapping_impl`: applying semantic `TypeMapping`s to existential binders, domains, or bodies is not an ownership requirement.
+1. Leave `OwnedConstraintSet::types` unchanged unless an actual ownership, display, or regression test demonstrates that existential-specific changes are necessary; retained range constraints already expose the types appearing in existential domains and bodies.
 
-### Owned storage, compaction, overlays, and loading
+### Required display
 
-1. Extend compacted owned storage with a separate `existentials: Box<[Existential]>` arena and `existential_indices` rank/index metadata alongside the unchanged `constraints` and `constraint_indices`. Retain the existing terminal fast path and `Arc` sharing. Do not introduce a shared `Atom` payload arena.
-1. Update `ConstraintSetBuilder::into_owned` reachability traversal to match each interior `AtomId`: mark range IDs in the existing constraint bitset; mark existential IDs in a separate existential bitset; traverse each retained existential's stored-domain and body nodes/atoms; and include all nested quantified relations. Bound instances remain directly available from each relation's Salsa-interned `TypeVarSet`.
-1. Persist each retained relation's existing Salsa-interned `TypeVarSet`, stored domain, and body in the compacted existential arena, but never persist transient support caches or add a companion domain to `OwnedConstraintSet`. Preserve sparse retained IDs independently for both arenas.
-1. Extend compacted-overlay existential access, retained-index lookup, identity-cache initialization, and existential interning so `OwnedConstraintSet::query` can read both typed arenas and append new range or existential payloads after the correct per-kind overlay split. Existing constraint overlay behavior must remain unchanged.
-1. Update `ConstraintSetBuilder::load` to rebuild nested domains and bodies before interning their containing existential, map each `AtomId` through the correct arena, reuse each relation's globally valid `TypeVarSet` unchanged, preserve source-order offsets, and preserve sharing for repeated relation/domain/body DAGs. Do not assume `ConstraintId` and `ExistentialId` share an index space or encounter order.
-1. Audit `OwnedConstraintSet::types`: it must expose range types, types in quantified domains and bodies, bound instances retained directly by `TypeVarSet`, and free interfaces introduced by declared bounds or `additional_domain`. If inspecting declarations requires `db`, update the small set of callers rather than losing mappings of relevant outer variables.
-1. Add owned-storage tests for unreachable relation/domain/body compaction, nested scopes, shared domain/body subgraphs, sparse retained IDs in both arenas, read-only overlay queries, mutation after overlay, cross-builder remapping, receiver-style additional domains, dependent declared bounds, fresh locals, and the storage-free terminal fast path.
+1. Both `ConstraintSet::display` and `ConstraintSet::display_graph` must support existential atoms while preserving existing ordinary-range output.
+1. Concise display treats an existential as an opaque atom, analogous to an ordinary range constraint. Recursively format its own binder, domain, and body as `(∃ {locals} . {domain} ∧ {body})`; surrounding clause construction continues to combine positive and negative atom literals without deeply transforming, lowering, or simplifying the quantified formula.
+1. Preserve the existing display-simplification pipeline rather than proactively skipping it or teaching it existential semantics. Mechanically generalize genuinely atom-generic display/literal operations as needed, and make atom implication/simplification return no range-containment or implication cases whenever an existential participates. Existing ordinary-range simplifications remain available.
+1. Graph display must structurally represent the existential node by showing its quantified variables, inline and separately identified recursively rendered domain/body TDDs, and its ordinary true/uncertain/false branches. Embedded diagrams appear beneath their containing existential node, not in detached sections. Use shared graph numbering and shared-subgraph references rather than repeatedly expanding nodes. Do not reuse the opaque concise `(∃...)` rendering as the graph node's label. Resolve exact connector alignment and visual formatting iteratively without weakening these acceptance requirements.
 
-### Type mapping, display, lexical scope, and deterministic ordering
+### Regression coverage
 
-1. Extend `ConstraintSet::apply_type_mapping_impl` to match the interior `AtomId`, retain its existing range mapping behavior, recursively rebuild both quantified domains and bodies, and, when a mapping actually renames binder variables, construct the corresponding mapped `TypeVarSet` and re-intern the mapped existential in its own arena.
-1. Specify capture-avoiding binder behavior explicitly. Free/interface variables must be mapped; deliberate freshness/typevar-to-typevar renaming must update binder, domain, and body together; mappings that would replace a bound local with a concrete type must have one documented, tested policy rather than silently capturing or freeing that variable.
-1. Ensure declared bounds of locals and additional-domain restrictions track mapped/freshened bound instances, including outer/free variables appearing only in the stored domain.
-1. Extend concise constraint display and full graph display to match the interior `AtomId` and show existential binders, their separate domains and bodies, negated polarity, uncertain branches, source order, and shared graphs. Do not introduce a separate universal atom or suggest that the outer `ConstraintSet` itself owns a domain.
-1. Update range-clause implication/simplification so it continues to use `ConstraintId` range containment/disjointness only for range literals. Quantified literals compare opaquely and are never simplified using range operations.
-1. Preserve deterministic local order, total TDD atom order, graph numbering, and source order across normal, reverse, and XOR builder orderings, cross-builder load, interning in separate arenas, and type mapping.
-1. Add targeted unit tests for free-variable specialization, freshness renaming, nested binders, capture avoidance, local declared-bound mapping, mapped receiver-style additional domains, positive/negative/uncertain display, domain/body graph sharing, and ordering stability. Keep the PR 0 mdtest expectations unchanged unless a separately implemented behavior genuinely improves; annotate any changed intermediate expectations with clear TODOs.
-1. Recheck the existing receiver-constraint `OwnedConstraintSet::types`/`Signature::map_constraints` integration and avoid exposing residual atoms through the mdtest `exists`/`for_all` entry points prematurely.
+Add only a small number of behavioral tests exercising the contracts of the constructors, ownership methods, display methods, structural Boolean operations, and explicitly unsupported semantic operations. Prefer observable rendered results and successful `query`/`load` round trips over assertions about arenas, IDs, caches, compaction layouts, traversal order, or other implementation details. Combine scenarios when practical and rely on existing tests for unchanged ordinary-range behavior; do not add an exhaustive edge-case matrix merely because an internal mechanism exists.
 
-**Exit criteria:** existing range IDs, payloads, arenas, caches, and hot paths remain strongly typed and intact; existential atoms retain their explicit binders, combined domains, and separate bodies in their own arenas; `AtomId` safely discriminates the two payload ID spaces in every interior node and has deterministic total ordering; existential atoms survive owned compaction, overlay queries, cross-builder loading, type mapping, and display; unit tests can explicitly lower them through the existing eager abstraction; unsupported production interrogation panics instead of silently guessing or performing a no-op normalization; production `reduce_inferable` and `for_all` do not create existential atoms; `ConstraintSet` has no companion domain; existing flat-TDD behavior, performance-sensitive fast paths, and all tests remain intact.
+### Not automatically required
+
+Do not implement semantic type mapping (`ConstraintSet::apply_type_mapping_impl`), capture avoidance, free-interface/support computation, existential lowering, receiver-constraint integration, production semantic interrogation, specialized simplification, or extra display machinery merely because a later consumer might require them. Do not assume that explicit free-variable-interface computation will ever be needed. Test-only lowering is deferred to PR 2B, where it can compare new existential traversal against the existing eager-quantification behavior; Phase 3 tests validate representation, ownership, and display structurally instead. Builder-local ID remapping required by `ConstraintSetBuilder::load` is part of the agreed ownership contract, but does not require applying semantic type mappings. Unsupported range-only semantic operations explicitly panic instead of guessing; exceptions must be justified and explicitly agreed. Add any other capability only after identifying a concrete acceptance case that makes it necessary for this phase.
+
+**Open decisions:** refine exact graph-display connector alignment and identify any further explicitly justified exceptions to range-only invariant failures. Regression coverage should remain minimal and behavioral rather than prescribing storage or implementation details.
+
+**Exit criteria:** existential relations have the agreed minimal representation, ownership, and display; existing range representations and behavior remain intact; production `reduce_inferable`, `for_all`, and mdtest quantifier entry points retain their current behavior; `ConstraintSet` has no companion domain; and all relevant tests pass. Do not expand these criteria without a concrete top-line requirement.
 
 ## Validation for every implementation phase
 
@@ -315,7 +311,7 @@ MDTEST_UPDATE_SNAPSHOTS=1 \
 cargo nextest run -p ty_python_semantic -- mdtest::type_properties/quantification.md
 ```
 
-Run the affected constraint-ordering mdtest when atom ordering, source order, loading, or support handling changes:
+Run the affected constraint-ordering mdtest under its normal ordering when atom ordering, source order, or loading changes:
 
 ```sh
 CARGO_PROFILE_DEV_OPT_LEVEL=1 \
@@ -336,6 +332,8 @@ CARGO_PROFILE_DEV_DEBUG="line-tables-only" \
 MDTEST_UPDATE_SNAPSHOTS=1 \
 cargo nextest run -p ty_python_semantic
 ```
+
+Alternative `TY_CONSTRAINT_SET_ORDER` settings are optional information-gathering tools, never a validation gate for any phase. Wobbled runs are expected to expose existing failures; do not require them to pass, do not update snapshots for them, and do not rewrite implementation or tests solely to make them green. Graph-display expectations may legitimately vary with TDD shape.
 
 If `cargo nextest` is unavailable, use the documented `cargo test` equivalents. Never run concurrent cargo commands in this workspace. Review all generated snapshot changes and check for `.pending-snap` files when applicable; never edit snapshot contents manually.
 
