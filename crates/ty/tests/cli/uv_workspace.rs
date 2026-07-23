@@ -68,7 +68,8 @@ fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
     let metadata = metadata.output()?;
     anyhow::ensure!(
         metadata.status.success(),
-        "failed to query uv workspace metadata"
+        "failed to query uv workspace metadata: {}",
+        String::from_utf8_lossy(&metadata.stderr)
     );
     if !String::from_utf8_lossy(&metadata.stdout).contains("\"environment\"") {
         return Ok(None);
@@ -220,6 +221,51 @@ invalid-assignment = "ignore"
         return Ok(());
     };
     command.arg("packages/member");
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+#[test]
+fn external_workspace_member_uses_workspace_configuration() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[tool.uv.workspace]
+members = ["../external-package"]
+
+[tool.ty.rules]
+invalid-assignment = "ignore"
+"#,
+        ),
+        (
+            "../external-package/pyproject.toml",
+            r#"
+[project]
+name = "external-package"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#,
+        ),
+        ("../external-package/member.py", "value: int = 'wrong'"),
+    ])?;
+
+    let Some(mut command) = command_with_uv(&case, None)? else {
+        return Ok(());
+    };
+    command
+        .args(["--project", "../external-package", "../external-package"])
+        .env("UV_PROJECT", case.root());
 
     assert_cmd_snapshot!(command, @"
     success: true

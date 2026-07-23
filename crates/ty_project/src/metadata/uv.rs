@@ -46,7 +46,7 @@ impl UvWorkspace {
             return None;
         }
 
-        match Self::from_metadata(path, &output.stdout, system) {
+        match Self::from_metadata(&output.stdout, system) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
                 tracing::debug!("Failed to use `uv workspace metadata` output: {error}");
@@ -56,7 +56,6 @@ impl UvWorkspace {
     }
 
     pub(super) fn from_metadata(
-        path: &SystemPath,
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
@@ -64,12 +63,6 @@ impl UvWorkspace {
             .map_err(UvWorkspaceError::InvalidMetadata)?;
 
         let root = existing_directory(metadata.workspace_root, "workspace root", system)?;
-        if !path.starts_with(&root) {
-            return Err(UvWorkspaceError::WorkspaceRootNotAncestor {
-                root,
-                path: path.to_path_buf(),
-            });
-        }
 
         let (environment, python_version) = match metadata.environment {
             Some(environment) => (
@@ -162,12 +155,6 @@ pub(super) enum UvWorkspaceError {
         description: &'static str,
         path: SystemPathBuf,
     },
-
-    #[error("uv workspace root `{root}` is not an ancestor of `{path}`")]
-    WorkspaceRootNotAncestor {
-        root: SystemPathBuf,
-        path: SystemPathBuf,
-    },
 }
 
 #[derive(Deserialize)]
@@ -198,7 +185,7 @@ mod tests {
         let system = TestSystem::default();
 
         assert!(matches!(
-            UvWorkspace::from_metadata(SystemPath::new("/app"), b"{", &system),
+            UvWorkspace::from_metadata(b"{", &system),
             Err(UvWorkspaceError::InvalidMetadata(_))
         ));
     }
@@ -213,7 +200,7 @@ mod tests {
             "workspace_root": "/app"
         }"#;
 
-        let workspace = UvWorkspace::from_metadata(SystemPath::new("/app"), metadata, &system)?;
+        let workspace = UvWorkspace::from_metadata(metadata, &system)?;
 
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
@@ -236,7 +223,7 @@ mod tests {
             }
         }"#;
 
-        let workspace = UvWorkspace::from_metadata(SystemPath::new("/app"), metadata, &system)?;
+        let workspace = UvWorkspace::from_metadata(metadata, &system)?;
 
         assert_eq!(workspace.environment(), Some(SystemPath::new("/env")));
         assert_eq!(
@@ -263,7 +250,7 @@ mod tests {
         }"#;
 
         assert!(matches!(
-            UvWorkspace::from_metadata(SystemPath::new("/app"), metadata, &system),
+            UvWorkspace::from_metadata(metadata, &system),
             Err(UvWorkspaceError::InvalidPythonVersion(_))
         ));
 

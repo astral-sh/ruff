@@ -221,10 +221,19 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
         let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvWorkspace::root);
+        let uv_workspace_root = uv_workspace
+            .as_ref()
+            .map(|workspace| workspace.root().to_path_buf());
 
-        for project_root in path.ancestors() {
-            let is_uv_workspace_root = uv_workspace_root == Some(project_root);
+        // Workspace members can live outside the workspace directory, for example when uv's
+        // members include `../external-package`. Include that root explicitly because walking
+        // the member's ancestors alone cannot discover its workspace configuration.
+        let external_uv_workspace_root = uv_workspace_root
+            .as_deref()
+            .filter(|root| !path.starts_with(root));
+
+        for project_root in path.ancestors().chain(external_uv_workspace_root) {
+            let is_uv_workspace_root = uv_workspace_root.as_deref() == Some(project_root);
             let pyproject_path = project_root.join("pyproject.toml");
 
             let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
@@ -880,7 +889,42 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let uv_workspace = uv_workspace(&root, &member, &system)?;
+        let uv_workspace = uv_workspace(&root, &system)?;
+        let project =
+            ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
+
+        assert_eq!(project.root(), &*root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn external_uv_workspace_precedes_plain_member_pyproject() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app/workspace");
+        let member = SystemPathBuf::from("/app/external-package");
+
+        system.memory_file_system().write_files_all([
+            (
+                root.join("pyproject.toml"),
+                r#"
+                [tool.uv.workspace]
+                members = ["../external-package"]
+
+                [tool.ty.rules]
+                invalid-assignment = "ignore"
+                "#,
+            ),
+            (
+                member.join("pyproject.toml"),
+                r#"
+                [project]
+                name = "external-package"
+                "#,
+            ),
+        ])?;
+
+        let uv_workspace = uv_workspace(&root, &system)?;
         let project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
 
@@ -928,7 +972,7 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let uv_workspace = uv_workspace(&root, &member, &system)?;
+        let uv_workspace = uv_workspace(&root, &system)?;
         let mut project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
         project.apply_configuration_files(&system)?;
@@ -974,7 +1018,7 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let uv_workspace = uv_workspace(&workspace, &member, &system)?;
+        let uv_workspace = uv_workspace(&workspace, &system)?;
         let project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
 
@@ -1014,8 +1058,7 @@ unclosed table, expected `]`
                 },
             },
         });
-        let uv_workspace =
-            UvWorkspace::from_metadata(&member, metadata.to_string().as_bytes(), &system)?;
+        let uv_workspace = UvWorkspace::from_metadata(metadata.to_string().as_bytes(), &system)?;
         let mut project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
         project.apply_fallback_options(Options::from_toml_str(
@@ -1548,17 +1591,12 @@ unclosed table, expected `]`
         assert_eq!(format!("{error:#}").replace('\\', "/"), message);
     }
 
-    fn uv_workspace(
-        root: &SystemPathBuf,
-        member: &SystemPathBuf,
-        system: &TestSystem,
-    ) -> anyhow::Result<UvWorkspace> {
+    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvWorkspace> {
         let metadata = serde_json::json!({
             "workspace_root": root,
         });
 
         Ok(UvWorkspace::from_metadata(
-            member,
             metadata.to_string().as_bytes(),
             system,
         )?)
