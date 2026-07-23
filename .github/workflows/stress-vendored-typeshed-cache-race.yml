@@ -62,12 +62,19 @@ jobs:
 
             $failed = @($processes | Where-Object { $_.ExitCode -ne 0 })
             if ($failed.Count -gt 0) {
-              Write-Host "Reproduced on round $round: $($failed.Count) of $workers workers failed"
-              Get-ChildItem $cacheRoot -Filter "*.stderr" | ForEach-Object {
-                $content = Get-Content $_.FullName -Raw
-                if ($content) {
-                  Write-Host "--- $($_.Name) ---"
-                  Write-Host $content
+              Write-Host "Reproduced on round ${round}: $($failed.Count) of $workers workers failed"
+              for ($worker = 1; $worker -le $workers; $worker++) {
+                if ($processes[$worker - 1].ExitCode -eq 0) {
+                  continue
+                }
+
+                foreach ($stream in "stdout", "stderr") {
+                  $path = Join-Path $cacheRoot "worker-$worker.$stream"
+                  $content = Get-Content $path -Raw
+                  if ($content) {
+                    Write-Host "--- worker-$worker.$stream ---"
+                    Write-Host $content
+                  }
                 }
               }
               exit 1
