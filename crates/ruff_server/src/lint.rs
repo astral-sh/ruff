@@ -16,7 +16,7 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator, SuppressionKind,
+    Locator,
     directives::{Flags, extract_directives},
     generate_suppression_edits,
     linter::{check_path, parse_unchecked_source},
@@ -152,7 +152,7 @@ pub(crate) fn check(
         &suppressions,
     );
 
-    let ignore_edits = generate_suppression_edits(
+    let (ignore_edits, noqa_edits) = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -161,19 +161,6 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
-        SuppressionKind::Ignore,
-        settings.linter.preview,
-    );
-    let noqa_edits = generate_suppression_edits(
-        &document_path,
-        &diagnostics,
-        &locator,
-        indexer.comment_ranges(),
-        &settings.linter.external,
-        &directives.noqa_line_for,
-        stylist.line_ending(),
-        &suppressions,
-        SuppressionKind::Noqa,
         settings.linter.preview,
     );
     let context = LspDiagnosticContext {
