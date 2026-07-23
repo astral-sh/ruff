@@ -1238,7 +1238,13 @@ class Box[T]:
 def ensure_tuple[T, **P](func: Callable[P, tuple[T, ...] | T]) -> Callable[P, tuple[T, ...]]:
     raise NotImplementedError
 
+def ensure_tuple_reversed[T, **P](func: Callable[P, T | tuple[T, ...]]) -> Callable[P, tuple[T, ...]]:
+    raise NotImplementedError
+
 def ensure_box[T, **P](func: Callable[P, Box[T] | T]) -> Callable[P, Box[T]]:
+    raise NotImplementedError
+
+def ensure_box_reversed[T, **P](func: Callable[P, T | Box[T]]) -> Callable[P, Box[T]]:
     raise NotImplementedError
 
 def check(
@@ -1251,10 +1257,16 @@ def check(
 ) -> None:
     reveal_type(ensure_tuple(scalar_first))  # revealed: (int, /) -> tuple[str, ...]
     reveal_type(ensure_tuple(tuple_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(scalar_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(tuple_first))  # revealed: (int, /) -> tuple[str, ...]
     reveal_type(ensure_tuple(nested_member_first))  # revealed: (int, /) -> tuple[Box[str], ...]
     reveal_type(ensure_tuple(nested_tuple_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_member_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_tuple_first))  # revealed: (int, /) -> tuple[Box[str], ...]
     reveal_type(ensure_box(box_scalar_first))  # revealed: (int, /) -> Box[str]
     reveal_type(ensure_box(box_first))  # revealed: (int, /) -> Box[str]
+    reveal_type(ensure_box_reversed(box_scalar_first))  # revealed: (int, /) -> Box[str]
+    reveal_type(ensure_box_reversed(box_first))  # revealed: (int, /) -> Box[str]
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times
