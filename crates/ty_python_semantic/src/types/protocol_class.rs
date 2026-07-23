@@ -1,10 +1,10 @@
-use crate::SemanticContext;
+use crate::{Program, SemanticContext};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
 use itertools::Itertools;
 
-use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::attribute_write::{
@@ -81,10 +81,7 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn interface(self, ctx: &SemanticContext<'db>) -> ProtocolInterface<'db> {
         let db = ctx.db();
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.class_literal(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.class_literal(db).program(db));
         cached_protocol_interface(db, *self)
     }
 
@@ -1148,7 +1145,7 @@ impl<'db> ProtocolMemberData<'db> {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
                 ProtocolMethodKind::Class,
-                protocol_bind_self(db, ctx.python_version(), callable, None),
+                protocol_bind_self(db, ctx.program(), callable, None),
             )
         } else if callable.is_staticmethod_like(db) {
             (ProtocolMethodKind::Static, callable.into_regular(db))
@@ -1200,14 +1197,9 @@ impl<'db> ProtocolMemberData<'db> {
         match self.kind {
             ProtocolMemberKind::Method(member, kind) => {
                 let instance_method = match (member.ty(), kind) {
-                    (Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                        member.with_ty(Type::Callable(protocol_bind_self(
-                            ctx.db(),
-                            ctx.python_version(),
-                            callable,
-                            None,
-                        )))
-                    }
+                    (Type::Callable(callable), ProtocolMethodKind::Instance) => member.with_ty(
+                        Type::Callable(protocol_bind_self(ctx.db(), ctx.program(), callable, None)),
+                    ),
                     _ => member,
                 };
                 ProtocolMemberCapabilities {
@@ -2079,7 +2071,7 @@ fn protocol_member_read_type<'db>(
             ctx,
             MemberLookupKey::new(
                 db,
-                ctx.python_version(),
+                ctx.program(),
                 ty,
                 member.name,
                 // The undefined fallback excludes instance members. Keep the class
@@ -2506,7 +2498,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     callable.bind_self(ctx, Some(implementation_self_binding_ty)),
                                     protocol_bind_self(
                                         ctx.db(),
-                                        ctx.python_version(),
+                                        ctx.program(),
                                         required_callable,
                                         Some(protocol_self_binding_ty),
                                     ),
@@ -3213,11 +3205,11 @@ fn proto_interface_cycle_recover<'db>(
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
-    python_version: PythonVersion,
+    program: Program,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    let ctx = SemanticContext::from_version(db, python_version);
+    let ctx = SemanticContext::from_program(db, program);
     callable.bind_self(&ctx, self_type).into_regular(db)
 }
 

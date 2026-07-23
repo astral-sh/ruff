@@ -142,7 +142,7 @@ fn create_bound_method<'db>(
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let ctx = SemanticContext::from_version(db, python_version);
+    let ctx = SemanticContext::from_program(db, python_version);
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),

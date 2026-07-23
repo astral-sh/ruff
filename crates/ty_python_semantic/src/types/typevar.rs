@@ -485,10 +485,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_bound_unchecked(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
         let db = ctx.db();
         if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(
-                ctx.python_version(),
-                definition.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), definition.program(db));
         }
         self.lazy_bound_unchecked_inner(db)
     }
@@ -539,10 +536,7 @@ impl<'db> TypeVarInstance<'db> {
     ) -> Option<TypeVarConstraints<'db>> {
         let db = ctx.db();
         if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(
-                ctx.python_version(),
-                definition.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), definition.program(db));
         }
         self.lazy_constraints_unchecked_inner(db)
     }
@@ -611,10 +605,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_default_unchecked(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
         let db = ctx.db();
         if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(
-                ctx.python_version(),
-                definition.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), definition.program(db));
         }
         self.lazy_default_unchecked_inner(db)
     }
@@ -1298,14 +1289,12 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// (resulting in `T@C`).
     pub(crate) fn default_type(self, ctx: &SemanticContext<'db>) -> Option<Type<'db>> {
         let db = ctx.db();
-        let python_version = ctx.python_version();
+        let program = ctx.program();
         debug_assert_eq!(
             self.typevar(db)
                 .definition(db)
-                .map_or(python_version, |definition| {
-                    definition.python_file(db).python_version(db)
-                }),
-            python_version,
+                .map_or(program, |definition| { definition.program(db) }),
+            program,
             "a bound TypeVar's Python version must match the active Python version"
         );
         bound_typevar_default_type(db, self)

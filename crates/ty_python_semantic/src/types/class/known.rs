@@ -1,5 +1,5 @@
 use crate::{
-    Db, SemanticContext,
+    Db, Program, SemanticContext,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
@@ -1045,7 +1045,7 @@ impl KnownClass {
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
         ) -> Type<'db> {
-            let ctx = &SemanticContext::from_version(db, argument.python_version(db));
+            let ctx = &SemanticContext::from_program(db, argument.program(db));
             argument
                 .class(db)
                 .to_class_literal(ctx)
@@ -1055,7 +1055,7 @@ impl KnownClass {
         }
 
         let db = ctx.db();
-        known_class_to_instance(db, KnownClassArgument::new(db, self, ctx.python_version()))
+        known_class_to_instance(db, KnownClassArgument::new(db, self, ctx.program()))
     }
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
@@ -1163,8 +1163,9 @@ impl KnownClass {
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
         ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-            let python_version = argument.python_version(db);
-            let ctx = &SemanticContext::from_version(db, python_version);
+            let program = argument.program(db);
+            let ctx = &SemanticContext::from_program(db, program);
+            let python_version = ctx.python_version();
             let class = argument.class(db);
             let module = class.canonical_module(python_version);
             let third_party = module.is_third_party();
@@ -1210,7 +1211,7 @@ impl KnownClass {
         }
 
         let db = ctx.db();
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self, ctx.python_version()))
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self, ctx.program()))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -2037,7 +2038,7 @@ struct KnownClassArgument {
     class: KnownClass,
 
     #[returns(copy)]
-    python_version: PythonVersion,
+    program: Program,
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
@@ -2122,7 +2123,7 @@ impl<'db> KnownClassLookupError<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::{Program, PythonVersionSource, PythonVersionWithSource};
+    use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
@@ -2130,7 +2131,7 @@ mod tests {
     #[test]
     fn known_class_roundtrip_from_str() {
         let mut db = setup_db();
-        Program::get(&db)
+        ty_python_core::program::Program::get(&db)
             .set_python_version_with_source(&mut db)
             .to(PythonVersionWithSource {
                 version: PythonVersion::latest_preview(),
@@ -2165,7 +2166,7 @@ mod tests {
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
         let mut db = setup_db();
 
-        Program::get(&db)
+        ty_python_core::program::Program::get(&db)
             .set_python_version_with_source(&mut db)
             .to(PythonVersionWithSource {
                 version: PythonVersion::latest_ty(),
@@ -2226,7 +2227,7 @@ mod tests {
 
         classes.sort_unstable_by_key(|(_, version)| *version);
 
-        let program = Program::get(&db);
+        let program = ty_python_core::program::Program::get(&db);
         let mut current_version = program.python_version(&db);
 
         for (class, version_added) in classes {

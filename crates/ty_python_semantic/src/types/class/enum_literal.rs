@@ -205,10 +205,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         ctx: &SemanticContext<'db>,
     ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.scope(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.scope(db).program(db));
         self.try_mro_inner(db)
     }
 

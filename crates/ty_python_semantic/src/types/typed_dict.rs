@@ -321,13 +321,7 @@ impl<'db> TypedDictType<'db> {
 
         match self {
             Self::Class(defining_class) => {
-                debug_assert_eq!(
-                    ctx.python_version(),
-                    defining_class
-                        .class_literal(db)
-                        .python_file(db)
-                        .python_version(db)
-                );
+                debug_assert_eq!(ctx.program(), defining_class.class_literal(db).program(db));
                 class_based_openness(db, defining_class)
             }
             Self::Synthesized(synthesized) => synthesized.openness(db),
@@ -562,13 +556,7 @@ impl<'db> TypedDictType<'db> {
                     return class.items(ctx);
                 }
 
-                debug_assert_eq!(
-                    ctx.python_version(),
-                    defining_class
-                        .class_literal(db)
-                        .python_file(db)
-                        .python_version(db)
-                );
+                debug_assert_eq!(ctx.program(), defining_class.class_literal(db).program(db));
                 class_based_items(db, defining_class)
             }
             Self::Synthesized(synthesized) => synthesized.items(db),
@@ -1319,10 +1307,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     definition: Definition<'db>,
 ) -> &'db TypedDictSchema<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     deferred_functional_typed_dict_schema_inner(db, definition)
 }
 
@@ -1394,10 +1379,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     deferred_functional_typed_dict_openness_inner(db, definition)
 }
 

@@ -110,7 +110,7 @@ use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, Program,
     SemanticContext, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
@@ -774,6 +774,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     #[inline]
     fn semantic_context(&self) -> &'ast SemanticContext<'db> {
         self.context.semantic_context()
+    }
+
+    #[inline]
+    fn program(&self) -> Program {
+        self.context.program()
     }
 
     fn module(&self) -> &'ast ParsedModuleRef {

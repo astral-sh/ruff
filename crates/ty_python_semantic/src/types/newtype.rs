@@ -56,10 +56,7 @@ impl<'db> NewType<'db> {
 
     fn lazy_base(self, ctx: &SemanticContext<'db>) -> NewTypeBase<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.definition(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.definition(db).program(db));
         self.lazy_base_inner(db)
     }
 

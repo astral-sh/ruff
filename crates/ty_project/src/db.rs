@@ -737,7 +737,7 @@ pub(crate) mod testing {
         }
 
         pub fn semantic_context(&self) -> SemanticContext<'_> {
-            SemanticContext::from_version(self, self.python_version())
+            SemanticContext::from_program(self, self.python_version())
         }
 
         /// Takes the salsa events.

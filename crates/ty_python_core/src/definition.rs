@@ -10,7 +10,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
-use crate::Db;
 use crate::LoopHeaderId;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
@@ -20,6 +19,7 @@ use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::{Db, Program};
 
 /// A definition of a place.
 ///
@@ -85,6 +85,10 @@ impl<'db> Definition<'db> {
 
     pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.scope_id(db).python_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope_id(db).program(db)
     }
 
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {

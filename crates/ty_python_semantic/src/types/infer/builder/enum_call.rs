@@ -326,13 +326,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let Some(name) = &kw.arg else {
                 continue;
             };
-            let python_version = self.semantic_context().python_version();
+            let ctx = self.semantic_context();
+            let python_version = ctx.python_version();
             if !enum_functional_call_keyword_is_valid(name.as_str(), python_version)
                 && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
             {
                 builder.into_diagnostic(format_args!(
                     "Argument `{name}` does not match any known parameter of function `{base_name}`",
-                    base_name = base_class.name(python_version),
+                    base_name = base_class.name(ctx.python_version()),
                 ));
             }
         }
@@ -490,14 +491,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_type = self.expression_type(name_arg);
 
         let Some(name_literal) = name_type.as_string_literal() else {
-            let python_version = self.semantic_context().python_version();
             let ctx = self.semantic_context();
             if !name_type.is_assignable_to(ctx, KnownClass::Str.to_instance(ctx))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`",
-                    base_name = base_class.name(python_version)
+                    base_name = base_class.name(ctx.python_version())
                 ));
                 diagnostic.set_primary_message(format_args!(
                     "Expected `str`, found `{}`",

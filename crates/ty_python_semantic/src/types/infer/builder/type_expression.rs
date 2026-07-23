@@ -1304,11 +1304,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     },
                     value_ty @ Type::ClassLiteral(class_literal) => {
                         if class_literal.is_tuple(self.db()) {
-                            let python_version = self.semantic_context().python_version();
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
                                 .map(|tuple_type| {
-                                    tuple_type.to_class_type(self.db(), python_version)
+                                    tuple_type.to_class_type(self.db(), self.program())
                                 })
                                 .unwrap_or_else(|| class_literal.default_specialization(ctx));
                             SubclassOfType::from(ctx, class_type)

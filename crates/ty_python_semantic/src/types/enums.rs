@@ -315,10 +315,7 @@ impl<'db> ClassLiteral<'db> {
         ctx: &SemanticContext<'db>,
     ) -> Option<EnumClassLiteral<'db>> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         enum_class_literal_inner(db, self)
     }
 }
@@ -906,10 +903,7 @@ pub(crate) fn enum_ignored_names<'db>(
     scope_id: ScopeId<'db>,
 ) -> &'db FxHashSet<Name> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope_id.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope_id.program(db));
     enum_ignored_names_inner(db, scope_id)
 }
 
@@ -977,10 +971,7 @@ pub(crate) fn enum_metadata<'db>(
     class: ClassLiteral<'db>,
 ) -> Option<&'db EnumMetadata<'db>> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        class.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), class.program(db));
     enum_metadata_inner(db, class)
 }
 

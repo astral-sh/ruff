@@ -482,8 +482,8 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let python_version = types.python_version(db);
-            let ctx = SemanticContext::from_version(db, python_version);
+            let program = types.program(db);
+            let ctx = SemanticContext::from_program(db, program);
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -505,10 +505,10 @@ impl<'db> Type<'db> {
             return Cow::Owned(OwnedConstraintSet::always());
         }
 
-        let python_version = ctx.python_version();
+        let program = ctx.program();
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
-            TypePair::new(db, python_version, self, target),
+            TypePair::new(db, program, self, target),
         ))
     }
 
@@ -550,8 +550,8 @@ impl<'db> Type<'db> {
     pub(super) fn is_redundant_with(self, ctx: &SemanticContext<'db>, other: Type<'db>) -> bool {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let python_version = types.python_version(db);
-            let ctx = SemanticContext::from_version(db, python_version);
+            let program = types.program(db);
+            let ctx = SemanticContext::from_program(db, program);
             types
                 .first(db)
                 .has_relation_to(
@@ -569,8 +569,8 @@ impl<'db> Type<'db> {
         }
 
         let db = ctx.db();
-        let python_version = ctx.python_version();
-        is_redundant_with_impl(db, TypePair::new(db, python_version, self, other))
+        let program = ctx.program();
+        is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }
 
     pub(super) fn has_relation_to<'c>(
