@@ -1959,12 +1959,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
-    /// Whether `pending` contains an actual-intersection relation for which the caller should try
-    /// path-wise return refinement.
-    ///
-    /// This is only a scope/performance gate. Callers must independently validate every path
-    /// before using its return type; disjunctions in `pending` need not originate here.
-    has_actual_intersection_constraint: bool,
 }
 
 /// The result of type variable inference before choosing how to handle unsolved type variables.
@@ -2066,7 +2060,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
-            has_actual_intersection_constraint: false,
         }
     }
 
@@ -2210,10 +2203,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         (!inferences.is_empty()).then(|| inferences.into_boxed_slice())
     }
 
-    pub(crate) fn has_actual_intersection_constraint(&self) -> bool {
-        self.has_actual_intersection_constraint
-    }
-
     fn solve_pending_constraints_with(
         &self,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
@@ -2240,9 +2229,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .variables_inner(self.db)
             .values()
             .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db));
-        if has_legacy_variadic && !self.has_actual_intersection_constraint {
-            return Ok(self.solve_hash_map_with(generic_context, choose));
-        }
 
         // TODO: This projection / solve can be expensive for large-union collection-literal type
         // contexts. During the pending-constraint-set migration, pydantic and hydra-zen regressed
@@ -2264,6 +2250,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Constrained(solutions) => solutions,
         };
 
+        // Validate all pending constraints before falling back; variadic inference can still
+        // share a context with ordinary type variables whose bounds may be contradictory.
         if has_legacy_variadic {
             return Ok(self.solve_hash_map_with(generic_context, choose));
         }
@@ -3414,7 +3402,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
-                self.has_actual_intersection_constraint = true;
                 self.infer_from_intersection_constraint_set(when)?;
                 return Ok(());
             }

@@ -5,6 +5,9 @@ non-inferable. Projecting its constraint out of the constraint set produces the 
 That terminal must be recognized before enumerating the remaining BDD paths; otherwise, the empty
 path list is interpreted as unsatisfiable and the inferred specialization degrades to `Unknown`.
 
+The remaining paths share the outer type variable as a valid specialization, which preserves the
+correlation between the returned `Call` and `wait`'s own return type.
+
 ```toml
 [environment]
 python-version = "3.11"
@@ -29,6 +32,6 @@ def cast_to_call(value: Callable[[], T | Awaitable[T]] | Call[T]) -> Call[T]:
 
 def wait(value: Callable[[], T] | Call[T]) -> T:
     call = cast_to_call(value)
-    reveal_type(call)  # revealed: Call[Awaitable[T@wait] | T@wait]
-    return call.result()  # error: [invalid-return-type]
+    reveal_type(call)  # revealed: Call[T@wait]
+    return call.result()
 ```
