@@ -2,7 +2,7 @@
 
 Quantification removes typevars from a constraint set, returning a new equivalent constraint set
 that only references the remaining typevars. With existential quantification (`exists`), the result
-holds when there is _at least one_ valid assignment of the removed variables satisfies the
+holds when there is _at least one_ valid assignment of the removed variables that satisfies the
 quantified expression. With universal quantification (`for_all`), the result holds when _every_
 valid assignment satisfies the quantified expression.
 
