@@ -2809,7 +2809,10 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
-                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetForAll(tracked)) => {
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetExists(tracked)
+                        | KnownBoundMethodType::ConstraintSetForAll(tracked)),
+                    ) => {
                         let [Some(typevars)] = overload.parameter_types() else {
                             continue;
                         };
@@ -2822,11 +2825,12 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            constraints.load(db, tracked.constraints(db)).for_all(
-                                db,
-                                constraints,
-                                typevars,
-                            )
+                            let set = constraints.load(db, tracked.constraints(db));
+                            if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
+                                set.reduce_inferable(db, constraints, typevars)
+                            } else {
+                                set.for_all(db, constraints, typevars)
+                            }
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
