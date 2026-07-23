@@ -7,6 +7,7 @@
 //! and overloads.
 
 use crate::Db;
+use crate::FxIndexMap;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
 use ruff_db::files::File;
@@ -236,7 +237,7 @@ fn create_parameters<'db>(
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
     } else {
-        indexmap::IndexMap::new()
+        FxIndexMap::default()
     };
 
     parameters

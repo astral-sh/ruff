@@ -69,10 +69,12 @@ use ruff_db::{
     vendored::VendoredPath,
 };
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
+
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

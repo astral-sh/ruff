@@ -24,7 +24,6 @@
 //!     The arithmetic mean.
 //! ```
 
-use indexmap::IndexMap;
 use ruff_text_size::{TextRange, TextSize};
 
 use super::preformatted::{PreformattedBlockScanner, starts_preformatted_block};
@@ -33,12 +32,13 @@ use super::syntax::{
     split_once_at_top_level_colon, starts_container_block,
 };
 use super::{DescriptionBuilder, HeaderKind, SectionKind};
+use crate::FxIndexMap;
 
 /// Returns parameter documentation from recognized NumPy-style parameter sections.
 ///
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
-pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
     let mut parameters = Parameters::default();
 
     for section in sections(normalized_source) {
@@ -56,7 +56,7 @@ pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<Strin
 }
 
 #[derive(Default)]
-struct Parameters(IndexMap<String, String>);
+struct Parameters(FxIndexMap<String, String>);
 
 impl Parameters {
     fn extend_fragments(&mut self, fragments: Vec<BodyFragment>) {
@@ -85,7 +85,7 @@ impl Parameters {
         }
     }
 
-    fn into_inner(self) -> IndexMap<String, String> {
+    fn into_inner(self) -> FxIndexMap<String, String> {
         self.0
     }
 }

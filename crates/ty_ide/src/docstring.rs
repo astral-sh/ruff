@@ -9,11 +9,10 @@
 mod document;
 mod markdown;
 
-use indexmap::IndexMap;
 use ruff_python_trivia::{PythonWhitespace, expand_tabs, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 
-use crate::MarkupKind;
+use crate::{FxIndexMap, MarkupKind};
 
 /// A docstring which hasn't yet been interpreted or rendered
 ///
@@ -48,7 +47,7 @@ impl Docstring {
 
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
-    pub fn parameter_documentation(&self) -> IndexMap<String, String> {
+    pub fn parameter_documentation(&self) -> FxIndexMap<String, String> {
         let normalized_source = documentation_trim(&self.0);
         document::parameter_documentation(&normalized_source)
     }
