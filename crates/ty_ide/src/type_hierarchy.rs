@@ -1,12 +1,12 @@
 use crate::Db;
 use crate::goto::find_goto_target;
 use rayon::prelude::*;
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{SemanticEnvironment, SemanticModel};
@@ -31,10 +31,10 @@ pub struct TypeHierarchyItem {
 /// Returns `None` if the position is not on a class definition or class reference.
 pub fn prepare_type_hierarchy(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
@@ -47,7 +47,7 @@ pub fn prepare_type_hierarchy(
 /// Get the supertypes (base classes) of a type hierarchy item.
 pub fn type_hierarchy_supertypes(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
@@ -65,14 +65,14 @@ pub fn type_hierarchy_supertypes(
 /// This scans all available modules and can be expensive in large projects.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
 
-    ty_module_resolver::all_modules(db, file.python_version(db))
+    ty_module_resolver::all_modules(db, file.resolver_environment(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
             let env = SemanticEnvironment::from_file(db, file);
@@ -91,10 +91,10 @@ pub fn type_hierarchy_subtypes(
 /// not be inferred, `None` is returned.
 fn resolve_type_at<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Option<Type<'db>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
 
     let goto_target = find_goto_target(&model, &module, offset)?;
@@ -733,7 +733,7 @@ Public = _Internal
         fn prepare(&self) -> Option<TypeHierarchyItem> {
             prepare_type_hierarchy(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             )
         }
@@ -744,7 +744,7 @@ Public = _Internal
             };
             type_hierarchy_supertypes(
                 &self.db,
-                self.python_file(item.file),
+                self.program_file(item.file),
                 item.selection_range.start(),
             )
         }
@@ -755,7 +755,7 @@ Public = _Internal
             };
             type_hierarchy_subtypes(
                 &self.db,
-                self.python_file(item.file),
+                self.program_file(item.file),
                 item.selection_range.start(),
             )
         }

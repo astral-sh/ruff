@@ -63,7 +63,7 @@ use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
-use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
+use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
@@ -101,7 +101,7 @@ use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
+use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RecursiveTypeNormalizationKey {
@@ -336,7 +336,11 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.body_scope(db).program_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.body_scope(db).program(db)
     }
 
@@ -447,7 +451,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.python_file(db));
+        let index = semantic_index(db, body_scope.program_file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
@@ -460,14 +464,14 @@ impl<'db> OverloadLiteral<'db> {
         let scope = self.definition(db).scope(db);
         let module = parsed_module(db, self.python_file(db)).load(db);
         let use_def =
-            semantic_index(db, scope.python_file(db)).use_def_map(scope.file_scope_id(db));
+            semantic_index(db, scope.program_file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, self.python_file(db));
+            .scoped_use_id(db, self.program_file(db));
 
         let Place::Defined(DefinedPlace {
             ty: Type::FunctionLiteral(previous_type),
@@ -514,7 +518,7 @@ impl<'db> OverloadLiteral<'db> {
         let mut signature = self.raw_signature(env, ReturnCallableTypeVarScope::Public);
         let module = parsed_module(db, python_file).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, self.program_file(db));
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
@@ -603,7 +607,7 @@ impl<'db> OverloadLiteral<'db> {
         let module = parsed_module(db, python_file).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, self.program_file(db));
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(env, index, definition, type_params)
         });
@@ -667,7 +671,7 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.python_file(db));
+                let index = semantic_index(db, scope_id.program_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                 let typing_self = typing_self(env, scope_id, typevar_binding_context, class.into())
@@ -824,7 +828,7 @@ impl<'db> FunctionLiteral<'db> {
             db: &'db dyn Db,
             self_overload: OverloadLiteral<'db>,
         ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-            let env = SemanticEnvironment::from_file(db, self_overload.python_file(db));
+            let env = SemanticEnvironment::from_file(db, self_overload.program_file(db));
             let mut current = self_overload;
             let mut overloads = vec![];
 
@@ -970,7 +974,7 @@ impl<'db> FunctionLiteral<'db> {
             implementation: OverloadLiteral<'db>,
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
-            let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+            let env = SemanticEnvironment::from_file(db, definition.program_file(db));
             let file = definition.file(db);
             let module = parsed_module(db, definition.python_file(db)).load(db);
             let node = implementation.node(db, file, &module);
@@ -1247,7 +1251,11 @@ impl<'db> FunctionType<'db> {
         self.literal(db).last_definition.python_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.literal(db).last_definition.program_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.literal(db).last_definition.program(db)
     }
 
@@ -1470,18 +1478,18 @@ impl<'db> FunctionType<'db> {
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, id, function: FunctionType<'db>| {
-            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            let env = SemanticEnvironment::from_file(db, function.program_file(db));
             CallableSignature::cycle_initial(&env, id)
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
-            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            let env = SemanticEnvironment::from_file(db, function.program_file(db));
             value.cycle_normalized(&env, previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn signature_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db).cloned().unwrap_or_else(|| {
-            let env = SemanticEnvironment::from_file(db, self.python_file(db));
+            let env = SemanticEnvironment::from_file(db, self.program_file(db));
             self.literal(db).signature(&env)
         })
     }
@@ -1510,7 +1518,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         self.signature(&env).variance_of(&env, typevar)
     }
 
@@ -1538,7 +1546,7 @@ impl<'db> FunctionType<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn last_definition_signature_inner(self, db: &'db dyn Db) -> Signature<'db> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         let literal = self.literal(db);
         if literal.has_separate_implementation(&env) {
             self.updated_implementation_signature(db)
@@ -1574,7 +1582,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         self.literal(db)
             .last_definition_raw_signature(&env, return_callable_typevar_scope)
     }
@@ -2317,8 +2325,9 @@ impl KnownFunction {
         }
 
         let candidate = Self::from_str(name).ok()?;
+        let file = definition.program_file(db);
         candidate
-            .check_module(file_to_module(db, definition.python_file(db))?.known(db)?)
+            .check_module(file_to_module(db, file.resolver_file(db))?.known(db)?)
             .then_some(candidate)
     }
 
@@ -2827,11 +2836,19 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, context.python_file(), &module_name) else {
+                let file = context.program_file();
+                let Some(module) = resolve_module(
+                    db,
+                    ImportingFile::File(
+                        file.file(db),
+                        context.semantic_environment().resolver_environment(),
+                    ),
+                    &module_name,
+                ) else {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, context.python_file(), module));
+                overload.set_return_type(Type::module_literal(db, file, module));
             }
 
             KnownFunction::TotalOrdering => {

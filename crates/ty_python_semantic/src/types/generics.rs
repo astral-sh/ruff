@@ -5,7 +5,7 @@ use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
 use itertools::{Either, Itertools};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::callable::walk_callable_type;
@@ -167,7 +167,7 @@ pub(crate) fn typing_self<'db>(
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
     let db = env.db();
-    let index = semantic_index(db, scope_id.python_file(db));
+    let index = semantic_index(db, scope_id.program_file(db));
 
     let identity = TypeVarIdentity::new(
         db,
@@ -519,7 +519,7 @@ impl<'db> GenericContext<'db> {
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             generic_context: GenericContext<'db>,
         ) -> InferableTypeVars<'db> {
             let env = &SemanticEnvironment::from_program(db, program);
@@ -531,8 +531,7 @@ impl<'db> GenericContext<'db> {
         }
 
         let db = env.db();
-        let program = env.program();
-        inferable_typevars_inner(db, program, self)
+        inferable_typevars_inner(db, env.program(), self)
     }
 
     pub(crate) fn variables(
@@ -2115,7 +2114,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
-    pub(crate) program: Program,
+    pub(crate) program: Program<'db>,
     #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]

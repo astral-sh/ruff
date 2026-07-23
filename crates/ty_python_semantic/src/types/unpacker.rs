@@ -3,7 +3,6 @@ use std::borrow::Cow;
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use ruff_db::PythonFile;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
@@ -14,6 +13,7 @@ use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::{ResizeTupleError, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
@@ -42,7 +42,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         env: &'ast SemanticEnvironment<'db>,
         target_scope: ScopeId<'db>,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let db = env.db();
@@ -50,8 +50,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             context: InferContext::new(
                 env,
                 target_scope,
-                python_file.file(db),
-                python_file,
+                program_file.file(db),
+                program_file,
                 module,
             ),
             targets: FxHashMap::default(),

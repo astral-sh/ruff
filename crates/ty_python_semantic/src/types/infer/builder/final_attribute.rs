@@ -63,7 +63,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.python_file(db));
+            let class_index = semantic_index(db, class_body_scope.program_file(db));
             let place_table = class_index.place_table(class_scope_id);
             let Some(symbol_id) = place_table.symbol_id(attribute) else {
                 continue;
@@ -252,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.python_file(db));
+            let class_index = semantic_index(db, class_body_scope.program_file(db));
             let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)

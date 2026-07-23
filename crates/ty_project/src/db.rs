@@ -15,7 +15,6 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use salsa::{Database, Event, Setter};
-use ty_module_resolver::SearchPaths;
 use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
 };
@@ -538,11 +537,7 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for ProjectDatabase {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for ProjectDatabase {}
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
@@ -737,7 +732,7 @@ pub(crate) mod testing {
         }
 
         pub fn semantic_environment(&self) -> SemanticEnvironment<'_> {
-            SemanticEnvironment::from_program(self, self.python_version())
+            SemanticEnvironment::from_program(self, Program::get(self).resolver_environment(self))
         }
 
         /// Takes the salsa events.
@@ -774,11 +769,7 @@ pub(crate) mod testing {
     }
 
     #[salsa::db]
-    impl ty_module_resolver::Db for TestDb {
-        fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ty_module_resolver::Db for TestDb {}
 
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
@@ -844,8 +835,9 @@ mod tests {
     use ruff_db::files::FileRootKind;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ty_module_resolver::list_modules;
+    use ty_python_core::program::Program;
 
-    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
+    use crate::{ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
@@ -889,7 +881,7 @@ mod tests {
         let metadata = ProjectMetadata::discover(&project, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
 
-        let modules = list_modules(&db, db.python_version());
+        let modules = list_modules(&db, Program::get(&db).resolver_environment(&db));
         assert!(
             modules
                 .iter()

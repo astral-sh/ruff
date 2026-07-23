@@ -5,7 +5,6 @@ use rustc_hash::FxHashMap;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
@@ -13,6 +12,7 @@ use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -103,7 +103,8 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition.python_file(db))?;
+                        let file = definition.program_file(db);
+                        let module = file_to_module(db, file.resolver_file(db))?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -290,11 +291,11 @@ pub struct InlayHintTextEdit {
 
 pub fn inlay_hints(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let ast = parsed_module(db, file).load(db);
+    let ast = parsed_module(db, file.python_file(db)).load(db);
     let source_file = file.file(db);
 
     let source = source_text(db, source_file);
@@ -347,7 +348,7 @@ impl Default for InlayHintSettings {
 
 struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     importer: &'a Importer<'db>,
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
@@ -369,7 +370,7 @@ struct InlayHintVisitor<'a, 'db> {
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        file: ProgramFile<'db>,
         importer: Importer<'db>,
         range: TextRange,
         settings: &'a InlayHintSettings,
@@ -398,7 +399,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
         let context = InlayHintImportContext {
             db: self.db,
-            file: self.model.python_file(),
+            file: self.model.program_file(),
             importer: &self.importer,
             dynamic_imports: &mut self.dynamic_imports,
         };
@@ -880,7 +881,11 @@ mod tests {
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
             let hints = inlay_hints(
                 &self.db,
-                PythonFile::new(&self.db, self.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.semantic_environment().program(),
+                ),
                 self.range,
                 settings,
             );

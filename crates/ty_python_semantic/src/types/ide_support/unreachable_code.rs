@@ -2,8 +2,8 @@ use crate::reachability::is_reachable;
 use crate::{Db, SemanticEnvironment};
 use get_size2::GetSize;
 use itertools::Itertools;
-use ruff_db::PythonFile;
 use ruff_text_size::TextRange;
+use ty_python_core::ProgramFile;
 use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::semantic_index;
 
@@ -45,7 +45,7 @@ pub enum UnreachableKind {
 /// `ALWAYS_FALSE` constraints are classified as unconditional; all others are
 /// unreachable only under the current analysis.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unreachable_ranges(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnreachableRange]> {
+pub fn unreachable_ranges(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
     let env = SemanticEnvironment::from_file(db, file);
@@ -96,13 +96,13 @@ mod tests {
     use super::{UnreachableKind, unreachable_ranges};
     use crate::db::tests::{TestDb, TestDbBuilder};
     use insta::assert_snapshot;
-    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
     };
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+    use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
 
     const TEST_PATH: &str = "/src/main.py";
@@ -149,23 +149,26 @@ mod tests {
 
     fn render_unreachable_diagnostics(db: &TestDb, path: &str) -> String {
         let file = system_path_to_file(db, path).unwrap();
-        let diagnostics = unreachable_ranges(db, PythonFile::new(db, file, db.python_version()))
-            .iter()
-            .map(|range| {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::lint("unreachable-code"),
-                    Severity::Info,
-                    match range.kind {
-                        UnreachableKind::Unconditional => "Code is always unreachable",
-                        UnreachableKind::CurrentAnalysis => "Code is unreachable",
-                    },
-                );
-                diagnostic.annotate(Annotation::primary(
-                    FileRange::new(file, range.range).into(),
-                ));
-                diagnostic
-            })
-            .collect::<Vec<_>>();
+        let diagnostics = unreachable_ranges(
+            db,
+            ProgramFile::new(db, file, db.semantic_environment().program()),
+        )
+        .iter()
+        .map(|range| {
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::lint("unreachable-code"),
+                Severity::Info,
+                match range.kind {
+                    UnreachableKind::Unconditional => "Code is always unreachable",
+                    UnreachableKind::CurrentAnalysis => "Code is unreachable",
+                },
+            );
+            diagnostic.annotate(Annotation::primary(
+                FileRange::new(file, range.range).into(),
+            ));
+            diagnostic
+        })
+        .collect::<Vec<_>>();
 
         DisplayDiagnostics::new(
             db,

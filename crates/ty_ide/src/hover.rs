@@ -1,13 +1,13 @@
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
-use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
@@ -16,10 +16,10 @@ use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Option<RangedValue<Hover<'db>>> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
@@ -142,7 +142,7 @@ pub fn hover<'db>(
     Some(RangedValue {
         range: FileRange::new(file.file(db), goto_target.range()),
         value: Hover {
-            python_file: file,
+            program_file: file,
             contents,
         },
     })
@@ -224,7 +224,7 @@ fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docs
 }
 
 pub struct Hover<'db> {
-    python_file: PythonFile<'db>,
+    program_file: ProgramFile<'db>,
     contents: Vec<HoverContent<'db>>,
 }
 
@@ -270,7 +270,7 @@ pub struct DisplayHover<'db, 'a> {
 impl fmt::Display for DisplayHover<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut first = true;
-        let env = SemanticEnvironment::from_file(self.db, self.hover.python_file);
+        let env = SemanticEnvironment::from_file(self.db, self.hover.program_file);
         for content in &self.hover.contents {
             if !first {
                 self.kind.horizontal_line().fmt(f)?;
@@ -7040,7 +7040,7 @@ type U<CURSOR> = MyType
 
             let Some(hover) = hover(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             ) else {
                 return "Hover provided no content".to_string();

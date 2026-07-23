@@ -6,9 +6,8 @@ use std::str::FromStr;
 
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
-use rustc_hash::FxHashMap;
 
-use crate::db::Db;
+use crate::FxOrderMap;
 use crate::module_name::ModuleName;
 
 pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
@@ -18,10 +17,6 @@ pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVers
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
     .expect("The VERSIONS file in the vendored typeshed stubs should be well-formed")
-}
-
-pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
-    db.search_paths().typeshed_versions()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -71,8 +66,8 @@ pub enum TypeshedVersionsParseErrorKind {
     VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct TypeshedVersions(FxOrderMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
     #[must_use]
@@ -164,7 +159,7 @@ impl FromStr for TypeshedVersions {
     type Err = TypeshedVersionsParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut map = FxHashMap::default();
+        let mut map = FxOrderMap::default();
 
         for (line_index, line) in s.lines().enumerate() {
             // humans expect line numbers to be 1-indexed

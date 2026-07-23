@@ -51,7 +51,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.python_file(db)).expect_single_definition(type_alias_stmt_node)
+        semantic_index(db, scope.program_file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
@@ -77,14 +77,14 @@ impl<'db> PEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = SemanticEnvironment::from_file(db, alias.rhs_scope(db).python_file(db));
+            let env = SemanticEnvironment::from_file(db, alias.rhs_scope(db).program_file(db));
             value.cycle_normalized(&env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn raw_value_type_inner(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.program_file(db));
         let module = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
@@ -130,7 +130,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     fn generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.program_file(db));
         let parsed = parsed_module(db, scope.python_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
@@ -139,7 +139,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.python_file(db));
+                let index = semantic_index(db, scope.program_file(db));
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(&env, index, definition, type_params)
             })
@@ -201,7 +201,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
-            let env = SemanticEnvironment::from_file(db, alias.definition(db).python_file(db));
+            let env = SemanticEnvironment::from_file(db, alias.definition(db).program_file(db));
             value.cycle_normalized(&env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
@@ -220,7 +220,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
             return Type::unknown();
         };
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         definition_expression_type(&env, definition, value_arg)
     }
 
@@ -254,9 +254,9 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     fn generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
-        let file = definition.python_file(db);
+        let file = definition.program_file(db);
         let env = SemanticEnvironment::from_file(db, file);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, file.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return None;
         };
@@ -460,7 +460,7 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let env = SemanticEnvironment::from_file(db, self.definition(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.definition(db).program_file(db));
         let Some(generic_context) = self.generic_context(&env) else {
             return self.value_type(&env).variance_of(&env, typevar);
         };
@@ -514,7 +514,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
         let definition = self.type_alias.definition(self.db);
-        let file = definition.python_file(self.db);
+        let file = definition.program_file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
         // Type aliases are defined directly in their enclosing scope (no body scope like classes),

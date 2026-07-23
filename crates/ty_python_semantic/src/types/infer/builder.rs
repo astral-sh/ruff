@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -20,7 +19,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
@@ -140,7 +139,7 @@ use ty_python_core::{
     ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
     unpack::UnpackPosition,
 };
-use ty_python_core::{ExpressionNodeKey, Statement};
+use ty_python_core::{ExpressionNodeKey, ProgramFile, Statement};
 
 mod annotation_expression;
 mod attribute_assignment;
@@ -461,14 +460,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         env: &'ast SemanticEnvironment<'db>,
         region: InferenceRegion<'db>,
         file: File,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         index: &'db SemanticIndex<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let db = env.db();
         let scope = region.scope(db);
         Self {
-            context: InferContext::new(env, scope, file, python_file, module),
+            context: InferContext::new(env, scope, file, program_file, module),
             index,
             region,
             scope,
@@ -771,8 +770,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.file()
     }
 
-    fn python_file(&self) -> PythonFile<'db> {
-        self.context.python_file()
+    fn program_file(&self) -> ProgramFile<'db> {
+        self.context.program_file()
     }
 
     #[inline]
@@ -781,7 +780,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[inline]
-    fn program(&self) -> Program {
+    fn program(&self) -> Program<'db> {
         self.context.program()
     }
 
@@ -987,7 +986,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// already in progress for that scope (further up the stack).
     fn file_expression_type(&self, expression: &ast::Expr) -> Type<'db> {
         let file_scope = self.index.expression_scope_id(expression);
-        let expr_scope = file_scope.to_scope_id(self.db(), self.python_file());
+        let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
@@ -999,7 +998,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Get metadata for a type expression from any scope in the same file.
     fn file_type_expression_flags(&self, expression: &ast::Expr) -> TypeExpressionFlags {
         let file_scope = self.index.expression_scope_id(expression);
-        let expr_scope = file_scope.to_scope_id(self.db(), self.python_file());
+        let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.type_expression_flags(expression)
@@ -1640,7 +1639,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceExprRef::Symbol(symbol) = &place
                 && scope.is_global()
             {
-                module_type_implicit_global_symbol(env, self.python_file(), symbol.name())
+                module_type_implicit_global_symbol(env, self.program_file(), symbol.name())
             } else {
                 Place::Undefined.into()
             }
@@ -1700,7 +1699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|symbol| {
                             module_type_implicit_global_symbol(
                                 env,
-                                self.python_file(),
+                                self.program_file(),
                                 symbol.name(),
                             )
                         })
@@ -2074,7 +2073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let rhs_scope = self
             .index
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
-            .to_scope_id(self.db(), self.python_file());
+            .to_scope_id(self.db(), self.program_file());
 
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
@@ -3348,7 +3347,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if let Some(special_form) = target.as_name_expr().and_then(|name| {
-            SpecialFormType::try_from_file_and_name(self.db(), self.python_file(), &name.id)
+            SpecialFormType::try_from_file_and_name(
+                self.db(),
+                ImportingFile::File(
+                    self.file(),
+                    self.semantic_environment().resolver_environment(),
+                ),
+                &name.id,
+            )
         }) {
             target_ty = Type::SpecialForm(special_form);
         }
@@ -4387,7 +4393,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(name_expr) = target.as_name_expr()
             && let Some(special_form) = SpecialFormType::try_from_file_and_name(
                 self.db(),
-                self.python_file(),
+                ImportingFile::File(
+                    self.file(),
+                    self.semantic_environment().resolver_environment(),
+                ),
                 &name_expr.id,
             )
         {
@@ -4979,7 +4988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(env, self.python_file(), name)
+            if !module_type_implicit_global_symbol(env, self.program_file(), name)
                 .place
                 .is_undefined()
             {
@@ -5004,8 +5013,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db(), self.python_file(), module_name)
-            .map(|module| Type::module_literal(self.db(), self.python_file(), module))
+        let db = self.db();
+        let file = self.program_file();
+        resolve_module(
+            db,
+            ImportingFile::File(
+                file.file(db),
+                self.semantic_environment().resolver_environment(),
+            ),
+            module_name,
+        )
+        .map(|module| Type::module_literal(db, file, module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -7559,7 +7577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let evaluation_mode =
             EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
         let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
-        let scope = scope_id.to_scope_id(self.db(), self.python_file());
+        let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.semantic_environment(), scope, yield_tcx);
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
@@ -7629,7 +7647,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.python_file());
+        let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.semantic_environment(), scope, tcx);
         self.extend_scope(inference);
 
@@ -7666,7 +7684,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.python_file());
+        let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.semantic_environment(), scope, tcx);
         self.extend_scope(inference);
 
@@ -7703,7 +7721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
-        let scope = scope_id.to_scope_id(self.db(), self.python_file());
+        let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.semantic_environment(), scope, tcx);
         self.extend_scope(inference);
 
@@ -8157,7 +8175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
 
-        let scope = scope_id.to_scope_id(self.db(), self.python_file());
+        let scope = scope_id.to_scope_id(self.db(), self.program_file());
 
         // If we have a direct `Callable` type context, we can infer the body with the annotated
         // return type as type context.
@@ -8226,7 +8244,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
-        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.python_file()))
+        for bindings in
+            use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
         {
             let place = place_from_bindings_with_reachability_cache(
                 env,
@@ -9431,7 +9450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(env, || {
-                module_type_implicit_global_symbol(env, self.python_file(), symbol_name).map_type(
+                module_type_implicit_global_symbol(env, self.program_file(), symbol_name).map_type(
                     |ty| {
                         self.narrow_place_with_applicable_constraints(
                             PlaceExprRef::from(&expr),
@@ -9535,7 +9554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (place, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, self.python_file());
+            let use_id = expr_ref.scoped_use_id(db, self.program_file());
             let place = place_from_bindings_with_reachability_cache(
                 env,
                 use_def.bindings_at_use(use_id),
@@ -9622,10 +9641,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Place::Undefined.into();
         };
 
-        explicit_global_symbol(self.semantic_environment(), self.python_file(), symbol_name)
-            .map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, constraint_keys)
-            })
+        explicit_global_symbol(
+            self.semantic_environment(),
+            self.program_file(),
+            symbol_name,
+        )
+        .map_type(|ty| {
+            self.narrow_place_with_applicable_constraints(place_expr, ty, constraint_keys)
+        })
     }
 
     /// Infer the type of a place expression from definitions, assuming a load context.
@@ -9876,7 +9899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // We've reached the defining scope of the variable. Infer its public type.
                 debug_assert!(enclosing_place.is_bound() || enclosing_place.is_declared());
                 let enclosing_scope_id =
-                    enclosing_scope_file_id.to_scope_id(db, self.python_file());
+                    enclosing_scope_file_id.to_scope_id(db, self.program_file());
                 return eagerly_resolved_place.unwrap_or_else(|| {
                     place_by_id(
                         self.semantic_environment(),
@@ -10166,7 +10189,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let mut maybe_submodule_name = module_name.clone();
                             maybe_submodule_name.extend(&relative_submodule);
-                            if resolve_module(db, self.python_file(), &maybe_submodule_name)
+                            let program_file = self.program_file();
+                            if resolve_module(
+                                db,
+                                ImportingFile::File(
+                                    program_file.file(db),
+                                    self.semantic_environment().resolver_environment(),
+                                ),
+                                &maybe_submodule_name,
+                            )
                                 .is_some()
                             {
                                 if let Some(builder) = self
@@ -10294,7 +10325,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     } else {
                         hint_if_stdlib_attribute_exists_on_other_versions(
-                            db,
+                            self.semantic_environment(),
                             diagnostic,
                             value_type,
                             attr_name,
@@ -11338,7 +11369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.semantic_environment(),
             region,
             self.file(),
-            self.python_file(),
+            self.program_file(),
             index,
             self.module(),
         );

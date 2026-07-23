@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
 use crate::LoopHeaderId;
+use crate::ProgramFile;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
@@ -87,7 +88,11 @@ impl<'db> Definition<'db> {
         self.scope_id(db).python_file(db)
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program {
+    pub fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.scope_id(db).program_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.scope_id(db).program(db)
     }
 

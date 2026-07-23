@@ -1,10 +1,8 @@
-use ruff_db::PythonFile;
-use ruff_db::files::{FilePath, system_path_to_file};
+use ruff_db::files::{File, FilePath, system_path_to_file};
 use ruff_db::system::SystemPath;
-use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
-    ModuleName, resolve_module, resolve_module_confident, resolve_real_module,
-    resolve_real_module_confident,
+    ImportingFile, ModuleName, ResolverEnvironment, resolve_module, resolve_module_confident,
+    resolve_real_module, resolve_real_module_confident,
 };
 
 use crate::ModuleDb;
@@ -13,21 +11,23 @@ use crate::collector::CollectedImport;
 /// Collect all imports for a given Python file.
 pub(crate) struct Resolver<'a> {
     db: &'a ModuleDb,
-    file: Option<PythonFile<'a>>,
-    python_version: PythonVersion,
+    file: Option<File>,
+    environment: ResolverEnvironment<'a>,
 }
 
 impl<'a> Resolver<'a> {
     /// Initialize a [`Resolver`] with a given [`ModuleDb`].
-    pub(crate) fn new(db: &'a ModuleDb, path: &SystemPath, python_version: PythonVersion) -> Self {
+    pub(crate) fn new(
+        db: &'a ModuleDb,
+        path: &SystemPath,
+        environment: ResolverEnvironment<'a>,
+    ) -> Self {
         // If we know the importing file we can potentially resolve more imports
-        let file = system_path_to_file(db, path)
-            .ok()
-            .map(|file| PythonFile::new(db, file, python_version));
+        let file = system_path_to_file(db, path).ok();
         Self {
             db,
             file,
-            python_version,
+            environment,
         }
     }
 
@@ -110,9 +110,13 @@ impl<'a> Resolver<'a> {
     /// Resolves a module name to a module.
     pub(crate) fn resolve_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
         let module = if let Some(file) = self.file {
-            resolve_module(self.db, file, module_name)?
+            resolve_module(
+                self.db,
+                ImportingFile::File(file, self.environment),
+                module_name,
+            )?
         } else {
-            resolve_module_confident(self.db, self.python_version, module_name)?
+            resolve_module_confident(self.db, self.environment, module_name)?
         };
         Some(module.file(self.db)?.path(self.db))
     }
@@ -120,9 +124,13 @@ impl<'a> Resolver<'a> {
     /// Resolves a module name to a module (stubs not allowed).
     fn resolve_real_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
         let module = if let Some(file) = self.file {
-            resolve_real_module(self.db, file, module_name)?
+            resolve_real_module(
+                self.db,
+                ImportingFile::File(file, self.environment),
+                module_name,
+            )?
         } else {
-            resolve_real_module_confident(self.db, self.python_version, module_name)?
+            resolve_real_module_confident(self.db, self.environment, module_name)?
         };
         Some(module.file(self.db)?.path(self.db))
     }

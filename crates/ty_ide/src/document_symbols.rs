@@ -1,9 +1,9 @@
 use crate::symbols::{FlatSymbols, symbols_for_file};
-use ruff_db::PythonFile;
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 
 /// Get all document symbols for a file with the given options.
-pub fn document_symbols<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> &'db FlatSymbols {
+pub fn document_symbols<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db FlatSymbols {
     symbols_for_file(db, file)
 }
 
@@ -290,7 +290,7 @@ class Aliases:
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols =
-                document_symbols(&self.db, self.python_file(self.cursor.file)).to_hierarchical();
+                document_symbols(&self.db, self.program_file(self.cursor.file)).to_hierarchical();
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

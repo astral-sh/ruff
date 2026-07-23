@@ -22,6 +22,7 @@ use crate::types::{
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
+use ty_python_core::ProgramFile;
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -33,7 +34,6 @@ use ty_python_core::predicate::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
-use ruff_db::PythonFile;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -130,11 +130,11 @@ fn all_narrowing_constraints_for_pattern_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let program_file = pattern.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
     NarrowingConstraintsBuilder::new(
         db,
-        python_file,
+        program_file,
         &module,
         PredicateNode::Pattern(pattern),
         true,
@@ -160,13 +160,13 @@ fn all_narrowing_constraints_for_expression_inner<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> ExpressionNarrowingConstraints<'db> {
-    let python_file = expression.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let program_file = expression.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
     let predicate = PredicateNode::Expression(expression);
     ExpressionNarrowingConstraints {
-        positive: NarrowingConstraintsBuilder::new(db, python_file, &module, predicate, true)
+        positive: NarrowingConstraintsBuilder::new(db, program_file, &module, predicate, true)
             .finish(),
-        negative: NarrowingConstraintsBuilder::new(db, python_file, &module, predicate, false)
+        negative: NarrowingConstraintsBuilder::new(db, program_file, &module, predicate, false)
             .finish(),
     }
 }
@@ -185,11 +185,11 @@ fn all_negative_narrowing_constraints_for_pattern_inner<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let program_file = pattern.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
     NarrowingConstraintsBuilder::new(
         db,
-        python_file,
+        program_file,
         &module,
         PredicateNode::Pattern(pattern),
         false,
@@ -213,11 +213,11 @@ fn all_narrowing_constraints_for_subject_element_pattern_inner<'db>(
     pattern: PatternPredicate<'db>,
     target: ExpressionNodeKey,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let program_file = pattern.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
     NarrowingConstraintsBuilder::new(
         db,
-        python_file,
+        program_file,
         &module,
         PredicateNode::SubjectElementPattern(SubjectElementPatternPredicate { pattern, target }),
         true,
@@ -458,7 +458,7 @@ pub(crate) fn pattern_success_types<'db>(
     returns(ref),
     cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
     cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>| {
-        let env = SemanticEnvironment::from_file(db, pattern.subject(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, pattern.subject(db).program_file(db));
         result.cycle_normalized(&env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -468,7 +468,7 @@ fn pattern_success_types_inner<'db>(
     pattern: PatternPredicate<'db>,
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
-    let env = SemanticEnvironment::from_file(db, subject.python_file(db));
+    let env = SemanticEnvironment::from_file(db, subject.program_file(db));
     let incoming_subject_ty =
         infer_same_file_expression_type(&env, subject, TypeContext::default());
     let incoming_subject_ty =
@@ -1137,13 +1137,13 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn new(
         db: &'db dyn Db,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
         predicate: PredicateNode<'db>,
         is_positive: bool,
     ) -> Self {
         Self {
-            env: SemanticEnvironment::from_file(db, python_file),
+            env: SemanticEnvironment::from_file(db, program_file),
             module,
             predicate,
             is_positive,
@@ -1186,7 +1186,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
             ast::Expr::Name(_) => {
-                let index = semantic_index(self.env.db(), expression.python_file(self.env.db()));
+                let index = semantic_index(self.env.db(), expression.program_file(self.env.db()));
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
                     let aliased_constraints =
@@ -1474,9 +1474,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
 impl<'db> PatternSuccessAnalyzer<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
-        let python_file = scope.python_file(db);
+        let program_file = scope.program_file(db);
         Self {
-            env: SemanticEnvironment::from_file(db, python_file),
+            env: SemanticEnvironment::from_file(db, program_file),
             scope,
         }
     }

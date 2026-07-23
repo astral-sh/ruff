@@ -10,12 +10,12 @@ use crate::Db;
 use crate::FxIndexMap;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
@@ -76,10 +76,10 @@ pub struct SignatureHelpInfo<'db> {
 /// Signature help information for function calls at the given position
 pub fn signature_help<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Option<SignatureHelpInfo<'db>> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
 
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
@@ -1451,7 +1451,7 @@ def ab(a: int, *, c: int):
         fn signature_help(&self) -> Option<SignatureHelpInfo<'_>> {
             crate::signature_help::signature_help(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             )
         }

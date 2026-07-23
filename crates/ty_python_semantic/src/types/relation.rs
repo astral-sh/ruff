@@ -483,8 +483,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let program = types.program(db);
-            let env = SemanticEnvironment::from_program(db, program);
+            let env = SemanticEnvironment::from_program(db, types.program(db));
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -506,10 +505,9 @@ impl<'db> Type<'db> {
             return Cow::Owned(OwnedConstraintSet::always());
         }
 
-        let program = env.program();
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
-            TypePair::new(db, program, self, target),
+            TypePair::new(db, env.program(), self, target),
         ))
     }
 
@@ -555,8 +553,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let program = types.program(db);
-            let env = SemanticEnvironment::from_program(db, program);
+            let env = SemanticEnvironment::from_program(db, types.program(db));
             types
                 .first(db)
                 .has_relation_to(
@@ -574,8 +571,7 @@ impl<'db> Type<'db> {
         }
 
         let db = env.db();
-        let program = env.program();
-        is_redundant_with_impl(db, TypePair::new(db, program, self, other))
+        is_redundant_with_impl(db, TypePair::new(db, env.program(), self, other))
     }
 
     pub(super) fn has_relation_to<'c>(

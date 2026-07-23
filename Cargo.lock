@@ -3177,6 +3177,7 @@ dependencies = [
  "tracing",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_core",
 ]
 
 [[package]]
@@ -4684,6 +4685,7 @@ dependencies = [
  "ruff_text_size",
  "ty_ide",
  "ty_project",
+ "ty_python_core",
 ]
 
 [[package]]
@@ -4703,6 +4705,7 @@ dependencies = [
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_core",
  "walkdir",
 ]
 
@@ -4755,6 +4758,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "ordermap",
  "regex",
  "regex-syntax",
  "ruff_db",

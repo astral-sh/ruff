@@ -237,7 +237,8 @@ impl<'db> NominalInstanceType<'db> {
     pub fn class_module_name(&self, env: &SemanticEnvironment<'db>) -> Option<&'db ModuleName> {
         let db = env.db();
         let class = self.class(env).class_literal(db);
-        file_to_module(db, class.python_file(db)).map(|module| module.name(db))
+        let file = class.program_file(db);
+        file_to_module(db, file.resolver_file(db)).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
@@ -796,7 +797,7 @@ fn non_recursive_protocol_interface_inner<'db>(
         }
     }
 
-    let env = SemanticEnvironment::from_file(db, protocol.class_literal(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, protocol.class_literal(db).program_file(db));
     interface.filter_members(db, |member| {
         let visitor = ProtocolReferenceFinder {
             origin: protocol.class_literal(db),
@@ -1085,7 +1086,7 @@ impl<'db> ProtocolInstanceType<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             protocol: ProtocolInstanceType<'db>,
         ) -> bool {
             let env = SemanticEnvironment::from_program(db, program);

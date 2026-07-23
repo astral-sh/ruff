@@ -25,8 +25,9 @@ use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
+use ty_module_resolver::ResolverEnvironment;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::{ProgramFile, semantic_index};
 
 /// The database and Python environment used by a semantic operation.
 #[derive(Clone)]
@@ -36,8 +37,8 @@ pub struct SemanticEnvironment<'db> {
 }
 
 impl<'db> SemanticEnvironment<'db> {
-    /// Creates an environment that lazily obtains its Python version from `file`.
-    pub fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    /// Creates an environment that lazily obtains its program from `file`.
+    pub fn from_file(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             db,
             environment: Cell::new(ProgramSource::File(file.as_id())),
@@ -45,10 +46,10 @@ impl<'db> SemanticEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub const fn from_program(db: &'db dyn Db, program: Program) -> Self {
+    pub fn from_program(db: &'db dyn Db, program: Program<'db>) -> Self {
         Self {
             db,
-            environment: Cell::new(ProgramSource::Program(program)),
+            environment: Cell::new(ProgramSource::Program(program.as_id())),
         }
     }
 
@@ -60,15 +61,16 @@ impl<'db> SemanticEnvironment<'db> {
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self) -> Program {
+    pub fn program(&self) -> Program<'db> {
         match self.environment.get() {
-            ProgramSource::Program(program) => program,
+            ProgramSource::Program(id) => ResolverEnvironment::from_id(id),
             ProgramSource::File(file) => {
                 cold_path();
                 // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
                 // re-wrapping it for this ingredient read restores that database lifetime.
-                let program = PythonFile::from_id(file).python_version(self.db);
-                self.environment.set(ProgramSource::Program(program));
+                let program = ProgramFile::from_id(file).resolver_environment(self.db);
+                self.environment
+                    .set(ProgramSource::Program(program.as_id()));
                 program
             }
         }
@@ -77,16 +79,22 @@ impl<'db> SemanticEnvironment<'db> {
     /// Returns the Python version used by this operation.
     #[inline]
     pub fn python_version(&self) -> PythonVersion {
+        self.program().python_version(self.db)
+    }
+
+    /// Returns the resolver environment used by this operation.
+    #[inline]
+    pub fn resolver_environment(&self) -> ResolverEnvironment<'db> {
         self.program()
     }
 }
 
 #[derive(Clone, Copy)]
 enum ProgramSource {
-    Program(Program),
-    // Salsa interned handles are thin `Id` wrappers, so converting between `PythonFile` and `Id`
+    Program(Id),
+    // Salsa interned handles are thin `Id` wrappers, so converting between `ProgramFile` and `Id`
     // is an inlined representation change with no database lookup. Keeping the lifetime-bearing
-    // `PythonFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
+    // `ProgramFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
     // the first read avoids repeated Salsa ingredient reads in hot, recursive type operations.
     File(Id),
 }
@@ -107,7 +115,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     semantic_environment: &'ast SemanticEnvironment<'db>,
     scope: ScopeId<'db>,
     file: File,
-    python_file: PythonFile<'db>,
+    program_file: ProgramFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     diagnostics_suppressed: bool,
@@ -121,19 +129,20 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         semantic_environment: &'ast SemanticEnvironment<'db>,
         scope: ScopeId<'db>,
         file: File,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let db = semantic_environment.db();
-        debug_assert_eq!(scope.python_file(db), python_file);
-        debug_assert_eq!(python_file.file(db), file);
+        debug_assert_eq!(scope.program_file(db), program_file);
+        debug_assert_eq!(program_file.file(db), file);
+        debug_assert_eq!(semantic_environment.program(), scope.program(db));
 
         Self {
             semantic_environment,
             scope,
             module,
             file,
-            python_file,
+            program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
@@ -149,7 +158,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(crate) fn python_file(&self) -> PythonFile<'db> {
-        self.python_file
+        self.program_file.python_file(self.db())
+    }
+
+    pub(crate) fn program_file(&self) -> ProgramFile<'db> {
+        self.program_file
     }
 
     #[inline]
@@ -158,7 +171,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[inline]
-    pub(crate) fn program(&self) -> Program {
+    pub(crate) fn program(&self) -> Program<'db> {
         self.semantic_environment.program()
     }
 
@@ -280,7 +293,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
         // Accessing the semantic index here is fine because
         // the index belongs to the same file as for which we emit the diagnostic.
-        let index = semantic_index(self.db(), self.python_file);
+        let index = semantic_index(self.db(), self.program_file);
 
         let scope_id = self.scope.file_scope_id(self.db());
 
@@ -313,7 +326,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
     fn is_range_reachable(&self, range: TextRange) -> bool {
-        let index = semantic_index(self.db(), self.python_file);
+        let index = semantic_index(self.db(), self.program_file);
         let scope_id = self.scope.file_scope_id(self.db());
         is_range_reachable(self.semantic_environment(), index, scope_id, range)
     }
@@ -349,7 +362,7 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("db", &"<dyn Db>")
             .field("scope", &self.scope)
             .field("file", &self.file)
-            .field("python_file", &self.python_file)
+            .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
             .field("diagnostics_suppressed", &self.diagnostics_suppressed)
             .field("inference_flags", &self.inference_flags)

@@ -269,12 +269,12 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
-            &SemanticEnvironment::from_file(db, self_.scope(db).python_file(db)),
+            &SemanticEnvironment::from_file(db, self_.scope(db).program_file(db)),
             ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
         ),
     )]
     fn mro_inner(self, db: &'db dyn Db) -> Mro<'db> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.scope(db).program_file(db));
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(&env);
         std::iter::once(self_base)
@@ -485,9 +485,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> NamedTupleSpec<'db> {
-            let python_file = definition.python_file(db);
-            let env = SemanticEnvironment::from_file(db, python_file);
-            let module = parsed_module(db, python_file).load(db);
+            let program_file = definition.program_file(db);
+            let env = SemanticEnvironment::from_file(db, program_file);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
             let node = definition
                 .kind(db)
                 .value(&module)

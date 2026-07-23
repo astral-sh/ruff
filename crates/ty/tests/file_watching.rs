@@ -39,7 +39,7 @@ fn resolve_module_confident<'db>(
 ) -> Option<Module<'db>> {
     ty_module_resolver::resolve_module_confident(
         db,
-        Program::get(db).python_version(db),
+        Program::get(db).resolver_environment(db),
         module_name,
     )
 }

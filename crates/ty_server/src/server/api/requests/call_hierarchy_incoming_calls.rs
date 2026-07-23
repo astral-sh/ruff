@@ -1,7 +1,6 @@
 use lsp_types::CallHierarchyIncomingCallsRequest;
 use lsp_types::{CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams};
-use ruff_db::PythonFile;
-use ty_project::Db as _;
+use ty_python_core::program::Program;
 
 use crate::document::{ToRangeExt as _, resolve_file_uri_range};
 use crate::server::api::requests::prepare_call_hierarchy::convert_to_lsp_item;
@@ -42,8 +41,7 @@ impl BackgroundRequestHandler for CallHierarchyIncomingCallsRequestHandler {
                 continue;
             };
 
-            for call in
-                ty_ide::incoming_calls(db, PythonFile::new(db, file, db.python_version()), offset)
+            for call in ty_ide::incoming_calls(db, Program::get(db).program_file(db, file), offset)
             {
                 // `from_ranges` are byte offsets into `call.from.file` (the caller),
                 // NOT into `file` (the prepared/queried symbol). Capture the caller

@@ -2,12 +2,11 @@ use std::borrow::Cow;
 
 use lsp_types::FoldingRangeRequest;
 use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
-use ruff_db::PythonFile;
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
-use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_core::program::Program;
 
 use crate::db::Db;
 use crate::document::ToRangeExt;
@@ -60,7 +59,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
 
         let results: Vec<_> = folding_ranges(
             db,
-            PythonFile::new(db, file, db.python_version()),
+            Program::get(db).program_file(db, file).python_file(db),
             cell_range,
         )
         .into_iter()
