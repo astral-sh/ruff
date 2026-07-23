@@ -1176,22 +1176,22 @@ Summary.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
-        <HB>
-        Returns<HB>
-        -------<HB>
-        str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        This is a function description.
+
+        ## Parameters
+        **param1**: `str`<HB>
+        The first parameter description
+
+        **param2**: `int`<HB>
+        The second parameter description<HB>
+        This is a continuation of param2 description.
+
+        **param3**<HB>
+        A parameter without type annotation
+
+        ## Returns
+        `str`<HB>
+        The return value description
         ");
     }
 
@@ -1324,10 +1324,9 @@ Summary.
         **param2**: `int`<HB>
         Another Google-style parameter
 
-        Parameters<HB>
-        ----------<HB>
-        param3 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters
+        **param3**: `bool`<HB>
+        NumPy-style parameter
         ");
     }
 
@@ -1488,12 +1487,12 @@ Summary.
         **param3**<HB>
         Another reST-style parameter
 
-        Parameters<HB>
-        ----------<HB>
-        param3 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style duplicate parameter<HB>
-        param4 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters
+        **param3**: `str`<HB>
+        NumPy-style duplicate parameter
+
+        **param4**: `bool`<HB>
+        NumPy-style parameter
         ");
     }
 
@@ -1547,17 +1546,18 @@ Summary.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
+        This is a function description.
+
+        ## Parameters
+        **param1**: `str`<HB>
+        The first parameter description
+
+        **param2**: `int`<HB>
+        The second parameter description<HB>
+        This is a continuation of param2 description.
+
+        **param3**<HB>
+        A parameter without type annotation
         ");
     }
 

@@ -9,6 +9,7 @@ use crate::docstring::document::preformatted::MarkdownFence;
 use crate::docstring::document::syntax::{is_markdown_code_span, starts_with_markdown_list_item};
 
 mod google;
+mod numpy;
 mod rst;
 
 /// Renders a docstring as Markdown.
@@ -18,6 +19,7 @@ mod rst;
 pub(super) fn render_into(output: &mut String, source: &str) {
     let mut sections = rst::structured_sections(source);
     sections.extend(google::structured_sections(source));
+    sections.extend(numpy::structured_sections(source));
     render_sections_into(output, source, sections);
 }
 
@@ -249,7 +251,7 @@ impl SectionItem {
 
         if let Some(name) = self.display_name.as_deref() {
             if matches!(self.kind, SectionKind::Raises) {
-                render_code_span_into(output, name);
+                render_type_code_span_into(output, name);
             } else {
                 render_bold_text_into(output, name);
             }

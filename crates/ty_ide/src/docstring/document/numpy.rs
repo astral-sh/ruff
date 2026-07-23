@@ -110,17 +110,17 @@ fn parameter_lookup_names(display_name: &str) -> Option<Vec<String>> {
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline normalization
 /// (typically via `docstring::documentation_trim`).
-fn sections(source: &str) -> Vec<Section> {
+pub(in crate::docstring) fn sections(source: &str) -> Vec<Section> {
     Parser::new(parsed_lines(source)).parse()
 }
 
 /// A recognized NumPy-style docstring section.
-type Section = super::Section<Option<String>>;
+pub(in crate::docstring) type Section = super::Section<Option<String>>;
 
 type SectionBody = super::SectionBody<Option<String>>;
 
 /// One parsed fragment in a NumPy section body.
-type BodyFragment = super::BodyFragment<Option<String>>;
+pub(in crate::docstring) type BodyFragment = super::BodyFragment<Option<String>>;
 
 /// A named or anonymous item in a NumPy section.
 type Item = super::Item<Option<String>>;
