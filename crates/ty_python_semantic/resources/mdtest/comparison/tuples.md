@@ -149,6 +149,7 @@ of the dunder methods.)
 
 ```py
 from __future__ import annotations
+from typing import Literal
 
 class EqReturnType: ...
 class NeReturnType: ...
@@ -203,6 +204,18 @@ class B:
         return LtReturnTypeOnB()
 
 reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
+
+class LaterLtReturnType: ...
+
+class CustomEq:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class Later:
+    def __lt__(self, other: Later) -> LaterLtReturnType:
+        return LaterLtReturnType()
+
+reveal_type((CustomEq(), Later()) < (CustomEq(), Later()))  # revealed: LaterLtReturnType | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
@@ -496,7 +509,20 @@ class A:
         return NotBoolable()
 
 # error: [unsupported-bool-conversion]
-(A(),) == (A(),)
+reveal_type((A(),) == (A(),))  # revealed: bool
+# error: [unsupported-bool-conversion]
+reveal_type((A(), "x") == (A(), "y"))  # revealed: Literal[False]
+# error: [unsupported-bool-conversion]
+reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
+```
+
+Tuple identity comparisons do not compare elements and therefore do not coerce their equality
+results to `bool`:
+
+```py
+def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
 ```
 
 ## Recursive NamedTuple

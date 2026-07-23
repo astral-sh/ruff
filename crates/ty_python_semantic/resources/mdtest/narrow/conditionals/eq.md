@@ -1137,7 +1137,8 @@ The resulting constraint is intersected with the type variable, preserving its i
 
 ```py
 from enum import Enum
-from typing import Literal, TypeVar, final
+from typing import Any, Generic, Literal, TypeVar, final
+from ty_extensions import Intersection, Top
 
 @final
 class ConstraintA: ...
@@ -1176,6 +1177,32 @@ def correlated_typevar_ne(value: E, other: EnumT) -> EnumT:
         return other
     reveal_type(value)  # revealed: EnumT@correlated_typevar_ne
     return value
+
+LiteralT = TypeVar("LiteralT", Literal[1], Literal[2])
+
+def correlated_literal_typevar_eq(value: Literal[1, 2], other: LiteralT) -> LiteralT:
+    if value == other:
+        return value
+    return other
+
+def correlated_literal_typevar_ne(value: Literal[1, 2], other: LiteralT) -> LiteralT:
+    if value != other:
+        return other
+    return value
+
+MaterializedT = TypeVar("MaterializedT", Literal[1], Intersection[Literal[2], Any])
+
+HolderT = TypeVar("HolderT")
+
+class Holder(Generic[HolderT]):
+    def __init__(self, value: HolderT) -> None:
+        self.value = value
+
+def correlated_materialized_pattern(left: Top[MaterializedT], right: MaterializedT) -> int:
+    holder = Holder(right)
+    match left:
+        case holder.value:
+            return 1
 ```
 
 ## `LiteralString` and string-valued enums
@@ -1407,7 +1434,7 @@ def _(x: Literal[1, 2]):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
-## `x != y` where `y` is a single-valued type
+## `x != y` where `y` is a class literal
 
 ```py
 def _(flag: bool):
@@ -1421,7 +1448,7 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
-## `x != y` where `y` has multiple single-valued options
+## `x != y` where `y` has multiple literal options
 
 ```py
 from typing import Literal
@@ -1452,9 +1479,9 @@ def _(x: Literal[1, 2], y: Y):
         reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-## `!=` for non-single-valued types
+## `!=` for broad types
 
-Only single-valued types should narrow the type:
+A broad right-hand type cannot narrow `x`:
 
 ```py
 def _(x: int | None, y: int):
@@ -1462,7 +1489,7 @@ def _(x: int | None, y: int):
         reveal_type(x)  # revealed: int | None
 ```
 
-## Mix of single-valued and non-single-valued types
+## Mix of literal and broad types
 
 ```py
 from typing import Literal
@@ -1731,7 +1758,7 @@ We assume that tuple subclasses don't override `tuple.__eq__`, which only return
 tuples. So they are excluded from the narrowed type when comparing to non-tuple values.
 
 ```py
-from typing import Literal
+from typing import Literal, cast
 
 def _(x: Literal["a", "b"] | tuple[int, int]):
     if x == "a":
@@ -1740,6 +1767,121 @@ def _(x: Literal["a", "b"] | tuple[int, int]):
     else:
         # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
+
+class OpenTupleSubclass(tuple[int, int]): ...
+
+def _(x: Literal["a", "b"] | OpenTupleSubclass):
+    if x == "a":
+        reveal_type(x)  # revealed: Literal["a"]
+    else:
+        reveal_type(x)  # revealed: Literal["b"] | OpenTupleSubclass
+
+def inequality_else(value: str | tuple[str | None, str | None, str] | None) -> None:
+    if value == "files":
+        pass
+    elif value != "response":
+        return
+
+    reveal_type(value)  # revealed: Literal["files", "response"]
+    cast(Literal["files", "response"], value)  # error: [redundant-cast]
+```
+
+Fixed-length tuples compare corresponding elements using identity before equality, so distinct
+inferred element types can still make the result definite. Different lengths cannot compare equal:
+
+```py
+from enum import Enum
+from typing import Final, Literal, NewType
+
+class TupleValues:
+    TRUE: Final = (True,)
+    LONGER: Final = (True, 0)
+
+def equivalent_tuple_pattern(value: tuple[Literal[1]]) -> int:
+    match value:
+        case TupleValues.TRUE:
+            return 1
+
+def different_length_tuple_pattern(value: tuple[Literal[1]]) -> None:
+    match value:
+        case TupleValues.LONGER:
+            reveal_type(value)  # revealed: Never
+
+class NeverEqualTupleElement(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+reveal_type((NeverEqualTupleElement.A,) == (NeverEqualTupleElement.A,))  # revealed: Literal[True]
+reveal_type((NeverEqualTupleElement.A,) != (NeverEqualTupleElement.A,))  # revealed: Literal[False]
+
+def tuple_with_non_reflexive_elements(left: NeverEqualTupleElement, right: NeverEqualTupleElement) -> None:
+    reveal_type((left,) == (right,))  # revealed: bool
+    reveal_type((left,) != (right,))  # revealed: bool
+
+LeftElement = NewType("LeftElement", NeverEqualTupleElement)
+RightElement = NewType("RightElement", NeverEqualTupleElement)
+
+def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
+    reveal_type((LeftElement(value),) == (RightElement(value),))  # revealed: bool
+    reveal_type((LeftElement(value),) != (RightElement(value),))  # revealed: bool
+```
+
+## Narrowing with NewTypes
+
+`NewType` wrappers erase their distinction at runtime, so comparisons with an identity-based enum
+literal remain ambiguous:
+
+```py
+from enum import Enum
+from typing import NewType
+
+class IdentityEnum(Enum):
+    A = 1
+    B = 2
+
+WrappedIdentityEnum = NewType("WrappedIdentityEnum", IdentityEnum)
+
+def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
+    reveal_type(IdentityEnum.A == value)  # revealed: bool
+    reveal_type(IdentityEnum.A != value)  # revealed: bool
+```
+
+## Narrowing with enums that have custom `__eq__` methods
+
+Custom enum comparison methods with definite return types determine equality and inequality
+independently:
+
+```py
+from enum import Enum
+from typing import Any, Literal
+
+class AlwaysEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class NeverUnequalEnum(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> Literal[False]:
+        return False
+
+reveal_type(AlwaysEqualEnum.A == AlwaysEqualEnum.B)  # revealed: Literal[True]
+reveal_type(NeverUnequalEnum.A != NeverUnequalEnum.B)  # revealed: Literal[False]
+
+def tuple_with_custom_equality(left: AlwaysEqualEnum, right: AlwaysEqualEnum) -> None:
+    reveal_type((left,) == (right,))  # revealed: Literal[True]
+    reveal_type((left,) != (right,))  # revealed: Literal[False]
+
+def never_unequal_narrowing(x: Any, value: Literal[NeverUnequalEnum.A]) -> None:
+    if x != value:
+        reveal_type(x)  # revealed: Any & ~Literal[NeverUnequalEnum.A]
 ```
 
 ## Narrowing tagged unions of nominal classes by attribute

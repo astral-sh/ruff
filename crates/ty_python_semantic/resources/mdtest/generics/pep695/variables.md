@@ -604,21 +604,17 @@ def f[
 # fmt: on
 ```
 
-## Singletons and single-valued types
-
-(Note: for simplicity, all of the prose in this section refers to _singleton_ types, but all of the
-claims also apply to _single-valued_ types.)
+## Singletons
 
 An unbounded, unconstrained typevar is not a singleton, because it can be specialized to a
 non-singleton type.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 ```
 
 A bounded typevar is not a singleton, even if its bound is a singleton, since it can still be
@@ -627,7 +623,6 @@ specialized to `Never`.
 ```py
 def bounded[T: None](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 ```
 
 A constrained typevar is a singleton if all of its constraints are singletons. (Note that you cannot
@@ -638,13 +633,9 @@ from typing_extensions import Literal
 
 def constrained_non_singletons[T: (int, str)](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 
 def constrained_singletons[T: (Literal[True], Literal[False])](t: T) -> None:
     static_assert(is_singleton(T))
-
-def constrained_single_valued[T: (Literal[True], tuple[()])](t: T) -> None:
-    static_assert(is_single_valued(T))
 ```
 
 ## Unions involving typevars

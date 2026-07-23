@@ -2119,8 +2119,6 @@ pub enum KnownFunction {
     IsDisjointFrom,
     /// `ty_extensions._internal.is_singleton`
     IsSingleton,
-    /// `ty_extensions._internal.is_single_valued`
-    IsSingleValued,
     /// `ty_extensions._internal.generic_context`
     GenericContext,
     /// `ty_extensions._internal.into_callable`
@@ -2228,7 +2226,6 @@ impl KnownFunction {
             | Self::IsConstraintSetAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
-            | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
@@ -2793,7 +2790,6 @@ pub(crate) mod tests {
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
                 | KnownFunction::IsDisjointFrom
-                | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsConstraintSetAssignableTo
                 | KnownFunction::IsEquivalentTo

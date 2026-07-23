@@ -433,21 +433,6 @@ static_assert(not is_singleton(int))
 static_assert(not is_singleton(Literal["a"]))
 ```
 
-### Single-valued types
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_single_valued
-from typing import Literal
-
-static_assert(is_single_valued(None))
-static_assert(is_single_valued(Literal[True]))
-static_assert(is_single_valued(Literal["a"]))
-
-static_assert(not is_single_valued(int))
-static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
-```
-
 ## `TypeOf`
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
