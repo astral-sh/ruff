@@ -1226,6 +1226,37 @@ def get_int() -> int | None: ...
 reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
+### Callable return union order does not affect inference
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def ensure_tuple[T, **P](func: Callable[P, tuple[T, ...] | T]) -> Callable[P, tuple[T, ...]]:
+    raise NotImplementedError
+
+def ensure_box[T, **P](func: Callable[P, Box[T] | T]) -> Callable[P, Box[T]]:
+    raise NotImplementedError
+
+def check(
+    scalar_first: Callable[[int], str | tuple[str, ...]],
+    tuple_first: Callable[[int], tuple[str, ...] | str],
+    nested_member_first: Callable[[int], Box[str] | tuple[Box[str], ...]],
+    nested_tuple_first: Callable[[int], tuple[Box[str], ...] | Box[str]],
+    box_scalar_first: Callable[[int], str | Box[str]],
+    box_first: Callable[[int], Box[str] | str],
+) -> None:
+    reveal_type(ensure_tuple(scalar_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple(tuple_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple(nested_member_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_tuple(nested_tuple_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_box(box_scalar_first))  # revealed: (int, /) -> Box[str]
+    reveal_type(ensure_box(box_first))  # revealed: (int, /) -> Box[str]
+```
+
 ### Don't include identical lower/upper bounds in type mapping multiple times
 
 This is was a performance regression reported in

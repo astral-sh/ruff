@@ -1190,6 +1190,39 @@ class MyCallable:
 reveal_type(call(MyCallable()))  # revealed: int
 ```
 
+## Callable return union order does not affect inference
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Box(Generic[T_co]): ...
+
+def ensure_tuple(func: Callable[P, tuple[T, ...] | T]) -> Callable[P, tuple[T, ...]]:
+    raise NotImplementedError
+
+def ensure_box(func: Callable[P, Box[T] | T]) -> Callable[P, Box[T]]:
+    raise NotImplementedError
+
+def check(
+    scalar_first: Callable[[int], str | tuple[str, ...]],
+    tuple_first: Callable[[int], tuple[str, ...] | str],
+    nested_member_first: Callable[[int], Box[str] | tuple[Box[str], ...]],
+    nested_tuple_first: Callable[[int], tuple[Box[str], ...] | Box[str]],
+    box_scalar_first: Callable[[int], str | Box[str]],
+    box_first: Callable[[int], Box[str] | str],
+) -> None:
+    reveal_type(ensure_tuple(scalar_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple(tuple_first))  # revealed: (int, /) -> tuple[str, ...]
+    reveal_type(ensure_tuple(nested_member_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_tuple(nested_tuple_first))  # revealed: (int, /) -> tuple[Box[str], ...]
+    reveal_type(ensure_box(box_scalar_first))  # revealed: (int, /) -> Box[str]
+    reveal_type(ensure_box(box_first))  # revealed: (int, /) -> Box[str]
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of

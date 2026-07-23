@@ -2199,15 +2199,15 @@ impl NodeId {
             return ALWAYS_TRUE;
         }
 
-        if if_true == if_false {
-            if if_true == if_uncertain {
-                return if_true;
+        if let Some(if_true_false) = if_true.merge_same_shape(builder, if_false) {
+            if let Some(result) = if_true_false.merge_same_shape(builder, if_uncertain) {
+                return result;
             }
             if if_true == ALWAYS_FALSE {
                 return if_uncertain;
             }
             if if_uncertain == ALWAYS_FALSE {
-                return if_true;
+                return if_true_false;
             }
 
             // TODO: A future reduction can handle this remaining `if_true == if_false` case by
@@ -2215,12 +2215,16 @@ impl NodeId {
             // the local equality check has already engaged.
         }
 
-        if if_true == if_uncertain && if_false == ALWAYS_FALSE {
-            return if_uncertain;
+        if if_false == ALWAYS_FALSE
+            && let Some(result) = if_true.merge_same_shape(builder, if_uncertain)
+        {
+            return result;
         }
 
-        if if_false == if_uncertain && if_true == ALWAYS_FALSE {
-            return if_uncertain;
+        if if_true == ALWAYS_FALSE
+            && let Some(result) = if_false.merge_same_shape(builder, if_uncertain)
+        {
+            return result;
         }
 
         let max_source_order = source_order
@@ -2330,6 +2334,58 @@ impl NodeId {
         }
         let interior = builder.interior_node_data(self);
         Some(interior.constraint)
+    }
+
+    /// Merges two TDDs with the same shape, preserving the earliest source order at each node.
+    fn merge_same_shape(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Option<Self> {
+        fn merge(
+            builder: &ConstraintSetBuilder<'_>,
+            left: NodeId,
+            right: NodeId,
+            cache: &mut FxHashMap<(NodeId, NodeId), NodeId>,
+        ) -> Option<NodeId> {
+            if left == right {
+                return Some(left);
+            }
+            let key = (left, right);
+            if let Some(result) = cache.get(&key) {
+                return Some(*result);
+            }
+            let (Node::Interior(_), Node::Interior(_)) = (left.node(), right.node()) else {
+                return None;
+            };
+            let left = builder.interior_node_data(left);
+            let right = builder.interior_node_data(right);
+            if left.constraint != right.constraint {
+                return None;
+            }
+
+            let if_true = merge(builder, left.if_true, right.if_true, cache)?;
+            let if_uncertain = merge(builder, left.if_uncertain, right.if_uncertain, cache)?;
+            let if_false = merge(builder, left.if_false, right.if_false, cache)?;
+            let result = NodeId::with_uncertain(
+                builder,
+                left.constraint,
+                if_true,
+                if_uncertain,
+                if_false,
+                left.source_order.min(right.source_order),
+            );
+            cache.insert(key, result);
+            Some(result)
+        }
+
+        if self == other {
+            return Some(self);
+        }
+        if self.is_terminal()
+            || other.is_terminal()
+            || self.root_constraint(builder) != other.root_constraint(builder)
+        {
+            return None;
+        }
+
+        merge(builder, self, other, &mut FxHashMap::default())
     }
 
     fn max_source_order(self, builder: &ConstraintSetBuilder<'_>) -> usize {
@@ -8035,6 +8091,127 @@ mod tests {
 
         let expected: FxIndexSet<_> = expected.into_iter().map(String::from).collect();
         assert_eq!(signatures, expected);
+    }
+
+    #[test]
+    fn constraint_absorption_is_independent_of_constraint_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let str = KnownClass::Str.to_instance(&db);
+        let int = KnownClass::Int.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, Some(str), None),
+            PermutedConstraint(t, Some(int), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t],
+            &atoms,
+            |builder| {
+                let [str_t, int_t] = atoms.map(|atom| atom.node(&db, builder));
+                str_t
+                    .or_with_offset(builder, int_t)
+                    .and_with_offset(builder, str_t)
+            },
+            ["never=false always=false merged=[T=str] paths=[T=str]"],
+        );
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t],
+            &atoms,
+            |builder| {
+                let [str_t, int_t] = atoms.map(|atom| atom.node(&db, builder));
+                str_t.or_with_offset(builder, int_t)
+            },
+            ["never=false always=false merged=[T=str | int] paths=[T=str; T=int]"],
+        );
+    }
+
+    #[test]
+    fn compound_constraint_absorption_is_independent_of_constraint_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let int = KnownClass::Int.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, Some(str), None),
+            PermutedConstraint(u, Some(bytes), None),
+            PermutedConstraint(t, Some(int), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [str_t, bytes_u, int_t] = atoms.map(|atom| atom.node(&db, builder));
+                let compound = str_t.and_with_offset(builder, bytes_u);
+                compound
+                    .or_with_offset(builder, int_t)
+                    .and_with_offset(builder, compound)
+            },
+            ["never=false always=false merged=[T=str, U=bytes] paths=[T=str, U=bytes]"],
+        );
+    }
+
+    #[test]
+    fn compound_constraint_absorption_preserves_binding_source_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let x = create_typevar(&db, "X");
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let int = KnownClass::Int.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, Some(str), None),
+            PermutedConstraint(u, Some(bytes), None),
+            PermutedConstraint(x, Some(int), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u, x],
+            &atoms,
+            |builder| {
+                let [str_t, bytes_u, int_x] = atoms.map(|atom| atom.node(&db, builder));
+                let early = int_x
+                    .and_with_offset(builder, str_t)
+                    .and_with_offset(builder, bytes_u);
+                let late = bytes_u.and_with_offset(builder, str_t);
+                early.or_with_offset(builder, late)
+            },
+            ["never=false always=false merged=[T=str, U=bytes] paths=[T=str, U=bytes]"],
+        );
+    }
+
+    #[test]
+    fn constraint_partition_is_independent_of_constraint_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let str = KnownClass::Str.to_instance(&db);
+        let int = KnownClass::Int.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, Some(str), None),
+            PermutedConstraint(t, Some(int), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t],
+            &atoms,
+            |builder| {
+                let [str_t, int_t] = atoms.map(|atom| atom.node(&db, builder));
+                let true_path = int_t.and_with_offset(builder, str_t);
+                let false_path = int_t.negate(builder).and_with_offset(builder, str_t);
+                true_path.or_with_offset(builder, false_path)
+            },
+            ["never=false always=false merged=[T=str] paths=[T=str]"],
+        );
     }
 
     #[test]
