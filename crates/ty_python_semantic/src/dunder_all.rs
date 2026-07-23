@@ -3,11 +3,13 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::Db;
 use crate::types::{Type, TypeContext, infer_expression_types};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
@@ -40,6 +42,12 @@ struct DunderAllNamesCollector<'db> {
 
     /// A set of names found in `__all__` for the current module.
     names: FxHashSet<Name>,
+
+    /// Local aliases introduced by `from module import __all__ as alias`.
+    imported_dunder_all: FxHashMap<Name, ImportedBinding<'db>>,
+
+    /// Local names introduced by direct module imports.
+    imported_modules: FxHashMap<Box<str>, ImportedBinding<'db>>,
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
@@ -51,6 +59,8 @@ impl<'db> DunderAllNamesCollector<'db> {
             origin: None,
             invalid: false,
             names: FxHashSet::default(),
+            imported_dunder_all: FxHashMap::default(),
+            imported_modules: FxHashMap::default(),
         }
     }
 
@@ -70,6 +80,10 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns `true` if the expression is a valid list/tuple/set or module `__all__`, `false` otherwise.
     fn extend(&mut self, expr: &ast::Expr) -> bool {
+        self.extend_with_root(expr, expr)
+    }
+
+    fn extend_with_root(&mut self, expr: &ast::Expr, root: &ast::Expr) -> bool {
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
@@ -83,14 +97,19 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
-                else {
-                    return false;
-                };
-                let Some(module_dunder_all_names) = module_literal
-                    .module(self.db)
-                    .file(self.db)
-                    .and_then(|file| dunder_all_names(self.db, file))
+                let module_file = self.imported_module_file_at_use(value).or_else(|| {
+                    if !std::ptr::eq(expr, root) {
+                        return None;
+                    }
+                    let Type::ModuleLiteral(module_literal) =
+                        self.standalone_expression_type(value)
+                    else {
+                        return None;
+                    };
+                    module_literal.module(self.db).file(self.db)
+                });
+                let Some(module_dunder_all_names) =
+                    module_file.and_then(|file| dunder_all_names(self.db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
@@ -98,6 +117,26 @@ impl<'db> DunderAllNamesCollector<'db> {
                 self.names.extend(module_dunder_all_names.iter().cloned());
                 true
             }
+
+            // `__all__ = imported_all + [...]`
+            ast::Expr::Name(name) => {
+                let Some(file) = self.imported_file_at_use(name, &self.imported_dunder_all) else {
+                    return false;
+                };
+                let Some(imported_names) = dunder_all_names(self.db, file) else {
+                    return false;
+                };
+                self.names.extend(imported_names.iter().cloned());
+                true
+            }
+
+            // `__all__ = [...] + module.__all__`
+            ast::Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: ast::Operator::Add,
+                right,
+                ..
+            }) => self.extend_with_root(left, root) && self.extend_with_root(right, root),
 
             _ => false,
         }
@@ -156,10 +195,47 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
+        let file = self.file_for_import_from(import_from)?;
+        dunder_all_names(self.db, file)
+    }
+
+    fn file_for_import_from(&self, import_from: &ast::StmtImportFrom) -> Option<File> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
-        dunder_all_names(self.db, module.file(self.db)?)
+        module.file(self.db)
+    }
+
+    fn imported_file_at_use(
+        &self,
+        name: &ast::ExprName,
+        imports: &FxHashMap<Name, ImportedBinding<'db>>,
+    ) -> Option<File> {
+        let imported = imports.get(&name.id)?;
+        self.imported_file_for_binding(name, *imported)
+    }
+
+    fn imported_module_file_at_use(&self, expr: &ast::Expr) -> Option<File> {
+        let (reference, root) = dotted_name(expr)?;
+        let imported = self.imported_modules.get(reference.as_str())?;
+        self.imported_file_for_binding(root, *imported)
+    }
+
+    fn imported_file_for_binding(
+        &self,
+        name: &ast::ExprName,
+        imported: ImportedBinding<'db>,
+    ) -> Option<File> {
+        let name_ref = ast::ExprRef::Name(name);
+        let use_def = self
+            .index
+            .use_def_map(self.index.expression_scope_id(&name_ref));
+        let mut bindings = use_def.bindings_at_use(name.scoped_use_id(self.db, self.file));
+        let expected = DefinitionState::Defined(imported.definition);
+
+        (bindings.next()?.binding == expected
+            && bindings.all(|binding| binding.binding == expected))
+        .then_some(imported.file)
     }
 
     /// Infer the type of a standalone expression.
@@ -216,8 +292,31 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
         }
 
         match stmt {
+            ast::Stmt::Import(ast::StmtImport { names, .. }) => {
+                for alias @ ast::Alias { name, asname, .. } in names {
+                    let Some(module_name) = ModuleName::new(name.as_str()) else {
+                        continue;
+                    };
+                    let Some(file) = resolve_module(self.db, self.file, &module_name)
+                        .and_then(|module| module.file(self.db))
+                    else {
+                        continue;
+                    };
+                    let reference = asname
+                        .as_ref()
+                        .map_or(name.as_str(), |asname| asname.as_str());
+                    self.imported_modules.insert(
+                        reference.into(),
+                        ImportedBinding {
+                            file,
+                            definition: self.index.expect_single_definition(alias),
+                        },
+                    );
+                }
+            }
+
             ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
-                for ast::Alias { name, asname, .. } in names {
+                for alias @ ast::Alias { name, asname, .. } in names {
                     // `from module import *` where `module` is a module with a top-level `__all__`
                     // variable that contains the "__all__" element.
                     if name == "*" {
@@ -236,13 +335,28 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                             self.names.extend(all_names.iter().cloned());
                         }
                     } else {
-                        // `from module import __all__`
-                        // `from module import __all__ as __all__`
-                        if name != "__all__"
-                            || asname.as_ref().is_some_and(|asname| asname != "__all__")
-                        {
+                        if name != "__all__" {
                             continue;
                         }
+
+                        // `from module import __all__ as module_all`
+                        if let Some(asname) = asname
+                            && asname != "__all__"
+                        {
+                            if let Some(file) = self.file_for_import_from(import_from) {
+                                self.imported_dunder_all.insert(
+                                    asname.id.clone(),
+                                    ImportedBinding {
+                                        file,
+                                        definition: self.index.expect_single_definition(alias),
+                                    },
+                                );
+                            }
+                            continue;
+                        }
+
+                        // `from module import __all__`
+                        // `from module import __all__ as __all__`
 
                         // We could do the `__all__` lookup lazily in case it's not needed. This would
                         // happen if a `__all__` is imported from another module but then the module
@@ -282,6 +396,17 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                     | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         self.update_origin(DunderAllOrigin::CurrentModule);
                         if !self.add_names(elts) {
+                            self.invalid = true;
+                        }
+                    }
+                    ast::Expr::BinOp(ast::ExprBinOp {
+                        op: ast::Operator::Add,
+                        ..
+                    })
+                    | ast::Expr::Name(_)
+                    | ast::Expr::Attribute(_) => {
+                        self.update_origin(DunderAllOrigin::CurrentModule);
+                        if !self.extend(value) {
                             self.invalid = true;
                         }
                     }
@@ -408,7 +533,6 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
             | ast::Stmt::Return(..)
             | ast::Stmt::Raise(..)
             | ast::Stmt::Assert(..)
-            | ast::Stmt::Import(..)
             | ast::Stmt::Global(..)
             | ast::Stmt::Nonlocal(..)
             | ast::Stmt::TypeAlias(..)
@@ -417,6 +541,25 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
             | ast::Stmt::Continue(..)
             | ast::Stmt::IpyEscapeCommand(..) => {}
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ImportedBinding<'db> {
+    file: File,
+    definition: Definition<'db>,
+}
+
+fn dotted_name(expr: &ast::Expr) -> Option<(String, &ast::ExprName)> {
+    match expr {
+        ast::Expr::Name(name) => Some((name.id.to_string(), name)),
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            let (mut name, root) = dotted_name(value)?;
+            name.push('.');
+            name.push_str(attr);
+            Some((name, root))
+        }
+        _ => None,
     }
 }
 

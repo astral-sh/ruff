@@ -125,6 +125,9 @@ from c import Y  # error: [unresolved-import]
 ```toml
 [environment]
 python-version = "3.12"
+
+[rules]
+implicit-reexport = "ignore"
 ```
 
 We understand all public symbols defined in an external module as being imported by a `*` import,
@@ -582,9 +585,9 @@ the explicit `from a import X as X` syntax to explicitly mark it as publicly re-
 not included in `__all__`; whether it should be considered a "public name" in module `b` is
 ambiguous.
 
-We should consider `X` bound in `c.py`. However, we could consider adding an opt-in rule to warn the
-user when they use `X` in `c.py` that it was neither included in `b.__all__` nor marked as an
-explicit re-export from `b` through the "redundant alias" convention.
+We should consider `X` bound in `c.py`. The opt-in `implicit-reexport` rule warns that `X` was
+neither included in `b.__all__` nor marked as an explicit re-export from `b` through the "redundant
+alias" convention.
 
 `a.py`:
 
@@ -601,9 +604,9 @@ from a import X
 `c.py`:
 
 ```py
+# error: [implicit-reexport] "Module `b` does not explicitly export attribute `X`"
 from b import *
 
-# TODO: we could consider an opt-in diagnostic (see prose commentary above)
 reveal_type(X)  # revealed: bool
 ```
 
@@ -690,7 +693,7 @@ python-version = "3.11"
 `exporter.py`:
 
 ```py
-import sys
+import sys as sys
 
 if sys.version_info >= (3, 11):
     X: bool = True
@@ -742,7 +745,7 @@ python-version = "3.11"
 `exporter.py`:
 
 ```py
-import sys
+import sys as sys
 
 if sys.version_info >= (3, 12):
     Z: str = "foo"
@@ -821,7 +824,7 @@ python-version = "3.11"
 `exporter.py`:
 
 ```py
-import sys
+import sys as sys
 
 if sys.version_info >= (3, 12):
     A: bool = True
@@ -1353,7 +1356,7 @@ class C:
 `exporter.py`:
 
 ```py
-from common import C
+from common import C as C
 
 def flag() -> bool:
     return True

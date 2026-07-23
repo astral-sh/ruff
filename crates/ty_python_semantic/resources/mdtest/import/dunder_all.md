@@ -421,6 +421,127 @@ from ty_extensions._internal import dunder_all_names
 reveal_type(dunder_all_names(exporter))
 ```
 
+## Additional supported idioms
+
+### Concatenated assignment
+
+`base.py`:
+
+```py
+__all__ = ["A"]
+
+class A: ...
+```
+
+`alias_exporter.py`:
+
+```py
+from base import A
+from base import __all__ as base_all
+
+class B: ...
+
+__all__ = base_all + ["B"]
+```
+
+`attribute_exporter.py`:
+
+```py
+import base
+from base import A
+
+class C: ...
+
+__all__ = ["C"] + base.__all__
+```
+
+`alias_only_exporter.py`:
+
+```py
+from base import A
+from base import __all__ as base_all
+
+__all__ = base_all
+```
+
+`package/__init__.py`:
+
+```py
+```
+
+`package/child.py`:
+
+```py
+__all__ = ["D"]
+
+class D: ...
+```
+
+`dotted_attribute_exporter.py`:
+
+```py
+import package.child
+from package.child import D
+
+class E: ...
+
+__all__ = ["E"] + package.child.__all__
+```
+
+`shadowed_alias_exporter.py`:
+
+```py
+from base import __all__ as base_all
+
+base_all = ["D"]
+
+# Local variables in concatenated assignments are not a supported `__all__` idiom. In particular,
+# this name should not still be interpreted as the import that it shadows.
+__all__ = base_all + ["E"]
+```
+
+`shadowed_module_exporter.py`:
+
+```py
+import base
+
+base = object()  # error: [invalid-assignment]
+
+# The shadowed name should not still be interpreted as the imported module.
+__all__ = ["D"] + base.__all__
+```
+
+`importer.py`:
+
+```py
+import alias_exporter
+import alias_only_exporter
+import attribute_exporter
+import dotted_attribute_exporter
+import shadowed_alias_exporter
+import shadowed_module_exporter
+from alias_exporter import A, B
+from alias_only_exporter import A as AliasOnlyA
+from attribute_exporter import A as AttributeA, C
+from dotted_attribute_exporter import D, E
+from ty_extensions._internal import dunder_all_names
+
+reveal_type(dunder_all_names(alias_exporter))  # revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(dunder_all_names(alias_only_exporter))  # revealed: tuple[Literal["A"]]
+reveal_type(dunder_all_names(attribute_exporter))  # revealed: tuple[Literal["A"], Literal["C"]]
+reveal_type(dunder_all_names(dotted_attribute_exporter))  # revealed: tuple[Literal["D"], Literal["E"]]
+reveal_type(dunder_all_names(shadowed_alias_exporter))  # revealed: None
+reveal_type(dunder_all_names(shadowed_module_exporter))  # revealed: None
+
+reveal_type(A)  # revealed: <class 'A'>
+reveal_type(AliasOnlyA)  # revealed: <class 'A'>
+reveal_type(B)  # revealed: <class 'B'>
+reveal_type(AttributeA)  # revealed: <class 'A'>
+reveal_type(C)  # revealed: <class 'C'>
+reveal_type(D)  # revealed: <class 'D'>
+reveal_type(E)  # revealed: <class 'E'>
+```
+
 ## Invalid
 
 ### Unsupported idioms

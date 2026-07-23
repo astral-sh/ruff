@@ -136,7 +136,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import TypeVar
 
-from .abc import BaseUser, Message
+from .abc import BaseUser, Message as Message
 from .chat import ChatMessage
 
 if TYPE_CHECKING:

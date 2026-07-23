@@ -10,7 +10,7 @@ use crate::{
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
-            POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
+            IMPLICIT_REEXPORT, POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
@@ -245,6 +245,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 self.extend_definition(*definition, inferred);
             }
+            if &alias.name == "*" {
+                self.report_star_import_implicit_reexports(import, alias);
+            }
+        }
+    }
+
+    fn report_star_import_implicit_reexports(
+        &self,
+        import_from: &ast::StmtImportFrom,
+        alias: &ast::Alias,
+    ) {
+        if !self.context.is_lint_enabled(&IMPLICIT_REEXPORT) {
+            return;
+        }
+
+        let db = self.db();
+        let Ok(module_name) = ModuleName::from_import_statement(db, self.file(), import_from)
+        else {
+            return;
+        };
+        let Some(module) = resolve_module(db, self.file(), &module_name) else {
+            return;
+        };
+        let Some(module_file) = module.file(db) else {
+            return;
+        };
+        if module_file.is_stub(db)
+            || (module_file == self.file() && self.scope().file_scope_id(db).is_global())
+        {
+            return;
+        }
+
+        let module_literal = ModuleLiteralType::new(
+            db,
+            module,
+            module.kind(db).is_package().then_some(self.file()),
+        );
+        let place_table = self.index.place_table(self.scope().file_scope_id(db));
+        let mut implicit_names = self
+            .index
+            .definitions(alias)
+            .iter()
+            .filter_map(|definition| definition.kind(db).as_star_import())
+            .map(|star_import| place_table.symbol(star_import.symbol_id()).name())
+            .filter(|name| {
+                module_literal
+                    .imported_member(db, name)
+                    .contains_non_reexported_definition(db, module_file, name, true)
+            })
+            .collect::<Vec<_>>();
+        implicit_names.sort_unstable();
+
+        if implicit_names.is_empty() {
+            return;
+        }
+        let Some(builder) = self.context.report_lint(&IMPLICIT_REEXPORT, alias) else {
+            return;
+        };
+        if implicit_names.len() == 1 {
+            builder.into_diagnostic(format_args!(
+                "Module `{module_name}` does not explicitly export attribute `{}`",
+                implicit_names[0]
+            ));
+        } else if implicit_names.len() == 2 {
+            builder.into_diagnostic(format_args!(
+                "Wildcard import from module `{module_name}` includes attributes `{}` and `{}` that are not explicitly exported",
+                implicit_names[0], implicit_names[1]
+            ));
+        } else {
+            builder.into_diagnostic(format_args!(
+                "Wildcard import from module `{module_name}` includes attributes `{}`, `{}`, and {} more that are not explicitly exported",
+                implicit_names[0],
+                implicit_names[1],
+                implicit_names.len() - 2
+            ));
         }
     }
 
@@ -367,6 +442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
+            let imported_member = module_literal.imported_member(db, name);
             if let PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
@@ -376,7 +452,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = module_literal.static_member(db, name)
+            } = imported_member.place_and_qualifiers
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -389,6 +465,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Member `{name}` of module `{module_name}` may be missing",
                         ));
                     }
+                }
+                if &alias.name != "*"
+                    && self.context.is_lint_enabled(&IMPLICIT_REEXPORT)
+                    && let Some(module_file) = module.file(db)
+                    && !module_file.is_stub(db)
+                    && imported_member.contains_non_reexported_definition(
+                        db,
+                        module_file,
+                        name,
+                        false,
+                    )
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&IMPLICIT_REEXPORT, ast::AnyNodeRef::Alias(alias))
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Module `{module_name}` does not explicitly export attribute `{name}`"
+                    ));
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
                     from_module_getattr = Some((ty, qualifiers, source_provenance));

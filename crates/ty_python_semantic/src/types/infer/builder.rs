@@ -54,10 +54,11 @@ use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
-    GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    GeneratorMismatchKind, IMPLICIT_REEXPORT, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
@@ -10024,7 +10025,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, &attr.id).map_type(|ty| {
+        let fallback_place = value_type.member(db, &attr.id);
+        if let Type::ModuleLiteral(module_literal) = value_type
+            && self.context.is_lint_enabled(&IMPLICIT_REEXPORT)
+        {
+            let module = module_literal.module(db);
+            if let Some(module_file) = module.file(db)
+                && !module_file.is_stub(db)
+                && module_literal
+                    .imported_member(db, &attr.id)
+                    .contains_non_reexported_definition(db, module_file, &attr.id, false)
+                && let Some(builder) = self.context.report_lint(&IMPLICIT_REEXPORT, attribute)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Module `{}` does not explicitly export attribute `{}`",
+                    module.name(db),
+                    attr.id
+                ));
+            }
+        }
+        let fallback_place = fallback_place.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
 
@@ -10291,6 +10311,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
             ExprContext::Store => {
+                // A store creates or replaces the attribute rather than consuming a re-export.
                 self.infer_expression(value, TypeContext::default());
                 Type::Never
             }

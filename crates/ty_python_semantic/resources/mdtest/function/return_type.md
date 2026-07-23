@@ -144,7 +144,7 @@ since these functions will never actually be called.
 `compat/sub/sub.py`:
 
 ```py
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING as TYPE_CHECKING
 ```
 
 `main.py`:

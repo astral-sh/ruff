@@ -567,6 +567,16 @@
             }
           ]
         },
+        "implicit-reexport": {
+          "title": "detects imports of names that are not explicitly re-exported",
+          "description": "## What it does\n\nChecks for imports and attribute accesses that use names from a runtime module\nwhich imports but does not explicitly re-export them.\n\n## Why is this bad?\n\nImports may only be intended for local use, not for re-export as part of the\npublic interface of a module. Importing names that were not intended for\nre-export can create inconsistent import locations for the same symbol, cause\nbreakages when an internal import is removed, and make refactors more difficult.\n\n## Rule status\n\nThis rule is disabled by default. Enable it to require runtime modules to use\nexplicit re-export conventions, matching the behavior that is always enforced\nfor stub files.\n\n## Example\n\n`models.py`:\n\n```python\nclass Admin: ...\n\n\nclass User: ...\n```\n\n`api.py`:\n\n```python\nfrom models import Admin as Admin\nfrom models import User\n```\n\n`app.py`:\n\n```python\nfrom api import Admin  # fine\nfrom api import User  # error: [implicit-reexport]\n```\n\nThe redundant alias marks `Admin` as part of the public interface of `api.py`.\nNames can also be explicitly re-exported by including them in `__all__`.\n\n## References\n\n- [Typing specification: Import conventions](https://typing.python.org/en/latest/spec/distributing.html#import-conventions)",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\n\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\n\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass A: ...\n\n\nclass B(A): ...\n\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...  # error\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",

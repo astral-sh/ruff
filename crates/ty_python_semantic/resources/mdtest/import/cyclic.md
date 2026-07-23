@@ -57,7 +57,7 @@ from .inner import *
 `pkg/sub/inner.py`:
 
 ```py
-from pkg.sub import A
+from pkg.sub import A as A
 ```
 
 ### Actual cycle
@@ -77,7 +77,7 @@ reveal_type(x)  # revealed: Unknown
 
 ```py
 # error: [unresolved-import]
-from module import x
+from module import x as x
 ```
 
 ### Self-referential `from` import in a nested scope
@@ -109,7 +109,7 @@ cycles or unresolved imports.
 ```py
 import module  # self-referential import
 
-from module.sub import x
+from module.sub import x as x
 ```
 
 `module/sub.py`:

@@ -73,6 +73,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&EMPTY_BODY);
     registry.register_lint(&EXPERIMENTAL_SYNTAX);
+    registry.register_lint(&IMPLICIT_REEXPORT);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -439,6 +440,15 @@ declare_lint! {
         summary: "detects functions with empty bodies that have a non-`None` return type annotation",
         status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/implicit-reexport.md")]
+    pub(crate) static IMPLICIT_REEXPORT = {
+        summary: "detects imports of names that are not explicitly re-exported",
+        status: LintStatus::stable("0.0.63"),
+        default_level: Level::Ignore,
     }
 }
 

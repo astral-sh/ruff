@@ -1545,6 +1545,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 symbol.name(),
                 requires_explicit_reexport,
             )
+            .place_and_qualifiers
             .place
             {
                 Place::Defined(DefinedPlace {
