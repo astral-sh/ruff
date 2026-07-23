@@ -86,27 +86,6 @@ def non_empty_first(flag: bool) -> None:
         reveal_type(value)  # revealed: range
 ```
 
-Empty ranges all compare equal, but non-empty ranges with the same type refinement may contain
-different values:
-
-```py
-empty_left = range(0)
-empty_right = range(1, 1)
-
-if empty_left == empty_right:
-    reveal_type(empty_left)  # revealed: range
-else:
-    reveal_type(empty_left)  # revealed: Never
-
-non_empty_left = range(1)
-non_empty_right = range(2)
-
-if non_empty_left == non_empty_right:
-    reveal_type(non_empty_left)  # revealed: range
-else:
-    reveal_type(non_empty_left)  # revealed: range
-```
-
 ## With shadowed `range`
 
 ```py

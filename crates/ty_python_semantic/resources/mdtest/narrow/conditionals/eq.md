@@ -1035,6 +1035,101 @@ def narrow_different_equality_implementations(value: FinalObject | FinalInt, oth
         reveal_type(value)  # revealed: FinalObject
 ```
 
+## Sentinels
+
+Sentinels always compare equal to themselves, since they are singletons:
+
+```py
+from typing_extensions import Sentinel
+
+MISSING = Sentinel("MISSING")
+
+reveal_type(MISSING == MISSING)  # revealed: Literal[True]
+```
+
+## Known typing-object equality behavior
+
+Certain typing APIs are heavily special-cased by ty, which makes it tempting to special case
+equality inference for these symbols. This, however, is error-prone: for example, ty currently
+infers the same type for `typing_extensions.Literal` as it does for `typing.Literal`, even though
+these may not be the same runtime object and may not compare equal. There's also no known use case
+for precisely inferring equality comparisons between these objects.
+
+For most special-cased typing APIs, therefore, we simply fallback to the nominal instance that the
+typing symbol is known to be an instance of:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Literal, NamedTuple
+from typing_extensions import NamedTuple as ExtensionsNamedTuple
+from ty_extensions._internal import generic_context
+
+type Alias = int
+
+class GenericClass[T]: ...
+
+reveal_type(Alias == Alias)  # revealed: bool
+reveal_type(generic_context(GenericClass) == generic_context(GenericClass))  # revealed: bool
+reveal_type((int | str) == (int | str))  # revealed: bool
+reveal_type(Literal[1] == Literal[1])  # revealed: bool
+
+def target(value: int) -> int:
+    return value
+
+# The bound `__call__` methods belong to distinct `partial` objects.
+reveal_type(partial(target, 1).__call__ == partial(target, 1).__call__)  # revealed: bool
+
+reveal_type(NamedTuple == ExtensionsNamedTuple)  # revealed: bool
+reveal_type(NamedTuple != ExtensionsNamedTuple)  # revealed: bool
+```
+
+Repeated construction of `dataclasses.Field` and `typing_extensions.deprecated` produces distinct
+objects that will compare unequal, even when their inferred payloads are identical:
+
+```py
+from dataclasses import dataclass, field
+from typing_extensions import deprecated
+
+@dataclass
+class FieldComparisons:
+    # False at runtime!
+    equals: bool = reveal_type(field(default=1) == field(default=1))  # revealed: bool
+    # True at runtime!
+    not_equals: bool = reveal_type(field(default=1) != field(default=1))  # revealed: bool
+
+# False at runtime!
+reveal_type(deprecated("gone") == deprecated("gone"))  # revealed: bool
+# True at runtime!
+reveal_type(deprecated("gone") != deprecated("gone"))  # revealed: bool
+```
+
+Runtime-significant metadata, spelling, and origin can be erased from the types that ty records for
+many of these APIs. Just because ty infers two of these objects as being of the same type does not
+therefore mean that they are equal:
+
+```py
+import builtins
+from collections.abc import Callable as AbcCallable
+from typing import Annotated, Callable, List, Type, TypeAlias
+
+A: TypeAlias = "int"
+B: TypeAlias = "builtins.int"
+
+# The `Annotated[]` metadata is discarded and ignored by ty, so these are inferred
+# as having the same type, but they will compare unequal at runtime
+reveal_type(Annotated[int, "a"] == Annotated[int, "b"])  # revealed: bool
+
+reveal_type(A == B)  # revealed: bool
+reveal_type(Callable[[int], str] == AbcCallable[[int], str])  # revealed: bool
+reveal_type(List[int] == list[int])  # revealed: bool
+reveal_type(Type[int] == type[int])  # revealed: bool
+```
+
 ## Constrained type variables
 
 Equality analysis expands the constraints of a constrained type variable in either operand position.
@@ -1518,7 +1613,7 @@ def _(x: Any, y: Any | str):
 
 def _(x: Any):
     if x != list[Any]:
-        reveal_type(x)  # revealed: Any & ~<class 'list[Any]'>
+        reveal_type(x)  # revealed: Any
 
 def _(x: Any, y: SingleIntEnum):
     if x == y:
@@ -1535,7 +1630,7 @@ def _(x: Any):
     if x == RUNTIME_TYPE_VAR:
         pass
     else:
-        reveal_type(x)  # revealed: Any & ~TypeVar
+        reveal_type(x)  # revealed: Any
 ```
 
 ## Booleans and integers

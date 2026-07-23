@@ -2486,15 +2486,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..) => true,
-            Type::SpecialForm(special_form) => {
-                // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
-                // originate from either `typing` or `typing_extensions` then this is not guaranteed.
-                // E.g. `typing.TypeGuard` is equivalent to `typing_extensions.TypeGuard`, so both are treated
-                // as inhabiting the type `SpecialFormType::TypeGuard` in our model, but they are actually
-                // distinct symbols at different memory addresses at runtime.
-                !(special_form.check_module(KnownModule::Typing)
-                    && special_form.check_module(KnownModule::TypingExtensions))
-            }
+            Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
             Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
             Type::KnownInstance(_) => false,
             Type::Callable(_) => {
@@ -2545,22 +2537,22 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
-            // All empty ranges compare equal, but non-empty ranges can contain different values.
-            Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => !is_non_empty,
+            Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
+            Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
 
-            // Each `partial()` call creates a distinct object at runtime.
-            Type::KnownInstance(
-                KnownInstanceType::FunctoolsPartial(_) | KnownInstanceType::FunctoolsPartialCall(_),
-            ) => false,
+            // It's tempting to add extensive special casing here, but it would be very error-prone,
+            // and there's no known use case. For example, `Annotated[int, ""]` does not compare
+            // equal to `Annotated[int, "fooo"]` (but for us they have identical types); `list[int]`
+            // does not compare equal to `typing.List[int]` (but for us they have identical types);
+            // `typing.Literal` will not necessarily be the same object as `typing_extensions.Literal`
+            // even on Python versions where typeshed says they are the same symbol; etc. etc.
+            Type::KnownInstance(_) | Type::GenericAlias(_) => false,
 
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(..)
-            | Type::ClassLiteral(..)
-            | Type::GenericAlias(..)
-            | Type::SpecialForm(..)
-            | Type::KnownInstance(..) => true,
+            | Type::ClassLiteral(..) => true,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(..) => !self.overrides_equality(db),

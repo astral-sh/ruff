@@ -2932,31 +2932,57 @@ def _(value: FinalPatternInt):
             reveal_type(value)  # revealed: FinalPatternInt
 ```
 
-Some precisely modeled objects compare equal to themselves, so an equivalent value pattern is
-exhaustive:
+We don't attempt to precisely model equality behaviour between special-cased typing-API objects. As
+described in `narrow/conditionals/eq.md`, doing so would be possible in some cases, but it would be
+error-prone, and there are few known use cases for doing this.
 
 ```py
+from functools import partial
 from types import FunctionType
-from typing import NewType, TypeVar
+from typing import List, Literal, NewType, Optional, TypeVar
+from typing_extensions import Literal as ExtensionsLiteral
 
 T = TypeVar("T")
 UserId = NewType("UserId", int)
 
 class ReflexivePatternValues:
     LIST_INT = list[int]
+    LEGACY_LIST_INT = List[int]
+    EXTENSIONS_LITERAL = ExtensionsLiteral
+    OPTIONAL = Optional
     TYPE_VAR = T
     NEW_TYPE = UserId
 
+# error: [invalid-return-type]
 def generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LIST_INT:
             return 1
 
+# error: [invalid-return-type]
+def cross_origin_generic_alias_value_pattern() -> int:
+    match list[int]:
+        case ReflexivePatternValues.LEGACY_LIST_INT:
+            return 1
+
+# error: [invalid-return-type]
+def cross_origin_special_form_value_pattern() -> int:
+    match Literal:
+        case ReflexivePatternValues.EXTENSIONS_LITERAL:
+            return 1
+
+def singleton_special_form_value_pattern() -> int:
+    match Optional:
+        case ReflexivePatternValues.OPTIONAL:
+            return 1
+
+# error: [invalid-return-type]
 def type_var_value_pattern() -> int:
     match T:
         case ReflexivePatternValues.TYPE_VAR:
             return 1
 
+# error: [invalid-return-type]
 def new_type_value_pattern() -> int:
     match UserId:
         case ReflexivePatternValues.NEW_TYPE:
@@ -2972,13 +2998,6 @@ def bound_method_value_pattern() -> int:
     match helper.__get__:
         case helper.__get__:
             return 1
-```
-
-Two calls that construct equivalent objects need not produce equal values. For example, separate
-`partial` objects do not compare equal, so this match is not exhaustive:
-
-```py
-from functools import partial
 
 def target(value: int) -> int:
     return value

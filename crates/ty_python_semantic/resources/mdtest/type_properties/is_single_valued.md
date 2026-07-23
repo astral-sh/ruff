@@ -48,7 +48,6 @@ static_assert(not is_single_valued(Callable[[int, str], None]))
 
 static_assert(not is_single_valued(TypeAliasType))
 static_assert(not is_single_valued(UnionType))
-static_assert(is_single_valued(TypeOf[list[int]]))
 
 class A:
     def method(self): ...
