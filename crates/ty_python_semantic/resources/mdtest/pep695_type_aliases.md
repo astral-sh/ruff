@@ -419,6 +419,9 @@ def f(x: IntOrStr) -> None:
 
 ### Generic example
 
+Manual aliases can be specialized in annotations and value positions, including when they are used
+in `type[...]` or nested inside another alias.
+
 ```py
 from typing import Callable, Concatenate, Generic
 from typing_extensions import ParamSpec, TypeAliasType, TypeVar, TypeVarTuple, Union, Unpack
@@ -439,7 +442,12 @@ Nested = TypeAliasType("Nested", list[IntAndT[T]], type_params=(T,))
 
 def nested(value: Nested[str]) -> None:
     reveal_type(value)  # revealed: list[IntAndT[str]]
+```
 
+Defaults apply to unspecialized aliases, and the order of `type_params` determines how type
+arguments are mapped even if the parameters appear in a different order in the alias value.
+
+```py
 U = TypeVar("U", default=str)
 
 ListOrSet = TypeAliasType("ListOrSet", Union[list[U], set[U]], type_params=(U,))
@@ -458,7 +466,12 @@ def g(
     reveal_type(dict_int_str)  # revealed: dict[int, str]
     reveal_type(dict_unknown_str)  # revealed: dict[Unknown, str]
     reveal_type(reordered)  # revealed: tuple[str, int]
+```
 
+Constructor inference sees through the specialized `ModelAlias[T]`: passing `Model` infers `T` as
+`Model` in `ViaAlias[T]`.
+
+```py
 ModelAlias = TypeAliasType("ModelAlias", type[T], type_params=(T,))
 
 class Model: ...
@@ -467,7 +480,12 @@ class ViaAlias(Generic[T]):
     def __init__(self, value: ModelAlias[T]) -> None: ...
 
 reveal_type(ViaAlias(Model))  # revealed: ViaAlias[Model]
+```
 
+`ParamSpec` parameters can be specialized alongside regular type variables and are preserved when a
+callable alias is used as a decorator return type.
+
+```py
 P = ParamSpec("P")
 R = TypeVar("R")
 WrappedMethod = TypeAliasType("WrappedMethod", Callable[Concatenate[T, P], R], type_params=(T, P, R))
@@ -485,7 +503,11 @@ def decorated(value: int) -> int:
     return value
 
 reveal_type(decorated)  # revealed: [**P'return](int, /, *args: P'return.args, **kwargs: P'return.kwargs) -> int
+```
 
+`TypeVarTuple` parameters accept multiple type arguments when specializing a variadic alias.
+
+```py
 Ts = TypeVarTuple("Ts")
 Variadic = TypeAliasType("Variadic", tuple[Unpack[Ts]], type_params=(Ts,))
 
@@ -576,7 +598,7 @@ Missing = TypeAliasType("Missing", dict[T, U], type_params=(T,))
 MissingAll = TypeAliasType("MissingAll", list[T])
 
 # error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
-Duplicate = TypeAliasType("Duplicate", list[T], type_params=(T, T))
+Duplicate = TypeAliasType("Duplicate", tuple[T, U], type_params=(T, U, T))
 
 MultipleTypeVarTuples = TypeAliasType(
     "MultipleTypeVarTuples",
