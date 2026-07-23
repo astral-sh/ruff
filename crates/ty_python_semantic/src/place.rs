@@ -16,7 +16,7 @@ use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -1017,10 +1017,7 @@ pub(crate) fn place_by_id<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     place_by_id_inner(
         db,
         scope,
@@ -1352,7 +1349,7 @@ fn symbol_impl<'db>(
             "version_info" => {
                 return Place::bound(Type::sys_version_info()).into();
             }
-            "platform" => match Program::get(db).python_platform(db) {
+            "platform" => match ty_python_core::program::Program::get(db).python_platform(db) {
                 crate::PythonPlatform::Identifier(platform) => {
                     return Place::bound(Type::string_literal(db, platform.as_str())).into();
                 }
@@ -1365,7 +1362,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
-        match Program::get(db).python_platform(db) {
+        match ty_python_core::program::Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
                 let os_name = if platform == "win32" { "nt" } else { "posix" };
@@ -1397,10 +1394,7 @@ pub(crate) fn loop_header_reachability<'db>(
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     loop_header_reachability_inner(db, definition)
 }
 
@@ -2080,12 +2074,12 @@ pub(crate) mod implicit_globals {
     use ruff_python_ast::name::Name;
     use ty_module_resolver::KnownModule;
 
-    use crate::SemanticContext;
     use crate::db::Db;
     use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::reachability::evaluate_reachability;
     use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
+    use crate::{Program, SemanticContext};
     use ruff_python_ast::PythonVersion;
     use ty_python_core::definition::{DefinitionKind, DefinitionState};
     use ty_python_core::scope::{NodeWithScopeRef, ScopeId};
@@ -2145,16 +2139,16 @@ pub(crate) mod implicit_globals {
 
     /// Return the body scope of the canonical `types.ModuleType` class.
     fn module_type_body_scope<'db>(ctx: &SemanticContext<'db>) -> Option<ScopeId<'db>> {
-        module_type_body_scope_inner(ctx.db(), ctx.python_version(), ())
+        module_type_body_scope_inner(ctx.db(), ctx.program(), ())
     }
 
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     fn module_type_body_scope_inner<'db>(
         db: &'db dyn Db,
-        python_version: PythonVersion,
+        program: Program,
         _: (), // TODO: Remove once this is a query over `Program`.
     ) -> Option<ScopeId<'db>> {
-        let ctx = SemanticContext::from_version(db, python_version);
+        let ctx = SemanticContext::from_program(db, program);
         let module_scope = core_module_scope(&ctx, KnownModule::Types)?;
         try_vendored_class_scope(&ctx, module_scope, "ModuleType").or_else(|| {
             KnownClass::ModuleType
@@ -2316,7 +2310,7 @@ pub(crate) mod implicit_globals {
     }
 
     fn module_type_symbols<'db>(ctx: &SemanticContext<'db>) -> &'db [ast::name::Name] {
-        module_type_symbols_inner(ctx.db(), ctx.python_version(), ())
+        module_type_symbols_inner(ctx.db(), ctx.program(), ())
     }
 
     #[salsa::tracked(
@@ -2326,10 +2320,10 @@ pub(crate) mod implicit_globals {
     )]
     fn module_type_symbols_inner(
         db: &dyn Db,
-        python_version: PythonVersion,
+        program: Program,
         _: (), // TODO: Remove once this is a query over `Program`.
     ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        let ctx = SemanticContext::from_version(db, python_version);
+        let ctx = SemanticContext::from_program(db, program);
         let Some(module_type_scope) = module_type_body_scope(&ctx) else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
             // without a resolvable `ModuleType` class in the `stdlib/types.pyi` stub.

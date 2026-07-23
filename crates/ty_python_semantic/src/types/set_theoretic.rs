@@ -78,12 +78,12 @@ impl<'db> UnionType<'db> {
             returns(copy),
             cycle_initial=|_, id, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(&SemanticContext::from_version(db, types.python_version(db)), *previous, cycle)
+                result.cycle_normalized(&SemanticContext::from_program(db, types.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let ctx = SemanticContext::from_version(db, types.python_version(db));
+            let ctx = SemanticContext::from_program(db, types.program(db));
             UnionBuilder::new(&ctx)
                 .add(types.first(db))
                 .add(types.second(db))
@@ -91,7 +91,7 @@ impl<'db> UnionType<'db> {
         }
 
         let db = ctx.db();
-        union_from_two_elements(db, TypePair::new(db, ctx.python_version(), a, b))
+        union_from_two_elements(db, TypePair::new(db, ctx.program(), a, b))
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -898,19 +898,19 @@ impl<'db> IntersectionType<'db> {
             returns(copy),
             cycle_initial=|_, id, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(&SemanticContext::from_version(db, types.python_version(db)), *previous, cycle)
+                result.cycle_normalized(&SemanticContext::from_program(db, types.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let ctx = SemanticContext::from_version(db, types.python_version(db));
+            let ctx = SemanticContext::from_program(db, types.program(db));
             IntersectionBuilder::new(&ctx)
                 .positive_elements([types.first(db), types.second(db)])
                 .build()
         }
 
         let db = ctx.db();
-        intersection_from_two_elements(db, TypePair::new(db, ctx.python_version(), a, b))
+        intersection_from_two_elements(db, TypePair::new(db, ctx.program(), a, b))
     }
 
     pub(crate) fn recursive_type_normalized_impl(

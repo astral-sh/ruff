@@ -72,10 +72,7 @@ impl<'db> BoundMethodType<'db> {
 
     pub(crate) fn into_callable_type(self, ctx: &SemanticContext<'db>) -> CallableType<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.function(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.function(db).program(db));
         self.into_callable_type_inner(db)
     }
 
@@ -123,10 +120,7 @@ impl<'db> BoundMethodType<'db> {
         ctx: &SemanticContext<'db>,
     ) -> &'db CallableSignature<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.function(db).python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.function(db).program(db));
         self.bound_signatures_inner(db)
     }
 

@@ -1109,13 +1109,7 @@ fn effective_superclass_variable_kind<'db>(
     name: &Name,
 ) -> Option<VariableKind> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        superclass
-            .class_literal(db)
-            .python_file(db)
-            .python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), superclass.class_literal(db).program(db));
     effective_superclass_variable_kind_inner(db, superclass, name.clone())
 }
 

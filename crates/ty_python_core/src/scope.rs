@@ -5,8 +5,8 @@ use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
 use crate::{
-    Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, node_key::NodeKey,
-    semantic_index,
+    Db, Program, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition,
+    node_key::NodeKey, semantic_index,
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -25,6 +25,10 @@ impl get_size2::GetSize for ScopeId<'_> {}
 impl<'db> ScopeId<'db> {
     pub fn file(self, db: &dyn Db) -> File {
         self.python_file(db).file(db)
+    }
+
+    pub fn program(self, db: &dyn Db) -> Program {
+        self.python_file(db).python_version(db)
     }
 
     pub fn is_annotation(self, db: &'db dyn Db) -> bool {

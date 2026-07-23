@@ -1,3 +1,4 @@
+use crate::Program;
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::scope::ScopeId;
@@ -77,5 +78,9 @@ impl<'db> Expression<'db> {
 
     pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.scope_id(db).python_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope_id(db).program(db)
     }
 }

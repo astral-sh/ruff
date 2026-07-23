@@ -99,9 +99,9 @@ use std::sync::{Arc, LazyLock};
 use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
-use ruff_python_ast::PythonVersion;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
@@ -3734,8 +3734,6 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> &'db PathBounds<'db> {
-        let db = ctx.db();
-        let python_version = ctx.python_version();
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _, _, _| PathBounds::Unsatisfiable,
@@ -3743,12 +3741,12 @@ impl<'db> Type<'db> {
         )]
         fn assignable_solutions_impl<'db>(
             db: &'db dyn Db,
-            python_version: PythonVersion,
+            program: Program,
             source: Type<'db>,
             target: Type<'db>,
             inferable: TypeVarSet<'db>,
         ) -> PathBounds<'db> {
-            let ctx = &SemanticContext::from_version(db, python_version);
+            let ctx = &SemanticContext::from_program(db, program);
             let when = source.when_constraint_set_assignable_to_owned(ctx, target);
             when.query(|builder, when| {
                 let mut storage = builder.storage.borrow_mut();
@@ -3756,7 +3754,9 @@ impl<'db> Type<'db> {
             })
         }
 
-        assignable_solutions_impl(db, python_version, self, target, inferable)
+        let db = ctx.db();
+        let program = ctx.program();
+        assignable_solutions_impl(db, program, self, target, inferable)
     }
 }
 
@@ -3766,8 +3766,8 @@ impl<'db> Type<'db> {
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-    let python_version = types.python_version(db);
-    let ctx = &SemanticContext::from_version(db, python_version);
+    let program = types.program(db);
+    let ctx = &SemanticContext::from_program(db, program);
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(ctx, types.second(db))
@@ -4096,7 +4096,7 @@ impl<'db> PathBounds<'db> {
 
                     if !is_possibly_constraint_set_assignable(
                         db,
-                        TypePair::new(db, ctx.python_version(), lower, declared_upper),
+                        TypePair::new(db, ctx.program(), lower, declared_upper),
                     ) {
                         // This path does not satisfy the typevar's declared upper bound, and is
                         // therefore not a valid specialization.

@@ -18,6 +18,10 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
+// FIXME: Replace this temporary alias once semantic query keys can use the environment-bearing
+// `Program` Salsa ingredient directly.
+pub type Program = ast::PythonVersion;
+
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};

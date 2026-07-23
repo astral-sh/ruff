@@ -28,9 +28,9 @@ pub(crate) use suppression::{
     SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
 };
 use ty_module_resolver::ModuleGlobSet;
+pub use ty_python_core::Program;
 use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,

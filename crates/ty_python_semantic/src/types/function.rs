@@ -65,7 +65,6 @@ use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
-use crate::SemanticContext;
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -98,7 +97,7 @@ use crate::types::{
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program, SemanticContext};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -335,6 +334,10 @@ impl<'db> OverloadLiteral<'db> {
 
     pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.body_scope(db).python_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        self.body_scope(db).program(db)
     }
 
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
@@ -902,10 +905,7 @@ impl<'db> FunctionLiteral<'db> {
         }
 
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.last_definition.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.last_definition.program(db));
         let (overloads, implementation) =
             overloads_and_implementation_inner(db, self.last_definition);
         (overloads.as_ref(), *implementation)
@@ -1050,10 +1050,7 @@ impl<'db> FunctionLiteral<'db> {
             return FunctionBodyKind::Stub;
         };
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            implementation.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), implementation.program(db));
         implementation_body_kind(db, implementation)
     }
 
@@ -1376,6 +1373,10 @@ impl<'db> FunctionType<'db> {
         self.literal(db).last_definition.python_file(db)
     }
 
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        self.literal(db).last_definition.program(db)
+    }
+
     /// Returns the AST node for this function.
     pub(super) fn node<'ast>(
         self,
@@ -1588,10 +1589,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     pub(crate) fn signature(self, ctx: &SemanticContext<'db>) -> &'db CallableSignature<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.signature_inner(db)
     }
 
@@ -1624,10 +1622,7 @@ impl<'db> FunctionType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.variance_of_inner(db, typevar)
     }
 
@@ -1659,10 +1654,7 @@ impl<'db> FunctionType<'db> {
         ctx: &SemanticContext<'db>,
     ) -> &'db Signature<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.last_definition_signature_inner(db)
     }
 
@@ -1694,10 +1686,7 @@ impl<'db> FunctionType<'db> {
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> &'db Signature<'db> {
         let db = ctx.db();
-        debug_assert_eq!(
-            ctx.python_version(),
-            self.python_file(db).python_version(db)
-        );
+        debug_assert_eq!(ctx.program(), self.program(db));
         self.last_definition_raw_signature_inner(db, return_callable_typevar_scope)
     }
 

@@ -126,10 +126,7 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> &'db DefinitionInference<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     infer_definition_types_inner(db, definition)
 }
 
@@ -205,10 +202,7 @@ pub(crate) fn function_known_decorators<'db>(
     definition: Definition<'db>,
 ) -> &'db FunctionDecoratorInference<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     function_known_decorators_inner(db, definition)
 }
 
@@ -299,10 +293,7 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> &'db DefinitionInference<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        definition.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), definition.program(db));
     infer_deferred_types_inner(db, definition)
 }
 
@@ -386,10 +377,7 @@ pub(crate) fn infer_scope_types<'db>(
     tcx: TypeContext<'db>,
 ) -> &'db ScopeInference<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        scope.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), scope.program(db));
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
@@ -441,10 +429,7 @@ pub(crate) fn infer_expression_types<'db>(
     tcx: TypeContext<'db>,
 ) -> &'db ExpressionInference<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        expression.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), expression.program(db));
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
@@ -527,10 +512,7 @@ pub(crate) fn infer_expression_type<'db>(
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        expression.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), expression.program(db));
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
@@ -570,10 +552,7 @@ pub(super) fn infer_statement_types<'db>(
             StatementInference::Definition(definition, infer_definition_types(ctx, definition))
         }
         Statement::Other(statement) => {
-            debug_assert_eq!(
-                ctx.python_version(),
-                statement.python_file(db).python_version(db)
-            );
+            debug_assert_eq!(ctx.program(), statement.program(db));
             StatementInference::Other(infer_statement_types_impl(db, statement))
         }
     }
@@ -774,10 +753,7 @@ pub(super) fn infer_unpack_types<'db>(
     unpack: Unpack<'db>,
 ) -> &'db UnpackResult<'db> {
     let db = ctx.db();
-    debug_assert_eq!(
-        ctx.python_version(),
-        unpack.python_file(db).python_version(db)
-    );
+    debug_assert_eq!(ctx.program(), unpack.program(db));
     infer_unpack_types_inner(db, unpack)
 }
 

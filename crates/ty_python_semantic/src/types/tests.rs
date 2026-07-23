@@ -69,7 +69,10 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
 ) -> Type<'db> {
-    let ctx = SemanticContext::from_version(db, crate::Program::get(db).python_version(db));
+    let ctx = SemanticContext::from_program(
+        db,
+        ty_python_core::program::Program::get(db).python_version(db),
+    );
     current.cycle_normalized(&ctx, *previous, cycle)
 }
 
@@ -79,7 +82,10 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
-    let ctx = SemanticContext::from_version(db, crate::Program::get(db).python_version(db));
+    let ctx = SemanticContext::from_program(
+        db,
+        ty_python_core::program::Program::get(db).python_version(db),
+    );
     let previous = oscillating_generic_alias(db);
     let argument = if let Type::GenericAlias(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]

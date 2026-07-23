@@ -5,7 +5,7 @@ use ty_module_resolver::{
 };
 
 use crate::{
-    Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -69,7 +69,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if level == 0 {
             if let Some(module_name) = module_name {
-                let program = Program::get(db);
+                let program = ty_python_core::program::Program::get(db);
                 let typeshed_versions = program.search_paths(db).typeshed_versions();
 
                 // Loop over ancestors in case we have info on the parent module but not submodule

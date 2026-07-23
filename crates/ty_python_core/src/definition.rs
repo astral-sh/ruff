@@ -20,7 +20,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::use_def::BindingWithConstraintsIterator;
-use crate::{Db, SemanticIndex};
+use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -86,6 +86,10 @@ impl<'db> Definition<'db> {
 
     pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.scope_id(db).python_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope_id(db).program(db)
     }
 
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
