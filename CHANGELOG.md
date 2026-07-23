@@ -124,14 +124,9 @@ The following behaviors have been stabilized:
 
 ### Documentation
 
-- Add missing period in `RUF200` "Why is this bad?" documentation portion ([#26930](https://github.com/astral-sh/ruff/pull/26930))
+- \[`ruff`\] Add missing period in "Why is this bad?" section (`RUF200`) ([#26930](https://github.com/astral-sh/ruff/pull/26930))
 - \[`flake8-simplify`\] Clarify `os.environ` behavior on Windows (`SIM112`) ([#26972](https://github.com/astral-sh/ruff/pull/26972))
 - \[`pydocstyle`\] Document fix safety (`D400`) ([#26971](https://github.com/astral-sh/ruff/pull/26971))
-
-### Other changes
-
-- Use Namespace runners for Windows ([#27101](https://github.com/astral-sh/ruff/pull/27101))
-- [ty] Fix memory report detail outcome icons ([#26929](https://github.com/astral-sh/ruff/pull/26929))
 
 ### Contributors
 
