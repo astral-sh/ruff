@@ -17,7 +17,7 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator, SuppressionKind,
+    Locator,
     directives::{Flags, extract_directives},
     generate_suppression_edits,
     linter::{check_path, parse_unchecked_source},
@@ -144,7 +144,12 @@ pub(crate) fn check(
         if message.is_invalid_syntax() && !show_syntax_errors {
             None
         } else {
-            Some(to_lsp_diagnostic(&message, ignore_edit, noqa_edit, &context))
+            Some(to_lsp_diagnostic(
+                &message,
+                ignore_edit,
+                noqa_edit,
+                &context,
+            ))
         }
     });
 
@@ -232,7 +237,7 @@ fn check_python(
         &suppressions,
     );
 
-    let ignore_edits = generate_suppression_edits(
+    let (ignore_edits, noqa_edits) = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -241,19 +246,6 @@ fn check_python(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
-        SuppressionKind::Ignore,
-        settings.linter.preview,
-    );
-    let noqa_edits = generate_suppression_edits(
-        &document_path,
-        &diagnostics,
-        &locator,
-        indexer.comment_ranges(),
-        &settings.linter.external,
-        &directives.noqa_line_for,
-        stylist.line_ending(),
-        &suppressions,
-        SuppressionKind::Noqa,
         settings.linter.preview,
     );
     let index = locator.to_index().clone();
