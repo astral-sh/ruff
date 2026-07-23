@@ -443,7 +443,7 @@ impl<'db> CompletionBuilder<'db> {
         env: &SemanticEnvironment<'db>,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, env, ty));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(env, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
