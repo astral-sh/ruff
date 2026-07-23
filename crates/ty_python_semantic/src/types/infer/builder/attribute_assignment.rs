@@ -801,7 +801,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 report_bad_dunder_set_call(
                     &self.builder.context,
                     &failure,
-                    self.attribute,
                     self.object_ty,
                     descriptor_ty,
                     includes_descriptor_argument,

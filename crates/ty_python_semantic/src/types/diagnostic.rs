@@ -1712,7 +1712,6 @@ pub(super) fn report_invalid_attribute_assignment(
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
-    attribute: &str,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
     includes_descriptor_argument: bool,
@@ -1720,6 +1719,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     value: &ast::Expr,
 ) {
     let db = context.db();
+    let attribute = target.attr.as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
         let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
             return;
