@@ -334,8 +334,8 @@ static_assert(is_equivalent_to(InvariantSub[P] & Top[InvariantBase[Any]], Invari
 
 The other direction, `Base[P] & Top[Sub[Any]]`, is more interesting. It can only be simplified under
 the additional assumption that `Base` (and `Sub`) are nominal types. There are five cases to
-consider, depending on the variance of `Base` and `Sub`. Since variance can only be restricted
-further in subtypes, we have five cases to consider:
+consider, depending on the variance of `Base` and `Sub` (variance can only be restricted further in
+subtypes):
 
 - `Base` is covariant and `Sub` is covariant
 - `Base` is covariant and `Sub` is invariant

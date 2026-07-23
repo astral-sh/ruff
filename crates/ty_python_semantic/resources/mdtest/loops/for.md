@@ -713,7 +713,6 @@ def _(x: Sequence[int], y: object):
     if isinstance(x, list):
         reveal_type(x)  # revealed: Top[list[Unknown & int]]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
