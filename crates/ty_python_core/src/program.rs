@@ -56,7 +56,6 @@ impl Program {
     }
 
     /// Returns the module-resolution environment for this program.
-    #[salsa::tracked(returns(copy))]
     pub fn resolver_environment(self, db: &dyn Db) -> ResolverEnvironment<'_> {
         ResolverEnvironment::new(db, self.python_version(db), self.search_paths(db))
     }

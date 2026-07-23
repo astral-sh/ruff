@@ -1691,7 +1691,6 @@ impl KnownClass {
 
         let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
         let python_version = file.resolver_environment(db).python_version(db);
-
         candidates
             .iter()
             .copied()
