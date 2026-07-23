@@ -8,11 +8,15 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_static::EnvVars;
 
 use crate::Db;
-use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError};
+use crate::metadata::options::{
+    EnvironmentOptions, OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError,
+};
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
+use crate::metadata::value::RelativePathBuf;
 pub use options::Options;
 use options::TyTomlError;
 
@@ -22,6 +26,7 @@ pub mod pyproject;
 pub mod python_version;
 mod script;
 pub mod settings;
+mod uv;
 pub mod value;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -41,10 +46,15 @@ pub struct ProjectMetadata {
     /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
     pub(super) options: Options,
 
+    /// Options derived from the uv workspace, with higher precedence than project and user-level
+    /// configuration.
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    uv_workspace_options: Option<Box<Options>>,
+
     /// The user-level configuration path and its options.
     ///
-    /// Its options have lower precedence than [`Self::override_options`] and [`Self::options`],
-    /// but higher precedence than [`Self::fallback_options`].
+    /// Its options have lower precedence than [`Self::override_options`], [`Self::options`], and
+    /// [`Self::uv_workspace_options`], but higher precedence than [`Self::fallback_options`].
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
     user_configuration: Option<Box<(SystemPathBuf, Options)>>,
 
@@ -58,6 +68,9 @@ pub struct ProjectMetadata {
     /// instead of from the project's `pyproject.toml` or `ty.toml` file.
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
     config_file_override: Option<SystemPathBuf>,
+
+    #[cfg_attr(test, serde(skip))]
+    uv_workspace: Option<uv::UvWorkspace>,
 }
 
 impl ProjectMetadata {
@@ -67,10 +80,12 @@ impl ProjectMetadata {
             name: ProjectName::new(name),
             root,
             options: Options::default(),
+            uv_workspace_options: None,
             override_options: None,
             user_configuration: None,
             fallback_options: None,
             config_file_override: None,
+            uv_workspace: None,
         }
     }
 
@@ -94,10 +109,12 @@ impl ProjectMetadata {
             name: ProjectName::new(root.file_name().unwrap_or("root")),
             root: root.to_path_buf(),
             options,
+            uv_workspace_options: None,
             override_options: None,
             user_configuration: None,
             fallback_options: None,
             config_file_override: Some(path),
+            uv_workspace: None,
         })
     }
 
@@ -152,24 +169,49 @@ impl ProjectMetadata {
             name,
             root,
             options,
+            uv_workspace_options: None,
             override_options: None,
             user_configuration: None,
             fallback_options: None,
             config_file_override: None,
+            uv_workspace: None,
         })
     }
 
     /// Discovers the closest project at `path` and returns its metadata.
     ///
     /// The algorithm traverses upwards in the `path`'s ancestor chain and uses the following precedence
-    /// the resolve the project's root.
+    /// to resolve the project's root.
     ///
     /// 1. The closest `pyproject.toml` with a `tool.ty` section or `ty.toml`.
+    /// 1. The uv workspace root, if uv integration is enabled.
     /// 1. The closest `pyproject.toml`.
     /// 1. Fallback to use `path` as the root and use the default settings.
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
+        {
+            uv::UvWorkspace::discover(path, system)
+        } else {
+            None
+        };
+        Self::discover_with_uv_workspace(path, system, uv_workspace)
+    }
+
+    /// Discovers the closest project without considering uv workspace metadata.
+    pub fn discover_without_uv(
+        path: &SystemPath,
+        system: &dyn System,
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        Self::discover_with_uv_workspace(path, system, None)
+    }
+
+    fn discover_with_uv_workspace(
+        path: &SystemPath,
+        system: &dyn System,
+        uv_workspace: Option<uv::UvWorkspace>,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
@@ -178,8 +220,11 @@ impl ProjectMetadata {
         }
 
         let mut closest_project: Option<ProjectMetadata> = None;
+        let mut uv_project: Option<ProjectMetadata> = None;
+        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvWorkspace::root);
 
         for project_root in path.ancestors() {
+            let is_uv_workspace_root = uv_workspace_root == Some(project_root);
             let pyproject_path = project_root.join("pyproject.toml");
 
             let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
@@ -242,7 +287,7 @@ impl ProjectMetadata {
                     }
                 })?;
 
-                return Ok(metadata);
+                return Ok(metadata.with_uv_workspace(uv_workspace));
             }
 
             if let Some(pyproject) = pyproject {
@@ -259,18 +304,30 @@ impl ProjectMetadata {
                 if has_ty_section {
                     tracing::debug!("Found project at '{}'", project_root);
 
-                    return Ok(metadata);
+                    return Ok(metadata.with_uv_workspace(uv_workspace));
                 }
 
-                // Not a project itself, keep looking for an enclosing project.
-                if closest_project.is_none() {
+                if is_uv_workspace_root {
+                    uv_project = Some(metadata);
+                } else if closest_project.is_none() {
+                    // Not a project itself, keep looking for an enclosing project.
                     closest_project = Some(metadata);
                 }
+            } else if is_uv_workspace_root {
+                uv_project = Some(Self::new(
+                    project_root.file_name().unwrap_or("root"),
+                    project_root.to_path_buf(),
+                ));
             }
         }
 
-        // No project found, but maybe a pyproject.toml was found.
-        let metadata = if let Some(closest_project) = closest_project {
+        // No explicitly configured project was found. Prefer the uv workspace over the closest
+        // plain `pyproject.toml`, if available.
+        let metadata = if let Some(uv_project) = uv_project {
+            tracing::debug!("Using uv workspace at '{}'", uv_project.root());
+
+            uv_project
+        } else if let Some(closest_project) = closest_project {
             tracing::debug!(
                 "Project without `tool.ty` section: '{}'",
                 closest_project.root()
@@ -286,7 +343,13 @@ impl ProjectMetadata {
             Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
 
-        Ok(metadata)
+        Ok(metadata.with_uv_workspace(uv_workspace))
+    }
+
+    #[must_use]
+    fn with_uv_workspace(mut self, uv_workspace: Option<uv::UvWorkspace>) -> Self {
+        self.uv_workspace = uv_workspace;
+        self
     }
 
     /// Rediscovers the project, while preserving applied options.
@@ -357,10 +420,14 @@ impl ProjectMetadata {
         }
     }
 
+    pub fn has_uv_workspace(&self) -> bool {
+        self.uv_workspace.is_some()
+    }
+
     /// Applies lower-precedence options to this project.
     ///
     /// Options applied later take precedence over options applied earlier, but all fallback options
-    /// have lower precedence than the raw and user-level options.
+    /// have lower precedence than the raw, uv workspace, and user-level options.
     pub fn apply_fallback_options(&mut self, options: Options) {
         if let Some(existing) = self.fallback_options.as_mut() {
             let previous = std::mem::replace(existing.as_mut(), options);
@@ -372,7 +439,7 @@ impl ProjectMetadata {
 
     /// Returns the project's option layers from highest to lowest precedence.
     ///
-    /// `options` is used as the raw base layer between the override and user-level options.
+    /// `options` is used as the raw base layer between the uv workspace and user-level options.
     /// Layers can be merged by passing them to [`Options::combine_with`] in iterator order:
     ///
     /// ```ignore
@@ -388,6 +455,7 @@ impl ProjectMetadata {
         self.override_options
             .as_deref()
             .into_iter()
+            .chain(self.uv_workspace_options.as_deref())
             .chain(std::iter::once(options))
             .chain(
                 self.user_configuration
@@ -401,6 +469,7 @@ impl ProjectMetadata {
     ///
     /// This includes:
     ///
+    /// * The uv workspace configuration
     /// * The user-level configuration
     pub fn apply_configuration_files(
         &mut self,
@@ -415,6 +484,19 @@ impl ProjectMetadata {
             );
             self.user_configuration = Some(Box::new((user.path().to_owned(), user.into_options())));
         }
+
+        self.uv_workspace_options = self.uv_workspace.as_ref().map(|uv_workspace| {
+            Box::new(Options {
+                environment: Some(EnvironmentOptions {
+                    python_version: uv_workspace.python_version().cloned(),
+                    python: uv_workspace
+                        .environment()
+                        .map(|path| RelativePathBuf::new(path, ValueSource::UvWorkspace)),
+                    ..EnvironmentOptions::default()
+                }),
+                ..Options::default()
+            })
+        });
 
         Ok(())
     }
@@ -523,7 +605,10 @@ mod tests {
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_python_ast::PythonVersion;
+    use ruff_ranged_value::ValueSource;
+    use ty_static::EnvVars;
 
+    use crate::metadata::{Options, uv::UvWorkspace, value::RelativePathBuf};
     use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
@@ -774,6 +859,232 @@ unclosed table, expected `]`
             )
             "#);
         });
+
+        Ok(())
+    }
+
+    #[test]
+    fn uv_workspace_precedes_plain_member_pyproject() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let member = root.join("packages/member");
+
+        system.memory_file_system().write_files_all([
+            (root.join("pyproject.toml"), "[tool.uv.workspace]"),
+            (
+                member.join("pyproject.toml"),
+                r#"
+                [project]
+                name = "member"
+                "#,
+            ),
+        ])?;
+
+        let uv_workspace = uv_workspace(&root, &member, &system)?;
+        let project =
+            ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
+
+        assert_eq!(project.root(), &*root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn uv_workspace_discovery_is_system_independent() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let member = root.join("packages/member");
+
+        system.set_env_var(EnvVars::TY_UV, "1");
+        system.set_env_var(EnvVars::UV, "uv");
+        system
+            .memory_file_system()
+            .write_file_all(member.join("pyproject.toml"), "[project]\nname = 'member'")?;
+
+        let project = ProjectMetadata::discover(&member, &system)?;
+
+        assert_eq!(project.root(), &*member);
+
+        Ok(())
+    }
+
+    #[test]
+    fn member_ty_configuration_selects_project_root() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let member = root.join("packages/member");
+
+        system.memory_file_system().write_files_all([
+            (root.join("uv.toml"), ""),
+            (
+                member.join("pyproject.toml"),
+                r#"
+                [project]
+                name = "member"
+
+                [tool.ty.environment]
+                python-version = "3.10"
+                "#,
+            ),
+        ])?;
+
+        let uv_workspace = uv_workspace(&root, &member, &system)?;
+        let mut project =
+            ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
+        project.apply_configuration_files(&system)?;
+
+        assert_eq!(project.root(), &*member);
+        assert_eq!(
+            project
+                .to_merged_options()
+                .options()
+                .environment
+                .as_ref()
+                .and_then(|environment| environment.python_version.as_deref())
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY310)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn outer_ty_configuration_precedes_uv_workspace() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let workspace = root.join("workspace");
+        let member = workspace.join("packages/member");
+
+        system.memory_file_system().write_files_all([
+            (
+                root.join("ty.toml"),
+                r#"
+                [environment]
+                python-version = "3.10"
+                "#,
+            ),
+            (workspace.join("pyproject.toml"), "[tool.uv.workspace]"),
+            (
+                member.join("pyproject.toml"),
+                r#"
+                [project]
+                name = "member"
+                "#,
+            ),
+        ])?;
+
+        let uv_workspace = uv_workspace(&workspace, &member, &system)?;
+        let project =
+            ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
+
+        assert_eq!(project.root(), &*root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn applies_uv_workspace_environment() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+        let member = root.join("packages/member");
+        let environment = root.join("uv-venv");
+
+        system.memory_file_system().write_files_all([
+            (
+                root.join("pyproject.toml"),
+                r#"
+                [tool.uv.workspace]
+
+                [tool.ty.environment]
+                python = "/project-venv"
+                python-version = "3.10"
+                "#,
+            ),
+            (member.join("pyproject.toml"), "[project]\nname = 'member'"),
+            (environment.join("marker"), ""),
+        ])?;
+
+        let metadata = serde_json::json!({
+            "workspace_root": root,
+            "environment": {
+                "root": environment,
+                "python": {
+                    "version": "3.13.5",
+                },
+            },
+        });
+        let uv_workspace =
+            UvWorkspace::from_metadata(&member, metadata.to_string().as_bytes(), &system)?;
+        let mut project =
+            ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
+        project.apply_fallback_options(Options::from_toml_str(
+            r#"
+            [environment]
+            python = "/editor-venv"
+            python-version = "3.10"
+            "#,
+            ValueSource::Editor,
+        )?);
+        project.apply_configuration_files(&system)?;
+
+        let merged_options = project.to_merged_options();
+        let project_environment = merged_options.options().environment.as_ref();
+        assert_eq!(
+            project_environment
+                .and_then(|environment| environment.python_version.as_deref())
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY313)
+        );
+        assert_eq!(
+            project_environment
+                .and_then(|environment| environment.python.as_ref())
+                .map(RelativePathBuf::path),
+            Some(environment.as_path())
+        );
+        assert!(matches!(
+            project_environment
+                .and_then(|environment| environment.python.as_ref())
+                .map(RelativePathBuf::source),
+            Some(ValueSource::UvWorkspace)
+        ));
+        assert!(matches!(
+            project_environment
+                .and_then(|environment| environment.python_version.as_ref())
+                .map(ruff_ranged_value::RangedValue::source),
+            Some(ValueSource::UvWorkspace)
+        ));
+
+        let user_config_directory = root.join("config");
+        system
+            .in_memory()
+            .set_user_configuration_directory(Some(user_config_directory.clone()));
+        system.memory_file_system().write_file_all(
+            user_config_directory.join("ty/ty.toml"),
+            r#"
+            [environment]
+            python = "/user-venv"
+            python-version = "3.12"
+            "#,
+        )?;
+        project.apply_configuration_files(&system)?;
+
+        let merged_options = project.to_merged_options();
+        let project_environment = merged_options.options().environment.as_ref();
+        assert_eq!(
+            project_environment
+                .and_then(|environment| environment.python_version.as_deref())
+                .copied()
+                .map(PythonVersion::from),
+            Some(PythonVersion::PY313)
+        );
+        assert_eq!(
+            project_environment
+                .and_then(|environment| environment.python.as_ref())
+                .map(|python| python.path().as_str()),
+            Some(environment.as_str())
+        );
 
         Ok(())
     }
@@ -1235,6 +1546,22 @@ unclosed table, expected `]`
     fn assert_error_chain_eq(error: ProjectMetadataError, message: &str) {
         let error = anyhow::Error::new(error);
         assert_eq!(format!("{error:#}").replace('\\', "/"), message);
+    }
+
+    fn uv_workspace(
+        root: &SystemPathBuf,
+        member: &SystemPathBuf,
+        system: &TestSystem,
+    ) -> anyhow::Result<UvWorkspace> {
+        let metadata = serde_json::json!({
+            "workspace_root": root,
+        });
+
+        Ok(UvWorkspace::from_metadata(
+            member,
+            metadata.to_string().as_bytes(),
+            system,
+        )?)
     }
 
     fn with_escaped_paths<R>(f: impl FnOnce() -> R) -> R {

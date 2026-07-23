@@ -7,6 +7,7 @@ mod python_environment;
 mod rule;
 mod rule_selection;
 mod scripts;
+mod uv_workspace;
 
 use anyhow::Context as _;
 use insta::Settings;
@@ -878,6 +879,7 @@ impl CliTest {
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
+        settings.add_filter(r"\bty\.exe\b", "ty");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         // 0.003s
         settings.add_filter(r"\d.\d\d\ds", "0.000s");

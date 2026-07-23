@@ -3,6 +3,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::Arc;
 
 use crate::Db;
@@ -179,6 +180,16 @@ impl System for LSPSystem {
 
     fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
         self.native_system.is_same_file(first, second)
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.native_system
+            .run_command(program, args, current_directory)
     }
 
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {

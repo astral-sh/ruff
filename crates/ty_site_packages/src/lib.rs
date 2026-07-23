@@ -2107,6 +2107,8 @@ pub enum SysPrefixPathOrigin {
     PythonCliFlag,
     /// The selected interpreter in the user's editor.
     Editor,
+    /// The `sys.prefix` path was provided by `uv workspace metadata`.
+    UvWorkspace,
     /// The `sys.prefix` path came from the `VIRTUAL_ENV` environment variable
     VirtualEnvVar,
     /// The `sys.prefix` path came from the `CONDA_PREFIX` environment variable
@@ -2136,6 +2138,7 @@ impl SysPrefixPathOrigin {
             | Self::DerivedFromPyvenvCfg
             | Self::CondaPrefixVar
             | Self::PythonBinary
+            | Self::UvWorkspace
             | Self::SelfEnvironment => false,
         }
     }
@@ -2154,7 +2157,8 @@ impl SysPrefixPathOrigin {
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
-            | Self::LocalVenv => true,
+            | Self::LocalVenv
+            | Self::UvWorkspace => true,
         }
     }
 
@@ -2169,7 +2173,8 @@ impl SysPrefixPathOrigin {
             | Self::DerivedFromPyvenvCfg
             | Self::ConfigFileSetting(..)
             | Self::PythonCliFlag
-            | Self::PythonBinary => false,
+            | Self::PythonBinary
+            | Self::UvWorkspace => false,
             Self::LocalVenv => true,
         }
     }
@@ -2185,6 +2190,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),
             Self::LocalVenv => f.write_str("local virtual environment"),
             Self::Editor => f.write_str("selected interpreter in your editor"),
+            Self::UvWorkspace => f.write_str("uv workspace environment"),
             Self::SelfEnvironment => f.write_str("ty environment"),
             Self::PythonBinary => f.write_str("Python binary discovered in $PATH"),
         }
@@ -2620,6 +2626,18 @@ mod tests {
             minor_version: 12,
             free_threaded: false,
             origin: SysPrefixPathOrigin::PythonCliFlag,
+            virtual_env: None,
+        };
+        test.run();
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_no_virtual_env_at_origin_uv_workspace() {
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 12,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::UvWorkspace,
             virtual_env: None,
         };
         test.run();

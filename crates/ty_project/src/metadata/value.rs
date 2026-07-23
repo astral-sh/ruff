@@ -76,7 +76,9 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match self.0.source() {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
+                system.current_directory()
+            }
         };
 
         // Expand tildes and environment variables in the path (e.g. `~/.cache/foo`).
@@ -146,7 +148,9 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match self.0.source() {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
+                system.current_directory()
+            }
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
