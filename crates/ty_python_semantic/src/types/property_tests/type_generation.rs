@@ -135,19 +135,32 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
+    env: &SemanticEnvironment<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let env = SemanticEnvironment::from_program(db, program);
-    Type::BoundMethod(BoundMethodType::new(
-        db,
-        function.expect_function_literal(),
-        builtins_class.to_instance_approximation(&env).unwrap(),
-    ))
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    fn create_bound_method_inner<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        function: Type<'db>,
+        builtins_class: Type<'db>,
+    ) -> Type<'db> {
+        let env = SemanticEnvironment::from_program(db, program);
+        Type::BoundMethod(BoundMethodType::new(
+            db,
+            function.expect_function_literal(),
+            builtins_class.to_instance_approximation(&env).unwrap(),
+        ))
+    }
+
+    let db = env.db();
+    debug_assert_eq!(
+        env.program(),
+        function.expect_function_literal().program(db)
+    );
+    create_bound_method_inner(db, env.program(), function, builtins_class)
 }
 
 impl Ty {
@@ -254,7 +267,7 @@ impl Ty {
                 let builtins_class = builtins_symbol(env, class).place.expect_type();
                 let function = builtins_class.member(env, method).place.expect_type();
 
-                create_bound_method(db, env.program(), function, builtins_class)
+                create_bound_method(env, function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,

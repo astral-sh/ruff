@@ -1651,8 +1651,6 @@ impl KnownClass {
         file: ImportingFile<'_>,
         class_name: &str,
     ) -> Option<Self> {
-        let python_version = file.resolver_environment(db).python_version(db);
-
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
         let candidates: &[Self] = match class_name {
@@ -1726,8 +1724,16 @@ impl KnownClass {
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
-            "EnumType" if python_version >= PythonVersion::PY311 => &[Self::EnumType],
-            "StrEnum" if python_version >= PythonVersion::PY311 => &[Self::StrEnum],
+            "EnumType"
+                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                &[Self::EnumType]
+            }
+            "StrEnum"
+                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                &[Self::StrEnum]
+            }
             "IntEnum" => &[Self::IntEnum],
             "Flag" => &[Self::Flag],
             "IntFlag" => &[Self::IntFlag],
@@ -1762,6 +1768,7 @@ impl KnownClass {
         };
 
         let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
+        let python_version = file.resolver_environment(db).python_version(db);
         candidates
             .iter()
             .copied()
