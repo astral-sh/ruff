@@ -10,7 +10,7 @@ use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::CallError;
+use crate::types::call::{CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -1712,15 +1712,18 @@ pub(super) fn report_invalid_attribute_assignment(
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
-    attribute: &str,
     object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
+    value: &ast::Expr,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
-        return;
-    };
     let db = context.db();
+    let attribute = target.attr.as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+            return;
+        };
         let object_type = object_type.display(db);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
@@ -1738,13 +1741,27 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
-        // TODO: Here, it would be nice to emit an additional diagnostic
-        // that explains why the call failed
-        builder.into_diagnostic(format_args!(
-            "Invalid assignment to data descriptor attribute \
-            `{attribute}` on type `{}` with custom `__set__` method",
-            object_type.display(db)
-        ));
+        let argument_ranges = if includes_descriptor_argument {
+            &[target.range(), target.value.range(), value.range()][..]
+        } else {
+            &[target.value.range(), value.range()][..]
+        };
+        dunder_set_failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ASSIGNMENT,
+                message: format!(
+                    "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db)
+                ),
+                info: &format!(
+                    "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
+                    descriptor_type.display(db)
+                ),
+                argument_ranges,
+            },
+        );
     }
 }
 

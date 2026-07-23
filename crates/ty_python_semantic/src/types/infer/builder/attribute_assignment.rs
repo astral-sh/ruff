@@ -8,7 +8,7 @@ use crate::types::attribute_write::{
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
     ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
 };
-use crate::types::call::{Bindings, CallArguments, CallError};
+use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
@@ -55,10 +55,15 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
         is_setattr_synthesized: bool,
     },
     TerminalDescriptor,
-    BadDunderSet(CallError<'db>),
+    BadDunderSet {
+        failure: CallError<'db>,
+        descriptor_ty: Type<'db>,
+        includes_descriptor_argument: bool,
+    },
     PossiblyMissing,
     BadSetAttr {
         value_ty: Type<'db>,
+        failure: CallError<'db>,
     },
     Unresolved {
         with_period: bool,
@@ -410,9 +415,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             }
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                Err(CallDunderError::CallError(..)) => {
+                Err(CallDunderError::CallError(kind, bindings, _)) => {
                     if emit_diagnostics {
-                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
                     }
                     false
                 }
@@ -484,10 +492,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
                 match setattr_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                    Err(CallDunderError::CallError(..)) => {
+                    Err(CallDunderError::CallError(kind, bindings, _)) => {
                         if emit_diagnostics {
                             self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                                 value_ty,
+                                failure: CallError(kind, bindings),
                             });
                         }
                         false
@@ -581,9 +590,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Ok(_) => true,
             Err(CallDunderError::CallError(kind, bindings, _)) => {
                 if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(CallError(
-                        kind, bindings,
-                    )));
+                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                        failure: CallError(kind, bindings),
+                        descriptor_ty,
+                        includes_descriptor_argument: false,
+                    });
                 }
                 false
             }
@@ -619,7 +630,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Ok(_) => true,
             Err(error) => {
                 if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(error));
+                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                        failure: error,
+                        descriptor_ty,
+                        includes_descriptor_argument: true,
+                    });
                 }
                 false
             }
@@ -778,13 +793,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     ));
                 }
             }
-            AssignmentAttributeWriteDiagnostic::BadDunderSet(failure) => {
+            AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                failure,
+                descriptor_ty,
+                includes_descriptor_argument,
+            } => {
                 report_bad_dunder_set_call(
                     &self.builder.context,
                     &failure,
-                    self.attribute,
                     self.object_ty,
+                    descriptor_ty,
+                    includes_descriptor_argument,
                     self.target,
+                    self.value,
                 );
             }
             AssignmentAttributeWriteDiagnostic::PossiblyMissing => {
@@ -795,19 +816,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.object_ty,
                 );
             }
-            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty } => {
-                if let Some(builder) = self
-                    .builder
-                    .context
-                    .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign object of type `{}` to attribute `{}` on type `{}` with custom `__setattr__` method.",
-                        value_ty.display(db),
-                        self.attribute,
-                        self.object_ty.display(db)
-                    ));
-                }
+            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty, failure } => {
+                failure.report_diagnostics_with_override(
+                    &self.builder.context,
+                    self.target.into(),
+                    &CallDiagnosticOverride {
+                        lint: &INVALID_ASSIGNMENT,
+                        message: format!(
+                            "Cannot assign object of type `{}` to attribute `{}` on type `{}`",
+                            value_ty.display(db),
+                            self.attribute,
+                            self.object_ty.display(db)
+                        ),
+                        info: "This assignment implicitly calls a custom `__setattr__` method",
+                        argument_ranges: &[self.target.range(), self.value.range()],
+                    },
+                );
             }
             AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {
                 if let Some(builder) = self
