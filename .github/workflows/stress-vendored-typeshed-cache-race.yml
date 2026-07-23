@@ -80,7 +80,7 @@ jobs:
               exit 1
             }
 
-            Write-Host "Round $round/$rounds: all $workers workers passed"
+            Write-Host "Round $round/${rounds}: all $workers workers passed"
           }
 
           Write-Host "No failure reproduced across $($rounds * $workers) test executions"
