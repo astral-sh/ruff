@@ -16,7 +16,7 @@ guide and overview of the changes!
 - Ruff can now format Python code blocks in Markdown files and will do this by default. See the
     [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
 
-- Ruff now supports `ruff: ignore` comments the ends of lines, like `noqa` comments`, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import`(`F401\`)\](<https://docs.astral.sh/ruff/rules/unused-import/>) diagnostic:
+- Ruff now supports `ruff: ignore` comments the ends of lines, like `noqa` comments, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import` (`F401`)](https://docs.astral.sh/ruff/rules/unused-import/) diagnostic:
 
     ```py
     import math  # ruff: ignore[F401]
@@ -89,8 +89,8 @@ The following behaviors have been stabilized:
 - [`blind-except`](https://docs.astral.sh/ruff/rules/blind-except) (`BLE001`) is now suppressed when
     the exception is logged via `logging` methods other than `critical`, `error` and `exception`.
 - [`future-required-type-annotation`](https://docs.astral.sh/ruff/rules/future-required-type-annotation)
-    (`FA102`) now checks for additional [PEP 585]-compatible APIs, such as those from
-    `collections.abc`.
+    (`FA102`) now checks for additional [PEP 585](https://peps.python.org/pep-0585/)-compatible
+    APIs, such as those from `collections.abc`.
 - [`f-string-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/f-string-in-get-text-func-call)
     (`INT001`),
     [`format-in-get-text-func-call`](https://docs.astral.sh/ruff/rules/format-in-get-text-func-call)
