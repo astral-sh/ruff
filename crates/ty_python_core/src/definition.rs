@@ -9,7 +9,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
-use crate::Db;
 use crate::LoopHeaderId;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
@@ -19,6 +18,8 @@ use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::use_def::BindingWithConstraintsIterator;
+use crate::{Db, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -1594,10 +1595,41 @@ impl LoopHeaderDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct NestedBindingsDefinitionKind {
     pub name: Name,
+    pub execution: NestedBindingExecution,
     // Note that in general this can include both `global` and `nonlocal` declarations from
     // different nested scopes, because we don't necessarily know at synthesis time which of those
     // kind will be visible in the current scope.
     pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
+}
+
+impl NestedBindingsDefinitionKind {
+    /// Returns the binding source for each nested declaration, along with whether it is global.
+    pub fn binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+    ) -> impl Iterator<Item = (bool, BindingWithConstraintsIterator<'index, 'db>)> + 'index {
+        self.nested_declarations.iter().filter_map(|declaration| {
+            debug_assert!(declaration.is_bound);
+            let symbol = index
+                .place_table(declaration.file_scope_id)
+                .symbol_id(&self.name)?;
+            let use_def = index.use_def_map(declaration.file_scope_id);
+            let bindings = match self.execution {
+                NestedBindingExecution::Lazy => use_def.reachable_bindings(symbol.into()),
+                NestedBindingExecution::Eager => use_def.end_of_scope_bindings(symbol.into()),
+            };
+            Some((declaration.is_global(), bindings))
+        })
+    }
+}
+
+/// Describes when writes from a nested scope can affect its containing scope.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum NestedBindingExecution {
+    /// The nested scope can run later or repeatedly, as with a function body.
+    Lazy,
+    /// The nested scope is modeled as running while evaluating the containing expression.
+    Eager,
 }
 
 #[derive(

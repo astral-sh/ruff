@@ -278,6 +278,17 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
+/// Summarizes whether the live control-flow paths leave a symbol bound.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum LiveBindingStatus {
+    /// No live path contains a binding.
+    Unbound,
+    /// Some live paths contain a binding and others leave the symbol unbound.
+    PossiblyBound,
+    /// Every live path contains a binding.
+    Bound,
+}
+
 /// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -2473,6 +2484,44 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings()
             .iter()
             .map(LiveBinding::binding)
+    }
+
+    /// Returns the current boundness of `symbol` after applying pending reachability constraints.
+    ///
+    /// Bindings on statically unreachable paths do not contribute to the result. This is stricter
+    /// than [`Symbol::is_bound`](crate::symbol::Symbol::is_bound), which records whether the symbol
+    /// is bound anywhere in the scope without considering control flow.
+    pub(super) fn symbol_live_binding_status(
+        &mut self,
+        symbol: ScopedSymbolId,
+    ) -> LiveBindingStatus {
+        let pending = self.pending_reachability.current;
+        let bindings = self
+            .pending_reachability
+            .materialize_ref(
+                &mut self.symbol_states[symbol],
+                pending,
+                &mut self.reachability_constraints,
+            )
+            .bindings();
+
+        let mut has_binding = false;
+        let mut has_unbound = false;
+        for binding in bindings.iter() {
+            if binding.reachability_constraint() == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                continue;
+            }
+            match self.all_definitions[binding.binding()] {
+                DefinitionState::Defined(_) => has_binding = true,
+                DefinitionState::Undefined | DefinitionState::Deleted => has_unbound = true,
+            }
+        }
+
+        match (has_binding, has_unbound) {
+            (true, true) => LiveBindingStatus::PossiblyBound,
+            (true, false) => LiveBindingStatus::Bound,
+            (false, _) => LiveBindingStatus::Unbound,
+        }
     }
 
     pub(super) fn mark_binding_definitions_used(

@@ -425,40 +425,20 @@ print(K)
 print(L)
 ```
 
-### Definitions in function-like scopes are not global definitions
+### Comprehension and lambda locals are not global definitions
 
-Except for some cases involving walrus expressions inside comprehension scopes.
+Comprehension iteration variables, lambda parameters, and assignments inside lambdas are not module
+globals and are therefore not available to a wildcard import.
 
 `exporter.py`:
 
 ```py
-class Iterator:
-    def __next__(self) -> int:
-        return 42
-
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
-
-[a for a in Iterable()]
-{b for b in Iterable()}
-{c: c for c in Iterable()}
-(d for d in Iterable())
+[a for a in [1]]
+{b for b in [1]}
+{c: c for c in [1]}
+(d for d in [1])
 lambda e: (f := 42)
-
-# Definitions created by walruses in a comprehension scope are unique;
-# they "leak out" of the scope and are stored in the surrounding scope
-[(g := h * 2) for h in Iterable()]
-[i for j in Iterable() if (i := j - 10) > 0]
-{(k := l * 2): (m := l * 3) for l in Iterable()}
-list(((o := p * 2) for p in Iterable()))
-
-# A walrus expression nested inside several scopes *still* leaks out
-# to the global scope:
-[[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
-
-# A walrus inside a lambda inside a comprehension does not leak out
-[(lambda s=s: (t := 42))() for s in Iterable()]
+[(lambda s=s: (t := 42))() for s in [1]]
 ```
 
 `importer.py`:
@@ -466,47 +446,43 @@ list(((o := p * 2) for p in Iterable()))
 ```py
 from exporter import *
 
-# error: [unresolved-reference]
-reveal_type(a)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(b)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(c)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(d)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(e)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(f)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(h)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(j)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(p)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(r)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(s)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(t)  # revealed: Unknown
+a  # error: [unresolved-reference]
+b  # error: [unresolved-reference]
+c  # error: [unresolved-reference]
+d  # error: [unresolved-reference]
+e  # error: [unresolved-reference]
+f  # error: [unresolved-reference]
+s  # error: [unresolved-reference]
+t  # error: [unresolved-reference]
+```
 
-# TODO: these should all reveal `Unknown | int` and should not emit errors.
-# (We don't generally model elsewhere in ty that bindings from walruses
-# "leak" from comprehension scopes into outer scopes, but we should.)
-# See https://github.com/astral-sh/ruff/issues/16954
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(i)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(k)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(m)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(o)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(q)  # revealed: Unknown
+### Assignment-expression targets in comprehensions are global definitions
+
+Assignment-expression targets bind in the scope containing the comprehension. At module level,
+targets in an element, filter, dictionary key or value, generator expression, or nested
+comprehension are all available to a wildcard import.
+
+`exporter.py`:
+
+```py
+[(list_value := item) for item in [1]]
+[item for item in [1] if (filtered_value := item - 10) > 0]
+{(dict_key := item * 2): (dict_value := item * 3) for item in [1]}
+list((generator_value := item * 2) for item in [1])
+[[[[(nested_value := item) for item in [1]]] for _ in [1]] for _ in [1]]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(list_value)  # revealed: int
+reveal_type(filtered_value)  # revealed: int
+reveal_type(dict_key)  # revealed: int
+reveal_type(dict_value)  # revealed: int
+reveal_type(generator_value)  # revealed: int
+reveal_type(nested_value)  # revealed: int
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file
