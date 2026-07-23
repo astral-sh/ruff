@@ -117,7 +117,8 @@ class E(Enum):
 
 def f(value: Not[E]) -> None:
     if value is E.ONLY:
-        value.missing
+        reveal_type(value)  # revealed: Never
+        value.does_not_exist  # no error (unreachable branch)
 ```
 
 After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
@@ -130,7 +131,8 @@ class B: ...
 def f(value: object, other_b: B) -> None:
     if isinstance(value, A) and not isinstance(value, B):
         if value is other_b:
-            value.missing
+            reveal_type(value)  # revealed: Never
+            value.does_not_exist  # no error (unreachable branch)
 ```
 
 ## Diagnostics

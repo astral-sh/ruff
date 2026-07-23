@@ -3061,9 +3061,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match op {
             ast::CmpOp::IsNot => {
                 let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
-                // Prefer a singleton runtime representation when all constraints collapse to the
-                // same object. Otherwise, keep a singleton-constrained `TypeVar` symbolic so that
-                // another occurrence refers to the same specialization.
+                // An `is not` check can narrow the LHS only when the RHS identifies a single
+                // runtime object. There are two ways this can happen:
+                //
+                // 1. The RHS's runtime identity type is itself a singleton. This includes ordinary
+                //    singleton types, such as `None`, and distinct `NewType`s that all wrap the
+                //    same singleton object. Narrow against the runtime identity type so that every
+                //    static type representing that object is excluded.
+                //
+                // 2. The RHS is a constrained `TypeVar` whose constraints are all singletons. For
+                //    example, `T = TypeVar("T", None, EllipsisType)` can be specialized to either
+                //    `None` or `EllipsisType` across different calls. Within one specialization,
+                //    however, every occurrence of `T` resolves to the same constraint, so all
+                //    values of type `T` are either `None` or all are `...`. Keep `T` symbolic so
+                //    that excluding it preserves its relationship with subsequent occurrences of
+                //    the same specialization.
+                //
+                // In every other case, the RHS might identify multiple objects even within a
+                // single specialization, so excluding its entire type would be unsound.
                 let rhs_constraint = if rhs_identity_ty.is_singleton(self.db) {
                     rhs_identity_ty
                 } else if matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))

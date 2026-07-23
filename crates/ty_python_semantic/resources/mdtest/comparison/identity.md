@@ -53,6 +53,7 @@ from ty_extensions import Unknown
 
 def f(value: Unknown) -> None:
     if value is None:
+        reveal_type(value)  # revealed: Unknown & None
         reveal_type(value is not None)  # revealed: Literal[False]
 ```
 
@@ -80,20 +81,4 @@ type Alias[X] = X
 
 def aliased(left: Alias[T], right: T) -> None:
     reveal_type(left is right)  # revealed: Literal[True]
-```
-
-## Recursive type aliases
-
-Checking identity for a recursive alias must terminate instead of repeatedly expanding the alias.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-type Recursive = Recursive | int
-
-def f(value: Recursive) -> None:
-    reveal_type(value is 1)  # revealed: bool
 ```

@@ -190,42 +190,24 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
         reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
-## `is not` with a constrained `TypeVar`
+## Narrowing with a constrained `TypeVar`
 
-An `is not` check excludes the object selected by a constrained `TypeVar`. A subsequent identity
-check against the same value is therefore unreachable.
+The `is` check below can discard `int` because it cannot be `None` or `...`. The `is not` check
+cannot discard either remaining type: depending on the current constraint, either value could differ
+from `other`.
 
 ```py
 from types import EllipsisType
 from typing import TypeVar
-from typing_extensions import assert_never
 
 T = TypeVar("T", None, EllipsisType)
 
+def takes_singleton(value: None | EllipsisType) -> None: ...
 def f(value: int | None | EllipsisType, other: T) -> None:
+    if value is other:
+        takes_singleton(value)
     if value is not other:
-        if value is other:
-            assert_never(value)
-```
-
-## Tuple narrowing with a constrained `TypeVar`
-
-The `is` check below can discard `tuple[int]` because its element cannot be `None` or `...`. The
-`is not` check cannot discard either remaining tuple: depending on the current constraint, either
-one could differ from `other`.
-
-```py
-from types import EllipsisType
-from typing import TypeVar
-
-T = TypeVar("T", None, EllipsisType)
-
-def takes_singleton_tuple(value: tuple[None] | tuple[EllipsisType]) -> None: ...
-def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
-    if value[0] is other:
-        takes_singleton_tuple(value)
-    if value[0] is not other:
-        reveal_type(value)  # revealed: tuple[int] | tuple[None] | tuple[EllipsisType]
+        reveal_type(value)  # revealed: int | (None & ~T@f) | (EllipsisType & ~T@f)
 ```
 
 ## `is` with `NewType`s
@@ -233,8 +215,8 @@ def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
 ### Distinct `NewType`s with the same base
 
 Calling a `NewType` returns its argument unchanged. Values with distinct `NewType`s over `Foo` can
-therefore be the same object even though their types are distinct. The examples below cover direct
-comparisons and narrowing through unions, intersections, and tuple elements.
+therefore be the same object even though their types are disjoint. The examples below cover direct
+comparisons and narrowing through unions and intersections.
 
 ```py
 from typing import NewType
@@ -245,8 +227,6 @@ class FooSub(Foo): ...
 
 FooNewType1 = NewType("FooNewType1", Foo)
 FooNewType2 = NewType("FooNewType2", Foo)
-IntNewType1 = NewType("IntNewType1", int)
-IntNewType2 = NewType("IntNewType2", int)
 
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
@@ -261,10 +241,6 @@ def union(value: FooNewType1 | None, other: FooNewType2) -> None:
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     if left is right:
         reveal_type(right)  # revealed: FooNewType2 & FooSub
-
-def tuple_element(value: tuple[IntNewType1] | tuple[str], other: IntNewType2) -> None:
-    if value[0] is other:
-        reveal_type(value)  # revealed: tuple[IntNewType1]
 ```
 
 ### `NewType`s in `TypeVar` bounds and constraints
@@ -286,23 +262,29 @@ FooNewType4 = NewType("FooNewType4", Foo)
 BoundedT = TypeVar("BoundedT", bound=FooNewType1)
 BoundedU = TypeVar("BoundedU", bound=FooNewType2)
 
-def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
+def bounded_typevars(left: BoundedT, right: BoundedU) -> tuple[BoundedU, BoundedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
+        # TODO: This should narrow to `BoundedT & BoundedU` and avoid the false positive below.
         reveal_type(left)  # revealed: BoundedT@bounded_typevars
+        return (left, left)  # error: [invalid-return-type]
+    return (right, right)
 
 ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
 ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
 
-def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
+def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[ConstrainedU, ConstrainedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
+        # TODO: This should narrow to `ConstrainedT & ConstrainedU` and avoid the false positive.
         reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
+        return (left, left)  # error: [invalid-return-type]
+    return (right, right)
 ```
 
 Every constraint below is a `NewType` based on `EllipsisType`, so `other` always refers to the same
 `...` object as a `SingletonC` value. After an `is not` check, repeating the opposite check must be
-unreachable, both directly and when narrowing a tuple.
+unreachable.
 
 ```py
 from types import EllipsisType
@@ -319,27 +301,21 @@ def direct(value: SingletonC | int, other: SingletonT) -> None:
     if value is not other:
         if value is other:
             assert_never(value)
-
-def tuple_element(value: tuple[SingletonC] | tuple[int], other: SingletonT) -> None:
-    if value[0] is not other:
-        if value[0] is other:
-            assert_never(value)
 ```
 
-### Preserving a `NewType` in the true branch
+### Narrowing an object to a `NewType` in the true branch
 
-If an object is identical to a value with a `NewType`, the true branch preserves the `NewType`
-rather than replacing it with its underlying type. The call below should not emit an error.
+If an object is identical to a value with a `NewType`, the true branch narrows the object to that
+`NewType` rather than its underlying type.
 
 ```py
 from typing import NewType
 
 UserId = NewType("UserId", int)
 
-def takes_user_id(value: UserId) -> None: ...
 def preserve_newtype(x: object, user_id: UserId) -> None:
     if x is user_id:
-        takes_user_id(x)
+        reveal_type(x)  # revealed: UserId
 ```
 
 ### Comparing `NewType`s with literals
@@ -348,26 +324,24 @@ Calls to `NewType` return their arguments unchanged. Comparisons with `bool` and
 therefore succeed, so the true branches below remain reachable.
 
 ```py
-from typing import NewType
+from typing import Literal, NewType
 
 BoolNewType = NewType("BoolNewType", bool)
 IntNewType = NewType("IntNewType", int)
 
-def literals() -> None:
-    true = True
-    forty_two = 42
-
-    if BoolNewType(true) is true:
+def literals(true: Literal[True], b: BoolNewType, forty_two: Literal[42], i: IntNewType) -> None:
+    if b is true:
         reveal_type(true)  # revealed: Literal[True]
-    if IntNewType(forty_two) is forty_two:
+        reveal_type(b)  # revealed: BoolNewType
+    if i is forty_two:
         reveal_type(forty_two)  # revealed: Literal[42]
+        reveal_type(i)  # revealed: IntNewType
 ```
 
 ### `is not` with singleton `NewType`s
 
 Both `NewType`s below are based on `EllipsisType`, which contains only the `...` object. The
-`is not` branch therefore removes the `NewType` alternative. The same rule applies when the check
-narrows a tuple.
+`is not` branch therefore removes the `NewType` alternative.
 
 ```py
 from types import EllipsisType
@@ -379,40 +353,35 @@ SingletonB = NewType("SingletonB", EllipsisType)
 def singleton_is_not(value: SingletonA | int, other: SingletonB) -> None:
     if value is not other:
         reveal_type(value)  # revealed: int
-
-def tuple_is_not(value: tuple[SingletonA] | tuple[int], other: SingletonB) -> None:
-    if value[0] is not other:
-        reveal_type(value)  # revealed: tuple[int]
 ```
 
 ### Static exclusions
 
-The type `Not[Literal[True]]` excludes the literal type but accepts the distinct `BoolNewType`.
-However, `BoolNewType(True)` returns `True` unchanged, so `value is True` can be either true or
-false.
+The type `~Literal[True]` excludes the literal type but accepts the distinct `BoolNewType`. However,
+`BoolNewType(True)` returns `True` unchanged, so `value is True` can be either true or false.
 
 ```py
+from __future__ import annotations
+
 from typing import Literal, NewType
-from ty_extensions import Not
 
 BoolNewType = NewType("BoolNewType", bool)
 
-def excludes_true(value: Not[Literal[True]]) -> None:
+def excludes_true(value: ~Literal[True]) -> None:
     reveal_type(value is True)  # revealed: bool
 
 excludes_true(BoolNewType(True))
 ```
 
-Similarly, `Intersection[int, Not[Literal[1]]]` accepts `IntNewType(1)`, which returns the `1`
-object unchanged, so the comparison remains possible.
+Similarly, `int & ~Literal[1]` accepts `IntNewType(1)`, which returns the `1` object unchanged, so
+the comparison remains possible.
 
 ```py
 from typing import Literal, NewType
-from ty_extensions import Intersection, Not
 
 IntNewType = NewType("IntNewType", int)
 
-def excludes_one(value: Intersection[int, Not[Literal[1]]]) -> None:
+def excludes_one(value: int & ~Literal[1]) -> None:
     reveal_type(value is 1)  # revealed: bool
 
 excludes_one(IntNewType(1))

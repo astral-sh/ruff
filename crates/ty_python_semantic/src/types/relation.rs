@@ -692,43 +692,43 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    /// Return a type that conservatively describes the possible runtime objects represented by
-    /// `self` in an identity comparison.
+    /// Widen `self` to a type that conservatively describes its possible runtime objects in an
+    /// identity comparison.
     ///
     /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
     /// type here while remaining distinct for ordinary type relations and intersections.
     ///
     /// Negative intersection elements are generally omitted. A static exclusion does not imply a
-    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but evaluates
+    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `~Literal[True]`, but evaluates
     /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
-    /// stable under `NewType` erasure, so constraints such as `Not[None]` and `Not[SomeClass]` are
+    /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
     /// preserved.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
-        struct IdentityComparisonProjection;
+        struct IdentityComparisonWidening;
 
-        fn project<'db>(
+        fn widen<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            visitor: &TypeTransformer<'db, IdentityComparisonProjection>,
+            visitor: &TypeTransformer<'db, IdentityComparisonWidening>,
         ) -> Type<'db> {
             match ty {
                 Type::TypeAlias(alias) => {
-                    visitor.visit_type(db, ty, || project(db, alias.value_type(db), visitor))
+                    visitor.visit_type(db, ty, || widen(db, alias.value_type(db), visitor))
                 }
                 Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(bound_or_constraints) => {
-                            project(db, bound_or_constraints.as_type(db), visitor)
+                            widen(db, bound_or_constraints.as_type(db), visitor)
                         }
                         None => ty,
                     }
                 }),
-                Type::Union(union) => union.map(db, |element| project(db, *element, visitor)),
+                Type::Union(union) => union.map(db, |element| widen(db, *element, visitor)),
                 Type::Intersection(intersection) => {
                     let mut builder = IntersectionBuilder::new(db);
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(project(db, *element, visitor));
+                        builder = builder.add_positive(widen(db, *element, visitor));
                     }
                     for element in intersection.negative(db) {
                         if element.resolve_type_alias(db).is_nominal_instance() {
@@ -741,10 +741,10 @@ impl<'db> Type<'db> {
             }
         }
 
-        project(
+        widen(
             db,
             self,
-            &TypeTransformer::<IdentityComparisonProjection>::default(),
+            &TypeTransformer::<IdentityComparisonWidening>::default(),
         )
     }
 

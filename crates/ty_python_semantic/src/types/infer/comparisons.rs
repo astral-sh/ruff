@@ -132,6 +132,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
+    // Identity comparisons between equal builtin types are unreliable and not guaranteed by the
+    // language specification:
+    // - `is` returns `false` if the types are disjoint and `bool` if they overlap.
+    // - `is not` returns `true` if the types are disjoint and `bool` if they overlap.
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(db, left, right, op, policy);
         let membership_test_comparison = |op, range: TextRange| {
@@ -170,6 +174,9 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
+    // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
+    // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
+    // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
     if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot)
         && !matches!(
             (
@@ -186,8 +193,9 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // OrderId = NewType("OrderId", int)
         // user_id is order_id  # possibly true
         //
-        // Project both operands before using the ordinary comparison logic. Keeping the usual
-        // recursive dispatch preserves facts carried by unions and intersections after projection.
+        // Widen both operands to the types of their possible runtime objects before using the
+        // ordinary comparison logic. Keeping the usual recursive dispatch preserves facts carried
+        // by unions and intersections after widening.
         let left_identity = left.identity_comparison_type(db);
         let right_identity = right.identity_comparison_type(db);
         if left_identity != left || right_identity != right {
