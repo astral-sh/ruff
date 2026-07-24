@@ -625,11 +625,6 @@ fn evaluate_comparison_once<'db>(
         (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
             operator.result_from_equality(left_module.module(db) == right_module.module(db))
         }
-        (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias))
-            if left_alias == right_alias =>
-        {
-            operator.result_from_equality(true)
-        }
         (Type::WrapperDescriptor(left_descriptor), Type::WrapperDescriptor(right_descriptor))
             if left_descriptor == right_descriptor =>
         {
@@ -1572,7 +1567,8 @@ fn has_known_identity_comparison_semantics<'db>(
     operator: ComparisonOperator,
 ) -> bool {
     match ty {
-        Type::FunctionLiteral(_) | Type::ModuleLiteral(_) | Type::SpecialForm(_) => true,
+        Type::FunctionLiteral(_) | Type::ModuleLiteral(_) => true,
+        Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
         Type::ClassLiteral(class) => {
             KnownComparisonSemantics::of_instance(db, class.metaclass_instance_type(db), operator)
                 == Some(KnownComparisonSemantics::Object)
