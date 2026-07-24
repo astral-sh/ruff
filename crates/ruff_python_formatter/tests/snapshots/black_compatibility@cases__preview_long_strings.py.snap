@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_strings.py
 ---
 ## Input
 
@@ -355,7 +354,7 @@ x = {
 ```diff
 --- Black
 +++ Ruff
-@@ -1,175 +1,108 @@
+@@ -1,175 +1,111 @@
 -x = (
 -    "This is a really long string that can't possibly be expected to fit all together"
 -    " on one line. In fact it may even take up three or more lines... like four or"
@@ -436,18 +435,21 @@ x = {
 -    "A long and ridiculous {}".format(string_key): (
 -        "This is a really really really long string that has to go i,side of a"
 -        " dictionary. It is soooo bad."
--    ),
--    some_func("calling", "some", "stuff"): (
--        "This is a really really really long string that has to go inside of a"
--        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
 +    "A long and ridiculous {}".format(
 +        string_key
 +    ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
 +    some_func(
-+        "calling", "some", "stuff"
++        "calling",
++        "some",
++        "stuff",
 +    ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
-+        sooo="soooo", x=2
++        sooo="soooo",
++        x=2,
      ),
+-    some_func("calling", "some", "stuff"): (
+-        "This is a really really really long string that has to go inside of a"
+-        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
+-    ),
      "A %s %s"
 -    % ("formatted", "string"): (
 -        "This is a really really really long string that has to go inside of a"
@@ -574,7 +576,7 @@ x = {
  )
  
  bad_split2 = (
-@@ -205,11 +138,9 @@
+@@ -205,11 +141,9 @@
      xxx,
      yyy,
      zzz,
@@ -589,7 +591,7 @@ x = {
  )
  
  bad_split_func3(
-@@ -228,29 +159,28 @@
+@@ -228,29 +162,28 @@
  )
  
  inline_comments_func1(
@@ -629,7 +631,7 @@ x = {
  )
  
  fmt_string2 = "But what about when the string is {} but {}".format(
-@@ -259,8 +189,8 @@
+@@ -259,8 +192,8 @@
  )
  
  old_fmt_string1 = (
@@ -640,7 +642,7 @@ x = {
  )
  
  old_fmt_string2 = "This is a %s %s %s %s" % (
-@@ -271,8 +201,7 @@
+@@ -271,8 +204,7 @@
  )
  
  old_fmt_string3 = (
@@ -650,7 +652,7 @@ x = {
      % (
          "really really really really really",
          "old",
-@@ -281,26 +210,14 @@
+@@ -281,26 +213,14 @@
      )
  )
  
@@ -681,7 +683,7 @@ x = {
      "Arg #2",
      "Arg #3",
      "Arg #4",
-@@ -316,79 +233,75 @@
+@@ -316,79 +236,82 @@
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
  assert some_type_of_boolean_expression, (
@@ -737,7 +739,8 @@ x = {
 -    "A really really really really really really really really really really really"
 -    " really really long {} {}".format("return", "value")
 +return "A really really really really really really really really really really really really really long {} {}".format(
-+    "return", "value"
++    "return",
++    "value",
  )
  
  func_with_bad_comma(
@@ -772,12 +775,18 @@ x = {
  
  func_with_bad_parens_that_wont_fit_in_one_line(
 -    "short string that should have parens stripped", x, y, z
-+    ("short string that should have parens stripped"), x, y, z
++    ("short string that should have parens stripped"),
++    x,
++    y,
++    z,
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
 -    x, y, "short string that should have parens stripped", z
-+    x, y, ("short string that should have parens stripped"), z
++    x,
++    y,
++    ("short string that should have parens stripped"),
++    z,
  )
  
  func_with_bad_parens(
@@ -786,7 +795,7 @@ x = {
      x,
      y,
      z,
-@@ -397,7 +310,7 @@
+@@ -397,7 +320,7 @@
  func_with_bad_parens(
      x,
      y,
@@ -795,7 +804,7 @@ x = {
      z,
  )
  
-@@ -408,50 +321,27 @@
+@@ -408,50 +331,27 @@
      + CONCATENATED
      + "using the '+' operator."
  )
@@ -854,7 +863,7 @@ x = {
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
-@@ -468,49 +358,24 @@
+@@ -468,49 +368,24 @@
      " of it."
  )
  
@@ -913,7 +922,7 @@ x = {
  )
  
  dict_with_lambda_values = {
-@@ -522,65 +387,58 @@
+@@ -522,65 +397,58 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -997,7 +1006,7 @@ x = {
  )
  
  log.info(
-@@ -588,7 +446,7 @@
+@@ -588,7 +456,7 @@
  )
  
  log.info(
@@ -1006,7 +1015,7 @@ x = {
  )
  
  x = {
-@@ -597,10 +455,10 @@
+@@ -597,10 +465,10 @@
      )
  }
  x = {
@@ -1063,9 +1072,12 @@ D4 = {
         string_key
     ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
     some_func(
-        "calling", "some", "stuff"
+        "calling",
+        "some",
+        "stuff",
     ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
-        sooo="soooo", x=2
+        sooo="soooo",
+        x=2,
     ),
     "A %s %s"
     % (
@@ -1295,7 +1307,8 @@ some_function_call(
 )
 
 return "A really really really really really really really really really really really really really long {} {}".format(
-    "return", "value"
+    "return",
+    "value",
 )
 
 func_with_bad_comma(
@@ -1321,11 +1334,17 @@ func_with_bad_comma(
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    ("short string that should have parens stripped"), x, y, z
+    ("short string that should have parens stripped"),
+    x,
+    y,
+    z,
 )
 
 func_with_bad_parens_that_wont_fit_in_one_line(
-    x, y, ("short string that should have parens stripped"), z
+    x,
+    y,
+    ("short string that should have parens stripped"),
+    z,
 )
 
 func_with_bad_parens(

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples.py
 ---
 ## Input
 ```python
@@ -1624,7 +1623,13 @@ def doctest_long_lines():
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
-        lion, giraffe, hippo, zeba, lemur, penguin, monkey
+        lion,
+        giraffe,
+        hippo,
+        zeba,
+        lemur,
+        penguin,
+        monkey,
     )
 
 
@@ -2997,7 +3002,13 @@ def doctest_long_lines():
   # get wrapped in the docstring above because of how the line-width
   # setting gets reset at the first column in each code snippet.
   foo, bar, quux = this_is_a_long_line(
-    lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    lion,
+    giraffe,
+    hippo,
+    zeba,
+    lemur,
+    penguin,
+    monkey,
   )
 
 
@@ -4370,7 +4381,13 @@ def doctest_long_lines():
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
-		lion, giraffe, hippo, zeba, lemur, penguin, monkey
+		lion,
+		giraffe,
+		hippo,
+		zeba,
+		lemur,
+		penguin,
+		monkey,
 	)
 
 
@@ -5743,7 +5760,13 @@ def doctest_long_lines():
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
-		lion, giraffe, hippo, zeba, lemur, penguin, monkey
+		lion,
+		giraffe,
+		hippo,
+		zeba,
+		lemur,
+		penguin,
+		monkey,
 	)
 
 
@@ -7106,19 +7129,40 @@ def doctest_long_lines():
     line width because it doesn't exceed the line width within this
     docstring. e.g, the `f` in `foo` is treated as the first column.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
     ... )
 
     But this one is long enough to get wrapped.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
+    ...     spider,
+    ...     bear,
+    ...     leopard,
     ... )
     """
     # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
-        lion, giraffe, hippo, zeba, lemur, penguin, monkey
+        lion,
+        giraffe,
+        hippo,
+        zeba,
+        lemur,
+        penguin,
+        monkey,
     )
 
 
@@ -8472,19 +8516,40 @@ def doctest_long_lines():
   line width because it doesn't exceed the line width within this
   docstring. e.g, the `f` in `foo` is treated as the first column.
   >>> foo, bar, quux = this_is_a_long_line(
-  ...   lion, giraffe, hippo, zeba, lemur, penguin, monkey
+  ...   lion,
+  ...   giraffe,
+  ...   hippo,
+  ...   zeba,
+  ...   lemur,
+  ...   penguin,
+  ...   monkey,
   ... )
 
   But this one is long enough to get wrapped.
   >>> foo, bar, quux = this_is_a_long_line(
-  ...   lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+  ...   lion,
+  ...   giraffe,
+  ...   hippo,
+  ...   zeba,
+  ...   lemur,
+  ...   penguin,
+  ...   monkey,
+  ...   spider,
+  ...   bear,
+  ...   leopard,
   ... )
   """
   # This demonstrates a normal line that will get wrapped but won't
   # get wrapped in the docstring above because of how the line-width
   # setting gets reset at the first column in each code snippet.
   foo, bar, quux = this_is_a_long_line(
-    lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    lion,
+    giraffe,
+    hippo,
+    zeba,
+    lemur,
+    penguin,
+    monkey,
   )
 
 
@@ -9838,7 +9903,13 @@ def doctest_long_lines():
 	line width because it doesn't exceed the line width within this
 	docstring. e.g, the `f` in `foo` is treated as the first column.
 	>>> foo, bar, quux = this_is_a_long_line(
-	...         lion, giraffe, hippo, zeba, lemur, penguin, monkey
+	...         lion,
+	...         giraffe,
+	...         hippo,
+	...         zeba,
+	...         lemur,
+	...         penguin,
+	...         monkey,
 	... )
 
 	But this one is long enough to get wrapped.
@@ -9859,7 +9930,13 @@ def doctest_long_lines():
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
-		lion, giraffe, hippo, zeba, lemur, penguin, monkey
+		lion,
+		giraffe,
+		hippo,
+		zeba,
+		lemur,
+		penguin,
+		monkey,
 	)
 
 
@@ -11213,19 +11290,40 @@ def doctest_long_lines():
 	line width because it doesn't exceed the line width within this
 	docstring. e.g, the `f` in `foo` is treated as the first column.
 	>>> foo, bar, quux = this_is_a_long_line(
-	...     lion, giraffe, hippo, zeba, lemur, penguin, monkey
+	...     lion,
+	...     giraffe,
+	...     hippo,
+	...     zeba,
+	...     lemur,
+	...     penguin,
+	...     monkey,
 	... )
 
 	But this one is long enough to get wrapped.
 	>>> foo, bar, quux = this_is_a_long_line(
-	...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+	...     lion,
+	...     giraffe,
+	...     hippo,
+	...     zeba,
+	...     lemur,
+	...     penguin,
+	...     monkey,
+	...     spider,
+	...     bear,
+	...     leopard,
 	... )
 	"""
 	# This demonstrates a normal line that will get wrapped but won't
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
-		lion, giraffe, hippo, zeba, lemur, penguin, monkey
+		lion,
+		giraffe,
+		hippo,
+		zeba,
+		lemur,
+		penguin,
+		monkey,
 	)
 
 
@@ -12579,7 +12677,13 @@ def doctest_long_lines():
     line width because it doesn't exceed the line width within this
     docstring. e.g, the `f` in `foo` is treated as the first column.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
     ... )
 
     But this one is long enough to get wrapped.
@@ -12600,7 +12704,13 @@ def doctest_long_lines():
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
-        lion, giraffe, hippo, zeba, lemur, penguin, monkey
+        lion,
+        giraffe,
+        hippo,
+        zeba,
+        lemur,
+        penguin,
+        monkey,
     )
 
 
@@ -13954,19 +14064,40 @@ def doctest_long_lines():
     line width because it doesn't exceed the line width within this
     docstring. e.g, the `f` in `foo` is treated as the first column.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
     ... )
 
     But this one is long enough to get wrapped.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
+    ...     spider,
+    ...     bear,
+    ...     leopard,
     ... )
     """
     # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
-        lion, giraffe, hippo, zeba, lemur, penguin, monkey
+        lion,
+        giraffe,
+        hippo,
+        zeba,
+        lemur,
+        penguin,
+        monkey,
     )
 
 
