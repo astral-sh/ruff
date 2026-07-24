@@ -241,19 +241,19 @@ def _(e: Exception | type[Exception] | None):
 ```py
 def _():
     try:
-        raise EOFError() from GeneratorExit  # fine
+        raise EOFError() from GeneratorExit  # error: [invalid-raise]
     except:
         pass
 
 def _():
     try:
-        raise StopIteration from MemoryError()  # fine
+        raise StopIteration from MemoryError()  # error: [invalid-raise]
     except:
         pass
 
 def _():
     try:
-        raise BufferError() from None  # fine
+        raise BufferError() from None  # error: [invalid-raise]
     except:
         pass
 
@@ -274,20 +274,20 @@ def _():
         raise
     except KeyboardInterrupt as e:  # fine
         reveal_type(e)  # revealed: KeyboardInterrupt
-        raise LookupError from e  # fine
+        raise LookupError from e  # error: [invalid-raise]
 
 def _():
     try:
         raise
     except int as e:  # error: [invalid-exception-caught]
         reveal_type(e)  # revealed: Unknown
-        raise KeyError from e
+        raise KeyError from e  # error: [invalid-raise]
 
 def _(e: Exception | type[Exception]):
-    raise ModuleNotFoundError from e  # fine
+    raise ModuleNotFoundError from e  # error: [invalid-raise]
 
 def _(e: Exception | type[Exception] | None):
-    raise IndexError from e  # fine
+    raise IndexError from e  # error: [invalid-raise]
 
 def _(e: int | None):
     raise IndexError from e  # error: [invalid-raise]

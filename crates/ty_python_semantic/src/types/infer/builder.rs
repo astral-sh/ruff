@@ -4828,9 +4828,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let can_be_raised =
             UnionType::from_two_elements(self.db(), base_exception_type, base_exception_instance);
-        let can_be_exception_cause =
-            UnionType::from_two_elements(self.db(), can_be_raised, Type::none(self.db()));
-
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised, TypeContext::default());
 
@@ -4841,10 +4838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(cause) = cause {
             let cause_type = self.infer_expression(cause, TypeContext::default());
-
-            if !cause_type.is_assignable_to(self.db(), can_be_exception_cause) {
-                report_invalid_exception_cause(&self.context, cause, cause_type);
-            }
+            report_invalid_exception_cause(&self.context, cause, cause_type);
         }
     }
 
